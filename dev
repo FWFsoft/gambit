@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# Build the project
+mkdir -p build
+cd build
+cmake ..
+make
+cd ..
+
+# Start the server
+./build/Server &
+SERVER_PID=$!
+
+# Start clients
+for i in {1..4}; do
+    ./build/Client &
+    CLIENT_PIDS+=($!)
+    sleep 1
+done
+
+# Wait for user input to terminate
+read -p "Press Enter to terminate..."
+
+# Gracefully stop the server and clients
+kill -SIGINT $SERVER_PID
+for pid in "${CLIENT_PIDS[@]}"; do
+    kill -SIGINT $pid
+done
+
+# Wait for processes to finish
+wait $SERVER_PID
+for pid in "${CLIENT_PIDS[@]}"; do
+    wait $pid
+done
+

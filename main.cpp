@@ -2,12 +2,22 @@
 #include "Logger.h"
 #include "FileSystem.h"
 #include <iostream>
+#include <enet/enet.h>
 
 int main() {
     Logger::init();
     Logger::info("Game engine started");
     Logger::error("Test error message");
-    
+
+    if (enet_initialize() != 0) {
+        std::cerr << "An error occurred while initializing ENet." << std::endl;
+        return EXIT_FAILURE;
+    }
+    std::cout << "ENet initialized successfully." << std::endl;
+
+    enet_deinitialize();
+    std::cout << "ENet deinitialized." << std::endl;
+
     if (FileSystem::exists("test.txt")) {
         std::cout << "test.txt exists" << std::endl;
     } else {
