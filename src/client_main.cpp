@@ -1,5 +1,6 @@
 #include "NetworkClient.h"
 #include "Logger.h"
+#include "Window.h"
 
 int main() {
     Logger::init();
@@ -13,10 +14,32 @@ int main() {
         return EXIT_FAILURE;
     }
 
-    client.send("Hello, Server!");
+    Window window("Gambit Client", 800, 600);
 
-    client.run();
+    // Main loop
+    while (window.isOpen()) {
+        // Poll window events
+        window.pollEvents();
 
+        // Process network events
+        client.run();
+
+        // Clear the window
+        SDL_SetRenderDrawColor(window.getRenderer(), 0, 0, 0, 255); // Black background
+        SDL_RenderClear(window.getRenderer());
+
+        // Render game objects
+        // ...
+
+        // Present the rendered frame
+        SDL_RenderPresent(window.getRenderer());
+
+        // Small delay to cap the frame rate
+        SDL_Delay(16); // Approximately 60 FPS
+    }
+
+    client.send("Window closed, disconnecting from Gambit Server!");
+    
     client.disconnect();
 
     return EXIT_SUCCESS;

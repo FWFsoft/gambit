@@ -75,7 +75,7 @@ void NetworkClient::run() {
     if (!connected) return;
 
     ENetEvent event;
-    while (enet_host_service(client, &event, 1000) > 0) {
+    while (enet_host_service(client, &event, 0) > 0) {
         if (event.type == ENET_EVENT_TYPE_RECEIVE) {
             Logger::info("Received packet: " +
                          std::string((char*)event.packet->data, event.packet->dataLength));

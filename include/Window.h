@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <SDL2/SDL.h>
 
 class Window {
 public:
@@ -10,7 +11,11 @@ public:
     void pollEvents();
     bool isOpen() const;
 
+    // Accessor for the renderer
+    SDL_Renderer* getRenderer() const;
+
 private:
-    void* sdlWindow;
+    SDL_Window* sdlWindow;
+    SDL_Renderer* renderer;
     bool open;
 };

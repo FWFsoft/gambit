@@ -19,13 +19,25 @@ Window::Window(const std::string& title, int width, int height) : open(true) {
     if (!sdlWindow) {
         throw std::runtime_error("Failed to create SDL window: " + std::string(SDL_GetError()));
     }
+
+    renderer = SDL_CreateRenderer(sdlWindow, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    if (!renderer) {
+        throw std::runtime_error("Failed to create SDL renderer: " + std::string(SDL_GetError()));
+    }
 }
 
 Window::~Window() {
+    if (renderer) {
+        SDL_DestroyRenderer(renderer);
+    }	
     if (sdlWindow) {
         SDL_DestroyWindow((SDL_Window*)sdlWindow);
     }
     SDL_Quit();
+}
+
+SDL_Renderer* Window::getRenderer() const {
+    return renderer;
 }
 
 void Window::pollEvents() {

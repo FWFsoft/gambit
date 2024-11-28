@@ -42,6 +42,7 @@ add_executable(Client
     src/Logger.cpp
     src/NetworkClient.cpp
     src/FileSystem.cpp
+    src/Window.cpp
 )
 target_include_directories(Client PRIVATE
     include
