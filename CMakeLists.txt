@@ -25,6 +25,9 @@ add_executable(Server
     src/Logger.cpp
     src/NetworkServer.cpp
     src/FileSystem.cpp
+    src/NetworkProtocol.cpp
+    src/GameLoop.cpp
+    src/ServerGameState.cpp
 )
 target_include_directories(Server PRIVATE
     include
@@ -43,6 +46,9 @@ add_executable(Client
     src/NetworkClient.cpp
     src/FileSystem.cpp
     src/Window.cpp
+    src/GameLoop.cpp
+    src/InputSystem.cpp
+    src/NetworkProtocol.cpp
 )
 target_include_directories(Client PRIVATE
     include
@@ -51,6 +57,19 @@ target_include_directories(Client PRIVATE
 target_link_libraries(Client PRIVATE
     ${ENET_LIBRARY}
     SDL2::SDL2
+    spdlog::spdlog
+)
+
+# Test executable
+add_executable(Tests
+    src/test_main.cpp
+    src/Logger.cpp
+    src/NetworkProtocol.cpp
+)
+target_include_directories(Tests PRIVATE
+    include
+)
+target_link_libraries(Tests PRIVATE
     spdlog::spdlog
 )
 

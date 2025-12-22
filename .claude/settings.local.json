@@ -6,7 +6,10 @@
       "Bash(./.claude/build:*)",
       "Bash(brew list:*)",
       "Bash(ls:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Skill(build)",
+      "Skill(*)",
+      "Bash(timeout 5:*)"
     ]
   }
 }

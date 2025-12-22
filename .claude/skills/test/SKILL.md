@@ -7,23 +7,25 @@ description: Run all tests for the Gambit game engine. Use when the user wants t
 
 Runs all tests for the Gambit game engine.
 
-## Current Status
-
-**The test framework is not yet implemented.**
-
 ## Instructions
 
-When tests are available, this skill will execute them. For now:
-
-1. Check if a tests directory exists:
+1. Build the project first (if not already built):
    ```bash
-   if [ -d "tests" ] || [ -d "test" ]; then
-       # Run tests here when implemented
-       echo "Tests found but framework not configured"
-   else
-       echo "No tests directory found."
-   fi
+   /build
    ```
+
+2. Run the test executable:
+   ```bash
+   ./build/Tests
+   ```
+
+## Current Tests
+
+- **Network Protocol Tests**: Verifies serialization/deserialization of all packet types
+  - ClientInputPacket round-trip
+  - StateUpdatePacket round-trip (multiple players)
+  - PlayerJoinedPacket round-trip
+  - PlayerLeftPacket round-trip
 
 ## Future Implementation
 

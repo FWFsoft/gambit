@@ -1,4 +1,5 @@
 #include "Window.h"
+#include "EventBus.h"
 #include <SDL2/SDL.h>
 #include <stdexcept>
 
@@ -45,6 +46,10 @@ void Window::pollEvents() {
     while (SDL_PollEvent(&event)) {
         if (event.type == SDL_QUIT) {
             open = false;
+        } else if (event.type == SDL_KEYDOWN) {
+            EventBus::instance().publish(KeyDownEvent{event.key.keysym.sym});
+        } else if (event.type == SDL_KEYUP) {
+            EventBus::instance().publish(KeyUpEvent{event.key.keysym.sym});
         }
     }
 }

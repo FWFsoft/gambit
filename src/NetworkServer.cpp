@@ -1,8 +1,6 @@
 #include "NetworkServer.h"
+#include "EventBus.h"
 #include "Logger.h"
-#include <csignal>
-
-volatile bool keepRunning = true;
 
 NetworkServer::NetworkServer(const std::string& addressStr, uint16_t port)
     : server(nullptr), running(false) {
@@ -34,33 +32,34 @@ bool NetworkServer::initialize() {
     return true;
 }
 
-void signalHandler(int signum) {
-    keepRunning = false;
-}
-
 void NetworkServer::run() {
-    signal(SIGINT, signalHandler); // Capture Ctrl+C signal
     running = true;
     ENetEvent event;
 
-    while (running && keepRunning) {
+    while (running) {
         while (enet_host_service(server, &event, 1000) > 0) {
             switch (event.type) {
-                case ENET_EVENT_TYPE_CONNECT:
-                    Logger::info("Client connected from " +
-                                 std::to_string(event.peer->address.host) + ":" +
-                                 std::to_string(event.peer->address.port));
+                case ENET_EVENT_TYPE_CONNECT: {
+                    uint32_t clientId = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(event.peer));
+                    EventBus::instance().publish(ClientConnectedEvent{event.peer, clientId});
                     break;
+                }
 
-                case ENET_EVENT_TYPE_RECEIVE:
-                    Logger::info("Received packet: " +
-                                 std::string((char*)event.packet->data, event.packet->dataLength));
+                case ENET_EVENT_TYPE_RECEIVE: {
+                    EventBus::instance().publish(NetworkPacketReceivedEvent{
+                        event.peer,
+                        event.packet->data,
+                        event.packet->dataLength
+                    });
                     enet_packet_destroy(event.packet);
                     break;
+                }
 
-                case ENET_EVENT_TYPE_DISCONNECT:
-                    Logger::info("Client disconnected.");
+                case ENET_EVENT_TYPE_DISCONNECT: {
+                    uint32_t clientId = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(event.peer));
+                    EventBus::instance().publish(ClientDisconnectedEvent{clientId});
                     break;
+                }
 
                 default:
                     break;
@@ -70,7 +69,57 @@ void NetworkServer::run() {
     Logger::info("Server shutting down.");
 }
 
+void NetworkServer::poll() {
+    if (!server) return;
+
+    ENetEvent event;
+    while (enet_host_service(server, &event, 0) > 0) {  // Non-blocking (0ms timeout)
+        switch (event.type) {
+            case ENET_EVENT_TYPE_CONNECT: {
+                uint32_t clientId = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(event.peer));
+                EventBus::instance().publish(ClientConnectedEvent{event.peer, clientId});
+                break;
+            }
+
+            case ENET_EVENT_TYPE_RECEIVE: {
+                EventBus::instance().publish(NetworkPacketReceivedEvent{
+                    event.peer,
+                    event.packet->data,
+                    event.packet->dataLength
+                });
+                enet_packet_destroy(event.packet);
+                break;
+            }
+
+            case ENET_EVENT_TYPE_DISCONNECT: {
+                uint32_t clientId = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(event.peer));
+                EventBus::instance().publish(ClientDisconnectedEvent{clientId});
+                break;
+            }
+
+            default:
+                break;
+        }
+    }
+}
+
 void NetworkServer::stop() {
     running = false;
+}
+
+void NetworkServer::broadcastPacket(const std::vector<uint8_t>& data) {
+    if (!server) return;
+
+    ENetPacket* packet = enet_packet_create(data.data(), data.size(), ENET_PACKET_FLAG_RELIABLE);
+    enet_host_broadcast(server, 0, packet);
+    enet_host_flush(server);
+}
+
+void NetworkServer::send(ENetPeer* peer, const std::vector<uint8_t>& data) {
+    if (!peer) return;
+
+    ENetPacket* packet = enet_packet_create(data.data(), data.size(), ENET_PACKET_FLAG_RELIABLE);
+    enet_peer_send(peer, 0, packet);
+    enet_host_flush(server);
 }
 
