@@ -80,3 +80,7 @@
   * Rive asset pipeline  
   * Aseprite pipeline  
 * Consider using an AI driven pipeline as well
+  * Nano banana
+  * ChatGPT + friends
+  * Pixel labs
+* For sound effects and voice overs, consider elevenlabs

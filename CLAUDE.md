@@ -34,9 +34,18 @@ The engine is in early development with the following components:
 
 ```
 gambit/
+├── .claude/
+│   └── skills/             # Claude Code skills (SKILL.md format)
+│       ├── build/          # Build the project
+│       ├── clean/          # Clean build artifacts
+│       ├── dev/            # Development environment (1 server + 4 clients)
+│       ├── run-client/     # Run a single client
+│       ├── run-server/     # Run the server
+│       └── test/           # Run tests
 ├── CMakeLists.txt          # CMake build configuration
+├── CLAUDE.md               # This file - comprehensive guide for Claude
 ├── DESIGN.md               # Detailed design requirements and decisions
-├── dev                     # Development script (builds + runs 1 server + 4 clients)
+├── README.md               # User-facing documentation
 ├── include/                # Public header files
 │   ├── FileSystem.h
 │   ├── Logger.h

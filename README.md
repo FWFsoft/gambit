@@ -55,7 +55,26 @@ This project includes Claude Code skills that streamline development workflows. 
 
 ### How Skills Work
 
-Skills are executable bash scripts located in the `.claude/` directory. When you invoke a skill with `/skill-name`, the tool executes the corresponding script.
+Skills follow the Claude Agent Skills format with YAML frontmatter. Each skill is a directory in `.claude/skills/` containing a `SKILL.md` file:
+
+```
+.claude/skills/
+├── build/
+│   └── SKILL.md
+├── dev/
+│   └── SKILL.md
+└── ...
+```
+
+Each `SKILL.md` has frontmatter that tells Claude when to use the skill:
+```yaml
+---
+name: build
+description: Build the Gambit game engine (Server and Client executables). Use when the user wants to compile the project...
+---
+```
+
+When you invoke a skill with `/skill-name` or ask Claude to perform a related task, Claude automatically uses the appropriate skill.
 
 ### Using Skills in Claude Code (CLI)
 
@@ -164,7 +183,14 @@ Use `/dev` to simulate a 4-player co-op environment:
 
 ```
 gambit/
-├── .claude/            # Claude Code skills
+├── .claude/
+│   └── skills/         # Claude Code skills (SKILL.md format)
+│       ├── build/
+│       ├── clean/
+│       ├── dev/
+│       ├── run-client/
+│       ├── run-server/
+│       └── test/
 ├── CMakeLists.txt      # Build configuration
 ├── CLAUDE.md           # Comprehensive guide for Claude
 ├── DESIGN.md           # Design requirements and decisions
@@ -229,18 +255,28 @@ See [DESIGN.md](DESIGN.md) for detailed design decisions and [CLAUDE.md](CLAUDE.
 
 ### Customizing Skills
 
-Skills are just bash scripts in `.claude/`. You can:
+Skills follow the SKILL.md format in `.claude/skills/`. You can:
 
 1. **Edit existing skills**:
    ```bash
-   vim .claude/build
+   vim .claude/skills/build/SKILL.md
    ```
 
 2. **Create new skills**:
    ```bash
-   touch .claude/my-skill
-   chmod +x .claude/my-skill
-   # Add your bash commands
+   mkdir -p .claude/skills/my-skill
+   cat > .claude/skills/my-skill/SKILL.md << 'EOF'
+   ---
+   name: my-skill
+   description: What this skill does and when to use it
+   ---
+
+   # My Skill
+
+   ## Instructions
+   1. Step one
+   2. Step two
+   EOF
    ```
 
 3. **Use skills in combination**:
@@ -248,6 +284,8 @@ Skills are just bash scripts in `.claude/`. You can:
    "Clean the build and rebuild everything"
    Claude: [Uses /clean then /build]
    ```
+
+For more on creating skills, see the [Claude Agent Skills documentation](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview).
 
 ## Contributing
 

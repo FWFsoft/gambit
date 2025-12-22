@@ -4,7 +4,9 @@
       "Bash(chmod:*)",
       "Bash(./.claude/clean:*)",
       "Bash(./.claude/build:*)",
-      "Bash(brew list:*)"
+      "Bash(brew list:*)",
+      "Bash(ls:*)",
+      "Bash(tree:*)"
     ]
   }
 }
