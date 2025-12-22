@@ -1,0 +1,13 @@
+#!/bin/bash
+# Clean build artifacts
+# Removes the build/ directory for a fresh build
+
+set -e
+
+if [ -d "build" ]; then
+    echo "Removing build directory..."
+    rm -rf build
+    echo "Build artifacts cleaned!"
+else
+    echo "No build directory found - nothing to clean."
+fi

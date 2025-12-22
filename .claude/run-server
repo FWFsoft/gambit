@@ -1,0 +1,13 @@
+#!/bin/bash
+# Run the Gambit game server
+# Starts the server on 0.0.0.0:1234
+
+set -e
+
+if [ ! -f "build/Server" ]; then
+    echo "Error: Server executable not found. Run /build first."
+    exit 1
+fi
+
+echo "Starting Gambit Server on 0.0.0.0:1234..."
+./build/Server

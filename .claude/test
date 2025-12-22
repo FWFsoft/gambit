@@ -1,0 +1,35 @@
+#!/bin/bash
+# Run all tests for Gambit
+# Note: Test framework not yet implemented
+
+set -e
+
+echo "Running tests..."
+echo ""
+
+# Check if tests exist
+if [ -d "tests" ] || [ -d "test" ]; then
+    # Future: Run your test framework here
+    # Examples:
+    # - cd build && ctest
+    # - ./build/tests/TestRunner
+    # - pytest tests/
+
+    echo "Error: Test framework not yet implemented."
+    echo ""
+    echo "When you add tests, update this script to run them."
+    echo "Consider using:"
+    echo "  - Google Test for C++ unit tests"
+    echo "  - CTest (built into CMake)"
+    echo "  - Custom integration tests for multiplayer scenarios"
+    exit 1
+else
+    echo "No tests directory found."
+    echo ""
+    echo "To add tests:"
+    echo "  1. Create a tests/ directory"
+    echo "  2. Add test framework (e.g., Google Test)"
+    echo "  3. Update CMakeLists.txt to build tests"
+    echo "  4. Update this script to run them"
+    exit 1
+fi
