@@ -10,6 +10,11 @@ void writeUint32(std::vector<uint8_t>& buffer, uint32_t value) {
     buffer.push_back((value >> 24) & 0xFF);
 }
 
+void writeUint16(std::vector<uint8_t>& buffer, uint16_t value) {
+    buffer.push_back(value & 0xFF);
+    buffer.push_back((value >> 8) & 0xFF);
+}
+
 void writeFloat(std::vector<uint8_t>& buffer, float value) {
     uint32_t bits;
     std::memcpy(&bits, &value, sizeof(float));
@@ -25,6 +30,11 @@ uint32_t readUint32(const uint8_t* data) {
            (static_cast<uint32_t>(data[1]) << 8) |
            (static_cast<uint32_t>(data[2]) << 16) |
            (static_cast<uint32_t>(data[3]) << 24);
+}
+
+uint16_t readUint16(const uint8_t* data) {
+    return static_cast<uint16_t>(data[0]) |
+           (static_cast<uint16_t>(data[1]) << 8);
 }
 
 float readFloat(const uint8_t* data) {
@@ -63,7 +73,7 @@ std::vector<uint8_t> serialize(const StateUpdatePacket& packet) {
 
     writeUint8(buffer, static_cast<uint8_t>(packet.type));
     writeUint32(buffer, packet.serverTick);
-    writeUint8(buffer, static_cast<uint8_t>(packet.players.size()));
+    writeUint16(buffer, static_cast<uint16_t>(packet.players.size()));
 
     for (const auto& player : packet.players) {
         writeUint32(buffer, player.playerId);
@@ -77,7 +87,7 @@ std::vector<uint8_t> serialize(const StateUpdatePacket& packet) {
         writeUint8(buffer, player.b);
     }
 
-    // 1 + 4 + 1 + (playerCount * 27) bytes
+    // 1 + 4 + 2 + (playerCount * 27) bytes
     return buffer;
 }
 
@@ -123,17 +133,17 @@ ClientInputPacket deserializeClientInput(const uint8_t* data, size_t size) {
 }
 
 StateUpdatePacket deserializeStateUpdate(const uint8_t* data, size_t size) {
-    assert(size >= 6);
+    assert(size >= 7);  // 1 + 4 + 2 = 7 bytes minimum
     assert(data[0] == static_cast<uint8_t>(PacketType::StateUpdate));
 
     StateUpdatePacket packet;
     packet.serverTick = readUint32(data + 1);
-    uint8_t playerCount = readUint8(data + 5);
+    uint16_t playerCount = readUint16(data + 5);
 
-    assert(size >= 6 + (playerCount * 27));
+    assert(size >= 7 + (playerCount * 27));
 
-    size_t offset = 6;
-    for (uint8_t i = 0; i < playerCount; ++i) {
+    size_t offset = 7;
+    for (uint16_t i = 0; i < playerCount; ++i) {
         PlayerState player;
         player.playerId = readUint32(data + offset);
         offset += 4;

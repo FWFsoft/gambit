@@ -1,6 +1,6 @@
 .ONESHELL:
 
-.PHONY: help build test clean run-server run-client dev
+.PHONY: help build test clean run-server run-client dev test-coverage test-coverage-open
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
@@ -21,6 +21,27 @@ clean:  ## Remove build artifacts for a fresh rebuild
 
 test: build  ## Builds and runs tests
 	./build/Tests
+
+test-coverage:  ## Run tests with code coverage and generate HTML report
+	@echo "Building with coverage enabled..."
+	@mkdir -p build
+	@cd build && \
+	cmake -DENABLE_COVERAGE=ON .. && \
+	make Tests
+	@echo "Running tests..."
+	@cd build && ./Tests
+	@echo "Generating coverage report..."
+	@mkdir -p build/coverage
+	@cd build && \
+	lcov --capture --directory . --output-file coverage.info --ignore-errors inconsistent,unsupported --rc branch_coverage=1 && \
+	lcov --remove coverage.info '/usr/*' '/opt/*' '*/build/*' --output-file coverage.info --ignore-errors inconsistent,unused,unsupported --rc branch_coverage=1 && \
+	genhtml coverage.info --output-directory coverage --ignore-errors inconsistent,category,source,unused,deprecated,unsupported
+	@echo ""
+	@echo "✓ Coverage report generated: build/coverage/index.html"
+	@echo "  Run 'make test-coverage-open' to view in browser"
+
+test-coverage-open: test-coverage  ## Generate coverage report and open in browser
+	@open build/coverage/index.html
 
 run-server: build  ## Start the Gambit server on 0.0.0.0:1234
 	@if [ ! -f "build/Server" ]; then \

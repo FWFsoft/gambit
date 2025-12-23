@@ -59,9 +59,11 @@ PlayerLeftPacket deserializePlayerLeft(const uint8_t* data, size_t size);
 
 // Helper functions for binary I/O
 void writeUint32(std::vector<uint8_t>& buffer, uint32_t value);
+void writeUint16(std::vector<uint8_t>& buffer, uint16_t value);
 void writeFloat(std::vector<uint8_t>& buffer, float value);
 void writeUint8(std::vector<uint8_t>& buffer, uint8_t value);
 
 uint32_t readUint32(const uint8_t* data);
+uint16_t readUint16(const uint8_t* data);
 float readFloat(const uint8_t* data);
 uint8_t readUint8(const uint8_t* data);

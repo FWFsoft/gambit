@@ -3,6 +3,9 @@ project(GameEngine)
 
 set(CMAKE_CXX_STANDARD 17)
 
+# Code coverage options
+option(ENABLE_COVERAGE "Enable code coverage" OFF)
+
 # Find packages
 find_package(SDL2 REQUIRED)
 find_package(spdlog REQUIRED)
@@ -67,11 +70,21 @@ add_executable(Tests
     src/test_main.cpp
     src/Logger.cpp
     src/NetworkProtocol.cpp
+    src/GameLoop.cpp
+    src/InputSystem.cpp
+    src/RemotePlayerInterpolation.cpp
 )
 target_include_directories(Tests PRIVATE
     include
 )
 target_link_libraries(Tests PRIVATE
     spdlog::spdlog
+    SDL2::SDL2
 )
+
+# Enable code coverage for Tests target
+if(ENABLE_COVERAGE)
+    target_compile_options(Tests PRIVATE --coverage)
+    target_link_options(Tests PRIVATE --coverage)
+endif()
 

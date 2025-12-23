@@ -9,7 +9,10 @@
       "Bash(tree:*)",
       "Skill(build)",
       "Skill(*)",
-      "Bash(timeout 5:*)"
+      "Bash(timeout 5:*)",
+      "Bash(genhtml:*)",
+      "Bash(make test-coverage:*)",
+      "Bash(make clean:*)"
     ]
   }
 }
