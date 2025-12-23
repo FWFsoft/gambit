@@ -2,7 +2,10 @@
 
 #include <SDL2/SDL.h>
 
+#include <cassert>
+
 #include "EventBus.h"
+#include "Logger.h"
 
 GameLoop::GameLoop() : running(false), frameNumber(0) {}
 
@@ -33,6 +36,19 @@ void GameLoop::run() {
         std::chrono::duration<float, std::milli>(endTime - lastFrameTime)
             .count();
     float sleepTime = TARGET_DELTA_MS - frameDuration;
+
+    // Tiger Style: Warn if frame rate drops below 58 FPS (17.24ms per frame)
+    // This indicates performance issues that need investigation
+    if (frameDuration > 17.24f) {
+      Logger::info("Frame time: " + std::to_string(frameDuration) +
+                   "ms (target: " + std::to_string(TARGET_DELTA_MS) + "ms)");
+    }
+
+    // Tiger Style: Assert if frame rate is catastrophically low (< 30 FPS)
+    // This should never happen and indicates a critical bug
+    assert(
+        frameDuration < MAX_FRAME_TIME_MS &&
+        "Frame time exceeded 30 FPS threshold - critical performance issue!");
 
     if (sleepTime > 0) {
       SDL_Delay(static_cast<uint32_t>(sleepTime));
