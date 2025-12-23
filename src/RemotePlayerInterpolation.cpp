@@ -3,7 +3,7 @@
 #include "Logger.h"
 
 RemotePlayerInterpolation::RemotePlayerInterpolation(uint32_t localPlayerId)
-    : localPlayerId(localPlayerId) {
+    : localPlayerId(localPlayerId), localPlayerIdConfirmed(false) {
   // Subscribe to network packet events
   EventBus::instance().subscribe<NetworkPacketReceivedEvent>(
       [this](const NetworkPacketReceivedEvent& e) {
@@ -60,7 +60,16 @@ void RemotePlayerInterpolation::onNetworkPacketReceived(
     }
   } else if (type == PacketType::PlayerJoined) {
     PlayerJoinedPacket packet = deserializePlayerJoined(e.data, e.size);
-    if (packet.playerId != localPlayerId) {
+
+    // The first PlayerJoined packet we receive is for our local player
+    // Update our local player ID to match what the server assigned
+    if (!localPlayerIdConfirmed) {
+      localPlayerId = packet.playerId;
+      localPlayerIdConfirmed = true;
+      Logger::info("Updated local player ID to: " +
+                   std::to_string(localPlayerId));
+    } else if (packet.playerId != localPlayerId) {
+      // This is a different player (remote player)
       onPlayerJoined(packet.playerId, packet.r, packet.g, packet.b);
     }
   } else if (type == PacketType::PlayerLeft) {

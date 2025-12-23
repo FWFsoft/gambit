@@ -5,6 +5,7 @@
 #include "Logger.h"
 #include "NetworkClient.h"
 #include "RemotePlayerInterpolation.h"
+#include "RenderSystem.h"
 #include "Window.h"
 
 int main() {
@@ -28,6 +29,7 @@ int main() {
   uint32_t localPlayerId = (uint32_t)(uintptr_t)&client;  // Temporary ID
   ClientPrediction clientPrediction(&client, localPlayerId);
   RemotePlayerInterpolation remoteInterpolation(localPlayerId);
+  RenderSystem renderSystem(&window, &clientPrediction, &remoteInterpolation);
 
   // Subscribe to UpdateEvent for network processing
   EventBus::instance().subscribe<UpdateEvent>([&](const UpdateEvent& e) {
@@ -47,17 +49,6 @@ int main() {
       Logger::info("Frame: " + std::to_string(e.frameNumber) +
                    " (deltaTime: " + std::to_string(e.deltaTime) + "ms)");
     }
-  });
-
-  // Subscribe to RenderEvent for drawing
-  EventBus::instance().subscribe<RenderEvent>([&](const RenderEvent& e) {
-    SDL_SetRenderDrawColor(window.getRenderer(), 0, 0, 0, 255);
-    SDL_RenderClear(window.getRenderer());
-
-    // Render game objects
-    // ...
-
-    SDL_RenderPresent(window.getRenderer());
   });
 
   // Subscribe to LocalInputEvent for testing (log when any input changes)

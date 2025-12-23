@@ -26,6 +26,7 @@ struct PlayerState {
   float vx, vy;
   float health;
   uint8_t r, g, b;
+  uint32_t lastInputSequence;  // Last input sequence processed by server
 };
 
 struct StateUpdatePacket {

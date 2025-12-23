@@ -142,6 +142,7 @@ void ServerGameState::broadcastStateUpdate() {
     ps.r = player.r;
     ps.g = player.g;
     ps.b = player.b;
+    ps.lastInputSequence = player.lastInputSequence;
     packet.players.push_back(ps);
   }
 

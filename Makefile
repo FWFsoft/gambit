@@ -161,6 +161,7 @@ src/ClientPrediction.o: src/ClientPrediction.cpp.o
 # target to build an object file
 src/ClientPrediction.cpp.o:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Client.dir/build.make CMakeFiles/Client.dir/src/ClientPrediction.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Tests.dir/build.make CMakeFiles/Tests.dir/src/ClientPrediction.cpp.o
 .PHONY : src/ClientPrediction.cpp.o
 
 src/ClientPrediction.i: src/ClientPrediction.cpp.i
@@ -169,6 +170,7 @@ src/ClientPrediction.i: src/ClientPrediction.cpp.i
 # target to preprocess a source file
 src/ClientPrediction.cpp.i:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Client.dir/build.make CMakeFiles/Client.dir/src/ClientPrediction.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Tests.dir/build.make CMakeFiles/Tests.dir/src/ClientPrediction.cpp.i
 .PHONY : src/ClientPrediction.cpp.i
 
 src/ClientPrediction.s: src/ClientPrediction.cpp.s
@@ -177,6 +179,7 @@ src/ClientPrediction.s: src/ClientPrediction.cpp.s
 # target to generate assembly for a file
 src/ClientPrediction.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Client.dir/build.make CMakeFiles/Client.dir/src/ClientPrediction.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Tests.dir/build.make CMakeFiles/Tests.dir/src/ClientPrediction.cpp.s
 .PHONY : src/ClientPrediction.cpp.s
 
 src/FileSystem.o: src/FileSystem.cpp.o
@@ -299,6 +302,7 @@ src/NetworkClient.o: src/NetworkClient.cpp.o
 # target to build an object file
 src/NetworkClient.cpp.o:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Client.dir/build.make CMakeFiles/Client.dir/src/NetworkClient.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Tests.dir/build.make CMakeFiles/Tests.dir/src/NetworkClient.cpp.o
 .PHONY : src/NetworkClient.cpp.o
 
 src/NetworkClient.i: src/NetworkClient.cpp.i
@@ -307,6 +311,7 @@ src/NetworkClient.i: src/NetworkClient.cpp.i
 # target to preprocess a source file
 src/NetworkClient.cpp.i:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Client.dir/build.make CMakeFiles/Client.dir/src/NetworkClient.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Tests.dir/build.make CMakeFiles/Tests.dir/src/NetworkClient.cpp.i
 .PHONY : src/NetworkClient.cpp.i
 
 src/NetworkClient.s: src/NetworkClient.cpp.s
@@ -315,6 +320,7 @@ src/NetworkClient.s: src/NetworkClient.cpp.s
 # target to generate assembly for a file
 src/NetworkClient.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Client.dir/build.make CMakeFiles/Client.dir/src/NetworkClient.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Tests.dir/build.make CMakeFiles/Tests.dir/src/NetworkClient.cpp.s
 .PHONY : src/NetworkClient.cpp.s
 
 src/NetworkProtocol.o: src/NetworkProtocol.cpp.o
@@ -397,6 +403,30 @@ src/RemotePlayerInterpolation.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Client.dir/build.make CMakeFiles/Client.dir/src/RemotePlayerInterpolation.cpp.s
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Tests.dir/build.make CMakeFiles/Tests.dir/src/RemotePlayerInterpolation.cpp.s
 .PHONY : src/RemotePlayerInterpolation.cpp.s
+
+src/RenderSystem.o: src/RenderSystem.cpp.o
+.PHONY : src/RenderSystem.o
+
+# target to build an object file
+src/RenderSystem.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Client.dir/build.make CMakeFiles/Client.dir/src/RenderSystem.cpp.o
+.PHONY : src/RenderSystem.cpp.o
+
+src/RenderSystem.i: src/RenderSystem.cpp.i
+.PHONY : src/RenderSystem.i
+
+# target to preprocess a source file
+src/RenderSystem.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Client.dir/build.make CMakeFiles/Client.dir/src/RenderSystem.cpp.i
+.PHONY : src/RenderSystem.cpp.i
+
+src/RenderSystem.s: src/RenderSystem.cpp.s
+.PHONY : src/RenderSystem.s
+
+# target to generate assembly for a file
+src/RenderSystem.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Client.dir/build.make CMakeFiles/Client.dir/src/RenderSystem.cpp.s
+.PHONY : src/RenderSystem.cpp.s
 
 src/ServerGameState.o: src/ServerGameState.cpp.o
 .PHONY : src/ServerGameState.o
@@ -556,6 +586,9 @@ help:
 	@echo "... src/RemotePlayerInterpolation.o"
 	@echo "... src/RemotePlayerInterpolation.i"
 	@echo "... src/RemotePlayerInterpolation.s"
+	@echo "... src/RenderSystem.o"
+	@echo "... src/RenderSystem.i"
+	@echo "... src/RenderSystem.s"
 	@echo "... src/ServerGameState.o"
 	@echo "... src/ServerGameState.i"
 	@echo "... src/ServerGameState.s"

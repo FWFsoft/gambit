@@ -29,6 +29,8 @@ class RemotePlayerInterpolation {
 
  private:
   uint32_t localPlayerId;
+  bool localPlayerIdConfirmed;  // Track if we've received our real ID from
+                                // server
   std::unordered_map<uint32_t, std::deque<PlayerSnapshot>> snapshotBuffers;
   std::unordered_map<uint32_t, Player>
       remotePlayers;  // Store latest known state

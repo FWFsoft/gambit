@@ -83,9 +83,10 @@ std::vector<uint8_t> serialize(const StateUpdatePacket& packet) {
     writeUint8(buffer, player.r);
     writeUint8(buffer, player.g);
     writeUint8(buffer, player.b);
+    writeUint32(buffer, player.lastInputSequence);
   }
 
-  // 1 + 4 + 2 + (playerCount * 27) bytes
+  // 1 + 4 + 2 + (playerCount * 31) bytes
   return buffer;
 }
 
@@ -138,7 +139,7 @@ StateUpdatePacket deserializeStateUpdate(const uint8_t* data, size_t size) {
   packet.serverTick = readUint32(data + 1);
   uint16_t playerCount = readUint16(data + 5);
 
-  assert(size >= 7 + (playerCount * 27));
+  assert(size >= 7 + (playerCount * 31));
 
   size_t offset = 7;
   for (uint16_t i = 0; i < playerCount; ++i) {
@@ -161,6 +162,8 @@ StateUpdatePacket deserializeStateUpdate(const uint8_t* data, size_t size) {
     offset += 1;
     player.b = readUint8(data + offset);
     offset += 1;
+    player.lastInputSequence = readUint32(data + offset);
+    offset += 4;
 
     packet.players.push_back(player);
   }

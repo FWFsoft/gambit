@@ -68,12 +68,18 @@ void ClientPrediction::onNetworkPacketReceived(
   } else if (type == PacketType::PlayerJoined) {
     PlayerJoinedPacket packet = deserializePlayerJoined(e.data, e.size);
 
-    // If this is our player, update color
-    if (packet.playerId == localPlayerId) {
+    // The first PlayerJoined packet we receive is for our local player
+    // (server sends PlayerJoined for the connecting client first)
+    // Update our player ID to match what the server assigned
+    if (localPlayer.r == 255 && localPlayer.g == 255 && localPlayer.b == 255) {
+      // Still have default white color, so this must be our player
+      localPlayerId = packet.playerId;
+      localPlayer.id = packet.playerId;
       localPlayer.r = packet.r;
       localPlayer.g = packet.g;
       localPlayer.b = packet.b;
-      Logger::info("Local player color: " + std::to_string(packet.r) + "," +
+      Logger::info("Local player ID: " + std::to_string(localPlayerId) +
+                   ", color: " + std::to_string(packet.r) + "," +
                    std::to_string(packet.g) + "," + std::to_string(packet.b));
     }
   }
@@ -113,14 +119,16 @@ void ClientPrediction::reconcile(const StateUpdatePacket& stateUpdate) {
   localPlayer.vx = serverState->vx;
   localPlayer.vy = serverState->vy;
   localPlayer.health = serverState->health;
+  localPlayer.r = serverState->r;
+  localPlayer.g = serverState->g;
+  localPlayer.b = serverState->b;
 
   // Find inputs that happened AFTER the server state
   // (These are inputs the server hasn't processed yet)
   std::deque<LocalInputEvent> inputsToReplay;
   for (const auto& input : inputHistory) {
-    // Note: We're comparing input sequence with server tick
-    // This assumes server processes one input per tick
-    if (input.inputSequence > stateUpdate.serverTick) {
+    // Only replay inputs the server hasn't processed yet
+    if (input.inputSequence > serverState->lastInputSequence) {
       inputsToReplay.push_back(input);
     }
   }
@@ -133,7 +141,7 @@ void ClientPrediction::reconcile(const StateUpdatePacket& stateUpdate) {
 
   // Remove old inputs from history (server has processed these)
   while (!inputHistory.empty() &&
-         inputHistory.front().inputSequence <= stateUpdate.serverTick) {
+         inputHistory.front().inputSequence <= serverState->lastInputSequence) {
     inputHistory.pop_front();
   }
 }

@@ -12,7 +12,9 @@
       "Bash(timeout 5:*)",
       "Bash(genhtml:*)",
       "Bash(make test-coverage:*)",
-      "Bash(make clean:*)"
+      "Bash(make clean:*)",
+      "Skill(test)",
+      "Bash(./build/Tests:*)"
     ]
   }
 }

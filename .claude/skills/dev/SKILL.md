@@ -30,19 +30,22 @@ Starting Gambit development environment...
   - 1 Server (0.0.0.0:1234)
   - 4 Clients (connecting to 127.0.0.1:1234)
 
+Press Ctrl+C to stop all processes...
+
 Starting server...
 Starting 4 clients...
 
 Development environment running!
-Press Enter to stop all processes...
+PIDs: 12345 12346 12347 12348 12349
 ```
 
 Then 4 game windows will open, each with a different colored player (Red, Green, Blue, Yellow).
 
 ## Stopping the Environment
 
-- Press `Enter` in the terminal to stop all processes gracefully
+- Press `Ctrl+C` to stop all processes and close all windows
 - All server and client processes will be terminated automatically
+- All game windows will close cleanly
 
 ## Notes
 

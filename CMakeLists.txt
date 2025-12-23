@@ -55,6 +55,7 @@ add_executable(Client
     src/NetworkProtocol.cpp
     src/ClientPrediction.cpp
     src/RemotePlayerInterpolation.cpp
+    src/RenderSystem.cpp
 )
 target_include_directories(Client SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
 target_include_directories(Client PRIVATE include)
@@ -72,11 +73,15 @@ add_executable(Tests
     src/GameLoop.cpp
     src/InputSystem.cpp
     src/RemotePlayerInterpolation.cpp
+    src/ClientPrediction.cpp
+    src/NetworkClient.cpp
 )
+target_include_directories(Tests SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
 target_include_directories(Tests PRIVATE
     include
 )
 target_link_libraries(Tests PRIVATE
+    ${ENET_LIBRARY}
     spdlog::spdlog
     SDL2::SDL2
 )

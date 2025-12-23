@@ -3,10 +3,12 @@
 #include <iostream>
 #include <vector>
 
+#include "ClientPrediction.h"
 #include "EventBus.h"
 #include "GameLoop.h"
 #include "InputSystem.h"
 #include "Logger.h"
+#include "NetworkClient.h"
 #include "NetworkProtocol.h"
 #include "Player.h"
 #include "RemotePlayerInterpolation.h"
@@ -116,6 +118,7 @@ TEST(StateUpdateSerialization) {
   player1.r = 255;
   player1.g = 0;
   player1.b = 0;
+  player1.lastInputSequence = 5;
 
   PlayerState player2;
   player2.playerId = 2;
@@ -127,13 +130,14 @@ TEST(StateUpdateSerialization) {
   player2.r = 0;
   player2.g = 255;
   player2.b = 0;
+  player2.lastInputSequence = 3;
 
   original.players.push_back(player1);
   original.players.push_back(player2);
 
   auto serialized = serialize(original);
   assert(serialized.size() ==
-         7 + (2 * 27));  // 61 bytes for 2 players (1+4+2+54)
+         7 + (2 * 31));  // 69 bytes for 2 players (1+4+2+62)
 
   auto deserialized =
       deserializeStateUpdate(serialized.data(), serialized.size());
@@ -415,10 +419,11 @@ TEST(NetworkProtocol_StateUpdate_OnePlayer) {
   player.r = 255;
   player.g = 0;
   player.b = 0;
+  player.lastInputSequence = 0;
   original.players.push_back(player);
 
   auto serialized = serialize(original);
-  assert(serialized.size() == 7 + 27);  // 34 bytes for 1 player (1+4+2+27)
+  assert(serialized.size() == 7 + 31);  // 38 bytes for 1 player (1+4+2+31)
 
   auto deserialized =
       deserializeStateUpdate(serialized.data(), serialized.size());
@@ -442,11 +447,12 @@ TEST(NetworkProtocol_StateUpdate_100Players) {
     player.r = static_cast<uint8_t>(i % 256);
     player.g = static_cast<uint8_t>((i * 2) % 256);
     player.b = static_cast<uint8_t>((i * 3) % 256);
+    player.lastInputSequence = i;
     original.players.push_back(player);
   }
 
   auto serialized = serialize(original);
-  size_t expectedSize = 7 + (100 * 27);  // 2707 bytes (1+4+2+2700)
+  size_t expectedSize = 7 + (100 * 31);  // 3107 bytes (1+4+2+3100)
   assert(serialized.size() == expectedSize);
 
   auto deserialized =
@@ -476,11 +482,12 @@ TEST(NetworkProtocol_StateUpdate_1000Players) {
     player.r = static_cast<uint8_t>(i % 256);
     player.g = 0;
     player.b = 0;
+    player.lastInputSequence = i;
     original.players.push_back(player);
   }
 
   auto serialized = serialize(original);
-  size_t expectedSize = 7 + (1000 * 27);  // 27007 bytes (1+4+2+27000)
+  size_t expectedSize = 7 + (1000 * 31);  // 31007 bytes (1+4+2+31000)
   assert(serialized.size() == expectedSize);
 
   auto deserialized =
@@ -584,7 +591,12 @@ TEST(InputSystem_SequenceIncrement) {
 
 TEST(RemotePlayerInterpolation_PlayerLifecycle) {
   resetEventBus();
-  RemotePlayerInterpolation interpolation(1);  // Local player ID = 1
+  RemotePlayerInterpolation interpolation(999);  // Temporary local player ID
+
+  // First PlayerJoined is for local player (server assigns real ID)
+  publishPlayerJoined(1, 0, 0, 255);  // Local player gets ID 1
+  assert(interpolation.getRemotePlayerIds().size() ==
+         0);  // Not added as remote
 
   // Test adding remote player
   publishPlayerJoined(2, 255, 0, 0);
@@ -602,21 +614,26 @@ TEST(RemotePlayerInterpolation_PlayerLifecycle) {
 
 TEST(RemotePlayerInterpolation_SkipLocalPlayer) {
   resetEventBus();
-  RemotePlayerInterpolation interpolation(1);
+  RemotePlayerInterpolation interpolation(999);  // Temporary ID
 
-  // Publish join/state for local player (should be ignored)
+  // First PlayerJoined is for local player
   publishPlayerJoined(1, 255, 0, 0);
   assert(interpolation.getRemotePlayerIds().size() == 0);
 
-  PlayerState ps{1, 100.0f, 100.0f, 0.0f, 0.0f, 100.0f, 255, 0, 0};
+  // State update with only local player (should be ignored)
+  PlayerState ps{1, 100.0f, 100.0f, 0.0f, 0.0f, 100.0f, 255, 0, 0, 0};
   publishStateUpdate(1, {ps});
   assert(interpolation.getRemotePlayerIds().size() == 0);
 }
 
 TEST(RemotePlayerInterpolation_Interpolation) {
   resetEventBus();
-  RemotePlayerInterpolation interpolation(1);
+  RemotePlayerInterpolation interpolation(999);  // Temporary ID
 
+  // First PlayerJoined is for local player
+  publishPlayerJoined(1, 0, 0, 255);
+
+  // Second PlayerJoined is for remote player
   publishPlayerJoined(2, 255, 0, 0);
 
   // Test with no snapshots
@@ -625,14 +642,14 @@ TEST(RemotePlayerInterpolation_Interpolation) {
   assert(player.id == 2);
 
   // Test with 1 snapshot
-  PlayerState ps1{2, 100.0f, 200.0f, 10.0f, 20.0f, 90.0f, 255, 0, 0};
+  PlayerState ps1{2, 100.0f, 200.0f, 10.0f, 20.0f, 90.0f, 255, 0, 0, 0};
   publishStateUpdate(1, {ps1});
   interpolation.getInterpolatedState(2, 0.5f, player);
   assert(floatEqual(player.x, 100.0f));
   assert(floatEqual(player.y, 200.0f));
 
   // Test with 2 snapshots - parameterized interpolation
-  PlayerState ps2{2, 200.0f, 400.0f, 20.0f, 40.0f, 80.0f, 255, 0, 0};
+  PlayerState ps2{2, 200.0f, 400.0f, 20.0f, 40.0f, 80.0f, 255, 0, 0, 0};
   publishStateUpdate(2, {ps2});
 
   struct InterpolationTest {
@@ -656,7 +673,10 @@ TEST(RemotePlayerInterpolation_Interpolation) {
 
 TEST(RemotePlayerInterpolation_MultipleRemotePlayers) {
   resetEventBus();
-  RemotePlayerInterpolation interpolation(1);
+  RemotePlayerInterpolation interpolation(999);  // Temporary ID
+
+  // First PlayerJoined is for local player
+  publishPlayerJoined(1, 0, 0, 255);
 
   // Add 3 remote players
   for (uint32_t id = 2; id <= 4; id++) {
@@ -676,6 +696,7 @@ TEST(RemotePlayerInterpolation_MultipleRemotePlayers) {
                    100.0f,
                    static_cast<uint8_t>(id * 50),
                    0,
+                   0,
                    0};
     states.push_back(ps);
   }
@@ -687,6 +708,48 @@ TEST(RemotePlayerInterpolation_MultipleRemotePlayers) {
     assert(interpolation.getInterpolatedState(id, 0.0f, player));
     assert(floatEqual(player.x, float(id * 100)));
   }
+}
+
+// ============================================================================
+// Phase 6: ClientPrediction Tests
+// ============================================================================
+
+TEST(ClientPrediction_ColorSyncDuringReconciliation) {
+  resetEventBus();
+  NetworkClient client;  // Dummy client for testing
+  ClientPrediction prediction(&client, 1);
+
+  // Simulate server sending a state update with a specific color (Red)
+  PlayerState serverState{1, 100.0f, 100.0f, 0.0f, 0.0f, 100.0f, 255, 0, 0, 5};
+  publishStateUpdate(1, {serverState});
+
+  // Verify local player has the correct color from server
+  const Player& localPlayer = prediction.getLocalPlayer();
+  assert(localPlayer.r == 255);
+  assert(localPlayer.g == 0);
+  assert(localPlayer.b == 0);
+}
+
+TEST(ClientPrediction_ColorPersistsAcrossMultipleReconciles) {
+  resetEventBus();
+  NetworkClient client;
+  ClientPrediction prediction(&client, 1);
+
+  // Send multiple state updates with the same color
+  for (uint32_t tick = 1; tick <= 5; tick++) {
+    PlayerState serverState{1,      static_cast<float>(tick * 10),
+                            100.0f, 0.0f,
+                            0.0f,   100.0f,
+                            0,      255,
+                            0,      tick};
+    publishStateUpdate(tick, {serverState});
+  }
+
+  // Verify color is still Green after multiple reconciliations
+  const Player& localPlayer = prediction.getLocalPlayer();
+  assert(localPlayer.r == 0);
+  assert(localPlayer.g == 255);
+  assert(localPlayer.b == 0);
 }
 
 int main() {
@@ -738,6 +801,11 @@ int main() {
   run_RemotePlayerInterpolation_SkipLocalPlayer();
   run_RemotePlayerInterpolation_Interpolation();
   run_RemotePlayerInterpolation_MultipleRemotePlayers();
+
+  // Phase 6: ClientPrediction Tests
+  std::cout << "\nPhase 6: ClientPrediction\n";
+  run_ClientPrediction_ColorSyncDuringReconciliation();
+  run_ClientPrediction_ColorPersistsAcrossMultipleReconciles();
 
   std::cout << "\n=== Test Results ===\n";
   std::cout << "Tests run: " << testsRun << "\n";
