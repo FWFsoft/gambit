@@ -4,12 +4,19 @@ on: [push, pull_request]
 
 jobs:
   build:
-    runs-on: ubuntu-latest # or windows-latest, macos-latest
-
+    runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4 # Check out your repository
+    - uses: actions/checkout@v4
       with:
-        fetch-depth: 0 # Optional, for full git history
+        fetch-depth: 0
+
+    - name: Install SDL2 dependencies
+      run: |
+        sudo apt update
+        sudo apt install libsdl2-dev libsdl2-2.0-0 -y
+        # Install other necessary libraries if needed, e.g.:
+        # sudo apt install libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev -y
 
     - name: Run tests with coverage
-      run: make test-coverage
+      run: |
+        make test-coverage
