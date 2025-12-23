@@ -651,6 +651,7 @@ outPlayer.y = from.y + (to.y - from.y) * t;
 - Edge case testing
 - Performance testing
 - Integration tests
+- Try using a more standard test setup, like ctest
 
 ---
 

@@ -1,0 +1,15 @@
+name: CMake Build
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest # or windows-latest, macos-latest
+
+    steps:
+    - uses: actions/checkout@v4 # Check out your repository
+      with:
+        fetch-depth: 0 # Optional, for full git history
+
+    - name: Run tests with coverage
+      run: make test-coverage
