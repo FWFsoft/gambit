@@ -11,7 +11,7 @@ Builds the project (if needed) and runs all tests.
 
 1. Run the test command:
    ```bash
-   make test
+   make test-coverage
    ```
 
 ## Expected Output
@@ -20,11 +20,13 @@ On success, you should see:
 ```
 All tests passed!
 ```
+And can view coverage in `build/coverage/index.html`
+Or by using `make test-coverage-open`
 
 On failure, you will see details about which tests failed.
 
 ## Notes
 
 - Tests are automatically built if they don't exist or if code has changed
-- The test suite includes unit tests for the network protocol serialization
-- Currently tests 4 packet types: ClientInput, StateUpdate, PlayerJoined, PlayerLeft
+- Coverage will be printed, which you can use to tell if you need to increase
+coverage for certain files

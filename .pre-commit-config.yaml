@@ -1,0 +1,19 @@
+fail_fast: false
+repos:
+  - repo: https://github.com/pocc/pre-commit-hooks
+    rev: v1.3.5
+    hooks:
+    - id: clang-format
+      args: [-i, --style=Google]
+    - id: clang-tidy
+      # Note: --fix is removed because it was corrupting files
+      # Run manually with --fix if needed after reviewing warnings
+      args:
+        [
+          "-p=.",
+          "--extra-arg-before=-xc++",
+          "--extra-arg-before=-I/opt/homebrew/include",
+          "--extra-arg-before=-I/opt/homebrew/opt/sdl2/include",
+          "--extra-arg-before=-I/opt/homebrew/opt/enet/include",
+          "--header-filter=include/.*",
+        ]

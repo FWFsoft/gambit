@@ -11,6 +11,9 @@ find_package(SDL2 REQUIRED)
 find_package(spdlog REQUIRED)
 
 # Find ENet library and include directory
+if(APPLE)
+    include_directories(SYSTEM /opt/homebrew/include)
+endif()
 find_path(ENET_INCLUDE_DIR enet/enet.h)
 find_library(ENET_LIBRARY enet)
 
@@ -32,10 +35,8 @@ add_executable(Server
     src/GameLoop.cpp
     src/ServerGameState.cpp
 )
-target_include_directories(Server PRIVATE
-    include
-    ${ENET_INCLUDE_DIR}
-)
+target_include_directories(Server SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
+target_include_directories(Server PRIVATE include)
 target_link_libraries(Server PRIVATE
     ${ENET_LIBRARY}
     SDL2::SDL2
@@ -55,10 +56,8 @@ add_executable(Client
     src/ClientPrediction.cpp
     src/RemotePlayerInterpolation.cpp
 )
-target_include_directories(Client PRIVATE
-    include
-    ${ENET_INCLUDE_DIR}
-)
+target_include_directories(Client SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
+target_include_directories(Client PRIVATE include)
 target_link_libraries(Client PRIVATE
     ${ENET_LIBRARY}
     SDL2::SDL2
