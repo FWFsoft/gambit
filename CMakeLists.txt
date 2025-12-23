@@ -25,6 +25,10 @@ else()
     message(FATAL_ERROR "ENet library not found")
 endif()
 
+# Find tmxlite library (uses pkg-config)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(TMXLITE REQUIRED IMPORTED_TARGET tmxlite)
+
 # Server executable
 add_executable(Server
     src/server_main.cpp
@@ -41,6 +45,7 @@ target_link_libraries(Server PRIVATE
     ${ENET_LIBRARY}
     SDL2::SDL2
     spdlog::spdlog
+    PkgConfig::TMXLITE
 )
 
 # Client executable
@@ -63,6 +68,7 @@ target_link_libraries(Client PRIVATE
     ${ENET_LIBRARY}
     SDL2::SDL2
     spdlog::spdlog
+    PkgConfig::TMXLITE
 )
 
 # Test executable

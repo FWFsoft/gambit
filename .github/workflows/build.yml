@@ -10,22 +10,32 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Install dependencies
-      run: |
-        sudo apt update
-        sudo apt install -y \
-          libsdl2-dev \
-          libsdl2-2.0-0 \
-          libenet-dev \
-          libspdlog-dev
+    - name: Setup vcpkg
+      uses: lukka/run-vcpkg@v11
+      with:
+        vcpkgGitCommitId: 'a42af01b72c28a8e1d7b48107b33e4f286a55ef6'  # Latest stable
 
     - name: Configure CMake
-      run: |
-        cmake -B build -S .
+      run: cmake -B build -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
 
     - name: Build
-      run: |
-        cmake --build build
+      run: cmake --build build
+#    - name: Install dependencies
+#      run: |
+#        sudo apt update
+#        sudo apt install -y \
+#          libsdl2-dev \
+#          libsdl2-2.0-0 \
+#          libenet-dev \
+#          libspdlog-dev
+#
+#    - name: Configure CMake
+#      run: |
+#        cmake -B build -S .
+
+#    - name: Build
+#      run: |
+#        cmake --build build
 
     - name: Run tests
       run: |

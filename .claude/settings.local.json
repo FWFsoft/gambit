@@ -14,7 +14,8 @@
       "Bash(make test-coverage:*)",
       "Bash(make clean:*)",
       "Skill(test)",
-      "Bash(./build/Tests:*)"
+      "Bash(./build/Tests:*)",
+      "WebSearch"
     ]
   }
 }

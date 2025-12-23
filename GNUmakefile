@@ -8,9 +8,9 @@ help: ## Show this help message
 
 
 build:  ## Builds the project as is
-	mkdir -p build && \
-	cd build && \
-	cmake .. && \
+	@mkdir -p build
+	@cd build && \
+	cmake .. -DCMAKE_TOOLCHAIN_FILE=$$HOME/dev/vcpkg/scripts/buildsystems/vcpkg.cmake && \
 	make
 
 clean:  ## Remove build artifacts for a fresh rebuild
@@ -28,7 +28,7 @@ test-coverage:  ## Run tests with code coverage and generate HTML report
 	@echo "Building with coverage enabled..."
 	@mkdir -p build
 	@cd build && \
-	cmake -DENABLE_COVERAGE=ON .. && \
+	cmake -DENABLE_COVERAGE=ON -DCMAKE_TOOLCHAIN_FILE=$$HOME/dev/vcpkg/scripts/buildsystems/vcpkg.cmake .. && \
 	make Tests
 	@echo "Running tests..."
 	@cd build && ./Tests
