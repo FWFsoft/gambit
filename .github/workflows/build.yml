@@ -10,13 +10,23 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Install SDL2 dependencies
+    - name: Install dependencies
       run: |
         sudo apt update
-        sudo apt install libsdl2-dev libsdl2-2.0-0 -y
-        # Install other necessary libraries if needed, e.g.:
-        # sudo apt install libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev -y
+        sudo apt install -y \
+          libsdl2-dev \
+          libsdl2-2.0-0 \
+          libenet-dev \
+          libspdlog-dev
 
-    - name: Run tests with coverage
+    - name: Configure CMake
       run: |
-        make test-coverage
+        cmake -B build -S .
+
+    - name: Build
+      run: |
+        cmake --build build
+
+    - name: Run tests
+      run: |
+        ./build/Tests
