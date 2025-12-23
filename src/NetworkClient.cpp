@@ -1,5 +1,6 @@
 #include "NetworkClient.h"
 #include "Logger.h"
+#include "EventBus.h"
 
 NetworkClient::NetworkClient()
     : client(nullptr), peer(nullptr), connected(false) {}
@@ -77,8 +78,12 @@ void NetworkClient::run() {
     ENetEvent event;
     while (enet_host_service(client, &event, 0) > 0) {
         if (event.type == ENET_EVENT_TYPE_RECEIVE) {
-            Logger::info("Received packet: " +
-                         std::string((char*)event.packet->data, event.packet->dataLength));
+            // Publish network packet received event
+            EventBus::instance().publish(NetworkPacketReceivedEvent{
+                nullptr,  // peer is nullptr on client
+                event.packet->data,
+                event.packet->dataLength
+            });
             enet_packet_destroy(event.packet);
         }
     }
@@ -89,6 +94,16 @@ void NetworkClient::send(const std::string& message) {
 
     ENetPacket* packet = enet_packet_create(message.c_str(),
                                             message.length() + 1,
+                                            ENET_PACKET_FLAG_RELIABLE);
+    enet_peer_send(peer, 0, packet);
+    enet_host_flush(client);
+}
+
+void NetworkClient::send(const std::vector<uint8_t>& data) {
+    if (!connected) return;
+
+    ENetPacket* packet = enet_packet_create(data.data(),
+                                            data.size(),
                                             ENET_PACKET_FLAG_RELIABLE);
     enet_peer_send(peer, 0, packet);
     enet_host_flush(client);

@@ -2,6 +2,8 @@
 
 #include <enet/enet.h>
 #include <string>
+#include <vector>
+#include <cstdint>
 
 class NetworkClient {
 public:
@@ -13,6 +15,7 @@ public:
     void disconnect();
     void run();
     void send(const std::string& message);
+    void send(const std::vector<uint8_t>& data);  // Binary packet send
 
 private:
     ENetHost* client;

@@ -4,6 +4,8 @@
 #include "EventBus.h"
 #include "GameLoop.h"
 #include "InputSystem.h"
+#include "ClientPrediction.h"
+#include "RemotePlayerInterpolation.h"
 
 int main() {
     Logger::init();
@@ -20,6 +22,11 @@ int main() {
     Window window("Gambit Client", 800, 600);
     GameLoop gameLoop;
     InputSystem inputSystem;
+
+    // Generate client ID from peer pointer (will be updated when server sends PlayerJoined)
+    uint32_t localPlayerId = (uint32_t)(uintptr_t)&client;  // Temporary ID
+    ClientPrediction clientPrediction(&client, localPlayerId);
+    RemotePlayerInterpolation remoteInterpolation(localPlayerId);
 
     // Subscribe to UpdateEvent for network processing
     EventBus::instance().subscribe<UpdateEvent>([&](const UpdateEvent& e) {

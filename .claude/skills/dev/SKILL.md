@@ -5,95 +5,49 @@ description: Full development environment - builds the project and runs 1 server
 
 # Development Environment
 
-Builds the Gambit game engine and launches a full development environment with 1 server and 4 clients to simulate multiplayer gameplay.
+Builds the project and runs a full development environment with 1 server and 4 clients.
 
 ## Instructions
 
-1. Build the project:
+1. Run the dev command:
    ```bash
-   mkdir -p build
-   cd build
-   cmake ..
-   make
-   cd ..
+   make dev
    ```
 
-2. Start the server in the background:
-   ```bash
-   ./build/Server &
-   SERVER_PID=$!
-   echo "Server started (PID: $SERVER_PID)"
-   ```
+## What This Does
 
-3. Start 4 clients with delays:
-   ```bash
-   CLIENT_PIDS=()
-   for i in {1..4}; do
-       ./build/Client &
-       CLIENT_PIDS+=($!)
-       echo "Client $i started (PID: ${CLIENT_PIDS[$i-1]})"
-       sleep 1
-   done
-   ```
-
-4. Display running processes:
-   ```bash
-   echo ""
-   echo "Development environment running:"
-   echo "  1 Server (PID: $SERVER_PID)"
-   echo "  4 Clients (PIDs: ${CLIENT_PIDS[@]})"
-   echo ""
-   ```
-
-5. Wait for user to press Enter to terminate:
-   ```bash
-   read -p "Press Enter to terminate all processes..."
-   ```
-
-6. Gracefully shut down all processes:
-   ```bash
-   echo "Shutting down..."
-   kill -SIGINT $SERVER_PID 2>/dev/null || true
-   for pid in "${CLIENT_PIDS[@]}"; do
-       kill -SIGINT $pid 2>/dev/null || true
-   done
-
-   wait $SERVER_PID 2>/dev/null || true
-   for pid in "${CLIENT_PIDS[@]}"; do
-       wait $pid 2>/dev/null || true
-   done
-
-   echo "All processes terminated."
-   ```
-
-## What This Simulates
-
-This environment simulates the target 4-player co-op PvE gameplay:
-- 1 Server managing game state
-- 4 Clients representing players
+1. Builds the project (if needed)
+2. Starts 1 server instance on 0.0.0.0:1234
+3. Waits 1 second for server to initialize
+4. Starts 4 client instances with 1-second delays between each
+5. Waits for you to press Enter to stop all processes
 
 ## Expected Behavior
 
 You should see:
-- Server starts and listens on port 1234
-- Each client connects with a 1-second delay
-- 4 SDL2 windows open (one per client)
-- All clients successfully connect to the server
+```
+Starting Gambit development environment...
+  - 1 Server (0.0.0.0:1234)
+  - 4 Clients (connecting to 127.0.0.1:1234)
+
+Starting server...
+Starting 4 clients...
+
+Development environment running!
+Press Enter to stop all processes...
+```
+
+Then 4 game windows will open, each with a different colored player (Red, Green, Blue, Yellow).
 
 ## Stopping the Environment
 
-- Press Enter in the terminal to terminate all processes gracefully
-- All server and client processes will shut down cleanly
-
-## Use Cases
-
-- Testing multiplayer interactions
-- Verifying network synchronization
-- Debugging client-server communication
-- Simulating full game sessions
+- Press `Enter` in the terminal to stop all processes gracefully
+- All server and client processes will be terminated automatically
 
 ## Notes
 
-- This is the primary development workflow for multiplayer testing
-- The 1-second delays between client starts prevent connection race conditions
-- All processes run locally for easy debugging
+- This simulates a 4-player multiplayer game
+- Each client gets a unique color assigned by the server
+- Perfect for testing networked gameplay features
+- The server and clients run in the background
+- All processes are cleaned up when you press Enter

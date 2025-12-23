@@ -49,6 +49,8 @@ add_executable(Client
     src/GameLoop.cpp
     src/InputSystem.cpp
     src/NetworkProtocol.cpp
+    src/ClientPrediction.cpp
+    src/RemotePlayerInterpolation.cpp
 )
 target_include_directories(Client PRIVATE
     include

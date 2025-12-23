@@ -9,18 +9,9 @@ Starts the Gambit game server, which listens for client connections on port 1234
 
 ## Instructions
 
-1. Verify the Server executable exists:
+1. Run the server command:
    ```bash
-   if [ ! -f "build/Server" ]; then
-       echo "Error: Server executable not found. Run the 'build' skill first."
-       exit 1
-   fi
-   ```
-
-2. Start the server:
-   ```bash
-   echo "Starting Gambit Server on 0.0.0.0:1234..."
-   ./build/Server
+   make run-server
    ```
 
 ## Server Details
@@ -39,7 +30,7 @@ When running, you should see:
 
 When clients connect:
 ```
-[HH:MM:SS] [info] Client connected from <ip>:<port>
+[HH:MM:SS] [info] Player <id> joined (color: r,g,b)
 ```
 
 ## Stopping the Server
@@ -52,3 +43,4 @@ When clients connect:
 - The server runs in the foreground - use `Ctrl+C` to stop it
 - For testing multiple clients, use the `dev` skill instead
 - Ensure port 1234 is not already in use
+- The server will automatically build if needed

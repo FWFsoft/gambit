@@ -9,14 +9,9 @@ Removes the build directory and all compiled artifacts to enable a fresh rebuild
 
 ## Instructions
 
-1. Check if the build directory exists:
+1. Run the clean command:
    ```bash
-   if [ -d "build" ]; then
-       rm -rf build
-       echo "Build artifacts cleaned!"
-   else
-       echo "No build directory found - nothing to clean."
-   fi
+   make clean
    ```
 
 ## When to Use
