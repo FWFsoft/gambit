@@ -52,4 +52,4 @@ jobs:
 
     - name: Run tests
       run: |
-        ./build/Tests
+        cd build && ctest --output-on-failure

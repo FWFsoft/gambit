@@ -5,28 +5,43 @@ description: Run all tests for the Gambit game engine. Use when the user wants t
 
 # Run Tests
 
-Builds the project (if needed) and runs all tests.
+Builds the project (if needed) and runs all tests using CTest.
 
 ## Instructions
 
-1. Run the test command:
+1. Run tests:
+   ```bash
+   make test
+   ```
+
+2. Run tests with coverage:
    ```bash
    make test-coverage
    ```
+
+## Test Structure
+
+Tests are organized into modular suites:
+- `PlayerMovement` - Player movement and bounds tests
+- `NetworkProtocol` - Network serialization/deserialization tests
+- `EventBus` - Event bus pub/sub tests
+- `InputSystem` - Input handling tests
+- `RemotePlayerInterpolation` - Remote player interpolation tests
+- `ClientPrediction` - Client-side prediction tests
 
 ## Expected Output
 
 On success, you should see:
 ```
-All tests passed!
+100% tests passed, 0 tests failed out of 6
 ```
-And can view coverage in `build/coverage/index.html`
-Or by using `make test-coverage-open`
 
-On failure, you will see details about which tests failed.
+On failure, CTest will show which test suites failed with error details.
 
 ## Notes
 
-- Tests are automatically built if they don't exist or if code has changed
-- Coverage will be printed, which you can use to tell if you need to increase
-coverage for certain files
+- Tests use CTest for better isolation and parallel execution
+- Each test suite is a separate executable in `build/test_*`
+- Run specific tests with: `cd build && ctest -R <TestName>`
+- Run tests in parallel with: `cd build && ctest -j8`
+- Coverage reports available at `build/coverage/index.html`

@@ -22,16 +22,16 @@ clean:  ## Remove build artifacts for a fresh rebuild
 	fi
 
 test: build  ## Builds and runs tests
-	./build/Tests
+	@cd build && ctest --output-on-failure
 
 test-coverage:  ## Run tests with code coverage and generate HTML report
 	@echo "Building with coverage enabled..."
 	@mkdir -p build
 	@cd build && \
 	cmake -DENABLE_COVERAGE=ON -DCMAKE_TOOLCHAIN_FILE=$$HOME/dev/vcpkg/scripts/buildsystems/vcpkg.cmake .. && \
-	make -j8 Tests
+	make -j8
 	@echo "Running tests..."
-	@cd build && ./Tests
+	@cd build && ctest --output-on-failure
 	@echo "Generating coverage report..."
 	@mkdir -p build/coverage
 	@cd build && \
