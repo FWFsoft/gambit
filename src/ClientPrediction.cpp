@@ -7,11 +7,13 @@
 
 ClientPrediction::ClientPrediction(NetworkClient* client,
                                    uint32_t localPlayerId, float worldWidth,
-                                   float worldHeight)
+                                   float worldHeight,
+                                   const CollisionSystem* collisionSystem)
     : client(client),
       localPlayerId(localPlayerId),
       worldWidth(worldWidth),
       worldHeight(worldHeight),
+      collisionSystem(collisionSystem),
       localInputSequence(0) {
   // Initialize local player
   localPlayer.id = localPlayerId;
@@ -38,7 +40,7 @@ ClientPrediction::ClientPrediction(NetworkClient* client,
 void ClientPrediction::onLocalInput(const LocalInputEvent& e) {
   // Apply input immediately to local player (instant response)
   applyInput(localPlayer, e.moveLeft, e.moveRight, e.moveUp, e.moveDown, 16.67f,
-             worldWidth, worldHeight);
+             worldWidth, worldHeight, collisionSystem);
 
   // Store input in history for reconciliation
   LocalInputEvent inputCopy = e;
@@ -141,7 +143,8 @@ void ClientPrediction::reconcile(const StateUpdatePacket& stateUpdate) {
   // Re-apply all inputs that happened after the server state
   for (const auto& input : inputsToReplay) {
     applyInput(localPlayer, input.moveLeft, input.moveRight, input.moveUp,
-               input.moveDown, 16.67f, worldWidth, worldHeight);
+               input.moveDown, 16.67f, worldWidth, worldHeight,
+               collisionSystem);
   }
 
   // Remove old inputs from history (server has processed these)

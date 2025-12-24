@@ -7,11 +7,13 @@
 #include "Player.h"
 
 class NetworkClient;
+class CollisionSystem;
 
 class ClientPrediction {
  public:
   ClientPrediction(NetworkClient* client, uint32_t localPlayerId,
-                   float worldWidth, float worldHeight);
+                   float worldWidth, float worldHeight,
+                   const CollisionSystem* collisionSystem);
 
   const Player& getLocalPlayer() const { return localPlayer; }
 
@@ -21,6 +23,7 @@ class ClientPrediction {
   Player localPlayer;
   float worldWidth;
   float worldHeight;
+  const CollisionSystem* collisionSystem;
 
   std::deque<LocalInputEvent> inputHistory;
   uint32_t localInputSequence;

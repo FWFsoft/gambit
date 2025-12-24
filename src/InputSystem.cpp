@@ -1,11 +1,14 @@
 #include "InputSystem.h"
 
-InputSystem::InputSystem()
+#include "Logger.h"
+
+InputSystem::InputSystem(CollisionDebugRenderer* debugRenderer)
     : moveLeft(false),
       moveRight(false),
       moveUp(false),
       moveDown(false),
-      inputSequence(0) {
+      inputSequence(0),
+      debugRenderer(debugRenderer) {
   // Subscribe to key events
   EventBus::instance().subscribe<KeyDownEvent>(
       [this](const KeyDownEvent& e) { onKeyDown(e); });
@@ -19,6 +22,13 @@ InputSystem::InputSystem()
 }
 
 void InputSystem::onKeyDown(const KeyDownEvent& e) {
+  // Toggle collision debug with F1
+  if (e.key == SDLK_F1 && debugRenderer) {
+    debugRenderer->toggle();
+    Logger::info("Collision debug: " +
+                 std::string(debugRenderer->isEnabled() ? "ON" : "OFF"));
+  }
+
   if (e.key == SDLK_a || e.key == SDLK_LEFT) moveLeft = true;
   if (e.key == SDLK_d || e.key == SDLK_RIGHT) moveRight = true;
   if (e.key == SDLK_w || e.key == SDLK_UP) moveUp = true;

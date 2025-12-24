@@ -6,7 +6,7 @@
 TEST(ClientPrediction_ColorSyncDuringReconciliation) {
   resetEventBus();
   NetworkClient client;
-  ClientPrediction prediction(&client, 1, 800.0f, 600.0f);
+  ClientPrediction prediction(&client, 1, 800.0f, 600.0f, nullptr);
 
   PlayerState serverState{1, 100.0f, 100.0f, 0.0f, 0.0f, 100.0f, 255, 0, 0, 5};
   publishStateUpdate(1, {serverState});
@@ -20,7 +20,7 @@ TEST(ClientPrediction_ColorSyncDuringReconciliation) {
 TEST(ClientPrediction_ColorPersistsAcrossMultipleReconciles) {
   resetEventBus();
   NetworkClient client;
-  ClientPrediction prediction(&client, 1, 800.0f, 600.0f);
+  ClientPrediction prediction(&client, 1, 800.0f, 600.0f, nullptr);
 
   for (uint32_t tick = 1; tick <= 5; tick++) {
     PlayerState serverState{1,      static_cast<float>(tick * 10),

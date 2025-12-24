@@ -2,15 +2,19 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 
+#include "CollisionSystem.h"
 #include "Logger.h"
 #include "NetworkServer.h"
 
 ServerGameState::ServerGameState(NetworkServer* server, float worldWidth,
-                                 float worldHeight)
+                                 float worldHeight,
+                                 const CollisionSystem* collisionSystem)
     : server(server),
       worldWidth(worldWidth),
       worldHeight(worldHeight),
+      collisionSystem(collisionSystem),
       serverTick(0) {
   // Subscribe to client connection events
   EventBus::instance().subscribe<ClientConnectedEvent>(
@@ -39,6 +43,30 @@ void ServerGameState::onClientConnected(const ClientConnectedEvent& e) {
 
   player.x = worldWidth / 2.0f;
   player.y = worldHeight / 2.0f;
+
+  // Validate spawn position is not in collision
+  if (collisionSystem &&
+      !collisionSystem->isPositionValid(player.x, player.y, PLAYER_RADIUS)) {
+    Logger::info(
+        "Default spawn position is invalid, searching for valid spawn...");
+    // Simple spiral search for valid position
+    bool found = false;
+    for (float radius = 50.0f; radius < 500.0f && !found; radius += 50.0f) {
+      for (float angle = 0; angle < 360.0f && !found; angle += 45.0f) {
+        float testX =
+            worldWidth / 2.0f + radius * std::cos(angle * 3.14159f / 180.0f);
+        float testY =
+            worldHeight / 2.0f + radius * std::sin(angle * 3.14159f / 180.0f);
+        if (collisionSystem->isPositionValid(testX, testY, PLAYER_RADIUS)) {
+          player.x = testX;
+          player.y = testY;
+          found = true;
+        }
+      }
+    }
+    assert(found && "Could not find valid spawn position");
+  }
+
   player.vx = 0;
   player.vy = 0;
   player.health = 100.0f;
@@ -120,7 +148,7 @@ void ServerGameState::processClientInput(ENetPeer* peer, const uint8_t* data,
   player.lastInputSequence = input.inputSequence;
 
   applyInput(player, input.moveLeft, input.moveRight, input.moveUp,
-             input.moveDown, 16.67f, worldWidth, worldHeight);
+             input.moveDown, 16.67f, worldWidth, worldHeight, collisionSystem);
 }
 
 void ServerGameState::onUpdate(const UpdateEvent& e) {

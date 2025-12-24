@@ -8,15 +8,18 @@
 #include "Player.h"
 
 class NetworkServer;
+class CollisionSystem;
 
 class ServerGameState {
  public:
-  ServerGameState(NetworkServer* server, float worldWidth, float worldHeight);
+  ServerGameState(NetworkServer* server, float worldWidth, float worldHeight,
+                  const CollisionSystem* collisionSystem);
 
  private:
   NetworkServer* server;
   float worldWidth;
   float worldHeight;
+  const CollisionSystem* collisionSystem;
   std::unordered_map<uint32_t, Player> players;
   std::unordered_map<ENetPeer*, uint32_t> peerToPlayerId;
   uint32_t serverTick;

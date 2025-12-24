@@ -4,6 +4,8 @@
 #include <cmath>
 #include <cstdint>
 
+#include "CollisionSystem.h"
+
 struct Player {
   uint32_t id;
   float x, y;
@@ -32,10 +34,12 @@ struct Player {
 };
 
 constexpr float PLAYER_SPEED = 200.0f;
+constexpr float PLAYER_RADIUS = 16.0f;  // Half of PLAYER_SIZE (32x32)
 
 inline void applyInput(Player& player, bool moveLeft, bool moveRight,
                        bool moveUp, bool moveDown, float deltaTime,
-                       float worldWidth, float worldHeight) {
+                       float worldWidth, float worldHeight,
+                       const CollisionSystem* collisionSystem = nullptr) {
   float dx = 0, dy = 0;
 
   if (moveUp) {
@@ -63,9 +67,22 @@ inline void applyInput(Player& player, bool moveLeft, bool moveRight,
 
   player.vx = dx * PLAYER_SPEED;
   player.vy = dy * PLAYER_SPEED;
-  player.x += player.vx * deltaTime / 1000.0f;
-  player.y += player.vy * deltaTime / 1000.0f;
 
+  // Calculate new position
+  float oldX = player.x;
+  float oldY = player.y;
+  float newX = player.x + player.vx * deltaTime / 1000.0f;
+  float newY = player.y + player.vy * deltaTime / 1000.0f;
+
+  // Check collision if system is provided
+  if (collisionSystem != nullptr) {
+    collisionSystem->checkMovement(oldX, oldY, newX, newY, PLAYER_RADIUS);
+  }
+
+  player.x = newX;
+  player.y = newY;
+
+  // Clamp to world bounds
   player.x = std::clamp(player.x, 0.0f, worldWidth);
   player.y = std::clamp(player.y, 0.0f, worldHeight);
 }

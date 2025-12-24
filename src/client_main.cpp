@@ -1,5 +1,7 @@
 #include "Camera.h"
 #include "ClientPrediction.h"
+#include "CollisionDebugRenderer.h"
+#include "CollisionSystem.h"
 #include "EventBus.h"
 #include "GameLoop.h"
 #include "InputSystem.h"
@@ -25,22 +27,28 @@ int main() {
 
   Window window("Gambit Client", 800, 600);
   GameLoop gameLoop;
-  InputSystem inputSystem;
 
   TiledMap map;
   assert(map.load("assets/test_map.tmx") && "Failed to load required map");
 
+  CollisionSystem collisionSystem(map.getCollisionShapes());
+  Logger::info("Client collision system initialized");
+
   Camera camera(800, 600);
   camera.setWorldBounds(map.getWorldWidth(), map.getWorldHeight());
 
+  CollisionDebugRenderer debugRenderer(window.getRenderer(), &camera,
+                                       &collisionSystem);
+
+  InputSystem inputSystem(&debugRenderer);
   TileRenderer tileRenderer(window.getRenderer(), &camera);
 
   uint32_t localPlayerId = (uint32_t)(uintptr_t)&client;
   ClientPrediction clientPrediction(&client, localPlayerId, map.getWorldWidth(),
-                                    map.getWorldHeight());
+                                    map.getWorldHeight(), &collisionSystem);
   RemotePlayerInterpolation remoteInterpolation(localPlayerId);
   RenderSystem renderSystem(&window, &clientPrediction, &remoteInterpolation,
-                            &camera, &map, &tileRenderer);
+                            &camera, &map, &tileRenderer, &debugRenderer);
 
   // Subscribe to UpdateEvent for network processing
   EventBus::instance().subscribe<UpdateEvent>([&](const UpdateEvent& e) {

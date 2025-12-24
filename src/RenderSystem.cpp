@@ -7,13 +7,15 @@
 RenderSystem::RenderSystem(Window* window, ClientPrediction* clientPrediction,
                            RemotePlayerInterpolation* remoteInterpolation,
                            Camera* camera, TiledMap* tiledMap,
-                           TileRenderer* tileRenderer)
+                           TileRenderer* tileRenderer,
+                           CollisionDebugRenderer* collisionDebugRenderer)
     : window(window),
       clientPrediction(clientPrediction),
       remoteInterpolation(remoteInterpolation),
       camera(camera),
       tiledMap(tiledMap),
-      tileRenderer(tileRenderer) {
+      tileRenderer(tileRenderer),
+      collisionDebugRenderer(collisionDebugRenderer) {
   EventBus::instance().subscribe<RenderEvent>(
       [this](const RenderEvent& e) { onRender(e); });
 }
@@ -47,6 +49,11 @@ void RenderSystem::onRender(const RenderEvent& e) {
       }
     }
   });
+
+  // Render collision debug overlay (if enabled)
+  if (collisionDebugRenderer) {
+    collisionDebugRenderer->render();
+  }
 
   SDL_RenderPresent(renderer);
 }

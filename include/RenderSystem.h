@@ -4,6 +4,7 @@
 
 #include "Camera.h"
 #include "ClientPrediction.h"
+#include "CollisionDebugRenderer.h"
 #include "EventBus.h"
 #include "RemotePlayerInterpolation.h"
 #include "TileRenderer.h"
@@ -14,7 +15,8 @@ class RenderSystem {
  public:
   RenderSystem(Window* window, ClientPrediction* clientPrediction,
                RemotePlayerInterpolation* remoteInterpolation, Camera* camera,
-               TiledMap* tiledMap, TileRenderer* tileRenderer);
+               TiledMap* tiledMap, TileRenderer* tileRenderer,
+               CollisionDebugRenderer* collisionDebugRenderer);
 
   ~RenderSystem() = default;
 
@@ -25,6 +27,7 @@ class RenderSystem {
   Camera* camera;
   TiledMap* tiledMap;
   TileRenderer* tileRenderer;
+  CollisionDebugRenderer* collisionDebugRenderer;
 
   void onRender(const RenderEvent& e);
   void drawPlayer(const Player& player);

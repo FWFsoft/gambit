@@ -43,6 +43,7 @@ add_executable(Server
     src/GameLoop.cpp
     src/ServerGameState.cpp
     src/TiledMap.cpp
+    src/CollisionSystem.cpp
 )
 target_include_directories(Server SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
 target_include_directories(Server PRIVATE include)
@@ -70,6 +71,8 @@ add_executable(Client
     src/RenderSystem.cpp
     src/TiledMap.cpp
     src/TileRenderer.cpp
+    src/CollisionSystem.cpp
+    src/CollisionDebugRenderer.cpp
 )
 target_include_directories(Client SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
 target_include_directories(Client PRIVATE include)
@@ -90,6 +93,7 @@ add_executable(test_player
     tests/test_player.cpp
     src/Logger.cpp
     src/NetworkProtocol.cpp
+    src/CollisionSystem.cpp
 )
 target_include_directories(test_player SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
 target_include_directories(test_player PRIVATE include tests)
@@ -141,6 +145,7 @@ add_executable(test_client_prediction
     src/NetworkProtocol.cpp
     src/ClientPrediction.cpp
     src/NetworkClient.cpp
+    src/CollisionSystem.cpp
 )
 target_include_directories(test_client_prediction SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
 target_include_directories(test_client_prediction PRIVATE include tests)
