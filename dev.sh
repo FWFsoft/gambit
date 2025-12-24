@@ -1,8 +1,11 @@
 #!/bin/bash
 # Gambit Development Environment
-# Starts 1 server + 4 clients, handles cleanup on Ctrl+C
+# Starts 1 server + 2 clients, handles cleanup on Ctrl+C
 
 set -e
+
+# Number of clients to spawn
+NUM_CLIENTS=2
 
 # Track all child processes
 PIDS=()
@@ -29,7 +32,7 @@ fi
 
 echo "Starting Gambit development environment..."
 echo "  - 1 Server (0.0.0.0:1234)"
-echo "  - 4 Clients (connecting to 127.0.0.1:1234)"
+echo "  - ${NUM_CLIENTS} Clients (connecting to 127.0.0.1:1234)"
 echo ""
 echo "Press Ctrl+C to stop all processes..."
 echo ""
@@ -40,9 +43,9 @@ echo "Starting server..."
 PIDS+=($!)
 sleep 1
 
-# Start 4 clients
-echo "Starting 4 clients..."
-for i in {1..4}; do
+# Start $NUM_CLIENTS clients
+echo "Starting $NUM_CLIENTS clients..."
+for i in {1..2}; do
     ./build/Client &
     PIDS+=($!)
     sleep 1

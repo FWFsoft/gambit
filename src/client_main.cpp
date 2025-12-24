@@ -57,8 +57,8 @@ int main() {
 
     // Log every 60 frames (once per second) to verify 60 FPS
     if (e.frameNumber % 60 == 0) {
-      Logger::info("Frame: " + std::to_string(e.frameNumber) +
-                   " (deltaTime: " + std::to_string(e.deltaTime) + "ms)");
+      Logger::debug("Frame: " + std::to_string(e.frameNumber) +
+                    " (deltaTime: " + std::to_string(e.deltaTime) + "ms)");
     }
   });
 

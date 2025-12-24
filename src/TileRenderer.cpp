@@ -26,10 +26,19 @@ void TileRenderer::render(const TiledMap& map,
     }
 
     float unit = map.getTileWidth() / 2.0f;
-    float rowMinDepth = tileY * unit;
-    float rowMaxDepth = (tileY + 1) * unit;
-    playerCallback(rowMinDepth, rowMaxDepth);
+    for (int tileX = 0; tileX < map.getWidth(); ++tileX) {
+      float tileWorldX = tileX * unit;
+      float tileWorldY = tileY * unit;
+      float tileDepth = tileWorldX + tileWorldY;
+      float nextDepth = tileDepth + unit;
+      playerCallback(tileDepth, nextDepth);
+    }
   }
+
+  // Render remaining players that are beyond all tiles
+  float unit = map.getTileWidth() / 2.0f;
+  float maxTileDepth = (map.getWidth() + map.getHeight()) * unit;
+  playerCallback(maxTileDepth, maxTileDepth + 10000);
 }
 
 void TileRenderer::renderTile(const TiledMap& map, int tileX, int tileY,

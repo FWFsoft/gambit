@@ -41,7 +41,8 @@ void RenderSystem::onRender(const RenderEvent& e) {
 
   tileRenderer->render(*tiledMap, [&](float minDepth, float maxDepth) {
     for (const Player& player : allPlayers) {
-      if (player.y >= minDepth && player.y < maxDepth) {
+      float playerDepth = player.x + player.y;
+      if (playerDepth >= minDepth && playerDepth < maxDepth) {
         drawPlayer(player);
       }
     }
