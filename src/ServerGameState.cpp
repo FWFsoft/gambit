@@ -37,8 +37,8 @@ void ServerGameState::onClientConnected(const ClientConnectedEvent& e) {
   Player player;
   player.id = playerId;
 
-  player.x = std::clamp(100.0f + (rand() % 600), 0.0f, worldWidth);
-  player.y = std::clamp(100.0f + (rand() % 400), 0.0f, worldHeight);
+  player.x = worldWidth / 2.0f;
+  player.y = worldHeight / 2.0f;
   player.vx = 0;
   player.vy = 0;
   player.health = 100.0f;

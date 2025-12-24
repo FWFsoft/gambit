@@ -25,8 +25,9 @@ void TileRenderer::render(const TiledMap& map,
       }
     }
 
-    float rowMinDepth = tileY * (tileHeight / 2.0f);
-    float rowMaxDepth = (tileY + 1) * (tileHeight / 2.0f);
+    float unit = map.getTileWidth() / 2.0f;
+    float rowMinDepth = tileY * unit;
+    float rowMaxDepth = (tileY + 1) * unit;
     playerCallback(rowMinDepth, rowMaxDepth);
   }
 }

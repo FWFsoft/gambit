@@ -30,14 +30,20 @@ struct Camera {
     float isoX = worldX - worldY;
     float isoY = (worldX + worldY) * 0.5f;
 
-    screenX = static_cast<int>(isoX - x + screenWidth / 2);
-    screenY = static_cast<int>(isoY - y + screenHeight / 2);
+    float camIsoX = x - y;
+    float camIsoY = (x + y) * 0.5f;
+
+    screenX = static_cast<int>(isoX - camIsoX + screenWidth / 2);
+    screenY = static_cast<int>(isoY - camIsoY + screenHeight / 2);
   }
 
   void screenToWorld(int screenX, int screenY, float& worldX,
                      float& worldY) const {
-    float isoX = screenX + x - screenWidth / 2;
-    float isoY = screenY + y - screenHeight / 2;
+    float camIsoX = x - y;
+    float camIsoY = (x + y) * 0.5f;
+
+    float isoX = screenX + camIsoX - screenWidth / 2;
+    float isoY = screenY + camIsoY - screenHeight / 2;
 
     worldX = isoY + (isoX * 0.5f);
     worldY = isoY - (isoX * 0.5f);
