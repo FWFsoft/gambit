@@ -275,13 +275,13 @@ TEST(Player_MoveRight) {
   player.x = 100.0f;
   player.y = 100.0f;
 
-  applyInput(player, false, true, false, false, 16.67f, 800.0f,
-             600.0f);  // Move right
+  applyInput(player, false, true, false, false, 16.67f, 800.0f, 600.0f);
 
-  assert(floatEqual(player.vx, 200.0f));
-  assert(floatEqual(player.vy, 0.0f));
-  assert(player.x > 100.0f);             // Moved right
-  assert(floatEqual(player.y, 100.0f));  // Y unchanged
+  float expectedSpeed = 200.0f * 0.707107f;
+  assert(floatEqual(player.vx, expectedSpeed));
+  assert(floatEqual(player.vy, -expectedSpeed));
+  assert(player.x > 100.0f);
+  assert(player.y < 100.0f);
 }
 
 TEST(Player_MoveLeft) {
@@ -289,12 +289,13 @@ TEST(Player_MoveLeft) {
   player.x = 100.0f;
   player.y = 100.0f;
 
-  applyInput(player, true, false, false, false, 16.67f, 800.0f,
-             600.0f);  // Move left
+  applyInput(player, true, false, false, false, 16.67f, 800.0f, 600.0f);
 
-  assert(floatEqual(player.vx, -200.0f));
-  assert(floatEqual(player.vy, 0.0f));
-  assert(player.x < 100.0f);  // Moved left
+  float expectedSpeed = 200.0f * 0.707107f;
+  assert(floatEqual(player.vx, -expectedSpeed));
+  assert(floatEqual(player.vy, expectedSpeed));
+  assert(player.x < 100.0f);
+  assert(player.y > 100.0f);
 }
 
 TEST(Player_MoveUp) {
@@ -302,12 +303,13 @@ TEST(Player_MoveUp) {
   player.x = 100.0f;
   player.y = 100.0f;
 
-  applyInput(player, false, false, true, false, 16.67f, 800.0f,
-             600.0f);  // Move up
+  applyInput(player, false, false, true, false, 16.67f, 800.0f, 600.0f);
 
-  assert(floatEqual(player.vx, 0.0f));
-  assert(floatEqual(player.vy, -200.0f));
-  assert(player.y < 100.0f);  // Moved up
+  float expectedSpeed = 200.0f * 0.707107f;
+  assert(floatEqual(player.vx, -expectedSpeed));
+  assert(floatEqual(player.vy, -expectedSpeed));
+  assert(player.x < 100.0f);
+  assert(player.y < 100.0f);
 }
 
 TEST(Player_MoveDown) {
@@ -315,12 +317,13 @@ TEST(Player_MoveDown) {
   player.x = 100.0f;
   player.y = 100.0f;
 
-  applyInput(player, false, false, false, true, 16.67f, 800.0f,
-             600.0f);  // Move down
+  applyInput(player, false, false, false, true, 16.67f, 800.0f, 600.0f);
 
-  assert(floatEqual(player.vx, 0.0f));
-  assert(floatEqual(player.vy, 200.0f));
-  assert(player.y > 100.0f);  // Moved down
+  float expectedSpeed = 200.0f * 0.707107f;
+  assert(floatEqual(player.vx, expectedSpeed));
+  assert(floatEqual(player.vy, expectedSpeed));
+  assert(player.x > 100.0f);
+  assert(player.y > 100.0f);
 }
 
 TEST(Player_DiagonalMovement) {
@@ -328,14 +331,12 @@ TEST(Player_DiagonalMovement) {
   player.x = 100.0f;
   player.y = 100.0f;
 
-  applyInput(player, false, true, false, true, 16.67f, 800.0f,
-             600.0f);  // Move right and down
+  applyInput(player, false, true, false, true, 16.67f, 800.0f, 600.0f);
 
-  // Diagonal speed should be normalized: 200 * 0.707 ≈ 141.4
-  assert(floatEqual(player.vx, 141.4f, 1.0f));
-  assert(floatEqual(player.vy, 141.4f, 1.0f));
+  assert(floatEqual(player.vx, 200.0f));
+  assert(floatEqual(player.vy, 0.0f));
   assert(player.x > 100.0f);
-  assert(player.y > 100.0f);
+  assert(floatEqual(player.y, 100.0f));
 }
 
 TEST(Player_Stationary) {
@@ -395,6 +396,58 @@ TEST(Player_BoundsClampingBottom) {
              600.0f);  // Move down
 
   assert(player.y <= 600.0f);  // Should be clamped to 600
+}
+
+TEST(Player_IsometricMapBounds_BottomRight) {
+  Player player;
+  player.x = 970.0f;
+  player.y = 970.0f;
+
+  applyInput(player, false, true, false, true, 16.67f, 976.0f, 976.0f);
+
+  assert(player.x <= 976.0f);
+  assert(player.y <= 976.0f);
+}
+
+TEST(Player_IsometricMapBounds_TopLeft) {
+  Player player;
+  player.x = 5.0f;
+  player.y = 5.0f;
+
+  applyInput(player, false, false, true, false, 16.67f, 976.0f, 976.0f);
+
+  assert(player.x >= 0.0f);
+  assert(player.y >= 0.0f);
+}
+
+TEST(Player_IsometricMapBounds_AllCorners) {
+  float worldSize = 976.0f;
+
+  Player topLeft;
+  topLeft.x = 0.0f;
+  topLeft.y = 0.0f;
+  applyInput(topLeft, false, false, true, false, 100.0f, worldSize, worldSize);
+  assert(topLeft.x >= 0.0f && topLeft.y >= 0.0f);
+
+  Player topRight;
+  topRight.x = worldSize;
+  topRight.y = 0.0f;
+  applyInput(topRight, false, true, false, false, 100.0f, worldSize, worldSize);
+  assert(topRight.x <= worldSize && topRight.y >= 0.0f);
+
+  Player bottomLeft;
+  bottomLeft.x = 0.0f;
+  bottomLeft.y = worldSize;
+  applyInput(bottomLeft, true, false, false, false, 100.0f, worldSize,
+             worldSize);
+  assert(bottomLeft.x >= 0.0f && bottomLeft.y <= worldSize);
+
+  Player bottomRight;
+  bottomRight.x = worldSize;
+  bottomRight.y = worldSize;
+  applyInput(bottomRight, false, false, false, true, 100.0f, worldSize,
+             worldSize);
+  assert(bottomRight.x <= worldSize && bottomRight.y <= worldSize);
 }
 
 // ============================================================================

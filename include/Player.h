@@ -4,8 +4,6 @@
 #include <cmath>
 #include <cstdint>
 
-#include "Logger.h"
-
 struct Player {
   uint32_t id;
   float x, y;
@@ -38,8 +36,6 @@ constexpr float PLAYER_SPEED = 200.0f;
 inline void applyInput(Player& player, bool moveLeft, bool moveRight,
                        bool moveUp, bool moveDown, float deltaTime,
                        float worldWidth, float worldHeight) {
-  bool anyInput = moveLeft || moveRight || moveUp || moveDown;
-
   float dx = 0, dy = 0;
 
   if (moveUp) {
@@ -67,33 +63,9 @@ inline void applyInput(Player& player, bool moveLeft, bool moveRight,
 
   player.vx = dx * PLAYER_SPEED;
   player.vy = dy * PLAYER_SPEED;
-
-  float prevX = player.x;
-  float prevY = player.y;
-
   player.x += player.vx * deltaTime / 1000.0f;
   player.y += player.vy * deltaTime / 1000.0f;
 
-  float preClampX = player.x;
-  float preClampY = player.y;
-
   player.x = std::clamp(player.x, 0.0f, worldWidth);
   player.y = std::clamp(player.y, 0.0f, worldHeight);
-
-  if (anyInput && (prevX != player.x || prevY != player.y)) {
-    Logger::info("MOVE - Player " + std::to_string(player.id) + " from (" +
-                 std::to_string(prevX) + ", " + std::to_string(prevY) +
-                 ") to (" + std::to_string(player.x) + ", " +
-                 std::to_string(player.y) + ") - dx/dy: (" +
-                 std::to_string(dx) + ", " + std::to_string(dy) + ")");
-  }
-
-  if (preClampX != player.x || preClampY != player.y) {
-    Logger::info("BOUNDS HIT - Player " + std::to_string(player.id) +
-                 " - Position before: (" + std::to_string(preClampX) + ", " +
-                 std::to_string(preClampY) + ") after: (" +
-                 std::to_string(player.x) + ", " + std::to_string(player.y) +
-                 ") - World bounds: (" + std::to_string(worldWidth) + ", " +
-                 std::to_string(worldHeight) + ")");
-  }
 }
