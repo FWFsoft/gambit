@@ -851,6 +851,9 @@ int main() {
   run_Player_BoundsClampingRight();
   run_Player_BoundsClampingTop();
   run_Player_BoundsClampingBottom();
+  run_Player_IsometricMapBounds_BottomRight();
+  run_Player_IsometricMapBounds_TopLeft();
+  run_Player_IsometricMapBounds_AllCorners();
 
   // Phase 2: InputSystem Tests
   std::cout << "\nPhase 2: InputSystem\n";

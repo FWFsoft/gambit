@@ -16,7 +16,8 @@
       "Skill(test)",
       "Bash(./build/Tests:*)",
       "WebSearch",
-      "Bash(make build:*)"
+      "Bash(make build:*)",
+      "WebFetch(domain:github.com)"
     ]
   }
 }

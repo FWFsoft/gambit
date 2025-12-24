@@ -12,9 +12,6 @@ ServerGameState::ServerGameState(NetworkServer* server, float worldWidth,
       worldWidth(worldWidth),
       worldHeight(worldHeight),
       serverTick(0) {
-  Logger::info("ServerGameState initialized with world bounds: " +
-               std::to_string(worldWidth) + " x " +
-               std::to_string(worldHeight));
   // Subscribe to client connection events
   EventBus::instance().subscribe<ClientConnectedEvent>(
       [this](const ClientConnectedEvent& e) { onClientConnected(e); });

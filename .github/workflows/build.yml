@@ -10,10 +10,23 @@ jobs:
       with:
         fetch-depth: 0
 
+    - name: Install system dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y \
+          pkg-config \
+          libx11-dev \
+          libxft-dev \
+          libxext-dev \
+          libwayland-dev \
+          libxkbcommon-dev \
+          libegl1-mesa-dev \
+          libibus-1.0-dev
+
     - name: Setup vcpkg
       uses: lukka/run-vcpkg@v11
       with:
-        vcpkgGitCommitId: 'a42af01b72c28a8e1d7b48107b33e4f286a55ef6'  # Latest stable
+        vcpkgGitCommitId: 'a42af01b72c28a8e1d7b48107b33e4f286a55ef6'
 
     - name: Configure CMake
       run: cmake -B build -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
