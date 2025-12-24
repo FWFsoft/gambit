@@ -1,3 +1,4 @@
+#include "Camera.h"
 #include "ClientPrediction.h"
 #include "EventBus.h"
 #include "GameLoop.h"
@@ -6,6 +7,8 @@
 #include "NetworkClient.h"
 #include "RemotePlayerInterpolation.h"
 #include "RenderSystem.h"
+#include "TileRenderer.h"
+#include "TiledMap.h"
 #include "Window.h"
 
 int main() {
@@ -24,12 +27,20 @@ int main() {
   GameLoop gameLoop;
   InputSystem inputSystem;
 
-  // Generate client ID from peer pointer (will be updated when server sends
-  // PlayerJoined)
-  uint32_t localPlayerId = (uint32_t)(uintptr_t)&client;  // Temporary ID
-  ClientPrediction clientPrediction(&client, localPlayerId);
+  TiledMap map;
+  assert(map.load("assets/test_map.tmx") && "Failed to load required map");
+
+  Camera camera(800, 600);
+  camera.setWorldBounds(map.getWorldWidth(), map.getWorldHeight());
+
+  TileRenderer tileRenderer(window.getRenderer(), &camera);
+
+  uint32_t localPlayerId = (uint32_t)(uintptr_t)&client;
+  ClientPrediction clientPrediction(&client, localPlayerId, map.getWorldWidth(),
+                                    map.getWorldHeight());
   RemotePlayerInterpolation remoteInterpolation(localPlayerId);
-  RenderSystem renderSystem(&window, &clientPrediction, &remoteInterpolation);
+  RenderSystem renderSystem(&window, &clientPrediction, &remoteInterpolation,
+                            &camera, &map, &tileRenderer);
 
   // Subscribe to UpdateEvent for network processing
   EventBus::instance().subscribe<UpdateEvent>([&](const UpdateEvent& e) {

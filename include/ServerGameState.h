@@ -11,10 +11,12 @@ class NetworkServer;
 
 class ServerGameState {
  public:
-  ServerGameState(NetworkServer* server);
+  ServerGameState(NetworkServer* server, float worldWidth, float worldHeight);
 
  private:
   NetworkServer* server;
+  float worldWidth;
+  float worldHeight;
   std::unordered_map<uint32_t, Player> players;
   std::unordered_map<ENetPeer*, uint32_t> peerToPlayerId;
   uint32_t serverTick;

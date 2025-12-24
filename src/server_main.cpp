@@ -1,3 +1,4 @@
+#include <cassert>
 #include <csignal>
 
 #include "EventBus.h"
@@ -5,6 +6,7 @@
 #include "Logger.h"
 #include "NetworkServer.h"
 #include "ServerGameState.h"
+#include "TiledMap.h"
 
 volatile bool serverRunning = true;
 
@@ -19,8 +21,11 @@ int main() {
     return EXIT_FAILURE;
   }
 
+  TiledMap map;
+  assert(map.load("assets/test_map.tmx") && "Failed to load required map");
+
   GameLoop gameLoop;
-  ServerGameState gameState(&server);
+  ServerGameState gameState(&server, map.getWorldWidth(), map.getWorldHeight());
 
   // Subscribe to UpdateEvent to process network events
   EventBus::instance().subscribe<UpdateEvent>([&](const UpdateEvent& e) {

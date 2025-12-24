@@ -29,6 +29,10 @@ endif()
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(TMXLITE REQUIRED IMPORTED_TARGET tmxlite)
 
+# tmxlite dependencies
+find_package(ZLIB REQUIRED)
+find_package(zstd CONFIG REQUIRED)
+
 # Server executable
 add_executable(Server
     src/server_main.cpp
@@ -38,6 +42,7 @@ add_executable(Server
     src/NetworkProtocol.cpp
     src/GameLoop.cpp
     src/ServerGameState.cpp
+    src/TiledMap.cpp
 )
 target_include_directories(Server SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
 target_include_directories(Server PRIVATE include)
@@ -46,6 +51,8 @@ target_link_libraries(Server PRIVATE
     SDL2::SDL2
     spdlog::spdlog
     PkgConfig::TMXLITE
+    ZLIB::ZLIB
+    $<IF:$<TARGET_EXISTS:zstd::libzstd_shared>,zstd::libzstd_shared,zstd::libzstd_static>
 )
 
 # Client executable
@@ -61,6 +68,8 @@ add_executable(Client
     src/ClientPrediction.cpp
     src/RemotePlayerInterpolation.cpp
     src/RenderSystem.cpp
+    src/TiledMap.cpp
+    src/TileRenderer.cpp
 )
 target_include_directories(Client SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
 target_include_directories(Client PRIVATE include)
@@ -69,6 +78,8 @@ target_link_libraries(Client PRIVATE
     SDL2::SDL2
     spdlog::spdlog
     PkgConfig::TMXLITE
+    ZLIB::ZLIB
+    $<IF:$<TARGET_EXISTS:zstd::libzstd_shared>,zstd::libzstd_shared,zstd::libzstd_static>
 )
 
 # Test executable

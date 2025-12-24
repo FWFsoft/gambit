@@ -10,7 +10,8 @@ class NetworkClient;
 
 class ClientPrediction {
  public:
-  ClientPrediction(NetworkClient* client, uint32_t localPlayerId);
+  ClientPrediction(NetworkClient* client, uint32_t localPlayerId,
+                   float worldWidth, float worldHeight);
 
   const Player& getLocalPlayer() const { return localPlayer; }
 
@@ -18,8 +19,9 @@ class ClientPrediction {
   NetworkClient* client;
   uint32_t localPlayerId;
   Player localPlayer;
+  float worldWidth;
+  float worldHeight;
 
-  // Input history for reconciliation (store last 60 inputs = 1 second)
   std::deque<LocalInputEvent> inputHistory;
   uint32_t localInputSequence;
 

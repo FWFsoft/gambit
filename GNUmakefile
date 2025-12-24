@@ -11,7 +11,7 @@ build:  ## Builds the project as is
 	@mkdir -p build
 	@cd build && \
 	cmake .. -DCMAKE_TOOLCHAIN_FILE=$$HOME/dev/vcpkg/scripts/buildsystems/vcpkg.cmake && \
-	make
+	make -j8
 
 clean:  ## Remove build artifacts for a fresh rebuild
 	@if [ -d "build" ]; then \
@@ -29,7 +29,7 @@ test-coverage:  ## Run tests with code coverage and generate HTML report
 	@mkdir -p build
 	@cd build && \
 	cmake -DENABLE_COVERAGE=ON -DCMAKE_TOOLCHAIN_FILE=$$HOME/dev/vcpkg/scripts/buildsystems/vcpkg.cmake .. && \
-	make Tests
+	make -j8 Tests
 	@echo "Running tests..."
 	@cd build && ./Tests
 	@echo "Generating coverage report..."

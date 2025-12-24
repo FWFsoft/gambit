@@ -15,7 +15,8 @@
       "Bash(make clean:*)",
       "Skill(test)",
       "Bash(./build/Tests:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(make build:*)"
     ]
   }
 }

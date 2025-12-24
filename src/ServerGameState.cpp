@@ -1,12 +1,17 @@
 #include "ServerGameState.h"
 
+#include <algorithm>
 #include <cassert>
 
 #include "Logger.h"
 #include "NetworkServer.h"
 
-ServerGameState::ServerGameState(NetworkServer* server)
-    : server(server), serverTick(0) {
+ServerGameState::ServerGameState(NetworkServer* server, float worldWidth,
+                                 float worldHeight)
+    : server(server),
+      worldWidth(worldWidth),
+      worldHeight(worldHeight),
+      serverTick(0) {
   // Subscribe to client connection events
   EventBus::instance().subscribe<ClientConnectedEvent>(
       [this](const ClientConnectedEvent& e) { onClientConnected(e); });
@@ -32,9 +37,8 @@ void ServerGameState::onClientConnected(const ClientConnectedEvent& e) {
   Player player;
   player.id = playerId;
 
-  // Spawn at random position
-  player.x = 100 + (rand() % 600);
-  player.y = 100 + (rand() % 400);
+  player.x = std::clamp(100.0f + (rand() % 600), 0.0f, worldWidth);
+  player.y = std::clamp(100.0f + (rand() % 400), 0.0f, worldHeight);
   player.vx = 0;
   player.vy = 0;
   player.health = 100.0f;
@@ -115,9 +119,8 @@ void ServerGameState::processClientInput(ENetPeer* peer, const uint8_t* data,
   }
   player.lastInputSequence = input.inputSequence;
 
-  // Apply input to player
   applyInput(player, input.moveLeft, input.moveRight, input.moveUp,
-             input.moveDown, 16.67f);
+             input.moveDown, 16.67f, worldWidth, worldHeight);
 }
 
 void ServerGameState::onUpdate(const UpdateEvent& e) {

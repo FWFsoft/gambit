@@ -275,7 +275,8 @@ TEST(Player_MoveRight) {
   player.x = 100.0f;
   player.y = 100.0f;
 
-  applyInput(player, false, true, false, false, 16.67f);  // Move right
+  applyInput(player, false, true, false, false, 16.67f, 800.0f,
+             600.0f);  // Move right
 
   assert(floatEqual(player.vx, 200.0f));
   assert(floatEqual(player.vy, 0.0f));
@@ -288,7 +289,8 @@ TEST(Player_MoveLeft) {
   player.x = 100.0f;
   player.y = 100.0f;
 
-  applyInput(player, true, false, false, false, 16.67f);  // Move left
+  applyInput(player, true, false, false, false, 16.67f, 800.0f,
+             600.0f);  // Move left
 
   assert(floatEqual(player.vx, -200.0f));
   assert(floatEqual(player.vy, 0.0f));
@@ -300,7 +302,8 @@ TEST(Player_MoveUp) {
   player.x = 100.0f;
   player.y = 100.0f;
 
-  applyInput(player, false, false, true, false, 16.67f);  // Move up
+  applyInput(player, false, false, true, false, 16.67f, 800.0f,
+             600.0f);  // Move up
 
   assert(floatEqual(player.vx, 0.0f));
   assert(floatEqual(player.vy, -200.0f));
@@ -312,7 +315,8 @@ TEST(Player_MoveDown) {
   player.x = 100.0f;
   player.y = 100.0f;
 
-  applyInput(player, false, false, false, true, 16.67f);  // Move down
+  applyInput(player, false, false, false, true, 16.67f, 800.0f,
+             600.0f);  // Move down
 
   assert(floatEqual(player.vx, 0.0f));
   assert(floatEqual(player.vy, 200.0f));
@@ -324,7 +328,8 @@ TEST(Player_DiagonalMovement) {
   player.x = 100.0f;
   player.y = 100.0f;
 
-  applyInput(player, false, true, false, true, 16.67f);  // Move right and down
+  applyInput(player, false, true, false, true, 16.67f, 800.0f,
+             600.0f);  // Move right and down
 
   // Diagonal speed should be normalized: 200 * 0.707 ≈ 141.4
   assert(floatEqual(player.vx, 141.4f, 1.0f));
@@ -338,7 +343,8 @@ TEST(Player_Stationary) {
   player.x = 100.0f;
   player.y = 100.0f;
 
-  applyInput(player, false, false, false, false, 16.67f);  // No movement
+  applyInput(player, false, false, false, false, 16.67f, 800.0f,
+             600.0f);  // No movement
 
   assert(floatEqual(player.vx, 0.0f));
   assert(floatEqual(player.vy, 0.0f));
@@ -351,7 +357,8 @@ TEST(Player_BoundsClampingLeft) {
   player.x = 5.0f;
   player.y = 100.0f;
 
-  applyInput(player, true, false, false, false, 16.67f);  // Move left
+  applyInput(player, true, false, false, false, 16.67f, 800.0f,
+             600.0f);  // Move left
 
   assert(player.x >= 0.0f);  // Should be clamped to 0
   assert(player.x <= 5.0f);  // Should not move right
@@ -362,7 +369,8 @@ TEST(Player_BoundsClampingRight) {
   player.x = 795.0f;
   player.y = 100.0f;
 
-  applyInput(player, false, true, false, false, 16.67f);  // Move right
+  applyInput(player, false, true, false, false, 16.67f, 800.0f,
+             600.0f);  // Move right
 
   assert(player.x <= 800.0f);  // Should be clamped to 800
 }
@@ -372,7 +380,8 @@ TEST(Player_BoundsClampingTop) {
   player.x = 100.0f;
   player.y = 5.0f;
 
-  applyInput(player, false, false, true, false, 16.67f);  // Move up
+  applyInput(player, false, false, true, false, 16.67f, 800.0f,
+             600.0f);  // Move up
 
   assert(player.y >= 0.0f);  // Should be clamped to 0
 }
@@ -382,7 +391,8 @@ TEST(Player_BoundsClampingBottom) {
   player.x = 100.0f;
   player.y = 595.0f;
 
-  applyInput(player, false, false, false, true, 16.67f);  // Move down
+  applyInput(player, false, false, false, true, 16.67f, 800.0f,
+             600.0f);  // Move down
 
   assert(player.y <= 600.0f);  // Should be clamped to 600
 }
@@ -717,7 +727,7 @@ TEST(RemotePlayerInterpolation_MultipleRemotePlayers) {
 TEST(ClientPrediction_ColorSyncDuringReconciliation) {
   resetEventBus();
   NetworkClient client;  // Dummy client for testing
-  ClientPrediction prediction(&client, 1);
+  ClientPrediction prediction(&client, 1, 800.0f, 600.0f);
 
   // Simulate server sending a state update with a specific color (Red)
   PlayerState serverState{1, 100.0f, 100.0f, 0.0f, 0.0f, 100.0f, 255, 0, 0, 5};
@@ -733,7 +743,7 @@ TEST(ClientPrediction_ColorSyncDuringReconciliation) {
 TEST(ClientPrediction_ColorPersistsAcrossMultipleReconciles) {
   resetEventBus();
   NetworkClient client;
-  ClientPrediction prediction(&client, 1);
+  ClientPrediction prediction(&client, 1, 800.0f, 600.0f);
 
   // Send multiple state updates with the same color
   for (uint32_t tick = 1; tick <= 5; tick++) {

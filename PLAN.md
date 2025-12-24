@@ -31,7 +31,7 @@ Integrate Tiled map editor with isometric rendering (like Hades), implement came
 
 ---
 
-### Phase 2: Camera System Foundation
+### ✅ Phase 2: Camera System Foundation (COMPLETED)
 **Goal**: Create camera that follows player and transforms world→screen coordinates.
 
 **New Files**:
@@ -81,7 +81,7 @@ if (isometric) {
 
 ---
 
-### Phase 3: Tiled Map Loading
+### ✅ Phase 3: Tiled Map Loading (COMPLETED)
 **Goal**: Load TMX files and extract map metadata.
 
 **New Files**:
@@ -128,7 +128,7 @@ private:
 
 ---
 
-### Phase 4: Isometric Tile Rendering
+### ✅ Phase 4: Isometric Tile Rendering (COMPLETED)
 **Goal**: Render isometric tiles from map.
 
 **New Files**:
@@ -173,7 +173,7 @@ if (map.isIsometric()) {
 
 ---
 
-### Phase 5: Depth Sorting (Players with Tiles)
+### ✅ Phase 5: Depth Sorting (Players with Tiles) (COMPLETED)
 **Goal**: Interleave players with tiles based on Y depth.
 
 **Algorithm**:
@@ -203,7 +203,7 @@ for (int tileY = 0; tileY < mapHeight; ++tileY) {
 
 ---
 
-### Phase 6: Dynamic World Bounds
+### ✅ Phase 6: Dynamic World Bounds (COMPLETED)
 **Goal**: Replace hardcoded 800x600 with map-based bounds.
 
 **Modified Files**:
@@ -328,7 +328,7 @@ void Camera::clampToWorldBounds() {
 
 **Per-Phase Testing**:
 - Phase 1: ✅ `/build` succeeds
-- Phase 2: Camera follows player (800x600 world still)
+- Phase 2: ✅ Camera follows player (800x600 world still)
 - Phase 3: Map loads, dimensions logged
 - Phase 4: Isometric tiles render in diamond pattern
 - Phase 5: Players behind/in-front of tiles correctly

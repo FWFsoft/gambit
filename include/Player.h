@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 
 struct Player {
@@ -30,25 +31,34 @@ struct Player {
         lastServerTick(0) {}
 };
 
-// Movement constants
-constexpr float PLAYER_SPEED = 200.0f;  // pixels per second
-constexpr float WORLD_WIDTH = 800.0f;
-constexpr float WORLD_HEIGHT = 600.0f;
+constexpr float PLAYER_SPEED = 200.0f;
 
-// Apply input to player (shared by client prediction and server authority)
 inline void applyInput(Player& player, bool moveLeft, bool moveRight,
-                       bool moveUp, bool moveDown, float deltaTime) {
+                       bool moveUp, bool moveDown, float deltaTime,
+                       float worldWidth, float worldHeight) {
   float dx = 0, dy = 0;
 
-  if (moveLeft) dx -= 1;
-  if (moveRight) dx += 1;
-  if (moveUp) dy -= 1;
-  if (moveDown) dy += 1;
+  if (moveUp) {
+    dx += 1;
+    dy -= 1;
+  }
+  if (moveDown) {
+    dx -= 1;
+    dy += 1;
+  }
+  if (moveRight) {
+    dx += 1;
+    dy += 1;
+  }
+  if (moveLeft) {
+    dx -= 1;
+    dy -= 1;
+  }
 
-  // Normalize diagonal movement
-  if (dx != 0 && dy != 0) {
-    dx *= 0.707f;
-    dy *= 0.707f;
+  float len = std::sqrt(dx * dx + dy * dy);
+  if (len > 0) {
+    dx /= len;
+    dy /= len;
   }
 
   player.vx = dx * PLAYER_SPEED;
@@ -56,7 +66,6 @@ inline void applyInput(Player& player, bool moveLeft, bool moveRight,
   player.x += player.vx * deltaTime / 1000.0f;
   player.y += player.vy * deltaTime / 1000.0f;
 
-  // Clamp to world bounds
-  player.x = std::clamp(player.x, 0.0f, WORLD_WIDTH);
-  player.y = std::clamp(player.y, 0.0f, WORLD_HEIGHT);
+  player.x = std::clamp(player.x, 0.0f, worldWidth);
+  player.y = std::clamp(player.y, 0.0f, worldHeight);
 }
