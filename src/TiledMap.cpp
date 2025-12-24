@@ -34,6 +34,6 @@ bool TiledMap::load(const std::string& filepath) {
   return true;
 }
 
-int TiledMap::getWorldWidth() const { return mapWidth * (tileWidth / 2); }
+int TiledMap::getWorldWidth() const { return mapWidth * (tileWidth / 2) * 2; }
 
-int TiledMap::getWorldHeight() const { return mapHeight * (tileWidth / 2); }
+int TiledMap::getWorldHeight() const { return mapHeight * (tileWidth / 2) * 2; }

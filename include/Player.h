@@ -39,20 +39,20 @@ inline void applyInput(Player& player, bool moveLeft, bool moveRight,
   float dx = 0, dy = 0;
 
   if (moveUp) {
+    dx -= 1;
+    dy -= 1;
+  }
+  if (moveRight) {
     dx += 1;
     dy -= 1;
   }
   if (moveDown) {
-    dx -= 1;
-    dy += 1;
-  }
-  if (moveRight) {
     dx += 1;
     dy += 1;
   }
   if (moveLeft) {
     dx -= 1;
-    dy -= 1;
+    dy += 1;
   }
 
   float len = std::sqrt(dx * dx + dy * dy);
