@@ -25,13 +25,19 @@ else()
     message(FATAL_ERROR "ENet library not found")
 endif()
 
-# Find tmxlite library (uses pkg-config)
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(TMXLITE REQUIRED IMPORTED_TARGET tmxlite)
+# Find tmxlite library
+# Try CMake config first (for vcpkg), then fall back to pkg-config (for system)
+find_package(tmxlite CONFIG QUIET)
+if(NOT tmxlite_FOUND)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(TMXLITE REQUIRED IMPORTED_TARGET tmxlite)
+endif()
 
-# tmxlite dependencies
-find_package(ZLIB REQUIRED)
-find_package(zstd CONFIG REQUIRED)
+# tmxlite dependencies (only needed when using system tmxlite)
+if(NOT tmxlite_FOUND)
+    find_package(ZLIB REQUIRED)
+    find_package(zstd CONFIG REQUIRED)
+endif()
 
 # Server executable
 add_executable(Server
@@ -51,10 +57,17 @@ target_link_libraries(Server PRIVATE
     ${ENET_LIBRARY}
     SDL2::SDL2
     spdlog::spdlog
-    PkgConfig::TMXLITE
-    ZLIB::ZLIB
-    $<IF:$<TARGET_EXISTS:zstd::libzstd_shared>,zstd::libzstd_shared,zstd::libzstd_static>
 )
+# Link tmxlite (vcpkg or pkg-config)
+if(tmxlite_FOUND)
+    target_link_libraries(Server PRIVATE tmxlite::tmxlite)
+else()
+    target_link_libraries(Server PRIVATE
+        PkgConfig::TMXLITE
+        ZLIB::ZLIB
+        $<IF:$<TARGET_EXISTS:zstd::libzstd_shared>,zstd::libzstd_shared,zstd::libzstd_static>
+    )
+endif()
 
 # Client executable
 add_executable(Client
@@ -80,10 +93,17 @@ target_link_libraries(Client PRIVATE
     ${ENET_LIBRARY}
     SDL2::SDL2
     spdlog::spdlog
-    PkgConfig::TMXLITE
-    ZLIB::ZLIB
-    $<IF:$<TARGET_EXISTS:zstd::libzstd_shared>,zstd::libzstd_shared,zstd::libzstd_static>
 )
+# Link tmxlite (vcpkg or pkg-config)
+if(tmxlite_FOUND)
+    target_link_libraries(Client PRIVATE tmxlite::tmxlite)
+else()
+    target_link_libraries(Client PRIVATE
+        PkgConfig::TMXLITE
+        ZLIB::ZLIB
+        $<IF:$<TARGET_EXISTS:zstd::libzstd_shared>,zstd::libzstd_shared,zstd::libzstd_static>
+    )
+endif()
 
 # Enable testing
 enable_testing()
