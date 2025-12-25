@@ -1,7 +1,6 @@
 #include "TileRenderer.h"
 
-TileRenderer::TileRenderer(SDL_Renderer* renderer, Camera* camera)
-    : renderer(renderer), camera(camera) {}
+TileRenderer::TileRenderer(Camera* camera) : camera(camera) {}
 
 void TileRenderer::render(const TiledMap& map,
                           PlayerRenderCallback playerCallback) {
@@ -43,24 +42,12 @@ void TileRenderer::render(const TiledMap& map,
 
 void TileRenderer::renderTile(const TiledMap& map, int tileX, int tileY,
                               uint32_t gid) {
-  float worldX, worldY;
-  gridToWorld(map, tileX, tileY, worldX, worldY);
-
-  int screenX, screenY;
-  camera->worldToScreen(worldX, worldY, screenX, screenY);
-
-  int tileWidth = map.getTileWidth();
-  int tileHeight = map.getTileHeight();
-
-  SDL_Rect rect;
-  rect.x = screenX - tileWidth / 2;
-  rect.y = screenY - tileHeight / 2;
-  rect.w = tileWidth;
-  rect.h = tileHeight;
-
-  uint8_t colorValue = static_cast<uint8_t>((gid - 1) * 64);
-  SDL_SetRenderDrawColor(renderer, colorValue, colorValue, colorValue, 255);
-  SDL_RenderFillRect(renderer, &rect);
+  // TODO: Implement OpenGL sprite rendering in Phase 3
+  // For now, just suppress unused parameter warnings
+  (void)map;
+  (void)tileX;
+  (void)tileY;
+  (void)gid;
 }
 
 void TileRenderer::gridToWorld(const TiledMap& map, int tileX, int tileY,

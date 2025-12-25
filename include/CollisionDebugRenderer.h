@@ -1,13 +1,11 @@
 #pragma once
 
-#include <SDL2/SDL.h>
-
 #include "Camera.h"
 #include "CollisionSystem.h"
 
 class CollisionDebugRenderer {
  public:
-  CollisionDebugRenderer(SDL_Renderer* renderer, Camera* camera,
+  CollisionDebugRenderer(Camera* camera,
                          const CollisionSystem* collisionSystem);
 
   void render();
@@ -16,7 +14,6 @@ class CollisionDebugRenderer {
   void toggle() { enabled = !enabled; }
 
  private:
-  SDL_Renderer* renderer;
   Camera* camera;
   const CollisionSystem* collisionSystem;
   bool enabled;

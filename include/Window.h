@@ -12,11 +12,11 @@ class Window {
   void pollEvents();
   bool isOpen() const;
 
-  // Accessor for the renderer
-  SDL_Renderer* getRenderer() const;
+  // Accessor for the SDL window (needed for OpenGL swap)
+  SDL_Window* getWindow() const;
 
  private:
   SDL_Window* sdlWindow;
-  SDL_Renderer* renderer;
+  SDL_GLContext glContext;
   bool open;
 };

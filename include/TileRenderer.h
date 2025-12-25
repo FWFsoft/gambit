@@ -1,7 +1,5 @@
 #pragma once
 
-#include <SDL2/SDL.h>
-
 #include <functional>
 
 #include "Camera.h"
@@ -12,11 +10,10 @@ using PlayerRenderCallback =
 
 class TileRenderer {
  public:
-  TileRenderer(SDL_Renderer* renderer, Camera* camera);
+  TileRenderer(Camera* camera);
   void render(const TiledMap& map, PlayerRenderCallback playerCallback);
 
  private:
-  SDL_Renderer* renderer;
   Camera* camera;
 
   void renderTile(const TiledMap& map, int tileX, int tileY, uint32_t gid);

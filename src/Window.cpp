@@ -1,6 +1,7 @@
 #include "Window.h"
 
 #include <SDL2/SDL.h>
+#include <glad/glad.h>
 
 #include <stdexcept>
 
@@ -12,34 +13,48 @@ Window::Window(const std::string& title, int width, int height) : open(true) {
                              std::string(SDL_GetError()));
   }
 
-  sdlWindow =
-      SDL_CreateWindow(title.c_str(), SDL_WINDOWPOS_CENTERED,
-                       SDL_WINDOWPOS_CENTERED, width, height, SDL_WINDOW_SHOWN);
+  // Set OpenGL attributes before creating the window
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+  SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+
+  sdlWindow = SDL_CreateWindow(title.c_str(), SDL_WINDOWPOS_CENTERED,
+                                SDL_WINDOWPOS_CENTERED, width, height,
+                                SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
 
   if (!sdlWindow) {
     throw std::runtime_error("Failed to create SDL window: " +
                              std::string(SDL_GetError()));
   }
 
-  renderer = SDL_CreateRenderer(
-      sdlWindow, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-  if (!renderer) {
-    throw std::runtime_error("Failed to create SDL renderer: " +
+  // Create OpenGL context
+  glContext = SDL_GL_CreateContext(sdlWindow);
+  if (!glContext) {
+    throw std::runtime_error("Failed to create OpenGL context: " +
                              std::string(SDL_GetError()));
+  }
+
+  // Enable VSync
+  SDL_GL_SetSwapInterval(1);
+
+  // Initialize GLAD
+  if (!gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress)) {
+    throw std::runtime_error("Failed to initialize GLAD");
   }
 }
 
 Window::~Window() {
-  if (renderer) {
-    SDL_DestroyRenderer(renderer);
+  if (glContext) {
+    SDL_GL_DeleteContext(glContext);
   }
   if (sdlWindow) {
-    SDL_DestroyWindow((SDL_Window*)sdlWindow);
+    SDL_DestroyWindow(sdlWindow);
   }
   SDL_Quit();
 }
 
-SDL_Renderer* Window::getRenderer() const { return renderer; }
+SDL_Window* Window::getWindow() const { return sdlWindow; }
 
 void Window::pollEvents() {
   SDL_Event event;

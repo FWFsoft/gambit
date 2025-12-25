@@ -9,6 +9,10 @@ option(ENABLE_COVERAGE "Enable code coverage" OFF)
 # Find packages
 find_package(SDL2 REQUIRED)
 find_package(spdlog REQUIRED)
+find_package(OpenGL REQUIRED)
+find_package(glad CONFIG REQUIRED)
+find_package(glm CONFIG REQUIRED)
+find_package(SDL2_image CONFIG REQUIRED)
 
 # Find ENet library and include directory
 if(APPLE)
@@ -86,6 +90,7 @@ add_executable(Client
     src/TileRenderer.cpp
     src/CollisionSystem.cpp
     src/CollisionDebugRenderer.cpp
+    src/OpenGLUtils.cpp
 )
 target_include_directories(Client SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
 target_include_directories(Client PRIVATE include)
@@ -93,6 +98,10 @@ target_link_libraries(Client PRIVATE
     ${ENET_LIBRARY}
     SDL2::SDL2
     spdlog::spdlog
+    OpenGL::GL
+    glad::glad
+    glm::glm
+    $<IF:$<TARGET_EXISTS:SDL2_image::SDL2_image>,SDL2_image::SDL2_image,$<IF:$<TARGET_EXISTS:SDL2_image::SDL2_image-static>,SDL2_image::SDL2_image-static,SDL2_image::SDL2_image>>
 )
 # Link tmxlite (vcpkg or pkg-config)
 if(tmxlite_FOUND)

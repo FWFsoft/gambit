@@ -38,11 +38,10 @@ int main() {
   Camera camera(800, 600);
   camera.setWorldBounds(map.getWorldWidth(), map.getWorldHeight());
 
-  CollisionDebugRenderer debugRenderer(window.getRenderer(), &camera,
-                                       &collisionSystem);
+  CollisionDebugRenderer debugRenderer(&camera, &collisionSystem);
 
   InputSystem inputSystem(&debugRenderer);
-  TileRenderer tileRenderer(window.getRenderer(), &camera);
+  TileRenderer tileRenderer(&camera);
 
   uint32_t localPlayerId = (uint32_t)(uintptr_t)&client;
   WorldConfig world(map.getWorldWidth(), map.getWorldHeight(),

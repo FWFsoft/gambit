@@ -6,6 +6,9 @@
     "sdl2",
     "enet",
     "spdlog",
-    "tmxlite"
+    "tmxlite",
+    "glad",
+    "glm",
+    "sdl2-image"
   ]
 }

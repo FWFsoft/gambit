@@ -1,8 +1,11 @@
 #include "RenderSystem.h"
 
+#include <glad/glad.h>
+
 #include <vector>
 
 #include "Logger.h"
+#include "OpenGLUtils.h"
 
 RenderSystem::RenderSystem(Window* window, ClientPrediction* clientPrediction,
                            RemotePlayerInterpolation* remoteInterpolation,
@@ -21,55 +24,25 @@ RenderSystem::RenderSystem(Window* window, ClientPrediction* clientPrediction,
 }
 
 void RenderSystem::onRender(const RenderEvent& e) {
-  SDL_Renderer* renderer = window->getRenderer();
+  SDL_Window* sdlWindow = window->getWindow();
 
   const Player& localPlayer = clientPrediction->getLocalPlayer();
   camera->follow(localPlayer.x, localPlayer.y);
 
-  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-  SDL_RenderClear(renderer);
+  // Clear the screen with OpenGL
+  glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+  glClear(GL_COLOR_BUFFER_BIT);
 
-  std::vector<Player> allPlayers;
-  allPlayers.push_back(localPlayer);
+  // TODO: Implement OpenGL rendering in Phase 3
+  // For now, just clear the screen to verify OpenGL works
 
-  auto remotePlayerIds = remoteInterpolation->getRemotePlayerIds();
-  for (uint32_t playerId : remotePlayerIds) {
-    Player remotePlayer;
-    if (remoteInterpolation->getInterpolatedState(playerId, e.interpolation,
-                                                  remotePlayer)) {
-      allPlayers.push_back(remotePlayer);
-    }
-  }
-
-  tileRenderer->render(*tiledMap, [&](float minDepth, float maxDepth) {
-    for (const Player& player : allPlayers) {
-      float playerDepth = player.x + player.y;
-      if (playerDepth >= minDepth && playerDepth < maxDepth) {
-        drawPlayer(player);
-      }
-    }
-  });
-
-  // Render collision debug overlay (if enabled)
-  if (collisionDebugRenderer) {
-    collisionDebugRenderer->render();
-  }
-
-  SDL_RenderPresent(renderer);
+  // Swap buffers
+  SDL_GL_SwapWindow(sdlWindow);
+  OpenGLUtils::checkGLError("RenderSystem::onRender");
 }
 
 void RenderSystem::drawPlayer(const Player& player) {
-  SDL_Renderer* renderer = window->getRenderer();
-
-  int screenX, screenY;
-  camera->worldToScreen(player.x, player.y, screenX, screenY);
-
-  SDL_Rect rect;
-  rect.x = screenX - PLAYER_SIZE / 2;
-  rect.y = screenY - PLAYER_SIZE / 2;
-  rect.w = PLAYER_SIZE;
-  rect.h = PLAYER_SIZE;
-
-  SDL_SetRenderDrawColor(renderer, player.r, player.g, player.b, 255);
-  SDL_RenderFillRect(renderer, &rect);
+  // TODO: Implement OpenGL sprite rendering in Phase 3
+  // This will use textured quads instead of SDL_RenderFillRect
+  (void)player;  // Suppress unused parameter warning
 }
