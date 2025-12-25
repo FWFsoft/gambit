@@ -17,7 +17,8 @@
       "Bash(./build/Tests:*)",
       "WebSearch",
       "Bash(make build:*)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(timeout 1 ./build/Client:*)"
     ]
   }
 }

@@ -20,8 +20,8 @@ Window::Window(const std::string& title, int width, int height) : open(true) {
   SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
   sdlWindow = SDL_CreateWindow(title.c_str(), SDL_WINDOWPOS_CENTERED,
-                                SDL_WINDOWPOS_CENTERED, width, height,
-                                SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
+                               SDL_WINDOWPOS_CENTERED, width, height,
+                               SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
 
   if (!sdlWindow) {
     throw std::runtime_error("Failed to create SDL window: " +

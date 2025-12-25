@@ -41,7 +41,6 @@ int main() {
   CollisionDebugRenderer debugRenderer(&camera, &collisionSystem);
 
   InputSystem inputSystem(&debugRenderer);
-  TileRenderer tileRenderer(&camera);
 
   uint32_t localPlayerId = (uint32_t)(uintptr_t)&client;
   WorldConfig world(map.getWorldWidth(), map.getWorldHeight(),
@@ -49,7 +48,7 @@ int main() {
   ClientPrediction clientPrediction(&client, localPlayerId, world);
   RemotePlayerInterpolation remoteInterpolation(localPlayerId);
   RenderSystem renderSystem(&window, &clientPrediction, &remoteInterpolation,
-                            &camera, &map, &tileRenderer, &debugRenderer);
+                            &camera, &map, &debugRenderer);
 
   // Subscribe to UpdateEvent for network processing
   EventBus::instance().subscribe<UpdateEvent>([&](const UpdateEvent& e) {

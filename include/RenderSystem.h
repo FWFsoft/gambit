@@ -2,11 +2,14 @@
 
 #include <SDL2/SDL.h>
 
+#include <memory>
+
 #include "Camera.h"
 #include "ClientPrediction.h"
 #include "CollisionDebugRenderer.h"
 #include "EventBus.h"
 #include "RemotePlayerInterpolation.h"
+#include "SpriteRenderer.h"
 #include "TileRenderer.h"
 #include "TiledMap.h"
 #include "Window.h"
@@ -15,7 +18,7 @@ class RenderSystem {
  public:
   RenderSystem(Window* window, ClientPrediction* clientPrediction,
                RemotePlayerInterpolation* remoteInterpolation, Camera* camera,
-               TiledMap* tiledMap, TileRenderer* tileRenderer,
+               TiledMap* tiledMap,
                CollisionDebugRenderer* collisionDebugRenderer);
 
   ~RenderSystem() = default;
@@ -26,8 +29,10 @@ class RenderSystem {
   RemotePlayerInterpolation* remoteInterpolation;
   Camera* camera;
   TiledMap* tiledMap;
-  TileRenderer* tileRenderer;
   CollisionDebugRenderer* collisionDebugRenderer;
+  std::unique_ptr<SpriteRenderer> spriteRenderer;
+  std::unique_ptr<Texture> whitePixelTexture;
+  std::unique_ptr<TileRenderer> tileRenderer;
 
   void onRender(const RenderEvent& e);
   void drawPlayer(const Player& player);

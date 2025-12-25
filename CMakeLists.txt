@@ -91,6 +91,9 @@ add_executable(Client
     src/CollisionSystem.cpp
     src/CollisionDebugRenderer.cpp
     src/OpenGLUtils.cpp
+    src/Texture.cpp
+    src/TextureManager.cpp
+    src/SpriteRenderer.cpp
 )
 target_include_directories(Client SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
 target_include_directories(Client PRIVATE include)

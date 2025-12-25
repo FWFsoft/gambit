@@ -1,6 +1,8 @@
 #include "TileRenderer.h"
 
-TileRenderer::TileRenderer(Camera* camera) : camera(camera) {}
+TileRenderer::TileRenderer(Camera* camera, SpriteRenderer* spriteRenderer,
+                           Texture* whitePixel)
+    : camera(camera), spriteRenderer(spriteRenderer), whitePixel(whitePixel) {}
 
 void TileRenderer::render(const TiledMap& map,
                           PlayerRenderCallback playerCallback) {
@@ -42,12 +44,24 @@ void TileRenderer::render(const TiledMap& map,
 
 void TileRenderer::renderTile(const TiledMap& map, int tileX, int tileY,
                               uint32_t gid) {
-  // TODO: Implement OpenGL sprite rendering in Phase 3
-  // For now, just suppress unused parameter warnings
-  (void)map;
-  (void)tileX;
-  (void)tileY;
-  (void)gid;
+  float worldX, worldY;
+  gridToWorld(map, tileX, tileY, worldX, worldY);
+
+  int screenX, screenY;
+  camera->worldToScreen(worldX, worldY, screenX, screenY);
+
+  int tileWidth = map.getTileWidth();
+  int tileHeight = map.getTileHeight();
+
+  // Calculate color based on gid (grayscale for now)
+  float colorValue = static_cast<float>((gid - 1) % 4) / 4.0f;
+
+  // Draw tile as colored rectangle using white pixel texture
+  if (whitePixel) {
+    spriteRenderer->draw(*whitePixel, screenX - tileWidth / 2.0f,
+                         screenY - tileHeight / 2.0f, tileWidth, tileHeight,
+                         colorValue, colorValue, colorValue, 1.0f);
+  }
 }
 
 void TileRenderer::gridToWorld(const TiledMap& map, int tileX, int tileY,
