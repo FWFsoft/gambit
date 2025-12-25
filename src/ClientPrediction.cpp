@@ -6,14 +6,13 @@
 #include "NetworkClient.h"
 
 ClientPrediction::ClientPrediction(NetworkClient* client,
-                                   uint32_t localPlayerId, float worldWidth,
-                                   float worldHeight,
-                                   const CollisionSystem* collisionSystem)
+                                   uint32_t localPlayerId,
+                                   const WorldConfig& world)
     : client(client),
       localPlayerId(localPlayerId),
-      worldWidth(worldWidth),
-      worldHeight(worldHeight),
-      collisionSystem(collisionSystem),
+      worldWidth(world.width),
+      worldHeight(world.height),
+      collisionSystem(world.collisionSystem),
       localInputSequence(0) {
   // Initialize local player
   localPlayer.id = localPlayerId;
@@ -39,8 +38,9 @@ ClientPrediction::ClientPrediction(NetworkClient* client,
 
 void ClientPrediction::onLocalInput(const LocalInputEvent& e) {
   // Apply input immediately to local player (instant response)
-  applyInput(localPlayer, e.moveLeft, e.moveRight, e.moveUp, e.moveDown, 16.67f,
-             worldWidth, worldHeight, collisionSystem);
+  MovementInput input(e.moveLeft, e.moveRight, e.moveUp, e.moveDown, 16.67f,
+                      worldWidth, worldHeight, collisionSystem);
+  applyInput(localPlayer, input);
 
   // Store input in history for reconciliation
   LocalInputEvent inputCopy = e;
@@ -141,10 +141,11 @@ void ClientPrediction::reconcile(const StateUpdatePacket& stateUpdate) {
   }
 
   // Re-apply all inputs that happened after the server state
-  for (const auto& input : inputsToReplay) {
-    applyInput(localPlayer, input.moveLeft, input.moveRight, input.moveUp,
-               input.moveDown, 16.67f, worldWidth, worldHeight,
-               collisionSystem);
+  for (const auto& inputEvent : inputsToReplay) {
+    MovementInput input(inputEvent.moveLeft, inputEvent.moveRight,
+                        inputEvent.moveUp, inputEvent.moveDown, 16.67f,
+                        worldWidth, worldHeight, collisionSystem);
+    applyInput(localPlayer, input);
   }
 
   // Remove old inputs from history (server has processed these)

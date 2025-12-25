@@ -8,6 +8,7 @@
 #include "NetworkServer.h"
 #include "ServerGameState.h"
 #include "TiledMap.h"
+#include "WorldConfig.h"
 
 volatile bool serverRunning = true;
 
@@ -30,8 +31,9 @@ int main() {
                std::to_string(map.getCollisionShapes().size()) + " shapes");
 
   GameLoop gameLoop;
-  ServerGameState gameState(&server, map.getWorldWidth(), map.getWorldHeight(),
-                            &collisionSystem);
+  WorldConfig world(map.getWorldWidth(), map.getWorldHeight(),
+                    &collisionSystem);
+  ServerGameState gameState(&server, world);
 
   // Subscribe to UpdateEvent to process network events
   EventBus::instance().subscribe<UpdateEvent>([&](const UpdateEvent& e) {

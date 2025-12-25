@@ -8,13 +8,12 @@
 #include "Logger.h"
 #include "NetworkServer.h"
 
-ServerGameState::ServerGameState(NetworkServer* server, float worldWidth,
-                                 float worldHeight,
-                                 const CollisionSystem* collisionSystem)
+ServerGameState::ServerGameState(NetworkServer* server,
+                                 const WorldConfig& world)
     : server(server),
-      worldWidth(worldWidth),
-      worldHeight(worldHeight),
-      collisionSystem(collisionSystem),
+      worldWidth(world.width),
+      worldHeight(world.height),
+      collisionSystem(world.collisionSystem),
       serverTick(0) {
   // Subscribe to client connection events
   EventBus::instance().subscribe<ClientConnectedEvent>(
@@ -37,67 +36,20 @@ ServerGameState::ServerGameState(NetworkServer* server, float worldWidth,
 void ServerGameState::onClientConnected(const ClientConnectedEvent& e) {
   uint32_t playerId = e.clientId;
 
-  // Create new player
-  Player player;
-  player.id = playerId;
-
-  player.x = worldWidth / 2.0f;
-  player.y = worldHeight / 2.0f;
-
-  // Validate spawn position is not in collision
-  if (collisionSystem &&
-      !collisionSystem->isPositionValid(player.x, player.y, PLAYER_RADIUS)) {
-    Logger::info(
-        "Default spawn position is invalid, searching for valid spawn...");
-    // Simple spiral search for valid position
-    bool found = false;
-    for (float radius = 50.0f; radius < 500.0f && !found; radius += 50.0f) {
-      for (float angle = 0; angle < 360.0f && !found; angle += 45.0f) {
-        float testX =
-            worldWidth / 2.0f + radius * std::cos(angle * 3.14159f / 180.0f);
-        float testY =
-            worldHeight / 2.0f + radius * std::sin(angle * 3.14159f / 180.0f);
-        if (collisionSystem->isPositionValid(testX, testY, PLAYER_RADIUS)) {
-          player.x = testX;
-          player.y = testY;
-          found = true;
-        }
-      }
-    }
-    assert(found && "Could not find valid spawn position");
-  }
-
-  player.vx = 0;
-  player.vy = 0;
-  player.health = 100.0f;
-  player.lastInputSequence = 0;
-
-  // Assign color (cycle through 4 colors)
-  const uint8_t colors[4][3] = {
-      {255, 0, 0},   // Red
-      {0, 255, 0},   // Green
-      {0, 0, 255},   // Blue
-      {255, 255, 0}  // Yellow
-  };
-  int colorIndex = players.size() % 4;
-  player.r = colors[colorIndex][0];
-  player.g = colors[colorIndex][1];
-  player.b = colors[colorIndex][2];
+  Player player = createPlayer(playerId);
+  assignPlayerColor(player, players.size());
 
   players[playerId] = player;
   peerToPlayerId[e.peer] = playerId;
 
-  Logger::info("Player " + std::to_string(playerId) +
-               " joined (color: " + std::to_string(player.r) + "," +
-               std::to_string(player.g) + "," + std::to_string(player.b) + ")");
+  Logger::info("Player " + std::to_string(playerId) + " joined");
 
-  // Broadcast player joined to all clients
+  // Broadcast join
   PlayerJoinedPacket packet;
   packet.playerId = playerId;
   packet.r = player.r;
   packet.g = player.g;
   packet.b = player.b;
-
   server->broadcastPacket(serialize(packet));
 }
 
@@ -147,8 +99,10 @@ void ServerGameState::processClientInput(ENetPeer* peer, const uint8_t* data,
   }
   player.lastInputSequence = input.inputSequence;
 
-  applyInput(player, input.moveLeft, input.moveRight, input.moveUp,
-             input.moveDown, 16.67f, worldWidth, worldHeight, collisionSystem);
+  MovementInput movementInput(input.moveLeft, input.moveRight, input.moveUp,
+                              input.moveDown, 16.67f, worldWidth, worldHeight,
+                              collisionSystem);
+  applyInput(player, movementInput);
 }
 
 void ServerGameState::onUpdate(const UpdateEvent& e) {
@@ -178,4 +132,58 @@ void ServerGameState::broadcastStateUpdate() {
   }
 
   server->broadcastPacket(serialize(packet));
+}
+
+Player ServerGameState::createPlayer(uint32_t playerId) {
+  Player player;
+  player.id = playerId;
+  player.vx = 0;
+  player.vy = 0;
+  player.health = 100.0f;
+  player.lastInputSequence = 0;
+
+  // Find spawn position
+  player.x = worldWidth / 2.0f;
+  player.y = worldHeight / 2.0f;
+  if (!findValidSpawnPosition(player.x, player.y)) {
+    Logger::error("Failed to find valid spawn position");
+  }
+
+  return player;
+}
+
+bool ServerGameState::findValidSpawnPosition(float& x, float& y) {
+  if (collisionSystem &&
+      !collisionSystem->isPositionValid(x, y, PLAYER_RADIUS)) {
+    Logger::info("Default spawn invalid, searching...");
+
+    for (float radius = 50.0f; radius < 500.0f; radius += 50.0f) {
+      for (float angle = 0; angle < 360.0f; angle += 45.0f) {
+        float testX =
+            worldWidth / 2.0f + radius * std::cos(angle * 3.14159f / 180.0f);
+        float testY =
+            worldHeight / 2.0f + radius * std::sin(angle * 3.14159f / 180.0f);
+        if (collisionSystem->isPositionValid(testX, testY, PLAYER_RADIUS)) {
+          x = testX;
+          y = testY;
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+  return true;
+}
+
+void ServerGameState::assignPlayerColor(Player& player, size_t playerCount) {
+  const uint8_t colors[4][3] = {
+      {255, 0, 0},   // Red
+      {0, 255, 0},   // Green
+      {0, 0, 255},   // Blue
+      {255, 255, 0}  // Yellow
+  };
+  int colorIndex = playerCount % 4;
+  player.r = colors[colorIndex][0];
+  player.g = colors[colorIndex][1];
+  player.b = colors[colorIndex][2];
 }

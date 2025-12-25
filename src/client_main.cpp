@@ -12,6 +12,7 @@
 #include "TileRenderer.h"
 #include "TiledMap.h"
 #include "Window.h"
+#include "WorldConfig.h"
 
 int main() {
   Logger::init();
@@ -44,8 +45,9 @@ int main() {
   TileRenderer tileRenderer(window.getRenderer(), &camera);
 
   uint32_t localPlayerId = (uint32_t)(uintptr_t)&client;
-  ClientPrediction clientPrediction(&client, localPlayerId, map.getWorldWidth(),
-                                    map.getWorldHeight(), &collisionSystem);
+  WorldConfig world(map.getWorldWidth(), map.getWorldHeight(),
+                    &collisionSystem);
+  ClientPrediction clientPrediction(&client, localPlayerId, world);
   RemotePlayerInterpolation remoteInterpolation(localPlayerId);
   RenderSystem renderSystem(&window, &clientPrediction, &remoteInterpolation,
                             &camera, &map, &tileRenderer, &debugRenderer);

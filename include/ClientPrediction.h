@@ -5,6 +5,7 @@
 #include "EventBus.h"
 #include "NetworkProtocol.h"
 #include "Player.h"
+#include "WorldConfig.h"
 
 class NetworkClient;
 class CollisionSystem;
@@ -12,8 +13,7 @@ class CollisionSystem;
 class ClientPrediction {
  public:
   ClientPrediction(NetworkClient* client, uint32_t localPlayerId,
-                   float worldWidth, float worldHeight,
-                   const CollisionSystem* collisionSystem);
+                   const WorldConfig& world);
 
   const Player& getLocalPlayer() const { return localPlayer; }
 

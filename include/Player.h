@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "CollisionSystem.h"
+#include "MovementInput.h"
 
 struct Player {
   uint32_t id;
@@ -36,25 +37,22 @@ struct Player {
 constexpr float PLAYER_SPEED = 200.0f;
 constexpr float PLAYER_RADIUS = 16.0f;  // Half of PLAYER_SIZE (32x32)
 
-inline void applyInput(Player& player, bool moveLeft, bool moveRight,
-                       bool moveUp, bool moveDown, float deltaTime,
-                       float worldWidth, float worldHeight,
-                       const CollisionSystem* collisionSystem = nullptr) {
+inline void applyInput(Player& player, const MovementInput& input) {
   float dx = 0, dy = 0;
 
-  if (moveUp) {
+  if (input.moveUp) {
     dx -= 1;
     dy -= 1;
   }
-  if (moveRight) {
+  if (input.moveRight) {
     dx += 1;
     dy -= 1;
   }
-  if (moveDown) {
+  if (input.moveDown) {
     dx += 1;
     dy += 1;
   }
-  if (moveLeft) {
+  if (input.moveLeft) {
     dx -= 1;
     dy += 1;
   }
@@ -71,18 +69,18 @@ inline void applyInput(Player& player, bool moveLeft, bool moveRight,
   // Calculate new position
   float oldX = player.x;
   float oldY = player.y;
-  float newX = player.x + player.vx * deltaTime / 1000.0f;
-  float newY = player.y + player.vy * deltaTime / 1000.0f;
+  float newX = player.x + player.vx * input.deltaTime / 1000.0f;
+  float newY = player.y + player.vy * input.deltaTime / 1000.0f;
 
   // Check collision if system is provided
-  if (collisionSystem != nullptr) {
-    collisionSystem->checkMovement(oldX, oldY, newX, newY, PLAYER_RADIUS);
+  if (input.collisionSystem != nullptr) {
+    input.collisionSystem->checkMovement(oldX, oldY, newX, newY, PLAYER_RADIUS);
   }
 
   player.x = newX;
   player.y = newY;
 
   // Clamp to world bounds
-  player.x = std::clamp(player.x, 0.0f, worldWidth);
-  player.y = std::clamp(player.y, 0.0f, worldHeight);
+  player.x = std::clamp(player.x, 0.0f, input.worldWidth);
+  player.y = std::clamp(player.y, 0.0f, input.worldHeight);
 }

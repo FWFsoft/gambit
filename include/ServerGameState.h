@@ -6,14 +6,14 @@
 #include "EventBus.h"
 #include "NetworkProtocol.h"
 #include "Player.h"
+#include "WorldConfig.h"
 
 class NetworkServer;
 class CollisionSystem;
 
 class ServerGameState {
  public:
-  ServerGameState(NetworkServer* server, float worldWidth, float worldHeight,
-                  const CollisionSystem* collisionSystem);
+  ServerGameState(NetworkServer* server, const WorldConfig& world);
 
  private:
   NetworkServer* server;
@@ -31,4 +31,9 @@ class ServerGameState {
 
   void processClientInput(ENetPeer* peer, const uint8_t* data, size_t size);
   void broadcastStateUpdate();
+
+  // Helper methods for player spawning
+  Player createPlayer(uint32_t playerId);
+  bool findValidSpawnPosition(float& x, float& y);
+  void assignPlayerColor(Player& player, size_t playerCount);
 };

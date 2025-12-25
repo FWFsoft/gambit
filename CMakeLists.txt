@@ -155,6 +155,16 @@ target_link_libraries(test_client_prediction PRIVATE
     SDL2::SDL2
 )
 
+add_executable(test_collision
+    tests/test_collision.cpp
+    src/Logger.cpp
+    src/CollisionSystem.cpp
+    src/NetworkProtocol.cpp
+)
+target_include_directories(test_collision SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
+target_include_directories(test_collision PRIVATE include tests)
+target_link_libraries(test_collision PRIVATE spdlog::spdlog SDL2::SDL2)
+
 # Register tests with CTest
 add_test(NAME PlayerMovement COMMAND test_player)
 add_test(NAME NetworkProtocol COMMAND test_network_protocol)
@@ -162,6 +172,7 @@ add_test(NAME EventBus COMMAND test_eventbus)
 add_test(NAME InputSystem COMMAND test_inputsystem)
 add_test(NAME RemotePlayerInterpolation COMMAND test_remote_player_interpolation)
 add_test(NAME ClientPrediction COMMAND test_client_prediction)
+add_test(NAME CollisionSystem COMMAND test_collision)
 
 # Enable code coverage for test targets
 if(ENABLE_COVERAGE)
@@ -177,5 +188,7 @@ if(ENABLE_COVERAGE)
     target_link_options(test_remote_player_interpolation PRIVATE --coverage)
     target_compile_options(test_client_prediction PRIVATE --coverage)
     target_link_options(test_client_prediction PRIVATE --coverage)
+    target_compile_options(test_collision PRIVATE --coverage)
+    target_link_options(test_collision PRIVATE --coverage)
 endif()
 
