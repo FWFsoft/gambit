@@ -17,6 +17,9 @@
 #include "TiledMap.h"
 #include "Window.h"
 #include "WorldConfig.h"
+#include "config/NetworkConfig.h"
+#include "config/ScreenConfig.h"
+#include "config/TimingConfig.h"
 
 int main() {
   Logger::init();
@@ -26,11 +29,11 @@ int main() {
     return EXIT_FAILURE;
   }
 
-  if (!client.connect("127.0.0.1", 1234)) {
+  if (!client.connect(Config::Network::SERVER_ADDRESS, Config::Network::PORT)) {
     return EXIT_FAILURE;
   }
 
-  Window window("Gambit Client", 800, 600);
+  Window window("Gambit Client", Config::Screen::WIDTH, Config::Screen::HEIGHT);
   GameLoop gameLoop;
 
   TiledMap map;
@@ -39,7 +42,7 @@ int main() {
   CollisionSystem collisionSystem(map.getCollisionShapes());
   Logger::info("Client collision system initialized");
 
-  Camera camera(800, 600);
+  Camera camera(Config::Screen::WIDTH, Config::Screen::HEIGHT);
   camera.setWorldBounds(map.getWorldWidth(), map.getWorldHeight());
 
   CollisionDebugRenderer collisionDebugRenderer(&camera, &collisionSystem);
@@ -85,8 +88,8 @@ int main() {
       gameLoop.stop();
     }
 
-    // Log every 60 frames (once per second) to verify 60 FPS
-    if (e.frameNumber % 60 == 0) {
+    // Log every second to verify target FPS
+    if (e.frameNumber % Config::Timing::LOG_FRAME_INTERVAL == 0) {
       Logger::debug("Frame: " + std::to_string(e.frameNumber) +
                     " (deltaTime: " + std::to_string(e.deltaTime) + "ms)");
     }

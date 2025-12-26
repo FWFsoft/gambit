@@ -2,12 +2,14 @@
 #include "Logger.h"
 #include "NetworkClient.h"
 #include "WorldConfig.h"
+#include "config/ScreenConfig.h"
 #include "test_utils.h"
 
 TEST(ClientPrediction_ColorSyncDuringReconciliation) {
   resetEventBus();
   NetworkClient client;
-  WorldConfig world(800.0f, 600.0f, nullptr);
+  WorldConfig world(static_cast<float>(Config::Screen::WIDTH),
+                    static_cast<float>(Config::Screen::HEIGHT), nullptr);
   ClientPrediction prediction(&client, 1, world);
 
   PlayerState serverState{1, 100.0f, 100.0f, 0.0f, 0.0f, 100.0f, 255, 0, 0, 5};
@@ -22,7 +24,8 @@ TEST(ClientPrediction_ColorSyncDuringReconciliation) {
 TEST(ClientPrediction_ColorPersistsAcrossMultipleReconciles) {
   resetEventBus();
   NetworkClient client;
-  WorldConfig world(800.0f, 600.0f, nullptr);
+  WorldConfig world(static_cast<float>(Config::Screen::WIDTH),
+                    static_cast<float>(Config::Screen::HEIGHT), nullptr);
   ClientPrediction prediction(&client, 1, world);
 
   for (uint32_t tick = 1; tick <= 5; tick++) {

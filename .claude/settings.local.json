@@ -20,7 +20,8 @@
       "WebFetch(domain:github.com)",
       "Bash(timeout 1 ./build/Client:*)",
       "Skill(dev)",
-      "Bash(make dev:*)"
+      "Bash(make dev:*)",
+      "Bash(ctest:*)"
     ]
   }
 }

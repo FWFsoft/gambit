@@ -5,6 +5,7 @@
 #include "FileSystem.h"
 #include "Logger.h"
 #include "Window.h"
+#include "config/ScreenConfig.h"
 
 int main() {
   Logger::init();
@@ -31,7 +32,7 @@ int main() {
   }
 
   try {
-    Window window("Game Engine", 800, 600);
+    Window window("Game Engine", Config::Screen::WIDTH, Config::Screen::HEIGHT);
     while (window.isOpen()) {
       window.pollEvents();
     }

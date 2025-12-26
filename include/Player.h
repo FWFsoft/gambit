@@ -9,6 +9,7 @@
 #include "AnimationController.h"
 #include "CollisionSystem.h"
 #include "MovementInput.h"
+#include "config/PlayerConfig.h"
 
 struct Player : public Animatable {
   uint32_t id;
@@ -33,7 +34,7 @@ struct Player : public Animatable {
         y(0),
         vx(0),
         vy(0),
-        health(100.0f),
+        health(Config::Player::MAX_HEALTH),
         r(255),
         g(255),
         b(255),
@@ -54,9 +55,6 @@ struct Player : public Animatable {
 
   float getVelocityY() const override { return vy; }
 };
-
-constexpr float PLAYER_SPEED = 200.0f;
-constexpr float PLAYER_RADIUS = 16.0f;  // Half of PLAYER_SIZE (32x32)
 
 inline void applyInput(Player& player, const MovementInput& input) {
   float dx = 0, dy = 0;
@@ -84,8 +82,8 @@ inline void applyInput(Player& player, const MovementInput& input) {
     dy /= len;
   }
 
-  player.vx = dx * PLAYER_SPEED;
-  player.vy = dy * PLAYER_SPEED;
+  player.vx = dx * Config::Player::SPEED;
+  player.vy = dy * Config::Player::SPEED;
 
   // Update animation state based on new velocity
   if (player.animationController) {
@@ -100,7 +98,8 @@ inline void applyInput(Player& player, const MovementInput& input) {
 
   // Check collision if system is provided
   if (input.collisionSystem != nullptr) {
-    input.collisionSystem->checkMovement(oldX, oldY, newX, newY, PLAYER_RADIUS);
+    input.collisionSystem->checkMovement(oldX, oldY, newX, newY,
+                                         Config::Player::RADIUS);
   }
 
   player.x = newX;

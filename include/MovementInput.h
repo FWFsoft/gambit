@@ -1,5 +1,8 @@
 #pragma once
 
+#include "config/ScreenConfig.h"
+#include "config/TimingConfig.h"
+
 class CollisionSystem;
 
 struct MovementInput {
@@ -21,9 +24,9 @@ struct MovementInput {
         moveRight(false),
         moveUp(false),
         moveDown(false),
-        deltaTime(16.67f),
-        worldWidth(800.0f),
-        worldHeight(600.0f),
+        deltaTime(Config::Timing::TARGET_DELTA_MS),
+        worldWidth(static_cast<float>(Config::Screen::WIDTH)),
+        worldHeight(static_cast<float>(Config::Screen::HEIGHT)),
         collisionSystem(nullptr) {}
 
   MovementInput(bool left, bool right, bool up, bool down, float dt, float ww,

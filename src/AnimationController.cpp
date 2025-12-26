@@ -1,6 +1,8 @@
 #include "AnimationController.h"
 
 #include "Logger.h"
+#include "config/AnimationConfig.h"
+#include "config/PlayerConfig.h"
 
 AnimationController::AnimationController()
     : currentAnimationName("idle"),
@@ -107,8 +109,8 @@ void AnimationController::getCurrentFrame(int& outSrcX, int& outSrcY,
     // Fallback to full sprite
     outSrcX = 0;
     outSrcY = 0;
-    outSrcW = 32;
-    outSrcH = 32;
+    outSrcW = Config::Player::FRAME_WIDTH;
+    outSrcH = Config::Player::FRAME_HEIGHT;
     return;
   }
 
@@ -116,8 +118,8 @@ void AnimationController::getCurrentFrame(int& outSrcX, int& outSrcY,
   if (currentAnim.getFrameCount() == 0) {
     outSrcX = 0;
     outSrcY = 0;
-    outSrcW = 32;
-    outSrcH = 32;
+    outSrcW = Config::Player::FRAME_WIDTH;
+    outSrcH = Config::Player::FRAME_HEIGHT;
     return;
   }
 

@@ -1,5 +1,7 @@
 #include "Logger.h"
 #include "Player.h"
+#include "config/ScreenConfig.h"
+#include "config/TimingConfig.h"
 #include "test_utils.h"
 
 TEST(Player_MoveRight) {
@@ -7,7 +9,10 @@ TEST(Player_MoveRight) {
   player.x = 100.0f;
   player.y = 100.0f;
 
-  MovementInput input(false, true, false, false, 16.67f, 800.0f, 600.0f);
+  MovementInput input(false, true, false, false,
+                      Config::Timing::TARGET_DELTA_MS,
+                      static_cast<float>(Config::Screen::WIDTH),
+                      static_cast<float>(Config::Screen::HEIGHT));
   applyInput(player, input);
 
   float expectedSpeed = 200.0f * 0.707107f;
@@ -22,7 +27,10 @@ TEST(Player_MoveLeft) {
   player.x = 100.0f;
   player.y = 100.0f;
 
-  MovementInput input(true, false, false, false, 16.67f, 800.0f, 600.0f);
+  MovementInput input(true, false, false, false,
+                      Config::Timing::TARGET_DELTA_MS,
+                      static_cast<float>(Config::Screen::WIDTH),
+                      static_cast<float>(Config::Screen::HEIGHT));
   applyInput(player, input);
 
   float expectedSpeed = 200.0f * 0.707107f;
@@ -37,7 +45,10 @@ TEST(Player_MoveUp) {
   player.x = 100.0f;
   player.y = 100.0f;
 
-  MovementInput input(false, false, true, false, 16.67f, 800.0f, 600.0f);
+  MovementInput input(false, false, true, false,
+                      Config::Timing::TARGET_DELTA_MS,
+                      static_cast<float>(Config::Screen::WIDTH),
+                      static_cast<float>(Config::Screen::HEIGHT));
   applyInput(player, input);
 
   float expectedSpeed = 200.0f * 0.707107f;
@@ -52,7 +63,10 @@ TEST(Player_MoveDown) {
   player.x = 100.0f;
   player.y = 100.0f;
 
-  MovementInput input(false, false, false, true, 16.67f, 800.0f, 600.0f);
+  MovementInput input(false, false, false, true,
+                      Config::Timing::TARGET_DELTA_MS,
+                      static_cast<float>(Config::Screen::WIDTH),
+                      static_cast<float>(Config::Screen::HEIGHT));
   applyInput(player, input);
 
   float expectedSpeed = 200.0f * 0.707107f;
@@ -67,7 +81,9 @@ TEST(Player_DiagonalMovement) {
   player.x = 100.0f;
   player.y = 100.0f;
 
-  MovementInput input(false, true, false, true, 16.67f, 800.0f, 600.0f);
+  MovementInput input(false, true, false, true, Config::Timing::TARGET_DELTA_MS,
+                      static_cast<float>(Config::Screen::WIDTH),
+                      static_cast<float>(Config::Screen::HEIGHT));
   applyInput(player, input);
 
   assert(floatEqual(player.vx, 200.0f));
@@ -81,7 +97,10 @@ TEST(Player_Stationary) {
   player.x = 100.0f;
   player.y = 100.0f;
 
-  MovementInput input(false, false, false, false, 16.67f, 800.0f, 600.0f);
+  MovementInput input(false, false, false, false,
+                      Config::Timing::TARGET_DELTA_MS,
+                      static_cast<float>(Config::Screen::WIDTH),
+                      static_cast<float>(Config::Screen::HEIGHT));
   applyInput(player, input);
 
   assert(floatEqual(player.vx, 0.0f));
@@ -95,7 +114,10 @@ TEST(Player_BoundsClampingLeft) {
   player.x = 5.0f;
   player.y = 100.0f;
 
-  MovementInput input(true, false, false, false, 16.67f, 800.0f, 600.0f);
+  MovementInput input(true, false, false, false,
+                      Config::Timing::TARGET_DELTA_MS,
+                      static_cast<float>(Config::Screen::WIDTH),
+                      static_cast<float>(Config::Screen::HEIGHT));
   applyInput(player, input);
 
   assert(player.x >= 0.0f);
@@ -107,10 +129,13 @@ TEST(Player_BoundsClampingRight) {
   player.x = 795.0f;
   player.y = 100.0f;
 
-  MovementInput input(false, true, false, false, 16.67f, 800.0f, 600.0f);
+  MovementInput input(false, true, false, false,
+                      Config::Timing::TARGET_DELTA_MS,
+                      static_cast<float>(Config::Screen::WIDTH),
+                      static_cast<float>(Config::Screen::HEIGHT));
   applyInput(player, input);
 
-  assert(player.x <= 800.0f);
+  assert(player.x <= static_cast<float>(Config::Screen::WIDTH));
 }
 
 TEST(Player_BoundsClampingTop) {
@@ -118,7 +143,10 @@ TEST(Player_BoundsClampingTop) {
   player.x = 100.0f;
   player.y = 5.0f;
 
-  MovementInput input(false, false, true, false, 16.67f, 800.0f, 600.0f);
+  MovementInput input(false, false, true, false,
+                      Config::Timing::TARGET_DELTA_MS,
+                      static_cast<float>(Config::Screen::WIDTH),
+                      static_cast<float>(Config::Screen::HEIGHT));
   applyInput(player, input);
 
   assert(player.y >= 0.0f);
@@ -129,10 +157,13 @@ TEST(Player_BoundsClampingBottom) {
   player.x = 100.0f;
   player.y = 595.0f;
 
-  MovementInput input(false, false, false, true, 16.67f, 800.0f, 600.0f);
+  MovementInput input(false, false, false, true,
+                      Config::Timing::TARGET_DELTA_MS,
+                      static_cast<float>(Config::Screen::WIDTH),
+                      static_cast<float>(Config::Screen::HEIGHT));
   applyInput(player, input);
 
-  assert(player.y <= 600.0f);
+  assert(player.y <= static_cast<float>(Config::Screen::HEIGHT));
 }
 
 TEST(Player_IsometricMapBounds_BottomRight) {

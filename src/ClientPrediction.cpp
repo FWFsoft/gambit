@@ -4,6 +4,7 @@
 
 #include "Logger.h"
 #include "NetworkClient.h"
+#include "config/PlayerConfig.h"
 
 ClientPrediction::ClientPrediction(NetworkClient* client,
                                    uint32_t localPlayerId,
@@ -16,11 +17,12 @@ ClientPrediction::ClientPrediction(NetworkClient* client,
       localInputSequence(0) {
   // Initialize local player
   localPlayer.id = localPlayerId;
-  localPlayer.x = 400.0f;  // Center of screen (will be updated by server)
-  localPlayer.y = 300.0f;
+  localPlayer.x =
+      Config::Player::DEFAULT_SPAWN_X;  // Default (will be updated by server)
+  localPlayer.y = Config::Player::DEFAULT_SPAWN_Y;
   localPlayer.vx = 0.0f;
   localPlayer.vy = 0.0f;
-  localPlayer.health = 100.0f;
+  localPlayer.health = Config::Player::MAX_HEALTH;
   localPlayer.r = 255;
   localPlayer.g = 255;
   localPlayer.b = 255;

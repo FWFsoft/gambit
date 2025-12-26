@@ -9,6 +9,7 @@
 #include "ServerGameState.h"
 #include "TiledMap.h"
 #include "WorldConfig.h"
+#include "config/NetworkConfig.h"
 
 volatile bool serverRunning = true;
 
@@ -18,7 +19,8 @@ int main() {
   Logger::init();
   signal(SIGINT, signalHandler);
 
-  NetworkServer server("0.0.0.0", 1234);
+  NetworkServer server(Config::Network::SERVER_BIND_ADDRESS,
+                       Config::Network::PORT);
   if (!server.initialize()) {
     return EXIT_FAILURE;
   }

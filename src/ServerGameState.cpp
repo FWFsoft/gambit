@@ -7,6 +7,9 @@
 #include "CollisionSystem.h"
 #include "Logger.h"
 #include "NetworkServer.h"
+#include "config/GameplayConfig.h"
+#include "config/PlayerConfig.h"
+#include "config/TimingConfig.h"
 
 ServerGameState::ServerGameState(NetworkServer* server,
                                  const WorldConfig& world)
@@ -119,8 +122,8 @@ void ServerGameState::processClientInput(ENetPeer* peer, const uint8_t* data,
   player.lastInputSequence = input.inputSequence;
 
   MovementInput movementInput(input.moveLeft, input.moveRight, input.moveUp,
-                              input.moveDown, 16.67f, worldWidth, worldHeight,
-                              collisionSystem);
+                              input.moveDown, Config::Timing::TARGET_DELTA_MS,
+                              worldWidth, worldHeight, collisionSystem);
   applyInput(player, movementInput);
 }
 
@@ -158,7 +161,7 @@ Player ServerGameState::createPlayer(uint32_t playerId) {
   player.id = playerId;
   player.vx = 0;
   player.vy = 0;
-  player.health = 100.0f;
+  player.health = Config::Player::MAX_HEALTH;
   player.lastInputSequence = 0;
 
   // Find spawn position
@@ -173,16 +176,20 @@ Player ServerGameState::createPlayer(uint32_t playerId) {
 
 bool ServerGameState::findValidSpawnPosition(float& x, float& y) {
   if (collisionSystem &&
-      !collisionSystem->isPositionValid(x, y, PLAYER_RADIUS)) {
+      !collisionSystem->isPositionValid(x, y, Config::Player::RADIUS)) {
     Logger::info("Default spawn invalid, searching...");
 
-    for (float radius = 50.0f; radius < 500.0f; radius += 50.0f) {
-      for (float angle = 0; angle < 360.0f; angle += 45.0f) {
+    for (float radius = Config::Gameplay::SPAWN_SEARCH_RADIUS_INCREMENT;
+         radius < Config::Gameplay::SPAWN_SEARCH_MAX_RADIUS;
+         radius += Config::Gameplay::SPAWN_SEARCH_RADIUS_INCREMENT) {
+      for (float angle = 0; angle < 360.0f;
+           angle += Config::Gameplay::SPAWN_SEARCH_ANGLE_INCREMENT) {
         float testX =
             worldWidth / 2.0f + radius * std::cos(angle * 3.14159f / 180.0f);
         float testY =
             worldHeight / 2.0f + radius * std::sin(angle * 3.14159f / 180.0f);
-        if (collisionSystem->isPositionValid(testX, testY, PLAYER_RADIUS)) {
+        if (collisionSystem->isPositionValid(testX, testY,
+                                             Config::Player::RADIUS)) {
           x = testX;
           y = testY;
           return true;
@@ -195,14 +202,8 @@ bool ServerGameState::findValidSpawnPosition(float& x, float& y) {
 }
 
 void ServerGameState::assignPlayerColor(Player& player, size_t playerCount) {
-  const uint8_t colors[4][3] = {
-      {255, 0, 0},   // Red
-      {0, 255, 0},   // Green
-      {0, 0, 255},   // Blue
-      {255, 255, 0}  // Yellow
-  };
-  int colorIndex = playerCount % 4;
-  player.r = colors[colorIndex][0];
-  player.g = colors[colorIndex][1];
-  player.b = colors[colorIndex][2];
+  int colorIndex = playerCount % Config::Player::MAX_PLAYERS;
+  player.r = Config::Player::COLORS[colorIndex].r;
+  player.g = Config::Player::COLORS[colorIndex].g;
+  player.b = Config::Player::COLORS[colorIndex].b;
 }

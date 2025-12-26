@@ -5,6 +5,8 @@
 #include "Logger.h"
 #include "OpenGLUtils.h"
 #include "TextureManager.h"
+#include "config/ScreenConfig.h"
+#include "config/TileConfig.h"
 
 // Batch tile vertex shader
 const char* batchTileVertexShader = R"(
@@ -87,9 +89,9 @@ void TileRenderer::initBatchRenderer() {
   glGenBuffers(1, &VBO);
 
   glBindBuffer(GL_ARRAY_BUFFER, VBO);
-  // Allocate enough space for max tiles (30x30 * 6 vertices * 4 floats)
-  glBufferData(GL_ARRAY_BUFFER, 30 * 30 * 6 * 4 * sizeof(float), nullptr,
-               GL_DYNAMIC_DRAW);
+  // Allocate enough space for max tiles
+  glBufferData(GL_ARRAY_BUFFER, Config::Tile::BATCH_BUFFER_SIZE * sizeof(float),
+               nullptr, GL_DYNAMIC_DRAW);
 
   glBindVertexArray(VAO);
 
@@ -106,7 +108,7 @@ void TileRenderer::initBatchRenderer() {
   glBindVertexArray(0);
 
   // Reserve space for vertices
-  batchVertices.reserve(30 * 30 * 6 * 4);
+  batchVertices.reserve(Config::Tile::BATCH_BUFFER_SIZE);
 }
 
 void TileRenderer::render(const TiledMap& map,
@@ -185,13 +187,13 @@ void TileRenderer::buildTileBatch(const TiledMap& map) {
         int tileTextureIndex = gid - 1;
         int column = tileTextureIndex % 2;
         int row = tileTextureIndex / 2;
-        int srcX = column * 64;
-        int srcY = row * 32;
+        int srcX = column * Config::Tile::WIDTH;
+        int srcY = row * Config::Tile::HEIGHT;
 
         u1 = srcX / (float)tilesetTexture->getWidth();
         v1 = srcY / (float)tilesetTexture->getHeight();
-        u2 = (srcX + 64) / (float)tilesetTexture->getWidth();
-        v2 = (srcY + 32) / (float)tilesetTexture->getHeight();
+        u2 = (srcX + Config::Tile::WIDTH) / (float)tilesetTexture->getWidth();
+        v2 = (srcY + Config::Tile::HEIGHT) / (float)tilesetTexture->getHeight();
       }
 
       // Build 6 vertices (2 triangles) for this tile
@@ -238,7 +240,10 @@ void TileRenderer::renderBatch() {
   glUseProgram(shaderProgram);
 
   // Set projection matrix
-  glm::mat4 projection = glm::ortho(0.0f, 800.0f, 600.0f, 0.0f, -1.0f, 1.0f);
+  glm::mat4 projection =
+      glm::ortho(Config::Screen::ORTHO_LEFT, Config::Screen::ORTHO_RIGHT,
+                 Config::Screen::ORTHO_BOTTOM, Config::Screen::ORTHO_TOP,
+                 Config::Screen::ORTHO_NEAR, Config::Screen::ORTHO_FAR);
   glUniformMatrix4fv(uniformProjection, 1, GL_FALSE, &projection[0][0]);
 
   // Update camera uniforms every frame

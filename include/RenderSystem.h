@@ -14,6 +14,7 @@
 #include "TileRenderer.h"
 #include "TiledMap.h"
 #include "Window.h"
+#include "config/PlayerConfig.h"
 
 class RenderSystem {
  public:
@@ -40,6 +41,4 @@ class RenderSystem {
 
   void onRender(const RenderEvent& e);
   void drawPlayer(const Player& player);
-
-  static constexpr int PLAYER_SIZE = 32;
 };

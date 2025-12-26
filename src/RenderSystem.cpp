@@ -10,6 +10,8 @@
 #include "OpenGLUtils.h"
 #include "Texture.h"
 #include "TextureManager.h"
+#include "config/PlayerConfig.h"
+#include "config/ScreenConfig.h"
 
 RenderSystem::RenderSystem(Window* window, ClientPrediction* clientPrediction,
                            RemotePlayerInterpolation* remoteInterpolation,
@@ -30,8 +32,11 @@ RenderSystem::RenderSystem(Window* window, ClientPrediction* clientPrediction,
   whitePixelTexture = std::make_unique<Texture>();
   whitePixelTexture->createWhitePixel();
 
-  // Set up orthographic projection (800x600 screen space)
-  glm::mat4 projection = glm::ortho(0.0f, 800.0f, 600.0f, 0.0f, -1.0f, 1.0f);
+  // Set up orthographic projection
+  glm::mat4 projection =
+      glm::ortho(Config::Screen::ORTHO_LEFT, Config::Screen::ORTHO_RIGHT,
+                 Config::Screen::ORTHO_BOTTOM, Config::Screen::ORTHO_TOP,
+                 Config::Screen::ORTHO_NEAR, Config::Screen::ORTHO_FAR);
   spriteRenderer->setProjection(projection);
 
   // Enable blending for transparency
@@ -123,15 +128,16 @@ void RenderSystem::drawPlayer(const Player& player) {
       int srcX, srcY, srcW, srcH;
       controller->getCurrentFrame(srcX, srcY, srcW, srcH);
 
-      spriteRenderer->drawRegion(*playerTexture, screenX - PLAYER_SIZE / 2.0f,
-                                 screenY - PLAYER_SIZE / 2.0f, PLAYER_SIZE,
-                                 PLAYER_SIZE, srcX, srcY, srcW, srcH, r, g, b,
-                                 1.0f);
+      spriteRenderer->drawRegion(
+          *playerTexture, screenX - Config::Player::SIZE / 2.0f,
+          screenY - Config::Player::SIZE / 2.0f, Config::Player::SIZE,
+          Config::Player::SIZE, srcX, srcY, srcW, srcH, r, g, b, 1.0f);
     } else {
       // Fallback to full sprite (for placeholder or if no animation)
-      spriteRenderer->draw(*playerTexture, screenX - PLAYER_SIZE / 2.0f,
-                           screenY - PLAYER_SIZE / 2.0f, PLAYER_SIZE,
-                           PLAYER_SIZE, r, g, b, 1.0f);
+      spriteRenderer->draw(
+          *playerTexture, screenX - Config::Player::SIZE / 2.0f,
+          screenY - Config::Player::SIZE / 2.0f, Config::Player::SIZE,
+          Config::Player::SIZE, r, g, b, 1.0f);
     }
   }
 }

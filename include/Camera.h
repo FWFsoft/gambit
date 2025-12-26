@@ -2,6 +2,8 @@
 
 #include <algorithm>
 
+#include "config/ScreenConfig.h"
+
 struct Camera {
   float x, y;
   float worldWidth, worldHeight;
@@ -10,8 +12,8 @@ struct Camera {
   Camera(int screenW, int screenH)
       : x(0),
         y(0),
-        worldWidth(800),
-        worldHeight(600),
+        worldWidth(Config::Screen::WIDTH),
+        worldHeight(Config::Screen::HEIGHT),
         screenWidth(screenW),
         screenHeight(screenH) {}
 

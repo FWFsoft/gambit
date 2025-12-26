@@ -2,6 +2,7 @@
 
 #include "EventBus.h"
 #include "Logger.h"
+#include "config/NetworkConfig.h"
 
 NetworkServer::NetworkServer(const std::string& addressStr, uint16_t port)
     : server(nullptr), running(false) {
@@ -22,7 +23,8 @@ bool NetworkServer::initialize() {
     return false;
   }
 
-  server = enet_host_create(&address, 32, 2, 0, 0);
+  server = enet_host_create(&address, Config::Network::MAX_CLIENTS,
+                            Config::Network::CHANNEL_COUNT, 0, 0);
   if (!server) {
     Logger::error(
         "An error occurred while trying to create an ENet server host.");
@@ -40,7 +42,8 @@ void NetworkServer::run() {
   ENetEvent event;
 
   while (running) {
-    while (enet_host_service(server, &event, 1000) > 0) {
+    while (enet_host_service(server, &event, Config::Network::POLL_TIMEOUT_MS) >
+           0) {
       switch (event.type) {
         case ENET_EVENT_TYPE_CONNECT: {
           uint32_t clientId =

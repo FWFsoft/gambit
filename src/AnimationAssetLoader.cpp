@@ -1,6 +1,8 @@
 #include "AnimationAssetLoader.h"
 
 #include "Logger.h"
+#include "config/AnimationConfig.h"
+#include "config/PlayerConfig.h"
 
 // Sprite sheet layout (256x256 PNG, 32x32 frames):
 // Row 0: Idle (0, 0)
@@ -46,11 +48,11 @@ AnimationClip AnimationAssetLoader::createIdleAnimation() {
   AnimationClip clip("idle", true);
 
   // Single frame at (0, 0)
-  AnimationFrame frame{0,         // srcX
-                       0,         // srcY
-                       32,        // srcW
-                       32,        // srcH
-                       1000.0f};  // duration (1 second)
+  AnimationFrame frame{0,                                        // srcX
+                       0,                                        // srcY
+                       Config::Player::FRAME_WIDTH,              // srcW
+                       Config::Player::FRAME_HEIGHT,             // srcH
+                       Config::Animation::IDLE_FRAME_DURATION};  // duration
   clip.frames.push_back(frame);
 
   return clip;
@@ -66,41 +68,41 @@ AnimationClip AnimationAssetLoader::createWalkAnimation(
 
   switch (dir) {
     case AnimationDirection::NORTH:
-      baseY = 32;
+      baseY = Config::Animation::ROW_NORTH;
       break;
     case AnimationDirection::NORTHEAST:
-      baseY = 64;
+      baseY = Config::Animation::ROW_NORTHEAST;
       break;
     case AnimationDirection::EAST:
-      baseY = 96;
+      baseY = Config::Animation::ROW_EAST;
       break;
     case AnimationDirection::SOUTHEAST:
-      baseY = 128;
+      baseY = Config::Animation::ROW_SOUTHEAST;
       break;
     case AnimationDirection::SOUTH:
-      baseY = 160;
+      baseY = Config::Animation::ROW_SOUTH;
       break;
     case AnimationDirection::SOUTHWEST:
-      baseY = 192;
+      baseY = Config::Animation::ROW_SOUTHWEST;
       break;
     case AnimationDirection::WEST:
-      baseY = 224;
+      baseY = Config::Animation::ROW_WEST;
       break;
     case AnimationDirection::NORTHWEST:
-      baseY = 0;
-      baseX = 128;  // Top-right corner
+      baseY = Config::Animation::ROW_NORTHWEST;
+      baseX = Config::Animation::COL_WALK_START;
       break;
     default:
-      baseY = 160;  // Fallback to south
+      baseY = Config::Animation::ROW_SOUTH;  // Fallback to south
   }
 
-  // Create 4-frame walk cycle (100ms per frame = 400ms total cycle)
+  // Create 4-frame walk cycle
   for (int i = 0; i < 4; i++) {
-    AnimationFrame frame{baseX + (i * 32),  // srcX
-                         baseY,             // srcY
-                         32,                // srcW
-                         32,                // srcH
-                         100.0f};           // duration (100ms per frame)
+    AnimationFrame frame{baseX + (i * Config::Player::FRAME_WIDTH),  // srcX
+                         baseY,                                      // srcY
+                         Config::Player::FRAME_WIDTH,                // srcW
+                         Config::Player::FRAME_HEIGHT,               // srcH
+                         Config::Animation::WALK_FRAME_DURATION};    // duration
     clip.frames.push_back(frame);
   }
 

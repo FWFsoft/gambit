@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "OpenGLUtils.h"
+#include "config/ScreenConfig.h"
 
 // Reuse simple shader from CollisionDebugRenderer
 const char* zoneVertexShader = R"(
@@ -38,8 +39,11 @@ MusicZoneDebugRenderer::MusicZoneDebugRenderer(Camera* camera,
   shaderProgram =
       OpenGLUtils::createShaderProgram(zoneVertexShader, zoneFragmentShader);
 
-  // Set up orthographic projection (800x600 screen space)
-  glm::mat4 projection = glm::ortho(0.0f, 800.0f, 600.0f, 0.0f, -1.0f, 1.0f);
+  // Set up orthographic projection
+  glm::mat4 projection =
+      glm::ortho(Config::Screen::ORTHO_LEFT, Config::Screen::ORTHO_RIGHT,
+                 Config::Screen::ORTHO_BOTTOM, Config::Screen::ORTHO_TOP,
+                 Config::Screen::ORTHO_NEAR, Config::Screen::ORTHO_FAR);
 
   glUseProgram(shaderProgram);
   GLint projLoc = glGetUniformLocation(shaderProgram, "projection");
