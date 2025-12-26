@@ -18,6 +18,13 @@ class SpriteRenderer {
   void draw(const Texture& texture, float x, float y, float width, float height,
             float r = 1.0f, float g = 1.0f, float b = 1.0f, float a = 1.0f);
 
+  // Draw a region of a texture (for tile atlases)
+  // srcX, srcY, srcW, srcH are in pixel coordinates
+  void drawRegion(const Texture& texture, float x, float y, float width,
+                  float height, int srcX, int srcY, int srcW, int srcH,
+                  float r = 1.0f, float g = 1.0f, float b = 1.0f,
+                  float a = 1.0f);
+
   // Draw a colored rectangle (no texture)
   void drawRect(float x, float y, float width, float height, float r = 1.0f,
                 float g = 1.0f, float b = 1.0f, float a = 1.0f);
@@ -26,6 +33,13 @@ class SpriteRenderer {
   GLuint shaderProgram;
   GLuint VAO;
   GLuint VBO;
+  GLuint regionVAO;  // Separate VAO for dynamic region rendering
+  GLuint regionVBO;  // Separate VBO to avoid modifying main VBO
+
+  // Cached uniform locations (avoid expensive glGetUniformLocation calls)
+  GLint uniformModel;
+  GLint uniformColor;
+  GLint uniformProjection;
 
   void initRenderData();
 };

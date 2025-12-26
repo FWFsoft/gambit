@@ -1,6 +1,10 @@
 #pragma once
 
+#include <glad/glad.h>
+
 #include <functional>
+#include <glm/glm.hpp>
+#include <vector>
 
 #include "Camera.h"
 #include "SpriteRenderer.h"
@@ -14,14 +18,28 @@ class TileRenderer {
  public:
   TileRenderer(Camera* camera, SpriteRenderer* spriteRenderer,
                Texture* whitePixel);
+  ~TileRenderer();
   void render(const TiledMap& map, PlayerRenderCallback playerCallback);
 
  private:
   Camera* camera;
   SpriteRenderer* spriteRenderer;
   Texture* whitePixel;
+  Texture* tilesetTexture;  // Managed by TextureManager, not owned
 
-  void renderTile(const TiledMap& map, int tileX, int tileY, uint32_t gid);
+  // Batched rendering
+  GLuint shaderProgram;
+  GLuint VAO, VBO;
+  GLint uniformProjection;
+  GLint uniformCameraPos;
+  GLint uniformScreenCenter;
+  std::vector<float> batchVertices;
+  bool batchBuilt;        // Cache flag - tiles are static
+  bool verticesUploaded;  // Cache flag - vertices uploaded to GPU
+
+  void initBatchRenderer();
+  void buildTileBatch(const TiledMap& map);
+  void renderBatch();
   void gridToWorld(const TiledMap& map, int tileX, int tileY, float& worldX,
                    float& worldY);
 };
