@@ -43,6 +43,21 @@ if(NOT tmxlite_FOUND)
 
     # If pkg-config also failed, manually search for tmxlite (vcpkg fallback)
     if(NOT TMXLITE_FOUND)
+        # Find tmxlite dependencies first (needed for manual linking)
+        find_package(ZLIB REQUIRED)
+        find_package(zstd CONFIG QUIET)
+
+        # Determine which zstd target is available
+        if(TARGET zstd::libzstd_shared)
+            set(ZSTD_TARGET zstd::libzstd_shared)
+        elseif(TARGET zstd::libzstd_static)
+            set(ZSTD_TARGET zstd::libzstd_static)
+        elseif(TARGET zstd::libzstd)
+            set(ZSTD_TARGET zstd::libzstd)
+        else()
+            message(FATAL_ERROR "zstd library not found")
+        endif()
+
         find_path(TMXLITE_INCLUDE_DIR tmxlite/Map.hpp)
         find_library(TMXLITE_LIBRARY NAMES tmxlite libtmxlite)
 
@@ -58,10 +73,8 @@ if(NOT tmxlite_FOUND)
                 INTERFACE_INCLUDE_DIRECTORIES "${TMXLITE_INCLUDE_DIR}"
             )
 
-            # tmxlite needs zlib and zstd
-            find_package(ZLIB REQUIRED)
-            find_package(zstd CONFIG REQUIRED)
-            target_link_libraries(tmxlite::tmxlite INTERFACE ZLIB::ZLIB zstd::libzstd)
+            # Link tmxlite dependencies
+            target_link_libraries(tmxlite::tmxlite INTERFACE ZLIB::ZLIB ${ZSTD_TARGET})
 
             set(tmxlite_FOUND TRUE)
         else()
@@ -73,7 +86,10 @@ endif()
 # tmxlite dependencies (only needed when using pkg-config)
 if(TARGET PkgConfig::TMXLITE)
     find_package(ZLIB REQUIRED)
-    find_package(zstd CONFIG REQUIRED)
+    find_package(zstd CONFIG QUIET)
+    if(NOT TARGET zstd::libzstd_shared AND NOT TARGET zstd::libzstd_static AND NOT TARGET zstd::libzstd)
+        message(FATAL_ERROR "zstd library not found for pkg-config tmxlite")
+    endif()
 endif()
 
 # Server executable
