@@ -1,10 +1,14 @@
 #include "RemotePlayerInterpolation.h"
 
 #include "AnimationAssetLoader.h"
+#include "AnimationSystem.h"
 #include "Logger.h"
 
-RemotePlayerInterpolation::RemotePlayerInterpolation(uint32_t localPlayerId)
-    : localPlayerId(localPlayerId), localPlayerIdConfirmed(false) {
+RemotePlayerInterpolation::RemotePlayerInterpolation(
+    uint32_t localPlayerId, AnimationSystem* animationSystem)
+    : localPlayerId(localPlayerId),
+      localPlayerIdConfirmed(false),
+      animationSystem(animationSystem) {
   // Subscribe to network packet events
   EventBus::instance().subscribe<NetworkPacketReceivedEvent>(
       [this](const NetworkPacketReceivedEvent& e) {
@@ -28,6 +32,18 @@ void RemotePlayerInterpolation::onNetworkPacketReceived(
         continue;  // Skip local player (handled by ClientPrediction)
       }
 
+      // Skip if we haven't received PlayerJoined for this player yet
+      auto playerIt = remotePlayers.find(playerState.playerId);
+      if (playerIt == remotePlayers.end()) {
+        static std::unordered_map<uint32_t, int> skippedCounts;
+        if (skippedCounts[playerState.playerId]++ < 3) {
+          Logger::debug("Skipping StateUpdate for unknown player " +
+                        std::to_string(playerState.playerId) +
+                        " (waiting for PlayerJoined)");
+        }
+        continue;  // Will be initialized when PlayerJoined arrives
+      }
+
       // Create snapshot
       PlayerSnapshot snapshot;
       snapshot.x = playerState.x;
@@ -48,7 +64,8 @@ void RemotePlayerInterpolation::onNetworkPacketReceived(
       }
 
       // Update latest known state
-      Player& remotePlayer = remotePlayers[playerState.playerId];
+      Player& remotePlayer = playerIt->second;
+
       remotePlayer.id = playerState.playerId;
       remotePlayer.x = playerState.x;
       remotePlayer.y = playerState.y;
@@ -61,8 +78,23 @@ void RemotePlayerInterpolation::onNetworkPacketReceived(
 
       // Update animation state based on velocity
       if (remotePlayer.animationController) {
+        std::string prevAnim =
+            remotePlayer.animationController->getCurrentAnimationName();
         remotePlayer.animationController->updateAnimationState(remotePlayer.vx,
                                                                remotePlayer.vy);
+        std::string newAnim =
+            remotePlayer.animationController->getCurrentAnimationName();
+
+        // Log when animation changes (throttled)
+        static std::unordered_map<uint32_t, std::string> lastLoggedAnim;
+        if (lastLoggedAnim[playerState.playerId] != newAnim) {
+          Logger::debug("Remote player " +
+                        std::to_string(playerState.playerId) +
+                        " anim: " + prevAnim + " -> " + newAnim +
+                        " (vx=" + std::to_string(remotePlayer.vx) +
+                        ", vy=" + std::to_string(remotePlayer.vy) + ")");
+          lastLoggedAnim[playerState.playerId] = newAnim;
+        }
       }
     }
   } else if (type == PacketType::PlayerJoined) {
@@ -73,11 +105,13 @@ void RemotePlayerInterpolation::onNetworkPacketReceived(
     if (!localPlayerIdConfirmed) {
       localPlayerId = packet.playerId;
       localPlayerIdConfirmed = true;
-      Logger::info("Updated local player ID to: " +
-                   std::to_string(localPlayerId));
+      Logger::debug("Confirmed local player ID: " +
+                    std::to_string(localPlayerId));
     } else if (packet.playerId != localPlayerId) {
       // This is a different player (remote player)
       onPlayerJoined(packet.playerId, packet.r, packet.g, packet.b);
+    } else {
+      Logger::debug("Ignoring duplicate PlayerJoined for self");
     }
   } else if (type == PacketType::PlayerLeft) {
     PlayerLeftPacket packet = deserializePlayerLeft(e.data, e.size);
@@ -107,12 +141,25 @@ void RemotePlayerInterpolation::onPlayerJoined(uint32_t playerId, uint8_t r,
 
   remotePlayers[playerId] = player;
 
+  // Register with animation system if available
+  if (animationSystem) {
+    animationSystem->registerEntity(&remotePlayers[playerId]);
+  }
+
   Logger::info("Remote player " + std::to_string(playerId) +
                " joined (color: " + std::to_string(r) + "," +
                std::to_string(g) + "," + std::to_string(b) + ")");
 }
 
 void RemotePlayerInterpolation::onPlayerLeft(uint32_t playerId) {
+  // Unregister from animation system before erasing
+  if (animationSystem) {
+    auto it = remotePlayers.find(playerId);
+    if (it != remotePlayers.end()) {
+      animationSystem->unregisterEntity(&it->second);
+    }
+  }
+
   remotePlayers.erase(playerId);
   snapshotBuffers.erase(playerId);
 

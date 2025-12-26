@@ -44,13 +44,32 @@ void ServerGameState::onClientConnected(const ClientConnectedEvent& e) {
 
   Logger::info("Player " + std::to_string(playerId) + " joined");
 
-  // Broadcast join
-  PlayerJoinedPacket packet;
-  packet.playerId = playerId;
-  packet.r = player.r;
-  packet.g = player.g;
-  packet.b = player.b;
-  server->broadcastPacket(serialize(packet));
+  // Send new player's own PlayerJoined packet to them FIRST
+  // (so they recognize it as their local player before receiving existing
+  // players)
+  PlayerJoinedPacket newPlayerPacket;
+  newPlayerPacket.playerId = playerId;
+  newPlayerPacket.r = player.r;
+  newPlayerPacket.g = player.g;
+  newPlayerPacket.b = player.b;
+  server->send(e.peer, serialize(newPlayerPacket));
+
+  // Then send existing players to new client
+  for (const auto& [existingId, existingPlayer] : players) {
+    if (existingId != playerId) {
+      PlayerJoinedPacket existingPacket;
+      existingPacket.playerId = existingId;
+      existingPacket.r = existingPlayer.r;
+      existingPacket.g = existingPlayer.g;
+      existingPacket.b = existingPlayer.b;
+      server->send(e.peer, serialize(existingPacket));
+      Logger::info("Sent existing player " + std::to_string(existingId) +
+                   " to new player " + std::to_string(playerId));
+    }
+  }
+
+  // Broadcast new player join to all clients (new client will ignore duplicate)
+  server->broadcastPacket(serialize(newPlayerPacket));
 }
 
 void ServerGameState::onClientDisconnected(const ClientDisconnectedEvent& e) {

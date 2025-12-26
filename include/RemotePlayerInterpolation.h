@@ -8,6 +8,8 @@
 #include "NetworkProtocol.h"
 #include "Player.h"
 
+class AnimationSystem;
+
 struct PlayerSnapshot {
   float x, y;
   float vx, vy;
@@ -18,7 +20,8 @@ struct PlayerSnapshot {
 
 class RemotePlayerInterpolation {
  public:
-  RemotePlayerInterpolation(uint32_t localPlayerId);
+  RemotePlayerInterpolation(uint32_t localPlayerId,
+                            AnimationSystem* animationSystem = nullptr);
 
   // Get interpolated state for a remote player
   bool getInterpolatedState(uint32_t playerId, float interpolation,
@@ -33,7 +36,9 @@ class RemotePlayerInterpolation {
                                 // server
   std::unordered_map<uint32_t, std::deque<PlayerSnapshot>> snapshotBuffers;
   std::unordered_map<uint32_t, Player>
-      remotePlayers;  // Store latest known state
+      remotePlayers;                 // Store latest known state
+  AnimationSystem* animationSystem;  // Optional animation system for remote
+                                     // players
 
   static constexpr size_t MAX_SNAPSHOTS = 3;  // ~50ms buffer at 60 FPS
 

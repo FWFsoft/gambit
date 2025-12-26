@@ -19,7 +19,8 @@
       "Bash(make build:*)",
       "WebFetch(domain:github.com)",
       "Bash(timeout 1 ./build/Client:*)",
-      "Skill(dev)"
+      "Skill(dev)",
+      "Bash(make dev:*)"
     ]
   }
 }

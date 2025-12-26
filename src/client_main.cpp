@@ -48,12 +48,18 @@ int main() {
   WorldConfig world(map.getWorldWidth(), map.getWorldHeight(),
                     &collisionSystem);
   ClientPrediction clientPrediction(&client, localPlayerId, world);
-  RemotePlayerInterpolation remoteInterpolation(localPlayerId);
+
+  // Initialize animation system first
+  AnimationSystem animationSystem;
+
+  // Create remote player interpolation with animation system
+  RemotePlayerInterpolation remoteInterpolation(localPlayerId,
+                                                &animationSystem);
+
   RenderSystem renderSystem(&window, &clientPrediction, &remoteInterpolation,
                             &camera, &map, &debugRenderer);
 
-  // Initialize animation system and load player animations
-  AnimationSystem animationSystem;
+  // Load local player animations
   Player& localPlayer = clientPrediction.getLocalPlayerMutable();
   AnimationAssetLoader::loadPlayerAnimations(
       *localPlayer.getAnimationController(), "assets/player_animated.png");

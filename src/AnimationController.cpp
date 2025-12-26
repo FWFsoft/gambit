@@ -21,6 +21,11 @@ const AnimationClip& AnimationController::getAnimation(
 }
 
 void AnimationController::updateAnimationState(float vx, float vy) {
+  // If no animations loaded (e.g., on server), skip animation updates
+  if (animations.empty()) {
+    return;
+  }
+
   AnimationDirection newDirection = velocityToDirection(vx, vy);
 
   // If direction changed, switch animation
