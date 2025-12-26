@@ -31,15 +31,47 @@ else()
 endif()
 
 # Find tmxlite library
-# Try CMake config first (for vcpkg), then fall back to pkg-config (for system)
+# Try CMake config first (for vcpkg), then pkg-config, then manual search
 find_package(tmxlite CONFIG QUIET)
+
 if(NOT tmxlite_FOUND)
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(TMXLITE REQUIRED IMPORTED_TARGET tmxlite)
+    # Try pkg-config (for system installations)
+    find_package(PkgConfig QUIET)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(TMXLITE IMPORTED_TARGET tmxlite)
+    endif()
+
+    # If pkg-config also failed, manually search for tmxlite (vcpkg fallback)
+    if(NOT TMXLITE_FOUND)
+        find_path(TMXLITE_INCLUDE_DIR tmxlite/Map.hpp)
+        find_library(TMXLITE_LIBRARY NAMES tmxlite libtmxlite)
+
+        if(TMXLITE_INCLUDE_DIR AND TMXLITE_LIBRARY)
+            message(STATUS "Found tmxlite (manual):")
+            message(STATUS "  Include: ${TMXLITE_INCLUDE_DIR}")
+            message(STATUS "  Library: ${TMXLITE_LIBRARY}")
+
+            # Create imported target
+            add_library(tmxlite::tmxlite UNKNOWN IMPORTED)
+            set_target_properties(tmxlite::tmxlite PROPERTIES
+                IMPORTED_LOCATION "${TMXLITE_LIBRARY}"
+                INTERFACE_INCLUDE_DIRECTORIES "${TMXLITE_INCLUDE_DIR}"
+            )
+
+            # tmxlite needs zlib and zstd
+            find_package(ZLIB REQUIRED)
+            find_package(zstd CONFIG REQUIRED)
+            target_link_libraries(tmxlite::tmxlite INTERFACE ZLIB::ZLIB zstd::libzstd)
+
+            set(tmxlite_FOUND TRUE)
+        else()
+            message(FATAL_ERROR "tmxlite library not found")
+        endif()
+    endif()
 endif()
 
-# tmxlite dependencies (only needed when using system tmxlite)
-if(NOT tmxlite_FOUND)
+# tmxlite dependencies (only needed when using pkg-config)
+if(TARGET PkgConfig::TMXLITE)
     find_package(ZLIB REQUIRED)
     find_package(zstd CONFIG REQUIRED)
 endif()
@@ -66,10 +98,10 @@ target_link_libraries(Server PRIVATE
     SDL2::SDL2
     spdlog::spdlog
 )
-# Link tmxlite (vcpkg or pkg-config)
+# Link tmxlite (CMake config, manual, or pkg-config)
 if(tmxlite_FOUND)
     target_link_libraries(Server PRIVATE tmxlite::tmxlite)
-else()
+elseif(TARGET PkgConfig::TMXLITE)
     target_link_libraries(Server PRIVATE
         PkgConfig::TMXLITE
         ZLIB::ZLIB
@@ -116,10 +148,10 @@ target_link_libraries(Client PRIVATE
     $<IF:$<TARGET_EXISTS:SDL2_image::SDL2_image>,SDL2_image::SDL2_image,$<IF:$<TARGET_EXISTS:SDL2_image::SDL2_image-static>,SDL2_image::SDL2_image-static,SDL2_image::SDL2_image>>
     $<IF:$<TARGET_EXISTS:SDL2_mixer::SDL2_mixer>,SDL2_mixer::SDL2_mixer,$<IF:$<TARGET_EXISTS:SDL2_mixer::SDL2_mixer-static>,SDL2_mixer::SDL2_mixer-static,SDL2_mixer::SDL2_mixer>>
 )
-# Link tmxlite (vcpkg or pkg-config)
+# Link tmxlite (CMake config, manual, or pkg-config)
 if(tmxlite_FOUND)
     target_link_libraries(Client PRIVATE tmxlite::tmxlite)
-else()
+elseif(TARGET PkgConfig::TMXLITE)
     target_link_libraries(Client PRIVATE
         PkgConfig::TMXLITE
         ZLIB::ZLIB
