@@ -9,6 +9,7 @@
 #include "Logger.h"
 #include "OpenGLUtils.h"
 #include "Texture.h"
+#include "TextureManager.h"
 
 RenderSystem::RenderSystem(Window* window, ClientPrediction* clientPrediction,
                            RemotePlayerInterpolation* remoteInterpolation,
@@ -38,6 +39,13 @@ RenderSystem::RenderSystem(Window* window, ClientPrediction* clientPrediction,
   // Create tile renderer with sprite renderer and white pixel texture
   tileRenderer = std::make_unique<TileRenderer>(camera, spriteRenderer.get(),
                                                 whitePixelTexture.get());
+
+  // Try to load player sprite (fallback to colored rectangle if not found)
+  playerTexture = TextureManager::instance().get("assets/player.png");
+  if (!playerTexture) {
+    Logger::info("Player sprite not found, using colored rectangles");
+    playerTexture = whitePixelTexture.get();
+  }
 
   Logger::info("RenderSystem initialized with OpenGL");
 
@@ -92,13 +100,16 @@ void RenderSystem::drawPlayer(const Player& player) {
   int screenX, screenY;
   camera->worldToScreen(player.x, player.y, screenX, screenY);
 
-  // Draw player as colored rectangle using white pixel texture
-  if (whitePixelTexture) {
-    float r = player.r / 255.0f;
-    float g = player.g / 255.0f;
-    float b = player.b / 255.0f;
+  if (playerTexture) {
+    // If using actual sprite, render without color tint
+    // If using white pixel fallback, tint with player color
+    bool isPlaceholder = (playerTexture == whitePixelTexture.get());
 
-    spriteRenderer->draw(*whitePixelTexture, screenX - PLAYER_SIZE / 2.0f,
+    float r = isPlaceholder ? player.r / 255.0f : 1.0f;
+    float g = isPlaceholder ? player.g / 255.0f : 1.0f;
+    float b = isPlaceholder ? player.b / 255.0f : 1.0f;
+
+    spriteRenderer->draw(*playerTexture, screenX - PLAYER_SIZE / 2.0f,
                          screenY - PLAYER_SIZE / 2.0f, PLAYER_SIZE, PLAYER_SIZE,
                          r, g, b, 1.0f);
   }

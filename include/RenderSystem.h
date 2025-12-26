@@ -33,6 +33,7 @@ class RenderSystem {
   std::unique_ptr<SpriteRenderer> spriteRenderer;
   std::unique_ptr<Texture> whitePixelTexture;
   std::unique_ptr<TileRenderer> tileRenderer;
+  Texture* playerTexture;  // Managed by TextureManager, not owned
 
   void onRender(const RenderEvent& e);
   void drawPlayer(const Player& player);
