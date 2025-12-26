@@ -16,6 +16,7 @@ class ClientPrediction {
                    const WorldConfig& world);
 
   const Player& getLocalPlayer() const { return localPlayer; }
+  Player& getLocalPlayerMutable() { return localPlayer; }
 
  private:
   NetworkClient* client;

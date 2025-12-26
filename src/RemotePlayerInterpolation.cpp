@@ -1,5 +1,6 @@
 #include "RemotePlayerInterpolation.h"
 
+#include "AnimationAssetLoader.h"
 #include "Logger.h"
 
 RemotePlayerInterpolation::RemotePlayerInterpolation(uint32_t localPlayerId)
@@ -57,6 +58,12 @@ void RemotePlayerInterpolation::onNetworkPacketReceived(
       remotePlayer.r = playerState.r;
       remotePlayer.g = playerState.g;
       remotePlayer.b = playerState.b;
+
+      // Update animation state based on velocity
+      if (remotePlayer.animationController) {
+        remotePlayer.animationController->updateAnimationState(remotePlayer.vx,
+                                                               remotePlayer.vy);
+      }
     }
   } else if (type == PacketType::PlayerJoined) {
     PlayerJoinedPacket packet = deserializePlayerJoined(e.data, e.size);
@@ -93,6 +100,10 @@ void RemotePlayerInterpolation::onPlayerJoined(uint32_t playerId, uint8_t r,
   player.r = r;
   player.g = g;
   player.b = b;
+
+  // Initialize animations
+  AnimationAssetLoader::loadPlayerAnimations(*player.getAnimationController(),
+                                             "assets/player_animated.png");
 
   remotePlayers[playerId] = player;
 

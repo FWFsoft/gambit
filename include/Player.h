@@ -3,16 +3,23 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <memory>
 
+#include "Animatable.h"
+#include "AnimationController.h"
 #include "CollisionSystem.h"
 #include "MovementInput.h"
 
-struct Player {
+struct Player : public Animatable {
   uint32_t id;
   float x, y;
   float vx, vy;
   float health;
   uint8_t r, g, b;
+
+  // Animation (shared_ptr allows Player to be copyable for remote
+  // interpolation)
+  std::shared_ptr<AnimationController> animationController;
 
   // Server-only fields
   uint32_t lastInputSequence;
@@ -30,8 +37,22 @@ struct Player {
         r(255),
         g(255),
         b(255),
+        animationController(std::make_shared<AnimationController>()),
         lastInputSequence(0),
         lastServerTick(0) {}
+
+  // Animatable interface implementation
+  AnimationController* getAnimationController() override {
+    return animationController.get();
+  }
+
+  const AnimationController* getAnimationController() const override {
+    return animationController.get();
+  }
+
+  float getVelocityX() const override { return vx; }
+
+  float getVelocityY() const override { return vy; }
 };
 
 constexpr float PLAYER_SPEED = 200.0f;
@@ -65,6 +86,11 @@ inline void applyInput(Player& player, const MovementInput& input) {
 
   player.vx = dx * PLAYER_SPEED;
   player.vy = dy * PLAYER_SPEED;
+
+  // Update animation state based on new velocity
+  if (player.animationController) {
+    player.animationController->updateAnimationState(player.vx, player.vy);
+  }
 
   // Calculate new position
   float oldX = player.x;

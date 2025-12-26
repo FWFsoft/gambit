@@ -54,6 +54,9 @@ add_executable(Server
     src/ServerGameState.cpp
     src/TiledMap.cpp
     src/CollisionSystem.cpp
+    src/AnimationController.cpp
+    src/AnimationSystem.cpp
+    src/AnimationAssetLoader.cpp
 )
 target_include_directories(Server SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
 target_include_directories(Server PRIVATE include)
@@ -94,6 +97,9 @@ add_executable(Client
     src/Texture.cpp
     src/TextureManager.cpp
     src/SpriteRenderer.cpp
+    src/AnimationController.cpp
+    src/AnimationSystem.cpp
+    src/AnimationAssetLoader.cpp
 )
 target_include_directories(Client SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
 target_include_directories(Client PRIVATE include)
@@ -126,6 +132,9 @@ add_executable(test_player
     src/Logger.cpp
     src/NetworkProtocol.cpp
     src/CollisionSystem.cpp
+    src/AnimationController.cpp
+    src/AnimationSystem.cpp
+    src/AnimationAssetLoader.cpp
 )
 target_include_directories(test_player SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
 target_include_directories(test_player PRIVATE include tests)
@@ -166,6 +175,9 @@ add_executable(test_remote_player_interpolation
     src/Logger.cpp
     src/NetworkProtocol.cpp
     src/RemotePlayerInterpolation.cpp
+    src/AnimationController.cpp
+    src/AnimationSystem.cpp
+    src/AnimationAssetLoader.cpp
 )
 target_include_directories(test_remote_player_interpolation SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
 target_include_directories(test_remote_player_interpolation PRIVATE include tests)
@@ -178,6 +190,9 @@ add_executable(test_client_prediction
     src/ClientPrediction.cpp
     src/NetworkClient.cpp
     src/CollisionSystem.cpp
+    src/AnimationController.cpp
+    src/AnimationSystem.cpp
+    src/AnimationAssetLoader.cpp
 )
 target_include_directories(test_client_prediction SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
 target_include_directories(test_client_prediction PRIVATE include tests)

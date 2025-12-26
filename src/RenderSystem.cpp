@@ -40,10 +40,11 @@ RenderSystem::RenderSystem(Window* window, ClientPrediction* clientPrediction,
   tileRenderer = std::make_unique<TileRenderer>(camera, spriteRenderer.get(),
                                                 whitePixelTexture.get());
 
-  // Try to load player sprite (fallback to colored rectangle if not found)
-  playerTexture = TextureManager::instance().get("assets/player.png");
+  // Try to load animated player sprite sheet (fallback to colored rectangle if
+  // not found)
+  playerTexture = TextureManager::instance().get("assets/player_animated.png");
   if (!playerTexture) {
-    Logger::info("Player sprite not found, using colored rectangles");
+    Logger::info("Player sprite sheet not found, using colored rectangles");
     playerTexture = whitePixelTexture.get();
   }
 
@@ -109,8 +110,21 @@ void RenderSystem::drawPlayer(const Player& player) {
     float g = isPlaceholder ? player.g / 255.0f : 1.0f;
     float b = isPlaceholder ? player.b / 255.0f : 1.0f;
 
-    spriteRenderer->draw(*playerTexture, screenX - PLAYER_SIZE / 2.0f,
-                         screenY - PLAYER_SIZE / 2.0f, PLAYER_SIZE, PLAYER_SIZE,
-                         r, g, b, 1.0f);
+    // Use animation frame if animation controller exists
+    const AnimationController* controller = player.getAnimationController();
+    if (controller && !isPlaceholder) {
+      int srcX, srcY, srcW, srcH;
+      controller->getCurrentFrame(srcX, srcY, srcW, srcH);
+
+      spriteRenderer->drawRegion(*playerTexture, screenX - PLAYER_SIZE / 2.0f,
+                                 screenY - PLAYER_SIZE / 2.0f, PLAYER_SIZE,
+                                 PLAYER_SIZE, srcX, srcY, srcW, srcH, r, g, b,
+                                 1.0f);
+    } else {
+      // Fallback to full sprite (for placeholder or if no animation)
+      spriteRenderer->draw(*playerTexture, screenX - PLAYER_SIZE / 2.0f,
+                           screenY - PLAYER_SIZE / 2.0f, PLAYER_SIZE,
+                           PLAYER_SIZE, r, g, b, 1.0f);
+    }
   }
 }

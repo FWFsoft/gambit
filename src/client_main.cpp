@@ -1,3 +1,5 @@
+#include "AnimationAssetLoader.h"
+#include "AnimationSystem.h"
 #include "Camera.h"
 #include "ClientPrediction.h"
 #include "CollisionDebugRenderer.h"
@@ -49,6 +51,13 @@ int main() {
   RemotePlayerInterpolation remoteInterpolation(localPlayerId);
   RenderSystem renderSystem(&window, &clientPrediction, &remoteInterpolation,
                             &camera, &map, &debugRenderer);
+
+  // Initialize animation system and load player animations
+  AnimationSystem animationSystem;
+  Player& localPlayer = clientPrediction.getLocalPlayerMutable();
+  AnimationAssetLoader::loadPlayerAnimations(
+      *localPlayer.getAnimationController(), "assets/player_animated.png");
+  animationSystem.registerEntity(&localPlayer);
 
   // Subscribe to UpdateEvent for network processing
   EventBus::instance().subscribe<UpdateEvent>([&](const UpdateEvent& e) {
