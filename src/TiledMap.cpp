@@ -28,6 +28,59 @@ bool TiledMap::load(const std::string& filepath) {
 
   extractCollisionShapes();
 
+  // Extract music zones from object layers
+  musicZones.clear();
+  for (const auto& layer : layers) {
+    if (layer->getType() == tmx::Layer::Type::Object) {
+      const auto& objectLayer = layer->getLayerAs<tmx::ObjectGroup>();
+
+      // Only process "Music" or "MusicZones" layers
+      if (objectLayer.getName() != "Music" &&
+          objectLayer.getName() != "MusicZones") {
+        continue;
+      }
+
+      for (const auto& object : objectLayer.getObjects()) {
+        // Only process rectangle zones
+        if (object.getShape() != tmx::Object::Shape::Rectangle) {
+          continue;
+        }
+
+        // Extract music_track property
+        std::string trackName;
+        const auto& properties = object.getProperties();
+        for (const auto& prop : properties) {
+          if (prop.getName() == "music_track" &&
+              prop.getType() == tmx::Property::Type::String) {
+            trackName = prop.getStringValue();
+            break;
+          }
+        }
+
+        // Skip if no music_track property
+        if (trackName.empty()) {
+          Logger::info("Music zone '" + object.getName() +
+                       "' missing music_track property, skipping");
+          continue;
+        }
+
+        // Create MusicZone
+        const auto& aabb = object.getAABB();
+        MusicZone zone;
+        zone.name = object.getName();
+        zone.trackName = trackName;
+        zone.x = aabb.left;
+        zone.y = aabb.top;
+        zone.width = aabb.width;
+        zone.height = aabb.height;
+
+        musicZones.push_back(zone);
+        Logger::info("Loaded music zone: " + zone.name + " -> " +
+                     zone.trackName);
+      }
+    }
+  }
+
   Logger::info("Loaded map: " + filepath + " (" + std::to_string(mapWidth) +
                "x" + std::to_string(mapHeight) + " tiles, " +
                std::to_string(tileWidth) + "x" + std::to_string(tileHeight) +
@@ -52,6 +105,13 @@ void TiledMap::extractCollisionShapes() {
   for (const auto& layer : layers) {
     if (layer->getType() == tmx::Layer::Type::Object) {
       const auto& objectLayer = layer->getLayerAs<tmx::ObjectGroup>();
+
+      // Skip Music/MusicZones layers (they're for music zones, not collision)
+      if (objectLayer.getName() == "Music" ||
+          objectLayer.getName() == "MusicZones") {
+        continue;
+      }
+
       const auto& objects = objectLayer.getObjects();
 
       for (const auto& obj : objects) {

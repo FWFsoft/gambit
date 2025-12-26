@@ -1,6 +1,7 @@
 # Custom Makefile targets for Gambit
 # This file takes precedence over the CMake-generated Makefile
 
+NUM_CLIENTS?=2
 
 .PHONY: help build test clean run-server run-client dev test-coverage test-coverage-open pre-commit
 help: ## Show this help message
@@ -61,8 +62,8 @@ run-client: build  ## Start a single Gambit client
 	@echo "Starting Gambit Client (connecting to 127.0.0.1:1234)..."
 	./build/Client
 
-dev: build  ## Full dev environment: 1 server + 4 clients
-	@./dev.sh
+dev: build  ## Full dev environment: 1 server + N clients
+	@./dev.sh $(NUM_CLIENTS)
 
 
 .PHONY: pre-commit

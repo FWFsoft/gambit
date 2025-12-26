@@ -14,13 +14,15 @@
 RenderSystem::RenderSystem(Window* window, ClientPrediction* clientPrediction,
                            RemotePlayerInterpolation* remoteInterpolation,
                            Camera* camera, TiledMap* tiledMap,
-                           CollisionDebugRenderer* collisionDebugRenderer)
+                           CollisionDebugRenderer* collisionDebugRenderer,
+                           MusicZoneDebugRenderer* musicZoneDebugRenderer)
     : window(window),
       clientPrediction(clientPrediction),
       remoteInterpolation(remoteInterpolation),
       camera(camera),
       tiledMap(tiledMap),
-      collisionDebugRenderer(collisionDebugRenderer) {
+      collisionDebugRenderer(collisionDebugRenderer),
+      musicZoneDebugRenderer(musicZoneDebugRenderer) {
   // Initialize sprite renderer
   spriteRenderer = std::make_unique<SpriteRenderer>();
 
@@ -86,6 +88,11 @@ void RenderSystem::onRender(const RenderEvent& e) {
       }
     }
   });
+
+  // Render music zone debug overlay (if enabled)
+  if (musicZoneDebugRenderer) {
+    musicZoneDebugRenderer->render();
+  }
 
   // Render collision debug overlay (if enabled)
   if (collisionDebugRenderer) {

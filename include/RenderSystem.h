@@ -8,6 +8,7 @@
 #include "ClientPrediction.h"
 #include "CollisionDebugRenderer.h"
 #include "EventBus.h"
+#include "MusicZoneDebugRenderer.h"
 #include "RemotePlayerInterpolation.h"
 #include "SpriteRenderer.h"
 #include "TileRenderer.h"
@@ -19,7 +20,8 @@ class RenderSystem {
   RenderSystem(Window* window, ClientPrediction* clientPrediction,
                RemotePlayerInterpolation* remoteInterpolation, Camera* camera,
                TiledMap* tiledMap,
-               CollisionDebugRenderer* collisionDebugRenderer);
+               CollisionDebugRenderer* collisionDebugRenderer,
+               MusicZoneDebugRenderer* musicZoneDebugRenderer);
 
   ~RenderSystem() = default;
 
@@ -30,6 +32,7 @@ class RenderSystem {
   Camera* camera;
   TiledMap* tiledMap;
   CollisionDebugRenderer* collisionDebugRenderer;
+  MusicZoneDebugRenderer* musicZoneDebugRenderer;
   std::unique_ptr<SpriteRenderer> spriteRenderer;
   std::unique_ptr<Texture> whitePixelTexture;
   std::unique_ptr<TileRenderer> tileRenderer;

@@ -8,6 +8,8 @@
 #include "GameLoop.h"
 #include "InputSystem.h"
 #include "Logger.h"
+#include "MusicSystem.h"
+#include "MusicZoneDebugRenderer.h"
 #include "NetworkClient.h"
 #include "RemotePlayerInterpolation.h"
 #include "RenderSystem.h"
@@ -40,9 +42,10 @@ int main() {
   Camera camera(800, 600);
   camera.setWorldBounds(map.getWorldWidth(), map.getWorldHeight());
 
-  CollisionDebugRenderer debugRenderer(&camera, &collisionSystem);
+  CollisionDebugRenderer collisionDebugRenderer(&camera, &collisionSystem);
+  MusicZoneDebugRenderer musicZoneDebugRenderer(&camera, &map);
 
-  InputSystem inputSystem(&debugRenderer);
+  InputSystem inputSystem(&collisionDebugRenderer, &musicZoneDebugRenderer);
 
   uint32_t localPlayerId = (uint32_t)(uintptr_t)&client;
   WorldConfig world(map.getWorldWidth(), map.getWorldHeight(),
@@ -52,12 +55,16 @@ int main() {
   // Initialize animation system first
   AnimationSystem animationSystem;
 
+  // Create music system (zone-based)
+  MusicSystem musicSystem(&clientPrediction, &map);
+
   // Create remote player interpolation with animation system
   RemotePlayerInterpolation remoteInterpolation(localPlayerId,
                                                 &animationSystem);
 
   RenderSystem renderSystem(&window, &clientPrediction, &remoteInterpolation,
-                            &camera, &map, &debugRenderer);
+                            &camera, &map, &collisionDebugRenderer,
+                            &musicZoneDebugRenderer);
 
   // Load local player animations
   Player& localPlayer = clientPrediction.getLocalPlayerMutable();

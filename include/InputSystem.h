@@ -2,10 +2,12 @@
 
 #include "CollisionDebugRenderer.h"
 #include "EventBus.h"
+#include "MusicZoneDebugRenderer.h"
 
 class InputSystem {
  public:
-  InputSystem(CollisionDebugRenderer* debugRenderer = nullptr);
+  InputSystem(CollisionDebugRenderer* collisionDebugRenderer = nullptr,
+              MusicZoneDebugRenderer* musicZoneDebugRenderer = nullptr);
 
  private:
   bool moveLeft;
@@ -13,7 +15,8 @@ class InputSystem {
   bool moveUp;
   bool moveDown;
   uint32_t inputSequence;
-  CollisionDebugRenderer* debugRenderer;
+  CollisionDebugRenderer* collisionDebugRenderer;
+  MusicZoneDebugRenderer* musicZoneDebugRenderer;
 
   void onKeyDown(const KeyDownEvent& e);
   void onKeyUp(const KeyUpEvent& e);

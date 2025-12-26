@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "CollisionShape.h"
+#include "MusicZone.h"
 
 class TiledMap {
  public:
@@ -26,6 +27,7 @@ class TiledMap {
   const std::vector<CollisionShape>& getCollisionShapes() const {
     return collisionShapes;
   }
+  const std::vector<MusicZone>& getMusicZones() const { return musicZones; }
 
  private:
   tmx::Map tmxMap;
@@ -35,6 +37,7 @@ class TiledMap {
   int tileHeight = 0;
   std::vector<const tmx::TileLayer*> tileLayers;
   std::vector<CollisionShape> collisionShapes;
+  std::vector<MusicZone> musicZones;
 
   void extractCollisionShapes();
 };

@@ -2,13 +2,15 @@
 
 #include "Logger.h"
 
-InputSystem::InputSystem(CollisionDebugRenderer* debugRenderer)
+InputSystem::InputSystem(CollisionDebugRenderer* collisionDebugRenderer,
+                         MusicZoneDebugRenderer* musicZoneDebugRenderer)
     : moveLeft(false),
       moveRight(false),
       moveUp(false),
       moveDown(false),
       inputSequence(0),
-      debugRenderer(debugRenderer) {
+      collisionDebugRenderer(collisionDebugRenderer),
+      musicZoneDebugRenderer(musicZoneDebugRenderer) {
   // Subscribe to key events
   EventBus::instance().subscribe<KeyDownEvent>(
       [this](const KeyDownEvent& e) { onKeyDown(e); });
@@ -22,11 +24,16 @@ InputSystem::InputSystem(CollisionDebugRenderer* debugRenderer)
 }
 
 void InputSystem::onKeyDown(const KeyDownEvent& e) {
-  // Toggle collision debug with F1
-  if (e.key == SDLK_F1 && debugRenderer) {
-    debugRenderer->toggle();
-    Logger::info("Collision debug: " +
-                 std::string(debugRenderer->isEnabled() ? "ON" : "OFF"));
+  // Toggle collision and music zone debug with F1
+  if (e.key == SDLK_F1 && collisionDebugRenderer) {
+    collisionDebugRenderer->toggle();
+    Logger::info(
+        "Collision debug: " +
+        std::string(collisionDebugRenderer->isEnabled() ? "ON" : "OFF"));
+    musicZoneDebugRenderer->toggle();
+    Logger::info(
+        "Music zone debug: " +
+        std::string(musicZoneDebugRenderer->isEnabled() ? "ON" : "OFF"));
   }
 
   if (e.key == SDLK_a || e.key == SDLK_LEFT) moveLeft = true;

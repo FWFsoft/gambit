@@ -8,7 +8,7 @@
 #include "EventBus.h"
 
 Window::Window(const std::string& title, int width, int height) : open(true) {
-  if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+  if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
     throw std::runtime_error("Failed to initialize SDL: " +
                              std::string(SDL_GetError()));
   }

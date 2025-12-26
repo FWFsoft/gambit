@@ -61,7 +61,7 @@
   * [https://rive.app/](https://rive.app/)   
 * Games built on the engine don’t need to think about the render and update loops and instead operate strictly over an asynchronous event-based architecture  
   * Why?  
-    * Needing to obey the update/render loops of the engine without pub-sub would force a lot down on the *technical design* of games built on the engine. Once you start considering pub-subbing the loops, then it just makes sense to have a design that abstracts over them and instead exposes a more well-thought-out subscriber API.  
+    * Needing to obey the update/render loops of the enginewithout pub-sub would force a lot down on the *technical design* of games built on the engine. Once you start considering pub-subbing the loops, then it just makes sense to have a design that abstracts over them and instead exposes a more well-thought-out subscriber API.  
     * The main thing that jumps out to me is MonoBehavior classes from Unity, and Unity basically takes your object lifecycle hostage. This totally rules out objects that only last for the duration of a request. They generally need to do this so that the engine has access to a bean for that class that it can call the update/start/etc methods on.   
     * Rather than having bean soup (sub to everything or else\!) we can just … allow game devs to just subscribe to exactly what they need when they need it (expressed in terms they care about), and that sounded like a better design  
   * **Games built on the engine run at a fixed 60 FPS**—this will ensure that our devs   
@@ -84,3 +84,12 @@
   * ChatGPT + friends
   * Pixel labs
 * For sound effects and voice overs, consider elevenlabs
+
+# Possible future increments
+* Combat
+  * Spawning/creating enemies
+  * Allowing players to attack the enemies/be attacked by them
+* UI
+  * ImGui initial integration for a UI
+* Music
+  * Layered music (drums etc. for combat)

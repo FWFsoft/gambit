@@ -5,7 +5,7 @@
 set -e
 
 # Number of clients to spawn
-NUM_CLIENTS=2
+NUM_CLIENTS="${1:-2}"
 
 # Track all child processes
 PIDS=()
@@ -45,7 +45,7 @@ sleep 1
 
 # Start $NUM_CLIENTS clients
 echo "Starting $NUM_CLIENTS clients..."
-for i in {1..2}; do
+for i in $(seq 1 ${NUM_CLIENTS}); do
     ./build/Client &
     PIDS+=($!)
     sleep 1
