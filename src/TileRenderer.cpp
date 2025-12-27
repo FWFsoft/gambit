@@ -128,20 +128,19 @@ void TileRenderer::render(const TiledMap& map,
   renderBatch();
 
   // Render players between tile rows for depth sorting
-  const tmx::TileLayer* layer = tileLayers[0];
+  // OPTIMIZATION: Only call playerCallback once per diagonal depth band, not per tile
+  // This reduces calls from O(width * height) to O(width + height)
   float unit = map.getTileWidth() / 2.0f;
-  for (int tileY = 0; tileY < map.getHeight(); ++tileY) {
-    for (int tileX = 0; tileX < map.getWidth(); ++tileX) {
-      float tileWorldX = tileX * unit;
-      float tileWorldY = tileY * unit;
-      float tileDepth = tileWorldX + tileWorldY;
-      float nextDepth = tileDepth + unit;
-      playerCallback(tileDepth, nextDepth);
-    }
+  int maxDepth = map.getWidth() + map.getHeight();
+
+  for (int depth = 0; depth < maxDepth; ++depth) {
+    float depthValue = depth * unit;
+    float nextDepthValue = (depth + 1) * unit;
+    playerCallback(depthValue, nextDepthValue);
   }
 
   // Render remaining players that are beyond all tiles
-  float maxTileDepth = (map.getWidth() + map.getHeight()) * unit;
+  float maxTileDepth = maxDepth * unit;
   playerCallback(maxTileDepth, maxTileDepth + 10000);
 }
 

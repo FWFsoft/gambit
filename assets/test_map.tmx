@@ -48,6 +48,38 @@
   <object id="8" name="inner_wall_4" type="solid" x="128" y="128" width="32" height="704"/>
   <object id="9" name="center_obstacle" type="solid" x="400" y="400" width="160" height="160"/>
  </objectgroup>
+ <objectgroup id="4" name="EnemySpawns">
+  <object id="14" name="spawn_1" x="300" y="300">
+   <properties>
+    <property name="enemy_type" value="slime"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="15" name="spawn_2" x="600" y="600">
+   <properties>
+    <property name="enemy_type" value="slime"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="16" name="spawn_3" x="400" y="200">
+   <properties>
+    <property name="enemy_type" value="slime"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="17" name="spawn_4" x="700" y="300">
+   <properties>
+    <property name="enemy_type" value="slime"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="18" name="spawn_5" x="200" y="700">
+   <properties>
+    <property name="enemy_type" value="slime"/>
+   </properties>
+   <point/>
+  </object>
+ </objectgroup>
  <objectgroup id="3" name="Music">
   <object id="10" name="northwest_zone" type="zone" x="0" y="0" width="488" height="488">
    <properties>

@@ -15,12 +15,14 @@
 
 RenderSystem::RenderSystem(Window* window, ClientPrediction* clientPrediction,
                            RemotePlayerInterpolation* remoteInterpolation,
+                           EnemyInterpolation* enemyInterpolation,
                            Camera* camera, TiledMap* tiledMap,
                            CollisionDebugRenderer* collisionDebugRenderer,
                            MusicZoneDebugRenderer* musicZoneDebugRenderer)
     : window(window),
       clientPrediction(clientPrediction),
       remoteInterpolation(remoteInterpolation),
+      enemyInterpolation(enemyInterpolation),
       camera(camera),
       tiledMap(tiledMap),
       collisionDebugRenderer(collisionDebugRenderer),
@@ -84,12 +86,51 @@ void RenderSystem::onRender(const RenderEvent& e) {
     }
   }
 
-  // Render tiles with depth-sorted players
+  // Gather all enemies (with frustum culling for performance)
+  std::vector<Enemy> allEnemies;
+  if (enemyInterpolation) {
+    auto enemyIds = enemyInterpolation->getEnemyIds();
+
+    for (uint32_t enemyId : enemyIds) {
+      Enemy enemy;
+      if (enemyInterpolation->getInterpolatedState(enemyId, e.interpolation,
+                                                   enemy)) {
+        // Skip dead enemies
+        if (enemy.state == ::EnemyState::Dead) {
+          continue;
+        }
+
+        // Frustum culling: Check if enemy is potentially visible on screen
+        // Use generous bounds to account for isometric projection
+        int screenX, screenY;
+        camera->worldToScreen(enemy.x, enemy.y, screenX, screenY);
+
+        // Cull enemies far off-screen (beyond 200px margin)
+        if (screenX < -200 || screenX > Config::Screen::WIDTH + 200 ||
+            screenY < -200 || screenY > Config::Screen::HEIGHT + 200) {
+          continue;
+        }
+
+        allEnemies.push_back(enemy);
+      }
+    }
+  }
+
+  // Render tiles with depth-sorted players AND enemies
   tileRenderer->render(*tiledMap, [&](float minDepth, float maxDepth) {
+    // Render players
     for (const Player& player : allPlayers) {
       float playerDepth = player.x + player.y;
       if (playerDepth >= minDepth && playerDepth < maxDepth) {
         drawPlayer(player);
+      }
+    }
+
+    // Render enemies
+    for (const Enemy& enemy : allEnemies) {
+      float enemyDepth = enemy.x + enemy.y;
+      if (enemyDepth >= minDepth && enemyDepth < maxDepth) {
+        drawEnemy(enemy);
       }
     }
   });
@@ -140,4 +181,46 @@ void RenderSystem::drawPlayer(const Player& player) {
           Config::Player::SIZE, r, g, b, 1.0f);
     }
   }
+}
+
+void RenderSystem::drawEnemy(const Enemy& enemy) {
+  int screenX, screenY;
+  camera->worldToScreen(enemy.x, enemy.y, screenX, screenY);
+
+  // Render enemy sprite (POC: use player sprite with red tint)
+  const AnimationController* controller = enemy.getAnimationController();
+  if (controller && playerTexture) {
+    int srcX, srcY, srcW, srcH;
+    controller->getCurrentFrame(srcX, srcY, srcW, srcH);
+
+    // Red tint for enemies
+    spriteRenderer->drawRegion(
+        *playerTexture, screenX - Config::Player::SIZE / 2.0f,
+        screenY - Config::Player::SIZE / 2.0f, Config::Player::SIZE,
+        Config::Player::SIZE, srcX, srcY, srcW, srcH,
+        1.0f, 0.3f, 0.3f, 1.0f  // Red tint (R=1.0, G=0.3, B=0.3)
+    );
+  }
+
+  // Render health bar
+  drawHealthBar(screenX, screenY - 20, enemy.health, enemy.maxHealth);
+}
+
+void RenderSystem::drawHealthBar(int x, int y, float health, float maxHealth) {
+  constexpr int BAR_WIDTH = 32;
+  constexpr int BAR_HEIGHT = 4;
+
+  float healthPercent = health / maxHealth;
+  int filledWidth = static_cast<int>(BAR_WIDTH * healthPercent);
+
+  // Background (black)
+  spriteRenderer->draw(*whitePixelTexture, x - BAR_WIDTH / 2, y, BAR_WIDTH,
+                       BAR_HEIGHT, 0.0f, 0.0f, 0.0f, 0.8f);
+
+  // Foreground (green to red gradient based on health)
+  float r = 1.0f - healthPercent;  // More red when low health
+  float g = healthPercent;         // More green when high health
+
+  spriteRenderer->draw(*whitePixelTexture, x - BAR_WIDTH / 2, y, filledWidth,
+                       BAR_HEIGHT, r, g, 0.0f, 1.0f);
 }

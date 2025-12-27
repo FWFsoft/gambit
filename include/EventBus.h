@@ -37,6 +37,10 @@ struct LocalInputEvent {
   uint32_t inputSequence;
 };
 
+struct AttackInputEvent {};
+
+struct ToggleMuteEvent {};
+
 struct NetworkPacketReceivedEvent {
   ENetPeer* peer;  // nullptr on client
   uint8_t* data;

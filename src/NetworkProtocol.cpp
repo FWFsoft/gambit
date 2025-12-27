@@ -193,3 +193,136 @@ PlayerLeftPacket deserializePlayerLeft(const uint8_t* data, size_t size) {
 
   return packet;
 }
+
+// Enemy packet serialization
+
+std::vector<uint8_t> serialize(const EnemyStateUpdatePacket& packet) {
+  std::vector<uint8_t> buffer;
+
+  writeUint8(buffer, static_cast<uint8_t>(packet.type));
+  writeUint16(buffer, static_cast<uint16_t>(packet.enemies.size()));
+
+  for (const auto& enemy : packet.enemies) {
+    writeUint32(buffer, enemy.id);
+    writeUint8(buffer, enemy.type);
+    writeUint8(buffer, enemy.state);
+    writeFloat(buffer, enemy.x);
+    writeFloat(buffer, enemy.y);
+    writeFloat(buffer, enemy.vx);
+    writeFloat(buffer, enemy.vy);
+    writeFloat(buffer, enemy.health);
+    writeFloat(buffer, enemy.maxHealth);
+  }
+
+  // 1 + 2 + (enemyCount * 30) bytes
+  // Per enemy: 4 + 1 + 1 + 4 + 4 + 4 + 4 + 4 + 4 = 30 bytes
+  return buffer;
+}
+
+std::vector<uint8_t> serialize(const AttackEnemyPacket& packet) {
+  std::vector<uint8_t> buffer;
+
+  writeUint8(buffer, static_cast<uint8_t>(packet.type));
+  writeUint32(buffer, packet.enemyId);
+  writeFloat(buffer, packet.damage);
+
+  assert(buffer.size() == 9);  // 1 + 4 + 4 = 9 bytes
+  return buffer;
+}
+
+std::vector<uint8_t> serialize(const EnemyDamagedPacket& packet) {
+  std::vector<uint8_t> buffer;
+
+  writeUint8(buffer, static_cast<uint8_t>(packet.type));
+  writeUint32(buffer, packet.enemyId);
+  writeFloat(buffer, packet.newHealth);
+  writeUint32(buffer, packet.attackerId);
+
+  assert(buffer.size() == 13);  // 1 + 4 + 4 + 4 = 13 bytes
+  return buffer;
+}
+
+std::vector<uint8_t> serialize(const EnemyDiedPacket& packet) {
+  std::vector<uint8_t> buffer;
+
+  writeUint8(buffer, static_cast<uint8_t>(packet.type));
+  writeUint32(buffer, packet.enemyId);
+  writeUint32(buffer, packet.killerId);
+
+  assert(buffer.size() == 9);  // 1 + 4 + 4 = 9 bytes
+  return buffer;
+}
+
+// Enemy packet deserialization
+
+EnemyStateUpdatePacket deserializeEnemyStateUpdate(const uint8_t* data,
+                                                    size_t size) {
+  assert(size >= 3);  // 1 + 2 = 3 bytes minimum
+  assert(data[0] == static_cast<uint8_t>(PacketType::EnemyStateUpdate));
+
+  EnemyStateUpdatePacket packet;
+  uint16_t enemyCount = readUint16(data + 1);
+
+  assert(size >= 3 + (enemyCount * 30));
+
+  size_t offset = 3;
+  for (uint16_t i = 0; i < enemyCount; ++i) {
+    NetworkEnemyState enemy;
+    enemy.id = readUint32(data + offset);
+    offset += 4;
+    enemy.type = readUint8(data + offset);
+    offset += 1;
+    enemy.state = readUint8(data + offset);
+    offset += 1;
+    enemy.x = readFloat(data + offset);
+    offset += 4;
+    enemy.y = readFloat(data + offset);
+    offset += 4;
+    enemy.vx = readFloat(data + offset);
+    offset += 4;
+    enemy.vy = readFloat(data + offset);
+    offset += 4;
+    enemy.health = readFloat(data + offset);
+    offset += 4;
+    enemy.maxHealth = readFloat(data + offset);
+    offset += 4;
+
+    packet.enemies.push_back(enemy);
+  }
+
+  return packet;
+}
+
+AttackEnemyPacket deserializeAttackEnemy(const uint8_t* data, size_t size) {
+  assert(size >= 9);
+  assert(data[0] == static_cast<uint8_t>(PacketType::AttackEnemy));
+
+  AttackEnemyPacket packet;
+  packet.enemyId = readUint32(data + 1);
+  packet.damage = readFloat(data + 5);
+
+  return packet;
+}
+
+EnemyDamagedPacket deserializeEnemyDamaged(const uint8_t* data, size_t size) {
+  assert(size >= 13);
+  assert(data[0] == static_cast<uint8_t>(PacketType::EnemyDamaged));
+
+  EnemyDamagedPacket packet;
+  packet.enemyId = readUint32(data + 1);
+  packet.newHealth = readFloat(data + 5);
+  packet.attackerId = readUint32(data + 9);
+
+  return packet;
+}
+
+EnemyDiedPacket deserializeEnemyDied(const uint8_t* data, size_t size) {
+  assert(size >= 9);
+  assert(data[0] == static_cast<uint8_t>(PacketType::EnemyDied));
+
+  EnemyDiedPacket packet;
+  packet.enemyId = readUint32(data + 1);
+  packet.killerId = readUint32(data + 5);
+
+  return packet;
+}

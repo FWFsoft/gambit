@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdlib>
+#include <memory>
 #include <unordered_map>
 
 #include "EventBus.h"
@@ -10,10 +11,14 @@
 
 class NetworkServer;
 class CollisionSystem;
+class EnemySystem;
 
 class ServerGameState {
  public:
   ServerGameState(NetworkServer* server, const WorldConfig& world);
+  ~ServerGameState();
+
+  EnemySystem* getEnemySystem() { return enemySystem.get(); }
 
  private:
   NetworkServer* server;
@@ -23,6 +28,7 @@ class ServerGameState {
   std::unordered_map<uint32_t, Player> players;
   std::unordered_map<ENetPeer*, uint32_t> peerToPlayerId;
   uint32_t serverTick;
+  std::unique_ptr<EnemySystem> enemySystem;
 
   void onClientConnected(const ClientConnectedEvent& e);
   void onClientDisconnected(const ClientDisconnectedEvent& e);

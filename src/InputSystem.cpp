@@ -36,6 +36,17 @@ void InputSystem::onKeyDown(const KeyDownEvent& e) {
         std::string(musicZoneDebugRenderer->isEnabled() ? "ON" : "OFF"));
   }
 
+  // Toggle mute with M or F2
+  if (e.key == SDLK_m || e.key == SDLK_F2) {
+    EventBus::instance().publish(ToggleMuteEvent{});
+  }
+
+  // Attack input (Spacebar)
+  if (e.key == SDLK_SPACE) {
+    Logger::info("InputSystem: SPACEBAR PRESSED - publishing AttackInputEvent");
+    EventBus::instance().publish(AttackInputEvent{});
+  }
+
   if (e.key == SDLK_a || e.key == SDLK_LEFT) moveLeft = true;
   if (e.key == SDLK_d || e.key == SDLK_RIGHT) moveRight = true;
   if (e.key == SDLK_w || e.key == SDLK_UP) moveUp = true;

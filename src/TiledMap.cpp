@@ -27,6 +27,7 @@ bool TiledMap::load(const std::string& filepath) {
   }
 
   extractCollisionShapes();
+  extractEnemySpawns();
 
   // Extract music zones from object layers
   musicZones.clear();
@@ -85,7 +86,8 @@ bool TiledMap::load(const std::string& filepath) {
                "x" + std::to_string(mapHeight) + " tiles, " +
                std::to_string(tileWidth) + "x" + std::to_string(tileHeight) +
                "px, " + std::to_string(collisionShapes.size()) +
-               " collision shapes)");
+               " collision shapes, " + std::to_string(enemySpawns.size()) +
+               " enemy spawns)");
 
   return true;
 }
@@ -141,6 +143,75 @@ void TiledMap::extractCollisionShapes() {
                        std::to_string(shape.aabb.height));
         }
         // Future: Add polygon support here
+      }
+    }
+  }
+}
+
+void TiledMap::extractEnemySpawns() {
+  enemySpawns.clear();
+
+  const auto& layers = tmxMap.getLayers();
+  for (const auto& layer : layers) {
+    if (layer->getType() == tmx::Layer::Type::Object) {
+      const auto& objectLayer = layer->getLayerAs<tmx::ObjectGroup>();
+
+      // Only process "Spawns" or "EnemySpawns" layers
+      if (objectLayer.getName() != "Spawns" &&
+          objectLayer.getName() != "EnemySpawns") {
+        continue;
+      }
+
+      for (const auto& object : objectLayer.getObjects()) {
+        // Only process point objects (spawn locations)
+        if (object.getShape() != tmx::Object::Shape::Point) {
+          continue;
+        }
+
+        // Extract enemy_type property
+        std::string enemyTypeStr;
+        const auto& properties = object.getProperties();
+        for (const auto& prop : properties) {
+          if (prop.getName() == "enemy_type" &&
+              prop.getType() == tmx::Property::Type::String) {
+            enemyTypeStr = prop.getStringValue();
+            break;
+          }
+        }
+
+        // Skip if no enemy_type property
+        if (enemyTypeStr.empty()) {
+          Logger::info("Enemy spawn '" + object.getName() +
+                       "' missing enemy_type property, skipping");
+          continue;
+        }
+
+        // Parse enemy type
+        EnemyType type;
+        if (enemyTypeStr == "slime") {
+          type = EnemyType::Slime;
+        } else if (enemyTypeStr == "goblin") {
+          type = EnemyType::Goblin;
+        } else if (enemyTypeStr == "skeleton") {
+          type = EnemyType::Skeleton;
+        } else {
+          Logger::info("Unknown enemy_type: " + enemyTypeStr + ", skipping");
+          continue;
+        }
+
+        // Create spawn point
+        const auto& pos = object.getPosition();
+        EnemySpawn spawn;
+        spawn.type = type;
+        spawn.x = pos.x;
+        spawn.y = pos.y;
+        spawn.name = object.getName();
+
+        enemySpawns.push_back(spawn);
+
+        Logger::info("Loaded enemy spawn: " + spawn.name + " type=" +
+                     enemyTypeStr + " at (" + std::to_string(spawn.x) + ", " +
+                     std::to_string(spawn.y) + ")");
       }
     }
   }

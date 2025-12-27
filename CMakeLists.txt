@@ -106,6 +106,7 @@ add_executable(Server
     src/AnimationController.cpp
     src/AnimationSystem.cpp
     src/AnimationAssetLoader.cpp
+    src/EnemySystem.cpp
 )
 target_include_directories(Server SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
 target_include_directories(Server PRIVATE include)
@@ -151,6 +152,8 @@ add_executable(Client
     src/AnimationAssetLoader.cpp
     src/MusicSystem.cpp
     src/MusicZoneDebugRenderer.cpp
+    src/EnemyInterpolation.cpp
+    src/CombatSystem.cpp
 )
 target_include_directories(Client SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
 target_include_directories(Client PRIVATE include)

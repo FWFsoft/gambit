@@ -40,15 +40,23 @@ void GameLoop::run() {
     // Tiger Style: Warn if frame rate drops significantly (> 30ms = 33 FPS)
     // Only log significant performance issues to reduce noise
     static int frameCount = 0;
+    static int slowFrameCount = 0;
     frameCount++;
 
     if (frameDuration > 30.0f) {
-      Logger::info("Frame time: " + std::to_string(frameDuration) +
-                   "ms (target: " + std::to_string(TARGET_DELTA_MS) + "ms)");
-    } else if (frameCount % 300 == 0) {
-      // Log average performance every 5 seconds (300 frames at 60 FPS)
-      Logger::debug("Frame time: " + std::to_string(frameDuration) +
-                    "ms (target: " + std::to_string(TARGET_DELTA_MS) + "ms)");
+      slowFrameCount++;
+      // Only log slow frames once per second to avoid log spam
+      if (slowFrameCount == 1 || frameCount % 60 == 0) {
+        Logger::debug("Frame time: " + std::to_string(frameDuration) +
+                      "ms (target: " + std::to_string(TARGET_DELTA_MS) + "ms)");
+      }
+    } else {
+      slowFrameCount = 0;
+      if (frameCount % 300 == 0) {
+        // Log average performance every 5 seconds (300 frames at 60 FPS)
+        Logger::debug("Frame time: " + std::to_string(frameDuration) +
+                      "ms (target: " + std::to_string(TARGET_DELTA_MS) + "ms)");
+      }
     }
 
     // Tiger Style: Assert if frame rate is catastrophically low (< 30 FPS)

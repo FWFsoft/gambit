@@ -4,6 +4,8 @@
 #include "ClientPrediction.h"
 #include "CollisionDebugRenderer.h"
 #include "CollisionSystem.h"
+#include "CombatSystem.h"
+#include "EnemyInterpolation.h"
 #include "EventBus.h"
 #include "GameLoop.h"
 #include "InputSystem.h"
@@ -65,9 +67,15 @@ int main() {
   RemotePlayerInterpolation remoteInterpolation(localPlayerId,
                                                 &animationSystem);
 
+  // Create enemy interpolation with animation system
+  EnemyInterpolation enemyInterpolation(&animationSystem);
+
+  // Create combat system
+  CombatSystem combatSystem(&client, &clientPrediction, &enemyInterpolation);
+
   RenderSystem renderSystem(&window, &clientPrediction, &remoteInterpolation,
-                            &camera, &map, &collisionDebugRenderer,
-                            &musicZoneDebugRenderer);
+                            &enemyInterpolation, &camera, &map,
+                            &collisionDebugRenderer, &musicZoneDebugRenderer);
 
   // Load local player animations
   Player& localPlayer = clientPrediction.getLocalPlayerMutable();

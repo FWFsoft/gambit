@@ -7,6 +7,7 @@
 #include "Camera.h"
 #include "ClientPrediction.h"
 #include "CollisionDebugRenderer.h"
+#include "EnemyInterpolation.h"
 #include "EventBus.h"
 #include "MusicZoneDebugRenderer.h"
 #include "RemotePlayerInterpolation.h"
@@ -19,7 +20,8 @@
 class RenderSystem {
  public:
   RenderSystem(Window* window, ClientPrediction* clientPrediction,
-               RemotePlayerInterpolation* remoteInterpolation, Camera* camera,
+               RemotePlayerInterpolation* remoteInterpolation,
+               EnemyInterpolation* enemyInterpolation, Camera* camera,
                TiledMap* tiledMap,
                CollisionDebugRenderer* collisionDebugRenderer,
                MusicZoneDebugRenderer* musicZoneDebugRenderer);
@@ -30,6 +32,7 @@ class RenderSystem {
   Window* window;
   ClientPrediction* clientPrediction;
   RemotePlayerInterpolation* remoteInterpolation;
+  EnemyInterpolation* enemyInterpolation;
   Camera* camera;
   TiledMap* tiledMap;
   CollisionDebugRenderer* collisionDebugRenderer;
@@ -41,4 +44,6 @@ class RenderSystem {
 
   void onRender(const RenderEvent& e);
   void drawPlayer(const Player& player);
+  void drawEnemy(const Enemy& enemy);
+  void drawHealthBar(int x, int y, float health, float maxHealth);
 };

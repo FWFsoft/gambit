@@ -34,7 +34,7 @@ int main() {
 
   GameLoop gameLoop;
   WorldConfig world(map.getWorldWidth(), map.getWorldHeight(),
-                    &collisionSystem);
+                    &collisionSystem, &map);
   ServerGameState gameState(&server, world);
 
   // Subscribe to UpdateEvent to process network events

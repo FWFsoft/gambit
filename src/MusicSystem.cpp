@@ -10,7 +10,8 @@
 
 MusicSystem::MusicSystem(const ClientPrediction* prediction,
                          const TiledMap* map)
-    : clientPrediction(prediction), tiledMap(map), volume(DEFAULT_VOLUME) {
+    : clientPrediction(prediction), tiledMap(map), volume(DEFAULT_VOLUME),
+      muted(false) {
   // Initialize SDL_mixer
   if (Mix_OpenAudio(AUDIO_FREQUENCY, MIX_DEFAULT_FORMAT, AUDIO_CHANNELS,
                     AUDIO_CHUNK_SIZE) < 0) {
@@ -25,6 +26,10 @@ MusicSystem::MusicSystem(const ClientPrediction* prediction,
   // Subscribe to UpdateEvent
   EventBus::instance().subscribe<UpdateEvent>(
       [this](const UpdateEvent& e) { onUpdate(e); });
+
+  // Subscribe to ToggleMuteEvent
+  EventBus::instance().subscribe<ToggleMuteEvent>(
+      [this](const ToggleMuteEvent& e) { onToggleMute(e); });
 }
 
 MusicSystem::~MusicSystem() {
@@ -136,4 +141,16 @@ Mix_Music* MusicSystem::loadMusic(const std::string& filename) {
   loadedTracks[filename] = music;
   Logger::info("Loaded music: " + filepath);
   return music;
+}
+
+void MusicSystem::onToggleMute(const ToggleMuteEvent& e) {
+  muted = !muted;
+
+  if (muted) {
+    Mix_VolumeMusic(0);
+    Logger::info("Music muted");
+  } else {
+    Mix_VolumeMusic(static_cast<int>(volume * SDL_MIXER_MAX_VOLUME));
+    Logger::info("Music unmuted");
+  }
 }

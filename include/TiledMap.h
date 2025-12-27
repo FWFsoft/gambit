@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "CollisionShape.h"
+#include "EnemySpawn.h"
 #include "MusicZone.h"
 
 class TiledMap {
@@ -28,6 +29,9 @@ class TiledMap {
     return collisionShapes;
   }
   const std::vector<MusicZone>& getMusicZones() const { return musicZones; }
+  const std::vector<EnemySpawn>& getEnemySpawns() const {
+    return enemySpawns;
+  }
 
  private:
   tmx::Map tmxMap;
@@ -38,6 +42,8 @@ class TiledMap {
   std::vector<const tmx::TileLayer*> tileLayers;
   std::vector<CollisionShape> collisionShapes;
   std::vector<MusicZone> musicZones;
+  std::vector<EnemySpawn> enemySpawns;
 
   void extractCollisionShapes();
+  void extractEnemySpawns();
 };

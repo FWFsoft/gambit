@@ -39,8 +39,10 @@ class MusicSystem {
   std::string currentTrack;
   std::string currentZoneName;
   float volume;
+  bool muted;
 
   void onUpdate(const UpdateEvent& e);
+  void onToggleMute(const struct ToggleMuteEvent& e);
   void checkZoneTransition();
   Mix_Music* loadMusic(const std::string& filename);
 };

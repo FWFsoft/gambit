@@ -5,8 +5,10 @@
 #include <cmath>
 
 #include "CollisionSystem.h"
+#include "EnemySystem.h"
 #include "Logger.h"
 #include "NetworkServer.h"
+#include "TiledMap.h"
 #include "config/GameplayConfig.h"
 #include "config/PlayerConfig.h"
 #include "config/TimingConfig.h"
@@ -18,6 +20,13 @@ ServerGameState::ServerGameState(NetworkServer* server,
       worldHeight(world.height),
       collisionSystem(world.collisionSystem),
       serverTick(0) {
+  // Initialize enemy system
+  if (world.tiledMap != nullptr) {
+    enemySystem =
+        std::make_unique<EnemySystem>(world.tiledMap->getEnemySpawns());
+    enemySystem->spawnAllEnemies();
+  }
+
   // Subscribe to client connection events
   EventBus::instance().subscribe<ClientConnectedEvent>(
       [this](const ClientConnectedEvent& e) { onClientConnected(e); });
@@ -35,6 +44,8 @@ ServerGameState::ServerGameState(NetworkServer* server,
   EventBus::instance().subscribe<UpdateEvent>(
       [this](const UpdateEvent& e) { onUpdate(e); });
 }
+
+ServerGameState::~ServerGameState() = default;
 
 void ServerGameState::onClientConnected(const ClientConnectedEvent& e) {
   uint32_t playerId = e.clientId;
@@ -95,8 +106,40 @@ void ServerGameState::onNetworkPacketReceived(
 
   PacketType type = static_cast<PacketType>(e.data[0]);
 
-  if (type == PacketType::ClientInput) {
-    processClientInput(e.peer, e.data, e.size);
+  switch (type) {
+    case PacketType::ClientInput:
+      processClientInput(e.peer, e.data, e.size);
+      break;
+
+    case PacketType::AttackEnemy: {
+      if (e.size < 9) {
+        Logger::info("Invalid AttackEnemy packet size");
+        break;
+      }
+
+      AttackEnemyPacket attackPacket = deserializeAttackEnemy(e.data, e.size);
+
+      // Get player ID from peer
+      auto it = peerToPlayerId.find(e.peer);
+      if (it == peerToPlayerId.end()) {
+        Logger::info("Received AttackEnemy from unknown peer");
+        break;
+      }
+      uint32_t playerId = it->second;
+
+      // Apply damage (server-authoritative)
+      if (enemySystem) {
+        enemySystem->damageEnemy(attackPacket.enemyId, attackPacket.damage,
+                                 playerId);
+      }
+
+      break;
+    }
+
+    default:
+      Logger::info("Unknown packet type: " +
+                   std::to_string(static_cast<int>(type)));
+      break;
   }
 }
 
@@ -130,6 +173,11 @@ void ServerGameState::processClientInput(ENetPeer* peer, const uint8_t* data,
 void ServerGameState::onUpdate(const UpdateEvent& e) {
   serverTick++;
 
+  // Update enemy AI
+  if (enemySystem) {
+    enemySystem->update(e.deltaTime, players);
+  }
+
   // Broadcast state update every frame
   broadcastStateUpdate();
 }
@@ -154,6 +202,42 @@ void ServerGameState::broadcastStateUpdate() {
   }
 
   server->broadcastPacket(serialize(packet));
+
+  // Broadcast enemy state
+  if (enemySystem) {
+    const auto& enemies = enemySystem->getEnemies();
+
+    EnemyStateUpdatePacket enemyPacket;
+    for (const auto& [id, enemy] : enemies) {
+      NetworkEnemyState state;
+      state.id = enemy.id;
+      state.type = static_cast<uint8_t>(enemy.type);
+      state.state = static_cast<uint8_t>(enemy.state);
+      state.x = enemy.x;
+      state.y = enemy.y;
+      state.vx = enemy.vx;
+      state.vy = enemy.vy;
+      state.health = enemy.health;
+      state.maxHealth = enemy.maxHealth;
+
+      enemyPacket.enemies.push_back(state);
+    }
+
+    server->broadcastPacket(serialize(enemyPacket));
+
+    // Broadcast enemy deaths
+    const auto& deaths = enemySystem->getDiedThisFrame();
+    for (const auto& death : deaths) {
+      EnemyDiedPacket deathPacket;
+      deathPacket.enemyId = death.enemyId;
+      deathPacket.killerId = death.killerId;
+
+      server->broadcastPacket(serialize(deathPacket));
+
+      Logger::debug("Broadcast EnemyDied: enemy=" + std::to_string(death.enemyId) +
+                    " killer=" + std::to_string(death.killerId));
+    }
+  }
 }
 
 Player ServerGameState::createPlayer(uint32_t playerId) {
