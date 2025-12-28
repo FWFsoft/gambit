@@ -127,21 +127,11 @@ void TileRenderer::render(const TiledMap& map,
   // Render all tiles in one draw call
   renderBatch();
 
-  // Render players between tile rows for depth sorting
-  // OPTIMIZATION: Only call playerCallback once per diagonal depth band, not per tile
-  // This reduces calls from O(width * height) to O(width + height)
-  float unit = map.getTileWidth() / 2.0f;
-  int maxDepth = map.getWidth() + map.getHeight();
-
-  for (int depth = 0; depth < maxDepth; ++depth) {
-    float depthValue = depth * unit;
-    float nextDepthValue = (depth + 1) * unit;
-    playerCallback(depthValue, nextDepthValue);
-  }
-
-  // Render remaining players that are beyond all tiles
-  float maxTileDepth = maxDepth * unit;
-  playerCallback(maxTileDepth, maxTileDepth + 10000);
+  // Render all entities on top of tiles
+  // Entities are already depth-sorted by RenderSystem before drawing
+  // Single callback - no need for multiple depth bands since tiles are drawn
+  // first
+  playerCallback(0.0f, 1000000.0f);
 }
 
 void TileRenderer::buildTileBatch(const TiledMap& map) {

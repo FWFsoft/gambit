@@ -2,6 +2,7 @@
 
 #include <glad/glad.h>
 
+#include <algorithm>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <vector>
@@ -116,21 +117,49 @@ void RenderSystem::onRender(const RenderEvent& e) {
     }
   }
 
-  // Render tiles with depth-sorted players AND enemies
-  tileRenderer->render(*tiledMap, [&](float minDepth, float maxDepth) {
-    // Render players
-    for (const Player& player : allPlayers) {
-      float playerDepth = player.x + player.y;
-      if (playerDepth >= minDepth && playerDepth < maxDepth) {
-        drawPlayer(player);
-      }
-    }
+  // Collect all entities with their depths for sorting
+  struct EntityToRender {
+    float depth;
+    bool isPlayer;
+    union {
+      const Player* player;
+      const Enemy* enemy;
+    };
+  };
 
-    // Render enemies
-    for (const Enemy& enemy : allEnemies) {
-      float enemyDepth = enemy.x + enemy.y;
-      if (enemyDepth >= minDepth && enemyDepth < maxDepth) {
-        drawEnemy(enemy);
+  std::vector<EntityToRender> entitiesToRender;
+  entitiesToRender.reserve(allPlayers.size() + allEnemies.size());
+
+  for (const Player& player : allPlayers) {
+    EntityToRender entity;
+    entity.depth = player.x + player.y;
+    entity.isPlayer = true;
+    entity.player = &player;
+    entitiesToRender.push_back(entity);
+  }
+
+  for (const Enemy& enemy : allEnemies) {
+    EntityToRender entity;
+    entity.depth = enemy.x + enemy.y;
+    entity.isPlayer = false;
+    entity.enemy = &enemy;
+    entitiesToRender.push_back(entity);
+  }
+
+  // Sort by depth (back to front for painter's algorithm)
+  std::sort(entitiesToRender.begin(), entitiesToRender.end(),
+            [](const EntityToRender& a, const EntityToRender& b) {
+              return a.depth < b.depth;
+            });
+
+  // Render tiles first, then all entities in depth order (single callback)
+  tileRenderer->render(*tiledMap, [&](float minDepth, float maxDepth) {
+    // Render all entities in sorted order
+    for (const auto& entity : entitiesToRender) {
+      if (entity.isPlayer) {
+        drawPlayer(*entity.player);
+      } else {
+        drawEnemy(*entity.enemy);
       }
     }
   });
@@ -197,8 +226,8 @@ void RenderSystem::drawEnemy(const Enemy& enemy) {
     spriteRenderer->drawRegion(
         *playerTexture, screenX - Config::Player::SIZE / 2.0f,
         screenY - Config::Player::SIZE / 2.0f, Config::Player::SIZE,
-        Config::Player::SIZE, srcX, srcY, srcW, srcH,
-        1.0f, 0.3f, 0.3f, 1.0f  // Red tint (R=1.0, G=0.3, B=0.3)
+        Config::Player::SIZE, srcX, srcY, srcW, srcH, 1.0f, 0.3f, 0.3f,
+        1.0f  // Red tint (R=1.0, G=0.3, B=0.3)
     );
   }
 
