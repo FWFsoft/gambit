@@ -22,7 +22,8 @@
       "Skill(dev)",
       "Bash(make dev:*)",
       "Bash(ctest:*)",
-      "Bash(./build/Server:*)"
+      "Bash(./build/Server:*)",
+      "Bash(cat:*)"
     ]
   }
 }
