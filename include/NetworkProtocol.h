@@ -12,7 +12,9 @@ enum class PacketType : uint8_t {
   EnemyStateUpdate = 5,
   EnemyDamaged = 6,
   EnemyDied = 7,
-  AttackEnemy = 8
+  AttackEnemy = 8,
+  PlayerDied = 9,
+  PlayerRespawned = 10
 };
 
 struct ClientInputPacket {
@@ -50,12 +52,23 @@ struct PlayerLeftPacket {
   uint32_t playerId;
 };
 
+struct PlayerDiedPacket {
+  PacketType type = PacketType::PlayerDied;
+  uint32_t playerId;
+};
+
+struct PlayerRespawnedPacket {
+  PacketType type = PacketType::PlayerRespawned;
+  uint32_t playerId;
+  float x, y;  // Respawn position
+};
+
 // Enemy-related packets
 
 struct NetworkEnemyState {
   uint32_t id;
-  uint8_t type;    // EnemyType enum
-  uint8_t state;   // EnemyState enum
+  uint8_t type;   // EnemyType enum
+  uint8_t state;  // EnemyState enum
   float x, y;
   float vx, vy;
   float health;
@@ -91,6 +104,8 @@ std::vector<uint8_t> serialize(const ClientInputPacket& packet);
 std::vector<uint8_t> serialize(const StateUpdatePacket& packet);
 std::vector<uint8_t> serialize(const PlayerJoinedPacket& packet);
 std::vector<uint8_t> serialize(const PlayerLeftPacket& packet);
+std::vector<uint8_t> serialize(const PlayerDiedPacket& packet);
+std::vector<uint8_t> serialize(const PlayerRespawnedPacket& packet);
 std::vector<uint8_t> serialize(const EnemyStateUpdatePacket& packet);
 std::vector<uint8_t> serialize(const AttackEnemyPacket& packet);
 std::vector<uint8_t> serialize(const EnemyDamagedPacket& packet);
@@ -99,10 +114,13 @@ std::vector<uint8_t> serialize(const EnemyDiedPacket& packet);
 // Deserialization functions
 ClientInputPacket deserializeClientInput(const uint8_t* data, size_t size);
 StateUpdatePacket deserializeStateUpdate(const uint8_t* data, size_t size);
+PlayerDiedPacket deserializePlayerDied(const uint8_t* data, size_t size);
+PlayerRespawnedPacket deserializePlayerRespawned(const uint8_t* data,
+                                                 size_t size);
 PlayerJoinedPacket deserializePlayerJoined(const uint8_t* data, size_t size);
 PlayerLeftPacket deserializePlayerLeft(const uint8_t* data, size_t size);
 EnemyStateUpdatePacket deserializeEnemyStateUpdate(const uint8_t* data,
-                                                    size_t size);
+                                                   size_t size);
 AttackEnemyPacket deserializeAttackEnemy(const uint8_t* data, size_t size);
 EnemyDamagedPacket deserializeEnemyDamaged(const uint8_t* data, size_t size);
 EnemyDiedPacket deserializeEnemyDied(const uint8_t* data, size_t size);

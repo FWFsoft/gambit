@@ -39,6 +39,11 @@ ClientPrediction::ClientPrediction(NetworkClient* client,
 }
 
 void ClientPrediction::onLocalInput(const LocalInputEvent& e) {
+  // Skip input processing if player is dead
+  if (localPlayer.isDead()) {
+    return;
+  }
+
   // Apply input immediately to local player (instant response)
   MovementInput input(e.moveLeft, e.moveRight, e.moveUp, e.moveDown, 16.67f,
                       worldWidth, worldHeight, collisionSystem);
@@ -90,6 +95,21 @@ void ClientPrediction::onNetworkPacketReceived(
       Logger::info("Local player ID: " + std::to_string(localPlayerId) +
                    ", color: " + std::to_string(packet.r) + "," +
                    std::to_string(packet.g) + "," + std::to_string(packet.b));
+    }
+  } else if (type == PacketType::PlayerDied) {
+    PlayerDiedPacket packet = deserializePlayerDied(e.data, e.size);
+    if (packet.playerId == localPlayerId) {
+      Logger::info("Local player died");
+      // Death state will be reconciled via StateUpdate packets
+    }
+  } else if (type == PacketType::PlayerRespawned) {
+    PlayerRespawnedPacket packet = deserializePlayerRespawned(e.data, e.size);
+    if (packet.playerId == localPlayerId) {
+      Logger::info("Local player respawned at (" + std::to_string(packet.x) +
+                   ", " + std::to_string(packet.y) + ")");
+      // Clear input history since we teleported
+      inputHistory.clear();
+      // Position and health will be reconciled via StateUpdate packets
     }
   }
 }

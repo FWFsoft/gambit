@@ -9,6 +9,7 @@
 #include "CollisionShape.h"
 #include "EnemySpawn.h"
 #include "MusicZone.h"
+#include "PlayerSpawn.h"
 
 class TiledMap {
  public:
@@ -29,8 +30,9 @@ class TiledMap {
     return collisionShapes;
   }
   const std::vector<MusicZone>& getMusicZones() const { return musicZones; }
-  const std::vector<EnemySpawn>& getEnemySpawns() const {
-    return enemySpawns;
+  const std::vector<EnemySpawn>& getEnemySpawns() const { return enemySpawns; }
+  const std::vector<PlayerSpawn>& getPlayerSpawns() const {
+    return playerSpawns;
   }
 
  private:
@@ -43,7 +45,9 @@ class TiledMap {
   std::vector<CollisionShape> collisionShapes;
   std::vector<MusicZone> musicZones;
   std::vector<EnemySpawn> enemySpawns;
+  std::vector<PlayerSpawn> playerSpawns;
 
   void extractCollisionShapes();
   void extractEnemySpawns();
+  void extractPlayerSpawns();
 };

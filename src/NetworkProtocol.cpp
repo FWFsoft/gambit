@@ -113,6 +113,28 @@ std::vector<uint8_t> serialize(const PlayerLeftPacket& packet) {
   return buffer;
 }
 
+std::vector<uint8_t> serialize(const PlayerDiedPacket& packet) {
+  std::vector<uint8_t> buffer;
+
+  writeUint8(buffer, static_cast<uint8_t>(packet.type));
+  writeUint32(buffer, packet.playerId);
+
+  assert(buffer.size() == 5);  // 1 + 4 = 5 bytes
+  return buffer;
+}
+
+std::vector<uint8_t> serialize(const PlayerRespawnedPacket& packet) {
+  std::vector<uint8_t> buffer;
+
+  writeUint8(buffer, static_cast<uint8_t>(packet.type));
+  writeUint32(buffer, packet.playerId);
+  writeFloat(buffer, packet.x);
+  writeFloat(buffer, packet.y);
+
+  assert(buffer.size() == 13);  // 1 + 4 + 4 + 4 = 13 bytes
+  return buffer;
+}
+
 // Deserialization
 
 ClientInputPacket deserializeClientInput(const uint8_t* data, size_t size) {
@@ -194,6 +216,29 @@ PlayerLeftPacket deserializePlayerLeft(const uint8_t* data, size_t size) {
   return packet;
 }
 
+PlayerDiedPacket deserializePlayerDied(const uint8_t* data, size_t size) {
+  assert(size >= 5);
+  assert(data[0] == static_cast<uint8_t>(PacketType::PlayerDied));
+
+  PlayerDiedPacket packet;
+  packet.playerId = readUint32(data + 1);
+
+  return packet;
+}
+
+PlayerRespawnedPacket deserializePlayerRespawned(const uint8_t* data,
+                                                 size_t size) {
+  assert(size >= 13);
+  assert(data[0] == static_cast<uint8_t>(PacketType::PlayerRespawned));
+
+  PlayerRespawnedPacket packet;
+  packet.playerId = readUint32(data + 1);
+  packet.x = readFloat(data + 5);
+  packet.y = readFloat(data + 9);
+
+  return packet;
+}
+
 // Enemy packet serialization
 
 std::vector<uint8_t> serialize(const EnemyStateUpdatePacket& packet) {
@@ -256,7 +301,7 @@ std::vector<uint8_t> serialize(const EnemyDiedPacket& packet) {
 // Enemy packet deserialization
 
 EnemyStateUpdatePacket deserializeEnemyStateUpdate(const uint8_t* data,
-                                                    size_t size) {
+                                                   size_t size) {
   assert(size >= 3);  // 1 + 2 = 3 bytes minimum
   assert(data[0] == static_cast<uint8_t>(PacketType::EnemyStateUpdate));
 

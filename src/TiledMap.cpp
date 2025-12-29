@@ -28,6 +28,7 @@ bool TiledMap::load(const std::string& filepath) {
 
   extractCollisionShapes();
   extractEnemySpawns();
+  extractPlayerSpawns();
 
   // Extract music zones from object layers
   musicZones.clear();
@@ -87,7 +88,8 @@ bool TiledMap::load(const std::string& filepath) {
                std::to_string(tileWidth) + "x" + std::to_string(tileHeight) +
                "px, " + std::to_string(collisionShapes.size()) +
                " collision shapes, " + std::to_string(enemySpawns.size()) +
-               " enemy spawns)");
+               " enemy spawns, " + std::to_string(playerSpawns.size()) +
+               " player spawns)");
 
   return true;
 }
@@ -212,6 +214,42 @@ void TiledMap::extractEnemySpawns() {
         Logger::info("Loaded enemy spawn: " + spawn.name + " type=" +
                      enemyTypeStr + " at (" + std::to_string(spawn.x) + ", " +
                      std::to_string(spawn.y) + ")");
+      }
+    }
+  }
+}
+
+void TiledMap::extractPlayerSpawns() {
+  playerSpawns.clear();
+
+  const auto& layers = tmxMap.getLayers();
+  for (const auto& layer : layers) {
+    if (layer->getType() == tmx::Layer::Type::Object) {
+      const auto& objectLayer = layer->getLayerAs<tmx::ObjectGroup>();
+
+      // Only process "PlayerSpawns" layer
+      if (objectLayer.getName() != "PlayerSpawns") {
+        continue;
+      }
+
+      for (const auto& object : objectLayer.getObjects()) {
+        // Only process point objects (spawn locations)
+        if (object.getShape() != tmx::Object::Shape::Point) {
+          continue;
+        }
+
+        // Create spawn point
+        const auto& pos = object.getPosition();
+        PlayerSpawn spawn;
+        spawn.x = pos.x;
+        spawn.y = pos.y;
+        spawn.name = object.getName();
+
+        playerSpawns.push_back(spawn);
+
+        Logger::info("Loaded player spawn: " + spawn.name + " at (" +
+                     std::to_string(spawn.x) + ", " + std::to_string(spawn.y) +
+                     ")");
       }
     }
   }

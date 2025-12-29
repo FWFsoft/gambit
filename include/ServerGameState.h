@@ -7,6 +7,7 @@
 #include "EventBus.h"
 #include "NetworkProtocol.h"
 #include "Player.h"
+#include "PlayerSpawn.h"
 #include "WorldConfig.h"
 
 class NetworkServer;
@@ -25,6 +26,7 @@ class ServerGameState {
   float worldWidth;
   float worldHeight;
   const CollisionSystem* collisionSystem;
+  const std::vector<PlayerSpawn>* playerSpawns;
   std::unordered_map<uint32_t, Player> players;
   std::unordered_map<ENetPeer*, uint32_t> peerToPlayerId;
   uint32_t serverTick;
@@ -42,4 +44,9 @@ class ServerGameState {
   Player createPlayer(uint32_t playerId);
   bool findValidSpawnPosition(float& x, float& y);
   void assignPlayerColor(Player& player, size_t playerCount);
+
+  // Death and respawn methods
+  void checkPlayerDeaths();
+  void handlePlayerRespawns();
+  void respawnPlayer(Player& player);
 };

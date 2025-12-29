@@ -19,7 +19,15 @@ ServerGameState::ServerGameState(NetworkServer* server,
       worldWidth(world.width),
       worldHeight(world.height),
       collisionSystem(world.collisionSystem),
+      playerSpawns(nullptr),
       serverTick(0) {
+  // Initialize player spawns
+  if (world.tiledMap != nullptr && !world.tiledMap->getPlayerSpawns().empty()) {
+    playerSpawns = &world.tiledMap->getPlayerSpawns();
+    Logger::info("Using " + std::to_string(playerSpawns->size()) +
+                 " player spawn points");
+  }
+
   // Initialize enemy system
   if (world.tiledMap != nullptr) {
     enemySystem =
@@ -156,6 +164,11 @@ void ServerGameState::processClientInput(ENetPeer* peer, const uint8_t* data,
 
   Player& player = playerIt->second;
 
+  // Ignore input from dead players
+  if (player.isDead()) {
+    return;
+  }
+
   // Validate input sequence (prevent replay attacks)
   if (input.inputSequence <= player.lastInputSequence) {
     Logger::info("Received old input sequence from player " +
@@ -177,6 +190,12 @@ void ServerGameState::onUpdate(const UpdateEvent& e) {
   if (enemySystem) {
     enemySystem->update(e.deltaTime, players);
   }
+
+  // Check for player deaths
+  checkPlayerDeaths();
+
+  // Check for player respawns
+  handlePlayerRespawns();
 
   // Broadcast state update every frame
   broadcastStateUpdate();
@@ -234,8 +253,9 @@ void ServerGameState::broadcastStateUpdate() {
 
       server->broadcastPacket(serialize(deathPacket));
 
-      Logger::debug("Broadcast EnemyDied: enemy=" + std::to_string(death.enemyId) +
-                    " killer=" + std::to_string(death.killerId));
+      Logger::debug(
+          "Broadcast EnemyDied: enemy=" + std::to_string(death.enemyId) +
+          " killer=" + std::to_string(death.killerId));
     }
   }
 }
@@ -249,8 +269,24 @@ Player ServerGameState::createPlayer(uint32_t playerId) {
   player.lastInputSequence = 0;
 
   // Find spawn position
-  player.x = worldWidth / 2.0f;
-  player.y = worldHeight / 2.0f;
+  if (playerSpawns && !playerSpawns->empty()) {
+    // Use round-robin spawn point selection based on player ID
+    size_t spawnIndex = playerId % playerSpawns->size();
+    const PlayerSpawn& spawn = (*playerSpawns)[spawnIndex];
+    player.x = spawn.x;
+    player.y = spawn.y;
+
+    Logger::info("Player " + std::to_string(playerId) + " spawned at " +
+                 spawn.name + " (" + std::to_string(player.x) + ", " +
+                 std::to_string(player.y) + ")");
+  } else {
+    // Fallback: use world center
+    player.x = worldWidth / 2.0f;
+    player.y = worldHeight / 2.0f;
+    Logger::info("Player " + std::to_string(playerId) +
+                 " spawned at world center (no spawn points)");
+  }
+
   if (!findValidSpawnPosition(player.x, player.y)) {
     Logger::error("Failed to find valid spawn position");
   }
@@ -290,4 +326,89 @@ void ServerGameState::assignPlayerColor(Player& player, size_t playerCount) {
   player.r = Config::Player::COLORS[colorIndex].r;
   player.g = Config::Player::COLORS[colorIndex].g;
   player.b = Config::Player::COLORS[colorIndex].b;
+}
+
+void ServerGameState::checkPlayerDeaths() {
+  for (auto& [id, player] : players) {
+    // Skip already dead players
+    if (player.deathTime > 0.0f) {
+      continue;
+    }
+
+    // Check if player just died
+    if (player.health <= 0.0f) {
+      player.health = 0.0f;
+      player.deathTime = static_cast<float>(serverTick);
+      player.vx = 0.0f;
+      player.vy = 0.0f;
+
+      Logger::info("Player " + std::to_string(player.id) + " died at tick " +
+                   std::to_string(serverTick));
+
+      // Broadcast death event
+      PlayerDiedPacket packet;
+      packet.playerId = player.id;
+      server->broadcastPacket(serialize(packet));
+    }
+  }
+}
+
+void ServerGameState::handlePlayerRespawns() {
+  float respawnDelayTicks =
+      Config::Gameplay::PLAYER_RESPAWN_DELAY / Config::Timing::TARGET_DELTA_MS;
+
+  for (auto& [id, player] : players) {
+    // Skip alive players
+    if (player.deathTime == 0.0f) {
+      continue;
+    }
+
+    // Check if respawn delay has elapsed
+    float ticksSinceDeath = serverTick - player.deathTime;
+    if (ticksSinceDeath >= respawnDelayTicks) {
+      respawnPlayer(player);
+    }
+  }
+}
+
+void ServerGameState::respawnPlayer(Player& player) {
+  // Reset health
+  player.health = Config::Player::MAX_HEALTH;
+  player.deathTime = 0.0f;
+  player.vx = 0.0f;
+  player.vy = 0.0f;
+
+  // Select spawn point (round-robin)
+  if (playerSpawns && !playerSpawns->empty()) {
+    size_t spawnIndex = player.id % playerSpawns->size();
+    const PlayerSpawn& spawn = (*playerSpawns)[spawnIndex];
+    player.x = spawn.x;
+    player.y = spawn.y;
+
+    // Validate spawn position and search for valid position if blocked
+    if (!findValidSpawnPosition(player.x, player.y)) {
+      Logger::error("Failed to find valid respawn position near " + spawn.name);
+    }
+
+    Logger::info("Player " + std::to_string(player.id) + " respawned at " +
+                 spawn.name + " (" + std::to_string(player.x) + ", " +
+                 std::to_string(player.y) + ")");
+  } else {
+    // Fallback: world center
+    player.x = worldWidth / 2.0f;
+    player.y = worldHeight / 2.0f;
+    if (!findValidSpawnPosition(player.x, player.y)) {
+      Logger::error("Failed to find valid respawn position");
+    }
+
+    Logger::info("Player " + std::to_string(player.id) +
+                 " respawned at world center (no spawn points)");
+  }
+
+  // Broadcast respawn event
+  PlayerRespawnedPacket packet;
+  packet.playerId = player.id;
+  packet.x = player.x;
+  packet.y = player.y;
+  server->broadcastPacket(serialize(packet));
 }

@@ -118,6 +118,20 @@ void RemotePlayerInterpolation::onNetworkPacketReceived(
     if (packet.playerId != localPlayerId) {
       onPlayerLeft(packet.playerId);
     }
+  } else if (type == PacketType::PlayerDied) {
+    PlayerDiedPacket packet = deserializePlayerDied(e.data, e.size);
+    if (packet.playerId != localPlayerId) {
+      Logger::info("Remote player " + std::to_string(packet.playerId) +
+                   " died");
+      // Death state will be reconciled via StateUpdate packets
+    }
+  } else if (type == PacketType::PlayerRespawned) {
+    PlayerRespawnedPacket packet = deserializePlayerRespawned(e.data, e.size);
+    if (packet.playerId != localPlayerId) {
+      Logger::info("Remote player " + std::to_string(packet.playerId) +
+                   " respawned");
+      // Position and health will be reconciled via StateUpdate packets
+    }
   }
 }
 

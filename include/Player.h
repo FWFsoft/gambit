@@ -24,6 +24,7 @@ struct Player : public Animatable {
 
   // Server-only fields
   uint32_t lastInputSequence;
+  float deathTime;  // Server tick when player died (0 = alive)
 
   // Client-only fields
   uint32_t lastServerTick;
@@ -40,7 +41,12 @@ struct Player : public Animatable {
         b(255),
         animationController(std::make_shared<AnimationController>()),
         lastInputSequence(0),
+        deathTime(0.0f),
         lastServerTick(0) {}
+
+  // Helper methods
+  bool isDead() const { return health <= 0.0f; }
+  bool isAlive() const { return health > 0.0f; }
 
   // Animatable interface implementation
   AnimationController* getAnimationController() override {

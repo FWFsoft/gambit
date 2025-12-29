@@ -4,11 +4,12 @@
 #include <cmath>
 
 #include "Logger.h"
+#include "config/GameplayConfig.h"
 
 EnemySystem::EnemySystem(const std::vector<EnemySpawn>& spawns)
-    : spawns(spawns), nextEnemyId(1) {
-  Logger::info("EnemySystem initialized with " +
-               std::to_string(spawns.size()) + " spawn points");
+    : spawns(spawns), nextEnemyId(1), accumulatedTime(0.0f) {
+  Logger::info("EnemySystem initialized with " + std::to_string(spawns.size()) +
+               " spawn points");
 }
 
 void EnemySystem::spawnAllEnemies() {
@@ -41,10 +42,13 @@ void EnemySystem::spawnAllEnemies() {
   }
 }
 
-void EnemySystem::update(
-    float deltaTime, const std::unordered_map<uint32_t, Player>& players) {
+void EnemySystem::update(float deltaTime,
+                         std::unordered_map<uint32_t, Player>& players) {
   // Clear death events from last frame
   diedThisFrame.clear();
+
+  // Update accumulated time (convert seconds to milliseconds)
+  accumulatedTime += deltaTime * 1000.0f;
 
   for (auto& [id, enemy] : enemies) {
     // Skip dead enemies (they'll be cleaned up later)
@@ -58,9 +62,9 @@ void EnemySystem::update(
   // TODO: Clean up dead enemies after delay (Phase 3)
 }
 
-void EnemySystem::updateEnemyAI(
-    Enemy& enemy, const std::unordered_map<uint32_t, Player>& players,
-    float deltaTime) {
+void EnemySystem::updateEnemyAI(Enemy& enemy,
+                                std::unordered_map<uint32_t, Player>& players,
+                                float deltaTime) {
   switch (enemy.state) {
     case EnemyState::Idle:
       updateIdleState(enemy, players);
@@ -92,8 +96,7 @@ void EnemySystem::updateIdleState(
     enemy.state = EnemyState::Chase;
 
     Logger::debug("Enemy " + std::to_string(enemy.id) + " detected player " +
-                  std::to_string(nearestPlayer->id) +
-                  ", entering Chase state");
+                  std::to_string(nearestPlayer->id) + ", entering Chase state");
   } else {
     // No targets nearby, stay idle
     enemy.vx = 0.0f;
@@ -117,6 +120,15 @@ void EnemySystem::updateChaseState(
 
   const Player& target = it->second;
 
+  // Check if target died
+  if (target.isDead()) {
+    enemy.targetPlayerId = 0;
+    enemy.state = EnemyState::Idle;
+    enemy.vx = 0.0f;
+    enemy.vy = 0.0f;
+    return;
+  }
+
   // Calculate distance to target
   float dist = distance(enemy.x, enemy.y, target.x, target.y);
 
@@ -130,8 +142,8 @@ void EnemySystem::updateChaseState(
   }
 
   // Check if target escaped detection range
-  if (dist > enemy.detectionRange *
-                 1.2f) {  // Hysteresis: 120% of detection range
+  if (dist >
+      enemy.detectionRange * 1.2f) {  // Hysteresis: 120% of detection range
     // Lost target - return to Idle
     enemy.targetPlayerId = 0;
     enemy.state = EnemyState::Idle;
@@ -161,7 +173,7 @@ void EnemySystem::updateChaseState(
 }
 
 void EnemySystem::updateAttackState(
-    Enemy& enemy, const std::unordered_map<uint32_t, Player>& players,
+    Enemy& enemy, std::unordered_map<uint32_t, Player>& players,
     float deltaTime) {
   // Find target player
   auto it = players.find(enemy.targetPlayerId);
@@ -172,7 +184,14 @@ void EnemySystem::updateAttackState(
     return;
   }
 
-  const Player& target = it->second;
+  Player& target = it->second;
+
+  // Skip dead players
+  if (target.health <= 0.0f) {
+    enemy.targetPlayerId = 0;
+    enemy.state = EnemyState::Idle;
+    return;
+  }
 
   // Calculate distance to target
   float dist = distance(enemy.x, enemy.y, target.x, target.y);
@@ -184,15 +203,31 @@ void EnemySystem::updateAttackState(
     return;
   }
 
-  // TODO: Implement actual attack logic (damage player)
-  // For POC, enemy just stands still when in attack range
-  // Attack damage will be handled in Phase 3
+  // Check attack cooldown
+  if (accumulatedTime - enemy.lastAttackTime >=
+      Config::Gameplay::ENEMY_ATTACK_COOLDOWN) {
+    // Apply damage
+    target.health -= enemy.damage;
+    if (target.health < 0.0f) {
+      target.health = 0.0f;
+    }
+
+    // Update attack timestamp
+    enemy.lastAttackTime = accumulatedTime;
+
+    Logger::debug("Enemy " + std::to_string(enemy.id) + " attacked player " +
+                  std::to_string(target.id) + " for " +
+                  std::to_string(enemy.damage) +
+                  " damage, health: " + std::to_string(target.health));
+  }
+
+  // Stand still while in attack state
   enemy.vx = 0.0f;
   enemy.vy = 0.0f;
 }
 
 void EnemySystem::damageEnemy(uint32_t enemyId, float damage,
-                               uint32_t attackerId) {
+                              uint32_t attackerId) {
   auto it = enemies.find(enemyId);
   if (it == enemies.end()) {
     Logger::info("Attempted to damage non-existent enemy ID=" +
@@ -211,8 +246,8 @@ void EnemySystem::damageEnemy(uint32_t enemyId, float damage,
   enemy.health -= damage;
 
   Logger::debug("Enemy " + std::to_string(enemyId) + " took " +
-                std::to_string(damage) + " damage, " + "health: " +
-                std::to_string(enemy.health) + "/" +
+                std::to_string(damage) + " damage, " +
+                "health: " + std::to_string(enemy.health) + "/" +
                 std::to_string(enemy.maxHealth));
 
   // Check if killed
@@ -222,8 +257,8 @@ void EnemySystem::damageEnemy(uint32_t enemyId, float damage,
     enemy.vx = 0.0f;
     enemy.vy = 0.0f;
 
-    Logger::info("Enemy " + std::to_string(enemyId) +
-                 " killed by player " + std::to_string(attackerId));
+    Logger::info("Enemy " + std::to_string(enemyId) + " killed by player " +
+                 std::to_string(attackerId));
 
     // Track death for broadcasting
     diedThisFrame.push_back({enemyId, attackerId});
@@ -237,6 +272,11 @@ const Player* EnemySystem::findNearestPlayer(
   float nearestDist = maxRange;
 
   for (const auto& [id, player] : players) {
+    // Skip dead players
+    if (player.isDead()) {
+      continue;
+    }
+
     float dist = distance(enemy.x, enemy.y, player.x, player.y);
     if (dist < nearestDist) {
       nearest = &player;

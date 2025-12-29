@@ -21,8 +21,7 @@ class EnemySystem {
   void spawnAllEnemies();
 
   // Update all enemy AI (called every frame)
-  void update(float deltaTime,
-              const std::unordered_map<uint32_t, Player>& players);
+  void update(float deltaTime, std::unordered_map<uint32_t, Player>& players);
 
   // Combat: Apply damage to enemy
   void damageEnemy(uint32_t enemyId, float damage, uint32_t attackerId);
@@ -48,10 +47,11 @@ class EnemySystem {
   std::unordered_map<uint32_t, Enemy> enemies;  // enemyId -> Enemy
   uint32_t nextEnemyId;
   std::vector<EnemyDeath> diedThisFrame;  // Cleared each update
+  float accumulatedTime;                  // Milliseconds since server start
 
   // AI behavior methods
   void updateEnemyAI(Enemy& enemy,
-                     const std::unordered_map<uint32_t, Player>& players,
+                     std::unordered_map<uint32_t, Player>& players,
                      float deltaTime);
   void updateIdleState(Enemy& enemy,
                        const std::unordered_map<uint32_t, Player>& players);
@@ -59,7 +59,7 @@ class EnemySystem {
                         const std::unordered_map<uint32_t, Player>& players,
                         float deltaTime);
   void updateAttackState(Enemy& enemy,
-                         const std::unordered_map<uint32_t, Player>& players,
+                         std::unordered_map<uint32_t, Player>& players,
                          float deltaTime);
 
   // Helper: Find nearest player within range

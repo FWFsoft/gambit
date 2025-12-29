@@ -17,5 +17,9 @@ constexpr float SPAWN_SEARCH_MAX_RADIUS = 500.0f;  // Max search distance
 constexpr float SPAWN_SEARCH_ANGLE_INCREMENT =
     45.0f;  // Degrees between test points
 
+// Combat parameters
+constexpr float ENEMY_ATTACK_COOLDOWN = 1500.0f;  // Milliseconds (1.5 seconds)
+constexpr float PLAYER_RESPAWN_DELAY = 3000.0f;   // Milliseconds (3 seconds)
+
 }  // namespace Gameplay
 }  // namespace Config

@@ -76,13 +76,21 @@ void RenderSystem::onRender(const RenderEvent& e) {
 
   // Gather all players
   std::vector<Player> allPlayers;
-  allPlayers.push_back(localPlayer);
+
+  // Add local player if alive
+  if (localPlayer.isAlive()) {
+    allPlayers.push_back(localPlayer);
+  }
 
   auto remotePlayerIds = remoteInterpolation->getRemotePlayerIds();
   for (uint32_t playerId : remotePlayerIds) {
     Player remotePlayer;
     if (remoteInterpolation->getInterpolatedState(playerId, e.interpolation,
                                                   remotePlayer)) {
+      // Skip dead players
+      if (remotePlayer.isDead()) {
+        continue;
+      }
       allPlayers.push_back(remotePlayer);
     }
   }
@@ -210,6 +218,10 @@ void RenderSystem::drawPlayer(const Player& player) {
           Config::Player::SIZE, r, g, b, 1.0f);
     }
   }
+
+  // Render health bar above player
+  drawHealthBar(screenX, screenY - Config::Player::SIZE / 2.0f - 10,
+                player.health, Config::Player::MAX_HEALTH);
 }
 
 void RenderSystem::drawEnemy(const Enemy& enemy) {

@@ -5,35 +5,31 @@
 #include "Animatable.h"
 #include "AnimationController.h"
 
-enum class EnemyState : uint8_t {
-  Idle = 0,
-  Chase = 1,
-  Attack = 2,
-  Dead = 3
-};
+enum class EnemyState : uint8_t { Idle = 0, Chase = 1, Attack = 2, Dead = 3 };
 
 enum class EnemyType : uint8_t {
-  Slime = 0,     // POC: Only implement this one
-  Goblin = 1,    // Future
-  Skeleton = 2   // Future
+  Slime = 0,    // POC: Only implement this one
+  Goblin = 1,   // Future
+  Skeleton = 2  // Future
 };
 
 struct Enemy : public Animatable {
-  uint32_t id;              // Unique enemy ID
-  EnemyType type;           // Enemy type (determines sprite, stats, etc.)
-  EnemyState state;         // Current AI state
+  uint32_t id;       // Unique enemy ID
+  EnemyType type;    // Enemy type (determines sprite, stats, etc.)
+  EnemyState state;  // Current AI state
 
   // Transform
-  float x, y;               // World position
-  float vx, vy;             // Velocity (for animation direction)
+  float x, y;    // World position
+  float vx, vy;  // Velocity (for animation direction)
 
   // Combat stats
-  float health;             // Current health
-  float maxHealth;          // Maximum health
-  float damage;             // Damage per attack
-  float attackRange;        // Melee attack range
-  float detectionRange;     // How far enemy can detect players
-  float speed;              // Movement speed (pixels/second)
+  float health;          // Current health
+  float maxHealth;       // Maximum health
+  float damage;          // Damage per attack
+  float attackRange;     // Melee attack range
+  float detectionRange;  // How far enemy can detect players
+  float speed;           // Movement speed (pixels/second)
+  float lastAttackTime;  // Timestamp of last attack (milliseconds)
 
   // Target tracking
   uint32_t targetPlayerId;  // Player being chased/attacked (0 = no target)
@@ -66,5 +62,6 @@ struct Enemy : public Animatable {
         attackRange(40.0f),
         detectionRange(200.0f),
         speed(100.0f),
+        lastAttackTime(0.0f),
         targetPlayerId(0) {}
 };
