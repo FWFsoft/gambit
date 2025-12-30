@@ -2,10 +2,14 @@
 
 #include <SDL2/SDL.h>
 #include <glad/glad.h>
+#include <imgui.h>
+#include <imgui_impl_opengl3.h>
+#include <imgui_impl_sdl2.h>
 
 #include <stdexcept>
 
 #include "EventBus.h"
+#include "Logger.h"
 
 Window::Window(const std::string& title, int width, int height) : open(true) {
   if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
@@ -42,9 +46,14 @@ Window::Window(const std::string& title, int width, int height) : open(true) {
   if (!gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress)) {
     throw std::runtime_error("Failed to initialize GLAD");
   }
+
+  // Subscribe to swap buffers event
+  EventBus::instance().subscribe<SwapBuffersEvent>(
+      [this](const SwapBuffersEvent& e) { SDL_GL_SwapWindow(sdlWindow); });
 }
 
 Window::~Window() {
+  shutdownImGui();
   if (glContext) {
     SDL_GL_DeleteContext(glContext);
   }
@@ -59,14 +68,54 @@ SDL_Window* Window::getWindow() const { return sdlWindow; }
 void Window::pollEvents() {
   SDL_Event event;
   while (SDL_PollEvent(&event)) {
+    // Let ImGui handle events first
+    ImGui_ImplSDL2_ProcessEvent(&event);
+
+    // Check if ImGui wants to capture this event
+    ImGuiIO& io = ImGui::GetIO();
+    bool imguiWantsKeyboard = io.WantCaptureKeyboard;
+
     if (event.type == SDL_QUIT) {
       open = false;
     } else if (event.type == SDL_KEYDOWN) {
-      EventBus::instance().publish(KeyDownEvent{event.key.keysym.sym});
-    } else if (event.type == SDL_KEYUP) {
+      // Always allow ESC and I for menu navigation
+      bool isMenuKey = (event.key.keysym.sym == SDLK_ESCAPE ||
+                        event.key.keysym.sym == SDLK_i);
+
+      if (isMenuKey || !imguiWantsKeyboard) {
+        EventBus::instance().publish(KeyDownEvent{event.key.keysym.sym});
+      }
+    } else if (event.type == SDL_KEYUP && !imguiWantsKeyboard) {
       EventBus::instance().publish(KeyUpEvent{event.key.keysym.sym});
     }
   }
 }
 
 bool Window::isOpen() const { return open; }
+
+void Window::close() { open = false; }
+
+void Window::initImGui() {
+  // Setup Dear ImGui context
+  IMGUI_CHECKVERSION();
+  ImGui::CreateContext();
+  ImGuiIO& io = ImGui::GetIO();
+
+  // Disable imgui.ini file (we'll handle settings ourselves)
+  io.IniFilename = nullptr;
+
+  // Setup Platform/Renderer backends
+  ImGui_ImplSDL2_InitForOpenGL(sdlWindow, glContext);
+  ImGui_ImplOpenGL3_Init("#version 330");  // Match our OpenGL version
+
+  // Setup Dear ImGui style (dark theme)
+  ImGui::StyleColorsDark();
+
+  Logger::info("ImGui initialized");
+}
+
+void Window::shutdownImGui() {
+  ImGui_ImplOpenGL3_Shutdown();
+  ImGui_ImplSDL2_Shutdown();
+  ImGui::DestroyContext();
+}

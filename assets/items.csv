@@ -1,0 +1,11 @@
+id,name,type,rarity,damage,armor,health,heal,maxStack,icon,description
+1,Health Potion,0,0,0,0,0,50,99,assets/icons/potion_health.png,Restores 50 health
+2,Greater Health Potion,0,1,0,0,0,100,99,assets/icons/potion_health_greater.png,Restores 100 health
+3,Iron Sword,1,0,25,0,0,0,1,assets/icons/sword_iron.png,A basic iron sword
+4,Steel Sword,1,1,40,0,0,0,1,assets/icons/sword_steel.png,A sturdy steel blade
+5,Dragon Sword,1,3,100,0,0,0,1,assets/icons/sword_dragon.png,Forged from dragon scales
+6,Leather Armor,2,0,0,10,25,0,1,assets/icons/armor_leather.png,Light leather protection
+7,Iron Armor,2,1,0,25,50,0,1,assets/icons/armor_iron.png,Solid iron plating
+8,Dragon Armor,2,3,0,75,150,0,1,assets/icons/armor_dragon.png,Legendary dragon scale armor
+9,Mana Potion,0,0,0,0,0,0,99,assets/icons/potion_mana.png,Restores mana (not yet implemented)
+10,Elven Bow,1,2,60,0,0,0,1,assets/icons/bow_elven.png,Crafted by ancient elves

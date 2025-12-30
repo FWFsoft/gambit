@@ -4,6 +4,7 @@
 #include "CollisionSystem.h"
 #include "EventBus.h"
 #include "GameLoop.h"
+#include "ItemRegistry.h"
 #include "Logger.h"
 #include "NetworkServer.h"
 #include "ServerGameState.h"
@@ -19,6 +20,11 @@ int main() {
   Logger::init();
   signal(SIGINT, signalHandler);
 
+  // Load item definitions
+  if (!ItemRegistry::instance().loadFromCSV("assets/items.csv")) {
+    Logger::error("Failed to load items.csv - inventory will be empty");
+  }
+
   NetworkServer server(Config::Network::SERVER_BIND_ADDRESS,
                        Config::Network::PORT);
   if (!server.initialize()) {
@@ -33,8 +39,8 @@ int main() {
                std::to_string(map.getCollisionShapes().size()) + " shapes");
 
   GameLoop gameLoop;
-  WorldConfig world(map.getWorldWidth(), map.getWorldHeight(),
-                    &collisionSystem, &map);
+  WorldConfig world(map.getWorldWidth(), map.getWorldHeight(), &collisionSystem,
+                    &map);
   ServerGameState gameState(&server, world);
 
   // Subscribe to UpdateEvent to process network events

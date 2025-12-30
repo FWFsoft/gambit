@@ -4,9 +4,12 @@
 #include "EventBus.h"
 #include "MusicZoneDebugRenderer.h"
 
+class ClientPrediction;
+
 class InputSystem {
  public:
-  InputSystem(CollisionDebugRenderer* collisionDebugRenderer = nullptr,
+  InputSystem(ClientPrediction* clientPrediction,
+              CollisionDebugRenderer* collisionDebugRenderer = nullptr,
               MusicZoneDebugRenderer* musicZoneDebugRenderer = nullptr);
 
  private:
@@ -15,6 +18,7 @@ class InputSystem {
   bool moveUp;
   bool moveDown;
   uint32_t inputSequence;
+  ClientPrediction* clientPrediction;
   CollisionDebugRenderer* collisionDebugRenderer;
   MusicZoneDebugRenderer* musicZoneDebugRenderer;
 

@@ -14,6 +14,7 @@ find_package(glad CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(SDL2_image CONFIG REQUIRED)
 find_package(SDL2_mixer CONFIG REQUIRED)
+find_package(imgui CONFIG REQUIRED)
 
 # Find ENet library and include directory
 if(APPLE)
@@ -107,6 +108,7 @@ add_executable(Server
     src/AnimationSystem.cpp
     src/AnimationAssetLoader.cpp
     src/EnemySystem.cpp
+    src/ItemRegistry.cpp
 )
 target_include_directories(Server SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
 target_include_directories(Server PRIVATE include)
@@ -154,9 +156,16 @@ add_executable(Client
     src/MusicZoneDebugRenderer.cpp
     src/EnemyInterpolation.cpp
     src/CombatSystem.cpp
+    src/UISystem.cpp
+    src/GameStateManager.cpp
+    src/Settings.cpp
+    src/ItemRegistry.cpp
+    src/imgui_backends/imgui_impl_sdl2.cpp
+    src/imgui_backends/imgui_impl_opengl3.cpp
 )
 target_include_directories(Client SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
 target_include_directories(Client PRIVATE include)
+target_include_directories(Client SYSTEM PRIVATE src/imgui_backends)
 target_link_libraries(Client PRIVATE
     ${ENET_LIBRARY}
     SDL2::SDL2
@@ -164,6 +173,7 @@ target_link_libraries(Client PRIVATE
     OpenGL::GL
     glad::glad
     glm::glm
+    imgui::imgui
     $<IF:$<TARGET_EXISTS:SDL2_image::SDL2_image>,SDL2_image::SDL2_image,$<IF:$<TARGET_EXISTS:SDL2_image::SDL2_image-static>,SDL2_image::SDL2_image-static,SDL2_image::SDL2_image>>
     $<IF:$<TARGET_EXISTS:SDL2_mixer::SDL2_mixer>,SDL2_mixer::SDL2_mixer,$<IF:$<TARGET_EXISTS:SDL2_mixer::SDL2_mixer-static>,SDL2_mixer::SDL2_mixer-static,SDL2_mixer::SDL2_mixer>>
 )
@@ -220,6 +230,10 @@ add_executable(test_inputsystem
     src/InputSystem.cpp
     src/GameLoop.cpp
     src/NetworkProtocol.cpp
+    src/GameStateManager.cpp
+    src/AnimationController.cpp
+    src/AnimationSystem.cpp
+    src/AnimationAssetLoader.cpp
 )
 target_include_directories(test_inputsystem SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
 target_include_directories(test_inputsystem PRIVATE include tests)

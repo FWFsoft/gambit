@@ -21,14 +21,14 @@ TEST(InputSystem_KeyBindings) {
 
   for (const auto& keyTest : keys) {
     resetEventBus();
-    InputSystem inputSystem;
+    InputSystem inputSystem(nullptr);
 
     LocalInputEvent downEvent =
         publishKeyAndUpdate(inputSystem, keyTest.sdlKey, true);
     assert(*keyTest.flagPtr(downEvent) == true);
 
     resetEventBus();
-    InputSystem inputSystem2;
+    InputSystem inputSystem2(nullptr);
     LocalInputEvent upEvent =
         publishKeyAndUpdate(inputSystem2, keyTest.sdlKey, false);
     assert(*keyTest.flagPtr(upEvent) == false);
@@ -37,7 +37,7 @@ TEST(InputSystem_KeyBindings) {
 
 TEST(InputSystem_AllDirections) {
   resetEventBus();
-  InputSystem inputSystem;
+  InputSystem inputSystem(nullptr);
 
   EventBus::instance().publish(KeyDownEvent{SDLK_w});
   EventBus::instance().publish(KeyDownEvent{SDLK_a});
@@ -56,7 +56,7 @@ TEST(InputSystem_AllDirections) {
 
 TEST(InputSystem_SequenceIncrement) {
   resetEventBus();
-  InputSystem inputSystem;
+  InputSystem inputSystem(nullptr);
 
   uint32_t sequences[3] = {0};
   int count = 0;

@@ -182,8 +182,7 @@ void RenderSystem::onRender(const RenderEvent& e) {
     collisionDebugRenderer->render();
   }
 
-  // Swap buffers
-  SDL_GL_SwapWindow(sdlWindow);
+  // NOTE: Buffer swap moved to GameLoop to ensure UI renders after game world
   OpenGLUtils::checkGLError("RenderSystem::onRender");
 }
 

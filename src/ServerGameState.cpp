@@ -6,6 +6,7 @@
 
 #include "CollisionSystem.h"
 #include "EnemySystem.h"
+#include "ItemRegistry.h"
 #include "Logger.h"
 #include "NetworkServer.h"
 #include "TiledMap.h"
@@ -143,6 +144,14 @@ void ServerGameState::onNetworkPacketReceived(
 
       break;
     }
+
+    case PacketType::UseItem:
+      processUseItem(e.peer, e.data, e.size);
+      break;
+
+    case PacketType::EquipItem:
+      processEquipItem(e.peer, e.data, e.size);
+      break;
 
     default:
       Logger::info("Unknown packet type: " +
@@ -410,5 +419,213 @@ void ServerGameState::respawnPlayer(Player& player) {
   packet.playerId = player.id;
   packet.x = player.x;
   packet.y = player.y;
+  server->broadcastPacket(serialize(packet));
+}
+
+void ServerGameState::processUseItem(ENetPeer* peer, const uint8_t* data,
+                                     size_t size) {
+  if (size < 2) {
+    Logger::info("Invalid UseItem packet size");
+    return;
+  }
+
+  UseItemPacket packet = deserializeUseItem(data, size);
+
+  // Get player ID from peer
+  auto it = peerToPlayerId.find(peer);
+  if (it == peerToPlayerId.end()) {
+    Logger::info("Received UseItem from unknown peer");
+    return;
+  }
+  uint32_t playerId = it->second;
+
+  auto playerIt = players.find(playerId);
+  if (playerIt == players.end()) {
+    Logger::info("Player not found for UseItem");
+    return;
+  }
+
+  Player& player = playerIt->second;
+
+  // Validate slot index
+  if (packet.slotIndex >= INVENTORY_SIZE) {
+    Logger::info("Invalid inventory slot: " + std::to_string(packet.slotIndex));
+    return;
+  }
+
+  ItemStack& stack = player.inventory[packet.slotIndex];
+  if (stack.isEmpty()) {
+    Logger::info("Attempted to use empty inventory slot");
+    return;
+  }
+
+  // Get item definition
+  const ItemDefinition* item = ItemRegistry::instance().getItem(stack.itemId);
+  if (!item) {
+    Logger::error("Invalid item ID in inventory: " +
+                  std::to_string(stack.itemId));
+    return;
+  }
+
+  // Only consumables can be used
+  if (item->type != ItemType::Consumable) {
+    Logger::info("Attempted to use non-consumable item");
+    return;
+  }
+
+  // Apply consumable effect (healing)
+  if (item->healAmount > 0) {
+    float oldHealth = player.health;
+    player.health =
+        std::min(player.health + item->healAmount, Config::Player::MAX_HEALTH);
+    Logger::info("Player " + std::to_string(playerId) + " used " + item->name +
+                 " (healed from " + std::to_string(oldHealth) + " to " +
+                 std::to_string(player.health) + ")");
+  }
+
+  // Consume one item
+  stack.quantity--;
+  if (stack.quantity <= 0) {
+    stack = ItemStack();  // Clear slot
+  }
+
+  // Broadcast inventory update
+  broadcastInventoryUpdate(playerId);
+}
+
+void ServerGameState::processEquipItem(ENetPeer* peer, const uint8_t* data,
+                                       size_t size) {
+  if (size < 3) {
+    Logger::info("Invalid EquipItem packet size");
+    return;
+  }
+
+  EquipItemPacket packet = deserializeEquipItem(data, size);
+
+  // Get player ID from peer
+  auto it = peerToPlayerId.find(peer);
+  if (it == peerToPlayerId.end()) {
+    Logger::info("Received EquipItem from unknown peer");
+    return;
+  }
+  uint32_t playerId = it->second;
+
+  auto playerIt = players.find(playerId);
+  if (playerIt == players.end()) {
+    Logger::info("Player not found for EquipItem");
+    return;
+  }
+
+  Player& player = playerIt->second;
+
+  // Validate equipment slot (255 = unequip)
+  if (packet.equipmentSlot != 255 && packet.equipmentSlot >= EQUIPMENT_SLOTS) {
+    Logger::info("Invalid equipment slot: " +
+                 std::to_string(packet.equipmentSlot));
+    return;
+  }
+
+  // Unequip case
+  if (packet.equipmentSlot == 255) {
+    // Find first empty inventory slot
+    int emptySlot = player.findEmptySlot();
+    if (emptySlot == -1) {
+      Logger::info("No empty inventory slot for unequip");
+      return;
+    }
+
+    // Move from equipment to inventory (use inventorySlot as equipment index)
+    if (packet.inventorySlot >= EQUIPMENT_SLOTS) {
+      Logger::info("Invalid equipment index for unequip");
+      return;
+    }
+
+    ItemStack& equipSlot = player.equipment[packet.inventorySlot];
+    if (!equipSlot.isEmpty()) {
+      player.inventory[emptySlot] = equipSlot;
+      equipSlot = ItemStack();
+      Logger::info("Player " + std::to_string(playerId) +
+                   " unequipped item to slot " + std::to_string(emptySlot));
+    }
+
+    broadcastInventoryUpdate(playerId);
+    return;
+  }
+
+  // Equip case: validate inventory slot
+  if (packet.inventorySlot >= INVENTORY_SIZE) {
+    Logger::info("Invalid inventory slot: " +
+                 std::to_string(packet.inventorySlot));
+    return;
+  }
+
+  ItemStack& invStack = player.inventory[packet.inventorySlot];
+  if (invStack.isEmpty()) {
+    Logger::info("Attempted to equip from empty inventory slot");
+    return;
+  }
+
+  // Validate item type matches equipment slot
+  const ItemDefinition* item =
+      ItemRegistry::instance().getItem(invStack.itemId);
+  if (!item) {
+    Logger::error("Invalid item ID: " + std::to_string(invStack.itemId));
+    return;
+  }
+
+  if (packet.equipmentSlot == EQUIPMENT_WEAPON_SLOT &&
+      item->type != ItemType::Weapon) {
+    Logger::info("Attempted to equip non-weapon in weapon slot");
+    return;
+  }
+
+  if (packet.equipmentSlot == EQUIPMENT_ARMOR_SLOT &&
+      item->type != ItemType::Armor) {
+    Logger::info("Attempted to equip non-armor in armor slot");
+    return;
+  }
+
+  // Swap: if equipment slot has item, move it to inventory
+  ItemStack& equipSlot = player.equipment[packet.equipmentSlot];
+  if (!equipSlot.isEmpty()) {
+    // Swap
+    ItemStack temp = equipSlot;
+    equipSlot = invStack;
+    invStack = temp;
+    Logger::info("Player " + std::to_string(playerId) + " swapped equipment");
+  } else {
+    // Simple equip
+    equipSlot = invStack;
+    invStack = ItemStack();
+    Logger::info("Player " + std::to_string(playerId) + " equipped " +
+                 item->name);
+  }
+
+  broadcastInventoryUpdate(playerId);
+}
+
+void ServerGameState::broadcastInventoryUpdate(uint32_t playerId) {
+  auto playerIt = players.find(playerId);
+  if (playerIt == players.end()) {
+    return;
+  }
+
+  const Player& player = playerIt->second;
+
+  InventoryUpdatePacket packet;
+  packet.playerId = playerId;
+
+  // Copy inventory
+  for (int i = 0; i < INVENTORY_SIZE; i++) {
+    packet.inventory[i].itemId = player.inventory[i].itemId;
+    packet.inventory[i].quantity = player.inventory[i].quantity;
+  }
+
+  // Copy equipment
+  for (int i = 0; i < EQUIPMENT_SLOTS; i++) {
+    packet.equipment[i].itemId = player.equipment[i].itemId;
+    packet.equipment[i].quantity = player.equipment[i].quantity;
+  }
+
   server->broadcastPacket(serialize(packet));
 }

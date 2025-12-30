@@ -8,7 +8,9 @@
 #include "EnemyInterpolation.h"
 #include "EventBus.h"
 #include "GameLoop.h"
+#include "GameStateManager.h"
 #include "InputSystem.h"
+#include "ItemRegistry.h"
 #include "Logger.h"
 #include "MusicSystem.h"
 #include "MusicZoneDebugRenderer.h"
@@ -17,6 +19,7 @@
 #include "RenderSystem.h"
 #include "TileRenderer.h"
 #include "TiledMap.h"
+#include "UISystem.h"
 #include "Window.h"
 #include "WorldConfig.h"
 #include "config/NetworkConfig.h"
@@ -25,6 +28,11 @@
 
 int main() {
   Logger::init();
+
+  // Load item definitions
+  if (!ItemRegistry::instance().loadFromCSV("assets/items.csv")) {
+    Logger::error("Failed to load items.csv - inventory will be empty");
+  }
 
   NetworkClient client;
   if (!client.initialize()) {
@@ -35,7 +43,12 @@ int main() {
     return EXIT_FAILURE;
   }
 
+  // Auto-start in Playing state since we connect before main menu
+  // TODO: Refactor to show main menu before connection
+  GameStateManager::instance().transitionTo(GameState::Playing);
+
   Window window("Gambit Client", Config::Screen::WIDTH, Config::Screen::HEIGHT);
+  window.initImGui();
   GameLoop gameLoop;
 
   TiledMap map;
@@ -50,12 +63,13 @@ int main() {
   CollisionDebugRenderer collisionDebugRenderer(&camera, &collisionSystem);
   MusicZoneDebugRenderer musicZoneDebugRenderer(&camera, &map);
 
-  InputSystem inputSystem(&collisionDebugRenderer, &musicZoneDebugRenderer);
-
   uint32_t localPlayerId = (uint32_t)(uintptr_t)&client;
   WorldConfig world(map.getWorldWidth(), map.getWorldHeight(),
                     &collisionSystem);
   ClientPrediction clientPrediction(&client, localPlayerId, world);
+
+  InputSystem inputSystem(&clientPrediction, &collisionDebugRenderer,
+                          &musicZoneDebugRenderer);
 
   // Initialize animation system first
   AnimationSystem animationSystem;
@@ -77,11 +91,26 @@ int main() {
                             &enemyInterpolation, &camera, &map,
                             &collisionDebugRenderer, &musicZoneDebugRenderer);
 
+  UISystem uiSystem(&window, &clientPrediction);
+
   // Load local player animations
   Player& localPlayer = clientPrediction.getLocalPlayerMutable();
   AnimationAssetLoader::loadPlayerAnimations(
       *localPlayer.getAnimationController(), "assets/player_animated.png");
   animationSystem.registerEntity(&localPlayer);
+
+  // Add test items to inventory for demonstration
+  localPlayer.inventory[0] = ItemStack(1, 5);    // 5x Health Potion
+  localPlayer.inventory[1] = ItemStack(2, 3);    // 3x Greater Health Potion
+  localPlayer.inventory[2] = ItemStack(3, 1);    // Iron Sword
+  localPlayer.inventory[3] = ItemStack(6, 1);    // Leather Armor
+  localPlayer.inventory[5] = ItemStack(4, 1);    // Steel Sword
+  localPlayer.inventory[10] = ItemStack(9, 10);  // 10x Mana Potion
+
+  // Equip items
+  localPlayer.equipment[EQUIPMENT_WEAPON_SLOT] =
+      ItemStack(5, 1);  // Dragon Sword
+  localPlayer.equipment[EQUIPMENT_ARMOR_SLOT] = ItemStack(7, 1);  // Iron Armor
 
   // Subscribe to UpdateEvent for network processing
   EventBus::instance().subscribe<UpdateEvent>([&](const UpdateEvent& e) {

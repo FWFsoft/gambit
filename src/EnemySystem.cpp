@@ -27,7 +27,7 @@ void EnemySystem::spawnAllEnemies() {
     if (spawn.type == EnemyType::Slime) {
       enemy.maxHealth = 50.0f;
       enemy.health = 50.0f;
-      enemy.damage = 10.0f;
+      enemy.damage = 1.0f;
       enemy.attackRange = 40.0f;
       enemy.detectionRange = 200.0f;
       enemy.speed = 100.0f;

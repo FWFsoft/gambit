@@ -21,6 +21,8 @@ struct RenderEvent {
   float interpolation;  // 0.0-1.0 for sub-frame interpolation
 };
 
+struct SwapBuffersEvent {};
+
 struct KeyDownEvent {
   SDL_Keycode key;
 };

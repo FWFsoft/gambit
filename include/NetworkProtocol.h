@@ -14,7 +14,10 @@ enum class PacketType : uint8_t {
   EnemyDied = 7,
   AttackEnemy = 8,
   PlayerDied = 9,
-  PlayerRespawned = 10
+  PlayerRespawned = 10,
+  InventoryUpdate = 11,
+  UseItem = 12,
+  EquipItem = 13
 };
 
 struct ClientInputPacket {
@@ -99,6 +102,31 @@ struct EnemyDiedPacket {
   uint32_t killerId;
 };
 
+// Inventory-related packets
+
+struct NetworkItemStack {
+  uint32_t itemId;
+  int32_t quantity;
+};
+
+struct InventoryUpdatePacket {
+  PacketType type = PacketType::InventoryUpdate;
+  uint32_t playerId;
+  NetworkItemStack inventory[20];  // Fixed size inventory
+  NetworkItemStack equipment[2];   // Weapon and armor slots
+};
+
+struct UseItemPacket {
+  PacketType type = PacketType::UseItem;
+  uint8_t slotIndex;  // Inventory slot to use
+};
+
+struct EquipItemPacket {
+  PacketType type = PacketType::EquipItem;
+  uint8_t inventorySlot;  // Source inventory slot
+  uint8_t equipmentSlot;  // 0 = weapon, 1 = armor (255 = unequip)
+};
+
 // Serialization functions
 std::vector<uint8_t> serialize(const ClientInputPacket& packet);
 std::vector<uint8_t> serialize(const StateUpdatePacket& packet);
@@ -110,6 +138,9 @@ std::vector<uint8_t> serialize(const EnemyStateUpdatePacket& packet);
 std::vector<uint8_t> serialize(const AttackEnemyPacket& packet);
 std::vector<uint8_t> serialize(const EnemyDamagedPacket& packet);
 std::vector<uint8_t> serialize(const EnemyDiedPacket& packet);
+std::vector<uint8_t> serialize(const InventoryUpdatePacket& packet);
+std::vector<uint8_t> serialize(const UseItemPacket& packet);
+std::vector<uint8_t> serialize(const EquipItemPacket& packet);
 
 // Deserialization functions
 ClientInputPacket deserializeClientInput(const uint8_t* data, size_t size);
@@ -124,14 +155,20 @@ EnemyStateUpdatePacket deserializeEnemyStateUpdate(const uint8_t* data,
 AttackEnemyPacket deserializeAttackEnemy(const uint8_t* data, size_t size);
 EnemyDamagedPacket deserializeEnemyDamaged(const uint8_t* data, size_t size);
 EnemyDiedPacket deserializeEnemyDied(const uint8_t* data, size_t size);
+InventoryUpdatePacket deserializeInventoryUpdate(const uint8_t* data,
+                                                 size_t size);
+UseItemPacket deserializeUseItem(const uint8_t* data, size_t size);
+EquipItemPacket deserializeEquipItem(const uint8_t* data, size_t size);
 
 // Helper functions for binary I/O
 void writeUint32(std::vector<uint8_t>& buffer, uint32_t value);
+void writeInt32(std::vector<uint8_t>& buffer, int32_t value);
 void writeUint16(std::vector<uint8_t>& buffer, uint16_t value);
 void writeFloat(std::vector<uint8_t>& buffer, float value);
 void writeUint8(std::vector<uint8_t>& buffer, uint8_t value);
 
 uint32_t readUint32(const uint8_t* data);
+int32_t readInt32(const uint8_t* data);
 uint16_t readUint16(const uint8_t* data);
 float readFloat(const uint8_t* data);
 uint8_t readUint8(const uint8_t* data);

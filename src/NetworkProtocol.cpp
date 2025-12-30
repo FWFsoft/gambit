@@ -22,6 +22,12 @@ void writeFloat(std::vector<uint8_t>& buffer, float value) {
   writeUint32(buffer, bits);
 }
 
+void writeInt32(std::vector<uint8_t>& buffer, int32_t value) {
+  uint32_t uvalue;
+  std::memcpy(&uvalue, &value, sizeof(int32_t));
+  writeUint32(buffer, uvalue);
+}
+
 void writeUint8(std::vector<uint8_t>& buffer, uint8_t value) {
   buffer.push_back(value);
 }
@@ -31,6 +37,13 @@ uint32_t readUint32(const uint8_t* data) {
          (static_cast<uint32_t>(data[1]) << 8) |
          (static_cast<uint32_t>(data[2]) << 16) |
          (static_cast<uint32_t>(data[3]) << 24);
+}
+
+int32_t readInt32(const uint8_t* data) {
+  uint32_t uvalue = readUint32(data);
+  int32_t value;
+  std::memcpy(&value, &uvalue, sizeof(int32_t));
+  return value;
 }
 
 uint16_t readUint16(const uint8_t* data) {
@@ -368,6 +381,105 @@ EnemyDiedPacket deserializeEnemyDied(const uint8_t* data, size_t size) {
   EnemyDiedPacket packet;
   packet.enemyId = readUint32(data + 1);
   packet.killerId = readUint32(data + 5);
+
+  return packet;
+}
+
+// Inventory packet serialization
+
+std::vector<uint8_t> serialize(const InventoryUpdatePacket& packet) {
+  std::vector<uint8_t> buffer;
+
+  writeUint8(buffer, static_cast<uint8_t>(packet.type));
+  writeUint32(buffer, packet.playerId);
+
+  // Serialize inventory (20 slots)
+  for (int i = 0; i < 20; i++) {
+    writeUint32(buffer, packet.inventory[i].itemId);
+    writeInt32(buffer, packet.inventory[i].quantity);
+  }
+
+  // Serialize equipment (2 slots)
+  for (int i = 0; i < 2; i++) {
+    writeUint32(buffer, packet.equipment[i].itemId);
+    writeInt32(buffer, packet.equipment[i].quantity);
+  }
+
+  // 1 + 4 + (20 * 8) + (2 * 8) = 181 bytes
+  assert(buffer.size() == 181);
+  return buffer;
+}
+
+std::vector<uint8_t> serialize(const UseItemPacket& packet) {
+  std::vector<uint8_t> buffer;
+
+  writeUint8(buffer, static_cast<uint8_t>(packet.type));
+  writeUint8(buffer, packet.slotIndex);
+
+  assert(buffer.size() == 2);
+  return buffer;
+}
+
+std::vector<uint8_t> serialize(const EquipItemPacket& packet) {
+  std::vector<uint8_t> buffer;
+
+  writeUint8(buffer, static_cast<uint8_t>(packet.type));
+  writeUint8(buffer, packet.inventorySlot);
+  writeUint8(buffer, packet.equipmentSlot);
+
+  assert(buffer.size() == 3);
+  return buffer;
+}
+
+// Inventory packet deserialization
+
+InventoryUpdatePacket deserializeInventoryUpdate(const uint8_t* data,
+                                                 size_t size) {
+  assert(size >= 181);
+  assert(data[0] == static_cast<uint8_t>(PacketType::InventoryUpdate));
+
+  InventoryUpdatePacket packet;
+  size_t offset = 1;
+
+  packet.playerId = readUint32(data + offset);
+  offset += 4;
+
+  // Deserialize inventory (20 slots)
+  for (int i = 0; i < 20; i++) {
+    packet.inventory[i].itemId = readUint32(data + offset);
+    offset += 4;
+    packet.inventory[i].quantity = readInt32(data + offset);
+    offset += 4;
+  }
+
+  // Deserialize equipment (2 slots)
+  for (int i = 0; i < 2; i++) {
+    packet.equipment[i].itemId = readUint32(data + offset);
+    offset += 4;
+    packet.equipment[i].quantity = readInt32(data + offset);
+    offset += 4;
+  }
+
+  return packet;
+}
+
+UseItemPacket deserializeUseItem(const uint8_t* data, size_t size) {
+  assert(size >= 2);
+  assert(data[0] == static_cast<uint8_t>(PacketType::UseItem));
+
+  UseItemPacket packet;
+  packet.slotIndex = readUint8(data + 1);
+
+  return packet;
+}
+
+EquipItemPacket deserializeEquipItem(const uint8_t* data, size_t size) {
+  assert(size >= 3);
+  assert(data[0] == static_cast<uint8_t>(PacketType::EquipItem));
+
+  EquipItemPacket packet;
+  packet.inventorySlot = readUint8(data + 1);
+  packet.equipmentSlot = readUint8(data + 2);
 
   return packet;
 }

@@ -23,7 +23,9 @@
       "Bash(make dev:*)",
       "Bash(ctest:*)",
       "Bash(./build/Server:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(vcpkg search:*)",
+      "Bash(timeout 3 ./build/Client:*)"
     ]
   }
 }

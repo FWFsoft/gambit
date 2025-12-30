@@ -30,6 +30,9 @@ void GameLoop::run() {
     RenderEvent renderEvent{interpolation};
     EventBus::instance().publish(renderEvent);
 
+    // Swap buffers after all rendering is complete
+    EventBus::instance().publish(SwapBuffersEvent{});
+
     // Sleep to maintain 60 FPS
     auto endTime = std::chrono::steady_clock::now();
     float frameDuration =

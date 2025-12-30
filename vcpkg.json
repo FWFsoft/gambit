@@ -10,6 +10,7 @@
     "glad",
     "glm",
     "sdl2-image",
-    "sdl2-mixer"
+    "sdl2-mixer",
+    "imgui"
   ]
 }

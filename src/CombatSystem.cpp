@@ -22,6 +22,11 @@ CombatSystem::CombatSystem(NetworkClient* netClient,
 void CombatSystem::onAttackInput(const AttackInputEvent& e) {
   const Player& player = clientPrediction->getLocalPlayer();
 
+  // Dead players cannot attack
+  if (player.health <= 0) {
+    return;
+  }
+
   // Find nearest enemy within attack range
   uint32_t enemyId = findNearestEnemy(player.x, player.y, ATTACK_RANGE);
 

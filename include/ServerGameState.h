@@ -38,7 +38,10 @@ class ServerGameState {
   void onUpdate(const UpdateEvent& e);
 
   void processClientInput(ENetPeer* peer, const uint8_t* data, size_t size);
+  void processUseItem(ENetPeer* peer, const uint8_t* data, size_t size);
+  void processEquipItem(ENetPeer* peer, const uint8_t* data, size_t size);
   void broadcastStateUpdate();
+  void broadcastInventoryUpdate(uint32_t playerId);
 
   // Helper methods for player spawning
   Player createPlayer(uint32_t playerId);

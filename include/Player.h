@@ -8,8 +8,14 @@
 #include "Animatable.h"
 #include "AnimationController.h"
 #include "CollisionSystem.h"
+#include "Item.h"
 #include "MovementInput.h"
 #include "config/PlayerConfig.h"
+
+constexpr int INVENTORY_SIZE = 20;
+constexpr int EQUIPMENT_WEAPON_SLOT = 0;
+constexpr int EQUIPMENT_ARMOR_SLOT = 1;
+constexpr int EQUIPMENT_SLOTS = 2;
 
 struct Player : public Animatable {
   uint32_t id;
@@ -21,6 +27,10 @@ struct Player : public Animatable {
   // Animation (shared_ptr allows Player to be copyable for remote
   // interpolation)
   std::shared_ptr<AnimationController> animationController;
+
+  // Inventory
+  ItemStack inventory[INVENTORY_SIZE];
+  ItemStack equipment[EQUIPMENT_SLOTS];  // [0] = weapon, [1] = armor
 
   // Server-only fields
   uint32_t lastInputSequence;
@@ -47,6 +57,32 @@ struct Player : public Animatable {
   // Helper methods
   bool isDead() const { return health <= 0.0f; }
   bool isAlive() const { return health > 0.0f; }
+
+  // Inventory helper methods
+  int findEmptySlot() const {
+    for (int i = 0; i < INVENTORY_SIZE; i++) {
+      if (inventory[i].isEmpty()) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  int findItemStack(uint32_t itemId) const {
+    for (int i = 0; i < INVENTORY_SIZE; i++) {
+      if (inventory[i].itemId == itemId && !inventory[i].isEmpty()) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  bool hasEquippedWeapon() const {
+    return !equipment[EQUIPMENT_WEAPON_SLOT].isEmpty();
+  }
+  bool hasEquippedArmor() const {
+    return !equipment[EQUIPMENT_ARMOR_SLOT].isEmpty();
+  }
 
   // Animatable interface implementation
   AnimationController* getAnimationController() override {

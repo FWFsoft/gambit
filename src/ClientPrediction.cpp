@@ -2,6 +2,7 @@
 
 #include <cmath>
 
+#include "ItemRegistry.h"
 #include "Logger.h"
 #include "NetworkClient.h"
 #include "config/PlayerConfig.h"
@@ -110,6 +111,23 @@ void ClientPrediction::onNetworkPacketReceived(
       // Clear input history since we teleported
       inputHistory.clear();
       // Position and health will be reconciled via StateUpdate packets
+    }
+  } else if (type == PacketType::InventoryUpdate) {
+    InventoryUpdatePacket packet = deserializeInventoryUpdate(e.data, e.size);
+    if (packet.playerId == localPlayerId) {
+      // Update local player inventory
+      for (int i = 0; i < INVENTORY_SIZE; i++) {
+        localPlayer.inventory[i].itemId = packet.inventory[i].itemId;
+        localPlayer.inventory[i].quantity = packet.inventory[i].quantity;
+      }
+
+      // Update local player equipment
+      for (int i = 0; i < EQUIPMENT_SLOTS; i++) {
+        localPlayer.equipment[i].itemId = packet.equipment[i].itemId;
+        localPlayer.equipment[i].quantity = packet.equipment[i].quantity;
+      }
+
+      Logger::info("Inventory updated from server");
     }
   }
 }
