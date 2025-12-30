@@ -34,6 +34,10 @@ struct Enemy : public Animatable {
   // Target tracking
   uint32_t targetPlayerId;  // Player being chased/attacked (0 = no target)
 
+  // Respawn tracking
+  uint32_t spawnIndex;  // Which spawn point this enemy came from
+  float deathTime;      // Timestamp when enemy died (milliseconds)
+
   // Animation
   AnimationController animController;
 
@@ -63,5 +67,7 @@ struct Enemy : public Animatable {
         detectionRange(200.0f),
         speed(100.0f),
         lastAttackTime(0.0f),
-        targetPlayerId(0) {}
+        targetPlayerId(0),
+        spawnIndex(0),
+        deathTime(0.0f) {}
 };

@@ -13,7 +13,8 @@ EnemySystem::EnemySystem(const std::vector<EnemySpawn>& spawns)
 }
 
 void EnemySystem::spawnAllEnemies() {
-  for (const auto& spawn : spawns) {
+  for (size_t i = 0; i < spawns.size(); ++i) {
+    const auto& spawn = spawns[i];
     Enemy enemy;
     enemy.id = nextEnemyId++;
     enemy.type = spawn.type;
@@ -22,6 +23,7 @@ void EnemySystem::spawnAllEnemies() {
     enemy.y = spawn.y;
     enemy.vx = 0.0f;
     enemy.vy = 0.0f;
+    enemy.spawnIndex = static_cast<uint32_t>(i);
 
     // Set stats based on type (POC: only Slime)
     if (spawn.type == EnemyType::Slime) {
@@ -51,15 +53,33 @@ void EnemySystem::update(float deltaTime,
   accumulatedTime += deltaTime * 1000.0f;
 
   for (auto& [id, enemy] : enemies) {
-    // Skip dead enemies (they'll be cleaned up later)
+    // Check if dead enemy should respawn (5 second delay)
     if (enemy.state == EnemyState::Dead) {
-      continue;
+      constexpr float RESPAWN_DELAY_MS = 5000.0f;
+
+      if (accumulatedTime - enemy.deathTime >= RESPAWN_DELAY_MS) {
+        // Respawn enemy at original spawn point
+        assert(enemy.spawnIndex < spawns.size() && "Invalid spawn index");
+        const EnemySpawn& spawn = spawns[enemy.spawnIndex];
+
+        enemy.x = spawn.x;
+        enemy.y = spawn.y;
+        enemy.vx = 0.0f;
+        enemy.vy = 0.0f;
+        enemy.health = enemy.maxHealth;
+        enemy.state = EnemyState::Idle;
+        enemy.targetPlayerId = 0;
+        enemy.deathTime = 0.0f;
+
+        Logger::info("Enemy " + std::to_string(id) + " respawned at spawn " +
+                     std::to_string(enemy.spawnIndex));
+      }
+
+      continue;  // Don't update AI for dead enemies
     }
 
     updateEnemyAI(enemy, players, deltaTime);
   }
-
-  // TODO: Clean up dead enemies after delay (Phase 3)
 }
 
 void EnemySystem::updateEnemyAI(Enemy& enemy,
@@ -256,6 +276,7 @@ void EnemySystem::damageEnemy(uint32_t enemyId, float damage,
     enemy.state = EnemyState::Dead;
     enemy.vx = 0.0f;
     enemy.vy = 0.0f;
+    enemy.deathTime = accumulatedTime;
 
     Logger::info("Enemy " + std::to_string(enemyId) + " killed by player " +
                  std::to_string(attackerId));
