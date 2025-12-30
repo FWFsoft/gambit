@@ -54,9 +54,11 @@ void EnemySystem::update(float deltaTime,
   accumulatedTime += deltaTime * 1000.0f;
 
   for (auto& [id, enemy] : enemies) {
-    // Check if dead enemy should respawn (random 1-5 second delay)
+    // Check if dead enemy should respawn (random delay)
     if (enemy.state == EnemyState::Dead) {
       if (accumulatedTime - enemy.deathTime >= enemy.respawnDelay) {
+        Logger::info("Enemy time" + std::to_string(enemy.deathTime) +
+                     " respawn delay " + std::to_string(enemy.respawnDelay));
         // Respawn enemy at original spawn point
         assert(enemy.spawnIndex < spawns.size() && "Invalid spawn index");
         const EnemySpawn& spawn = spawns[enemy.spawnIndex];
@@ -278,10 +280,9 @@ void EnemySystem::damageEnemy(uint32_t enemyId, float damage,
     enemy.vy = 0.0f;
     enemy.deathTime = accumulatedTime;
 
-    // Generate random respawn delay (1-5 seconds)
     static std::random_device rd;
     static std::mt19937 gen(rd());
-    std::uniform_real_distribution<float> dist(1000.0f, 5000.0f);
+    std::uniform_real_distribution<float> dist(5000.0f, 10000.0f);
     enemy.respawnDelay = dist(gen);
 
     Logger::info("Enemy " + std::to_string(enemyId) + " killed by player " +

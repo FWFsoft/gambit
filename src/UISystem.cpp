@@ -15,6 +15,7 @@
 #include "Texture.h"
 #include "TextureManager.h"
 #include "Window.h"
+#include "config/GameplayConfig.h"
 #include "config/PlayerConfig.h"
 
 UISystem::UISystem(Window* window, ClientPrediction* clientPrediction,
@@ -117,6 +118,10 @@ void UISystem::render() {
       break;
     case GameState::Playing:
       renderHUD();
+      // Show death screen overlay if player is dead
+      if (clientPrediction && clientPrediction->getLocalPlayer().isDead()) {
+        renderDeathScreen();
+      }
       break;
     case GameState::Paused:
       renderHUD();
@@ -355,6 +360,60 @@ void UISystem::renderPauseMenu() {
   // Quit button
   if (ImGui::Button("Quit", ImVec2(-1, 40))) {
     window->close();
+  }
+
+  ImGui::End();
+}
+
+void UISystem::renderDeathScreen() {
+  // Dark red overlay (darker and more dramatic than pause)
+  ImGui::SetNextWindowPos(ImVec2(0, 0));
+  ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+  ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.2f, 0.0f, 0.0f, 0.7f));
+  ImGui::Begin("DeathOverlay", nullptr,
+               ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                   ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoInputs);
+  ImGui::End();
+  ImGui::PopStyleColor();
+
+  // Centered death message
+  ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+  ImGui::SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+  ImGui::SetNextWindowBgAlpha(0.0f);
+
+  ImGui::Begin("DeathMessage", nullptr,
+               ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                   ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize);
+
+  // Calculate respawn time remaining
+  const Player& localPlayer = clientPrediction->getLocalPlayer();
+  float deathDuration = currentTime - localPlayer.deathTime / 1000.0f;
+  float respawnDelay = Config::Gameplay::PLAYER_RESPAWN_DELAY / 1000.0f;
+  float timeRemaining = std::max(0.0f, respawnDelay - deathDuration);
+
+  // Pulsing "YOU DIED" text in red
+  float pulseAlpha = 0.7f + 0.3f * sinf(currentTime * 4.0f);
+  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.2f, 0.2f, pulseAlpha));
+
+  // Large font for dramatic effect
+  ImGui::SetWindowFontScale(3.0f);
+  ImGui::Text("YOU DIED");
+  ImGui::SetWindowFontScale(1.0f);
+
+  ImGui::PopStyleColor();
+
+  ImGui::Spacing();
+  ImGui::Spacing();
+
+  // Respawn countdown in white
+  if (timeRemaining > 0.0f) {
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 0.9f));
+    ImGui::Text("Respawning in %.1f...", timeRemaining);
+    ImGui::PopStyleColor();
+  } else {
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 1.0f, 0.5f, 0.9f));
+    ImGui::Text("Respawning...");
+    ImGui::PopStyleColor();
   }
 
   ImGui::End();

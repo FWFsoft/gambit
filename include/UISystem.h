@@ -37,6 +37,7 @@ class UISystem {
   void renderHUD();
   void renderPauseMenu();
   void renderInventory();
+  void renderDeathScreen();
 
   // UI interaction handlers
   void handleInventorySlotClick(int slotIndex, const ItemDefinition& item);
