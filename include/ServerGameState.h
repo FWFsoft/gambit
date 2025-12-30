@@ -9,6 +9,7 @@
 #include "Player.h"
 #include "PlayerSpawn.h"
 #include "WorldConfig.h"
+#include "WorldItem.h"
 
 class NetworkServer;
 class CollisionSystem;
@@ -32,6 +33,10 @@ class ServerGameState {
   uint32_t serverTick;
   std::unique_ptr<EnemySystem> enemySystem;
 
+  // World item management
+  std::unordered_map<uint32_t, WorldItem> worldItems;
+  uint32_t nextWorldItemId;
+
   void onClientConnected(const ClientConnectedEvent& e);
   void onClientDisconnected(const ClientDisconnectedEvent& e);
   void onNetworkPacketReceived(const NetworkPacketReceivedEvent& e);
@@ -52,4 +57,10 @@ class ServerGameState {
   void checkPlayerDeaths();
   void handlePlayerRespawns();
   void respawnPlayer(Player& player);
+
+  // World item management methods
+  void checkEnemyLootDrops();
+  void spawnWorldItem(uint32_t itemId, float x, float y);
+  void processItemPickupRequest(ENetPeer* peer, const uint8_t* data,
+                                size_t size);
 };

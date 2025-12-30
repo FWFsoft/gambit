@@ -483,3 +483,84 @@ EquipItemPacket deserializeEquipItem(const uint8_t* data, size_t size) {
 
   return packet;
 }
+
+// World item packet serialization
+
+std::vector<uint8_t> serialize(const ItemSpawnedPacket& packet) {
+  std::vector<uint8_t> buffer;
+
+  writeUint8(buffer, static_cast<uint8_t>(packet.type));
+  writeUint32(buffer, packet.worldItemId);
+  writeUint32(buffer, packet.itemId);
+  writeFloat(buffer, packet.x);
+  writeFloat(buffer, packet.y);
+
+  assert(buffer.size() == 17);
+  return buffer;
+}
+
+std::vector<uint8_t> serialize(const ItemPickupRequestPacket& packet) {
+  std::vector<uint8_t> buffer;
+
+  writeUint8(buffer, static_cast<uint8_t>(packet.type));
+  writeUint32(buffer, packet.worldItemId);
+
+  assert(buffer.size() == 5);
+  return buffer;
+}
+
+std::vector<uint8_t> serialize(const ItemPickedUpPacket& packet) {
+  std::vector<uint8_t> buffer;
+
+  writeUint8(buffer, static_cast<uint8_t>(packet.type));
+  writeUint32(buffer, packet.worldItemId);
+  writeUint32(buffer, packet.playerId);
+
+  assert(buffer.size() == 9);
+  return buffer;
+}
+
+// World item packet deserialization
+
+ItemSpawnedPacket deserializeItemSpawned(const uint8_t* data, size_t size) {
+  assert(size >= 17);
+  assert(data[0] == static_cast<uint8_t>(PacketType::ItemSpawned));
+
+  ItemSpawnedPacket packet;
+  size_t offset = 1;
+
+  packet.worldItemId = readUint32(data + offset);
+  offset += 4;
+  packet.itemId = readUint32(data + offset);
+  offset += 4;
+  packet.x = readFloat(data + offset);
+  offset += 4;
+  packet.y = readFloat(data + offset);
+
+  return packet;
+}
+
+ItemPickupRequestPacket deserializeItemPickupRequest(const uint8_t* data,
+                                                     size_t size) {
+  assert(size >= 5);
+  assert(data[0] == static_cast<uint8_t>(PacketType::ItemPickupRequest));
+
+  ItemPickupRequestPacket packet;
+  packet.worldItemId = readUint32(data + 1);
+
+  return packet;
+}
+
+ItemPickedUpPacket deserializeItemPickedUp(const uint8_t* data, size_t size) {
+  assert(size >= 9);
+  assert(data[0] == static_cast<uint8_t>(PacketType::ItemPickedUp));
+
+  ItemPickedUpPacket packet;
+  size_t offset = 1;
+
+  packet.worldItemId = readUint32(data + offset);
+  offset += 4;
+  packet.playerId = readUint32(data + offset);
+
+  return packet;
+}

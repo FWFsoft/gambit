@@ -128,20 +128,25 @@ void RenderSystem::onRender(const RenderEvent& e) {
   // Collect all entities with their depths for sorting
   struct EntityToRender {
     float depth;
-    bool isPlayer;
+    enum Type { Player, Enemy, WorldItem } type;
     union {
-      const Player* player;
-      const Enemy* enemy;
+      const ::Player* player;
+      const ::Enemy* enemy;
+      const ::WorldItem* worldItem;
     };
   };
 
+  // Get world items from client prediction
+  const auto& worldItems = clientPrediction->getWorldItems();
+
   std::vector<EntityToRender> entitiesToRender;
-  entitiesToRender.reserve(allPlayers.size() + allEnemies.size());
+  entitiesToRender.reserve(allPlayers.size() + allEnemies.size() +
+                           worldItems.size());
 
   for (const Player& player : allPlayers) {
     EntityToRender entity;
     entity.depth = player.x + player.y;
-    entity.isPlayer = true;
+    entity.type = EntityToRender::Player;
     entity.player = &player;
     entitiesToRender.push_back(entity);
   }
@@ -149,8 +154,16 @@ void RenderSystem::onRender(const RenderEvent& e) {
   for (const Enemy& enemy : allEnemies) {
     EntityToRender entity;
     entity.depth = enemy.x + enemy.y;
-    entity.isPlayer = false;
+    entity.type = EntityToRender::Enemy;
     entity.enemy = &enemy;
+    entitiesToRender.push_back(entity);
+  }
+
+  for (const auto& [id, worldItem] : worldItems) {
+    EntityToRender entity;
+    entity.depth = worldItem.x + worldItem.y;
+    entity.type = EntityToRender::WorldItem;
+    entity.worldItem = &worldItem;
     entitiesToRender.push_back(entity);
   }
 
@@ -164,10 +177,12 @@ void RenderSystem::onRender(const RenderEvent& e) {
   tileRenderer->render(*tiledMap, [&](float minDepth, float maxDepth) {
     // Render all entities in sorted order
     for (const auto& entity : entitiesToRender) {
-      if (entity.isPlayer) {
+      if (entity.type == EntityToRender::Player) {
         drawPlayer(*entity.player);
-      } else {
+      } else if (entity.type == EntityToRender::Enemy) {
         drawEnemy(*entity.enemy);
+      } else if (entity.type == EntityToRender::WorldItem) {
+        drawWorldItem(*entity.worldItem);
       }
     }
   });
@@ -244,6 +259,20 @@ void RenderSystem::drawEnemy(const Enemy& enemy) {
 
   // Render health bar
   drawHealthBar(screenX, screenY - 20, enemy.health, enemy.maxHealth);
+}
+
+void RenderSystem::drawWorldItem(const WorldItem& worldItem) {
+  int screenX, screenY;
+  camera->worldToScreen(worldItem.x, worldItem.y, screenX, screenY);
+
+  // Render as 16x16 gold square (placeholder for now)
+  constexpr float ITEM_SIZE = 16.0f;
+  glm::vec4 color(1.0f, 0.84f, 0.0f, 1.0f);  // Gold color
+
+  spriteRenderer->draw(*whitePixelTexture,
+                       static_cast<float>(screenX - ITEM_SIZE / 2),
+                       static_cast<float>(screenY - ITEM_SIZE / 2), ITEM_SIZE,
+                       ITEM_SIZE, color.r, color.g, color.b, color.a);
 }
 
 void RenderSystem::drawHealthBar(int x, int y, float health, float maxHealth) {

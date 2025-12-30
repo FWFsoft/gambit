@@ -58,6 +58,11 @@ struct ClientDisconnectedEvent {
   uint32_t clientId;
 };
 
+struct ItemPickedUpEvent {
+  uint32_t itemId;  // The ItemDefinition ID that was picked up
+  uint32_t quantity;
+};
+
 // Global singleton event bus for pub-sub architecture
 class EventBus {
  public:

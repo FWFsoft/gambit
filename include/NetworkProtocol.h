@@ -17,7 +17,10 @@ enum class PacketType : uint8_t {
   PlayerRespawned = 10,
   InventoryUpdate = 11,
   UseItem = 12,
-  EquipItem = 13
+  EquipItem = 13,
+  ItemSpawned = 14,        // Server → Client (broadcast)
+  ItemPickupRequest = 15,  // Client → Server
+  ItemPickedUp = 16        // Server → Client (broadcast)
 };
 
 struct ClientInputPacket {
@@ -127,6 +130,26 @@ struct EquipItemPacket {
   uint8_t equipmentSlot;  // 0 = weapon, 1 = armor (255 = unequip)
 };
 
+// World item packets
+
+struct ItemSpawnedPacket {
+  PacketType type = PacketType::ItemSpawned;
+  uint32_t worldItemId;  // Unique ID for this world item instance
+  uint32_t itemId;       // ItemDefinition ID
+  float x, y;            // World position
+};
+
+struct ItemPickupRequestPacket {
+  PacketType type = PacketType::ItemPickupRequest;
+  uint32_t worldItemId;  // Which world item to pick up
+};
+
+struct ItemPickedUpPacket {
+  PacketType type = PacketType::ItemPickedUp;
+  uint32_t worldItemId;  // Item that was picked up
+  uint32_t playerId;     // Who picked it up
+};
+
 // Serialization functions
 std::vector<uint8_t> serialize(const ClientInputPacket& packet);
 std::vector<uint8_t> serialize(const StateUpdatePacket& packet);
@@ -141,6 +164,9 @@ std::vector<uint8_t> serialize(const EnemyDiedPacket& packet);
 std::vector<uint8_t> serialize(const InventoryUpdatePacket& packet);
 std::vector<uint8_t> serialize(const UseItemPacket& packet);
 std::vector<uint8_t> serialize(const EquipItemPacket& packet);
+std::vector<uint8_t> serialize(const ItemSpawnedPacket& packet);
+std::vector<uint8_t> serialize(const ItemPickupRequestPacket& packet);
+std::vector<uint8_t> serialize(const ItemPickedUpPacket& packet);
 
 // Deserialization functions
 ClientInputPacket deserializeClientInput(const uint8_t* data, size_t size);
@@ -159,6 +185,10 @@ InventoryUpdatePacket deserializeInventoryUpdate(const uint8_t* data,
                                                  size_t size);
 UseItemPacket deserializeUseItem(const uint8_t* data, size_t size);
 EquipItemPacket deserializeEquipItem(const uint8_t* data, size_t size);
+ItemSpawnedPacket deserializeItemSpawned(const uint8_t* data, size_t size);
+ItemPickupRequestPacket deserializeItemPickupRequest(const uint8_t* data,
+                                                     size_t size);
+ItemPickedUpPacket deserializeItemPickedUp(const uint8_t* data, size_t size);
 
 // Helper functions for binary I/O
 void writeUint32(std::vector<uint8_t>& buffer, uint32_t value);

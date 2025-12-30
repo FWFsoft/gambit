@@ -91,7 +91,7 @@ int main() {
                             &enemyInterpolation, &camera, &map,
                             &collisionDebugRenderer, &musicZoneDebugRenderer);
 
-  UISystem uiSystem(&window, &clientPrediction);
+  UISystem uiSystem(&window, &clientPrediction, &client);
 
   // Load local player animations
   Player& localPlayer = clientPrediction.getLocalPlayerMutable();
@@ -119,6 +119,34 @@ int main() {
 
     // Process network events
     client.run();
+
+    // Auto-pickup detection for nearby world items
+    GameState currentState = GameStateManager::instance().getCurrentState();
+    if (currentState == GameState::Playing) {
+      const Player& localPlayer = clientPrediction.getLocalPlayer();
+
+      if (localPlayer.isAlive()) {
+        const auto& worldItems = clientPrediction.getWorldItems();
+        constexpr float PICKUP_RADIUS = 32.0f;
+
+        for (const auto& [worldItemId, worldItem] : worldItems) {
+          float dx = localPlayer.x - worldItem.x;
+          float dy = localPlayer.y - worldItem.y;
+          float distanceSquared = dx * dx + dy * dy;
+
+          if (distanceSquared <= PICKUP_RADIUS * PICKUP_RADIUS) {
+            // Send pickup request to server
+            ItemPickupRequestPacket packet;
+            packet.worldItemId = worldItemId;
+            client.send(serialize(packet));
+
+            Logger::debug("Requesting pickup of world item " +
+                          std::to_string(worldItemId));
+            break;  // Only one item per frame
+          }
+        }
+      }
+    }
 
     // Stop the game loop if window is closed
     if (!window.isOpen()) {

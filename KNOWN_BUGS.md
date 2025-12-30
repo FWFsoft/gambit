@@ -2,10 +2,10 @@
 
 ## Rendering Issues
 
-1. **Tile Jitteriness** - Significant jitter/stuttering visible when moving in cardinal directions (North, South, East, West)
-   - **Location**: Tile rendering system
-   - **Impact**: Visual quality degradation during movement
-   - **Status**: Under investigation
+1. **Enemies not respawning** - Enemies don't seem to respawn
+  - **Location**: Probably game state
+  - **Impact**: Makes testing a bit difficult
+  - **Status**: Needs triaging
 
 ## Future Bug Tracking
 

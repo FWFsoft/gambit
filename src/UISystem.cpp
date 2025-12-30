@@ -8,16 +8,36 @@
 #include "GameStateManager.h"
 #include "ItemRegistry.h"
 #include "Logger.h"
+#include "NetworkClient.h"
 #include "Player.h"
 #include "Window.h"
+#include "config/PlayerConfig.h"
 
-UISystem::UISystem(Window* window, ClientPrediction* clientPrediction)
-    : window(window), clientPrediction(clientPrediction), showSettings(false) {
+UISystem::UISystem(Window* window, ClientPrediction* clientPrediction,
+                   NetworkClient* client)
+    : window(window),
+      clientPrediction(clientPrediction),
+      client(client),
+      showSettings(false),
+      currentTime(0.0f) {
   // Load settings
   settings.load(Settings::DEFAULT_FILENAME);
 
   EventBus::instance().subscribe<RenderEvent>(
       [this](const RenderEvent& e) { onRender(e); });
+
+  EventBus::instance().subscribe<ItemPickedUpEvent>(
+      [this](const ItemPickedUpEvent& e) { onItemPickedUp(e); });
+
+  EventBus::instance().subscribe<UpdateEvent>([this](const UpdateEvent& e) {
+    currentTime += e.deltaTime / 1000.0f;  // Convert ms to seconds
+
+    // Remove old notifications (after 3 seconds)
+    while (!notifications.empty() &&
+           currentTime - notifications.front().timestamp > 3.0f) {
+      notifications.pop_front();
+    }
+  });
 
   Logger::info("UISystem initialized");
 }
@@ -53,6 +73,11 @@ void UISystem::render() {
     case GameState::Inventory:
       renderInventory();
       break;
+  }
+
+  // Render pickup notifications (always on top, except in main menu)
+  if (currentState != GameState::MainMenu) {
+    renderNotifications();
   }
 
   // Render ImGui
@@ -285,7 +310,19 @@ void UISystem::renderInventory() {
         if (item) {
           std::string label =
               item->name + "\nx" + std::to_string(stack.quantity);
-          ImGui::Button(label.c_str(), ImVec2(slotSize, slotSize));
+          bool clicked =
+              ImGui::Button(label.c_str(), ImVec2(slotSize, slotSize));
+
+          // Handle click-to-equip
+          if (clicked) {
+            handleInventorySlotClick(slotIndex, *item);
+          }
+
+          // Handle double-click-to-use for consumables
+          if (item->type == ItemType::Consumable && ImGui::IsItemHovered() &&
+              ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+            handleConsumableUse(slotIndex, *item);
+          }
 
           // Tooltip on hover
           if (ImGui::IsItemHovered()) {
@@ -361,7 +398,10 @@ void UISystem::renderInventory() {
   } else {
     const ItemDefinition* weapon = registry.getItem(weaponSlot.itemId);
     if (weapon) {
-      ImGui::Button(weapon->name.c_str(), ImVec2(200, 80));
+      bool clicked = ImGui::Button(weapon->name.c_str(), ImVec2(200, 80));
+      if (clicked) {
+        handleEquipmentSlotClick(EQUIPMENT_WEAPON_SLOT);
+      }
       if (ImGui::IsItemHovered()) {
         ImGui::SetNextWindowSize(ImVec2(250, 0), ImGuiCond_Always);
         ImGui::BeginTooltip();
@@ -382,7 +422,10 @@ void UISystem::renderInventory() {
   } else {
     const ItemDefinition* armor = registry.getItem(armorSlot.itemId);
     if (armor) {
-      ImGui::Button(armor->name.c_str(), ImVec2(200, 80));
+      bool clicked = ImGui::Button(armor->name.c_str(), ImVec2(200, 80));
+      if (clicked) {
+        handleEquipmentSlotClick(EQUIPMENT_ARMOR_SLOT);
+      }
       if (ImGui::IsItemHovered()) {
         ImGui::SetNextWindowSize(ImVec2(250, 0), ImGuiCond_Always);
         ImGui::BeginTooltip();
@@ -427,6 +470,135 @@ void UISystem::renderInventory() {
   ImGui::Text("Max Health: %.0f (+%d)", localPlayer.health, totalHealthBonus);
 
   ImGui::Columns(1);
+
+  ImGui::End();
+}
+
+// UI interaction handlers
+
+void UISystem::handleInventorySlotClick(int slotIndex,
+                                        const ItemDefinition& item) {
+  uint8_t equipmentSlot = 255;
+
+  if (item.type == ItemType::Weapon) {
+    equipmentSlot = EQUIPMENT_WEAPON_SLOT;
+  } else if (item.type == ItemType::Armor) {
+    equipmentSlot = EQUIPMENT_ARMOR_SLOT;
+  } else if (item.type == ItemType::Consumable) {
+    Logger::info("Double-click consumable items to use them");
+    return;
+  }
+
+  EquipItemPacket packet;
+  packet.inventorySlot = static_cast<uint8_t>(slotIndex);
+  packet.equipmentSlot = equipmentSlot;
+
+  client->send(serialize(packet));
+
+  Logger::info("Equipping " + item.name);
+}
+
+void UISystem::handleEquipmentSlotClick(int equipmentSlotIndex) {
+  const Player& localPlayer = clientPrediction->getLocalPlayer();
+  const ItemStack& equipSlot = localPlayer.equipment[equipmentSlotIndex];
+
+  if (equipSlot.isEmpty()) {
+    return;
+  }
+
+  int emptySlot = localPlayer.findEmptySlot();
+  if (emptySlot == -1) {
+    Logger::info("Inventory full, cannot unequip item");
+    return;
+  }
+
+  EquipItemPacket packet;
+  packet.inventorySlot = static_cast<uint8_t>(equipmentSlotIndex);
+  packet.equipmentSlot = 255;  // Unequip mode
+
+  client->send(serialize(packet));
+
+  const ItemRegistry& registry = ItemRegistry::instance();
+  const ItemDefinition* item = registry.getItem(equipSlot.itemId);
+  if (item) {
+    Logger::info("Unequipping " + item->name);
+  }
+}
+
+void UISystem::handleConsumableUse(int slotIndex, const ItemDefinition& item) {
+  // Check if healing item and already at max health
+  const Player& localPlayer = clientPrediction->getLocalPlayer();
+  if (item.healAmount > 0 && localPlayer.health >= Config::Player::MAX_HEALTH) {
+    // Show notification that you're already at full health
+    Notification notification;
+    notification.message = "Already at full health!";
+    notification.timestamp = currentTime;
+    notifications.push_back(notification);
+
+    Logger::info("Cannot use " + item.name + " - already at full health");
+    return;
+  }
+
+  UseItemPacket packet;
+  packet.slotIndex = static_cast<uint8_t>(slotIndex);
+
+  client->send(serialize(packet));
+
+  Logger::info("Using " + item.name);
+}
+
+void UISystem::onItemPickedUp(const ItemPickedUpEvent& e) {
+  const ItemRegistry& registry = ItemRegistry::instance();
+  const ItemDefinition* item = registry.getItem(e.itemId);
+
+  if (item) {
+    std::string message = "+ " + item->name;
+    if (e.quantity > 1) {
+      message += " x" + std::to_string(e.quantity);
+    }
+
+    Notification notification;
+    notification.message = message;
+    notification.timestamp = currentTime;
+    notifications.push_back(notification);
+
+    // Keep only last 5 notifications
+    while (notifications.size() > 5) {
+      notifications.pop_front();
+    }
+  }
+}
+
+void UISystem::renderNotifications() {
+  if (notifications.empty()) {
+    return;
+  }
+
+  // Render notifications in bottom-right corner
+  ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x - 10,
+                                 ImGui::GetIO().DisplaySize.y - 10),
+                          ImGuiCond_Always, ImVec2(1.0f, 1.0f));
+  ImGui::SetNextWindowBgAlpha(0.7f);
+
+  ImGui::Begin("Notifications", nullptr,
+               ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                   ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
+                   ImGuiWindowFlags_NoInputs |
+                   ImGuiWindowFlags_AlwaysAutoResize);
+
+  // Render notifications from oldest to newest
+  for (const auto& notification : notifications) {
+    float age = currentTime - notification.timestamp;
+    float alpha = 1.0f;
+
+    // Fade out in last 0.5 seconds
+    if (age > 2.5f) {
+      alpha = 1.0f - ((age - 2.5f) / 0.5f);
+    }
+
+    ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.6f, alpha), "%s",
+                       notification.message.c_str());
+  }
 
   ImGui::End();
 }

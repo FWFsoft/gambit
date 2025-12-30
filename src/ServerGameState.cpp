@@ -21,7 +21,8 @@ ServerGameState::ServerGameState(NetworkServer* server,
       worldHeight(world.height),
       collisionSystem(world.collisionSystem),
       playerSpawns(nullptr),
-      serverTick(0) {
+      serverTick(0),
+      nextWorldItemId(1) {
   // Initialize player spawns
   if (world.tiledMap != nullptr && !world.tiledMap->getPlayerSpawns().empty()) {
     playerSpawns = &world.tiledMap->getPlayerSpawns();
@@ -153,6 +154,10 @@ void ServerGameState::onNetworkPacketReceived(
       processEquipItem(e.peer, e.data, e.size);
       break;
 
+    case PacketType::ItemPickupRequest:
+      processItemPickupRequest(e.peer, e.data, e.size);
+      break;
+
     default:
       Logger::info("Unknown packet type: " +
                    std::to_string(static_cast<int>(type)));
@@ -194,6 +199,9 @@ void ServerGameState::processClientInput(ENetPeer* peer, const uint8_t* data,
 
 void ServerGameState::onUpdate(const UpdateEvent& e) {
   serverTick++;
+
+  // Check for enemy deaths and spawn loot (BEFORE update clears the vector)
+  checkEnemyLootDrops();
 
   // Update enemy AI
   if (enemySystem) {
@@ -299,6 +307,18 @@ Player ServerGameState::createPlayer(uint32_t playerId) {
   if (!findValidSpawnPosition(player.x, player.y)) {
     Logger::error("Failed to find valid spawn position");
   }
+
+  // Add test items to inventory for demonstration
+  player.inventory[0] = ItemStack(1, 5);    // 5x Health Potion
+  player.inventory[1] = ItemStack(2, 3);    // 3x Greater Health Potion
+  player.inventory[2] = ItemStack(3, 1);    // Iron Sword
+  player.inventory[3] = ItemStack(6, 1);    // Leather Armor
+  player.inventory[5] = ItemStack(4, 1);    // Steel Sword
+  player.inventory[10] = ItemStack(9, 10);  // 10x Mana Potion
+
+  // Equip items
+  player.equipment[EQUIPMENT_WEAPON_SLOT] = ItemStack(5, 1);  // Dragon Sword
+  player.equipment[EQUIPMENT_ARMOR_SLOT] = ItemStack(7, 1);   // Iron Armor
 
   return player;
 }
@@ -475,6 +495,13 @@ void ServerGameState::processUseItem(ENetPeer* peer, const uint8_t* data,
 
   // Apply consumable effect (healing)
   if (item->healAmount > 0) {
+    // Don't allow using healing items at max health
+    if (player.health >= Config::Player::MAX_HEALTH) {
+      Logger::info("Player " + std::to_string(playerId) + " tried to use " +
+                   item->name + " at full health");
+      return;
+    }
+
     float oldHealth = player.health;
     player.health =
         std::min(player.health + item->healAmount, Config::Player::MAX_HEALTH);
@@ -628,4 +655,155 @@ void ServerGameState::broadcastInventoryUpdate(uint32_t playerId) {
   }
 
   server->broadcastPacket(serialize(packet));
+}
+
+// World item management
+
+void ServerGameState::checkEnemyLootDrops() {
+  if (!enemySystem) {
+    return;
+  }
+
+  const auto& deaths = enemySystem->getDiedThisFrame();
+  for (const auto& death : deaths) {
+    // Simple loot table: All enemies drop Health Potion (itemId=1)
+    uint32_t lootItemId = 1;
+
+    const auto& enemies = enemySystem->getEnemies();
+    auto enemyIt = enemies.find(death.enemyId);
+    if (enemyIt != enemies.end()) {
+      const Enemy& enemy = enemyIt->second;
+      spawnWorldItem(lootItemId, enemy.x, enemy.y);
+
+      Logger::info("Enemy " + std::to_string(death.enemyId) + " dropped item " +
+                   std::to_string(lootItemId));
+    }
+  }
+}
+
+void ServerGameState::spawnWorldItem(uint32_t itemId, float x, float y) {
+  uint32_t worldItemId = nextWorldItemId++;
+
+  WorldItem worldItem(worldItemId, itemId, x, y,
+                      static_cast<float>(serverTick));
+  worldItems[worldItemId] = worldItem;
+
+  // Broadcast spawn to all clients
+  ItemSpawnedPacket packet;
+  packet.worldItemId = worldItemId;
+  packet.itemId = itemId;
+  packet.x = x;
+  packet.y = y;
+
+  server->broadcastPacket(serialize(packet));
+
+  Logger::debug("Spawned world item " + std::to_string(worldItemId) + " at (" +
+                std::to_string(x) + ", " + std::to_string(y) + ")");
+}
+
+void ServerGameState::processItemPickupRequest(ENetPeer* peer,
+                                               const uint8_t* data,
+                                               size_t size) {
+  if (size < 5) {
+    Logger::info("Invalid ItemPickupRequest packet size");
+    return;
+  }
+
+  ItemPickupRequestPacket packet = deserializeItemPickupRequest(data, size);
+
+  // Get player ID
+  auto peerIt = peerToPlayerId.find(peer);
+  if (peerIt == peerToPlayerId.end()) {
+    Logger::info("ItemPickupRequest from unknown peer");
+    return;
+  }
+  uint32_t playerId = peerIt->second;
+
+  auto playerIt = players.find(playerId);
+  if (playerIt == players.end()) {
+    return;
+  }
+  Player& player = playerIt->second;
+
+  // Validate world item exists
+  auto itemIt = worldItems.find(packet.worldItemId);
+  if (itemIt == worldItems.end()) {
+    Logger::debug("World item " + std::to_string(packet.worldItemId) +
+                  " does not exist (already picked up?)");
+    return;
+  }
+  const WorldItem& worldItem = itemIt->second;
+
+  // Validate distance (anti-cheat)
+  constexpr float PICKUP_RADIUS = 32.0f;
+  float dx = player.x - worldItem.x;
+  float dy = player.y - worldItem.y;
+  float distanceSquared = dx * dx + dy * dy;
+
+  if (distanceSquared > PICKUP_RADIUS * PICKUP_RADIUS) {
+    Logger::info("Player " + std::to_string(playerId) + " too far from item " +
+                 std::to_string(packet.worldItemId));
+    return;
+  }
+
+  // Validate inventory space
+  int emptySlot = player.findEmptySlot();
+  if (emptySlot == -1) {
+    Logger::info("Player " + std::to_string(playerId) +
+                 " inventory full, cannot pick up item");
+    return;
+  }
+
+  const ItemDefinition* itemDef =
+      ItemRegistry::instance().getItem(worldItem.itemId);
+  if (!itemDef) {
+    Logger::error("Invalid item ID: " + std::to_string(worldItem.itemId));
+    return;
+  }
+
+  // Check for stacking (consumables)
+  if (itemDef->maxStackSize > 1) {
+    int existingSlot = player.findItemStack(worldItem.itemId);
+    if (existingSlot != -1) {
+      ItemStack& stack = player.inventory[existingSlot];
+      if (stack.quantity < itemDef->maxStackSize) {
+        stack.quantity++;
+
+        Logger::info("Player " + std::to_string(playerId) + " picked up " +
+                     itemDef->name + " (stacked to " +
+                     std::to_string(stack.quantity) + ")");
+
+        // Remove from world
+        worldItems.erase(packet.worldItemId);
+
+        // Broadcast pickup
+        ItemPickedUpPacket pickupPacket;
+        pickupPacket.worldItemId = packet.worldItemId;
+        pickupPacket.playerId = playerId;
+        server->broadcastPacket(serialize(pickupPacket));
+
+        // Update inventory
+        broadcastInventoryUpdate(playerId);
+        return;
+      }
+    }
+  }
+
+  // Add to inventory (new stack or non-stackable item)
+  player.inventory[emptySlot] = ItemStack(worldItem.itemId, 1);
+
+  Logger::info("Player " + std::to_string(playerId) + " picked up " +
+               itemDef->name);
+
+  // Remove from world
+  worldItems.erase(packet.worldItemId);
+
+  // Broadcast pickup
+  ItemPickedUpPacket pickupPacket;
+  pickupPacket.worldItemId = packet.worldItemId;
+  pickupPacket.playerId = playerId;
+  server->broadcastPacket(serialize(pickupPacket));
+
+  // Update inventory
+  broadcastInventoryUpdate(playerId);
 }

@@ -129,6 +129,35 @@ void ClientPrediction::onNetworkPacketReceived(
 
       Logger::info("Inventory updated from server");
     }
+  } else if (type == PacketType::ItemSpawned) {
+    ItemSpawnedPacket packet = deserializeItemSpawned(e.data, e.size);
+
+    WorldItem worldItem(packet.worldItemId, packet.itemId, packet.x, packet.y,
+                        0.0f);
+    worldItems[packet.worldItemId] = worldItem;
+
+    Logger::debug("World item " + std::to_string(packet.worldItemId) +
+                  " spawned");
+  } else if (type == PacketType::ItemPickedUp) {
+    ItemPickedUpPacket packet = deserializeItemPickedUp(e.data, e.size);
+
+    // Get item info before erasing
+    auto it = worldItems.find(packet.worldItemId);
+    if (it != worldItems.end()) {
+      uint32_t itemId = it->second.itemId;
+      worldItems.erase(it);
+
+      // If local player picked it up, show notification
+      if (packet.playerId == localPlayerId) {
+        ItemPickedUpEvent event;
+        event.itemId = itemId;
+        event.quantity = 1;
+        EventBus::instance().publish(event);
+      }
+    }
+
+    Logger::debug("World item " + std::to_string(packet.worldItemId) +
+                  " picked up by player " + std::to_string(packet.playerId));
   }
 }
 
