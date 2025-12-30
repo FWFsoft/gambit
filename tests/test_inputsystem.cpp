@@ -1,10 +1,13 @@
 #include <SDL2/SDL.h>
 
+#include "GameStateManager.h"
 #include "InputSystem.h"
 #include "Logger.h"
 #include "test_utils.h"
 
 TEST(InputSystem_KeyBindings) {
+  // Set game state to Playing so InputSystem processes key events
+  GameStateManager::instance().transitionTo(GameState::Playing);
   struct KeyTest {
     int sdlKey;
     bool* flagPtr(LocalInputEvent& e) const {
@@ -21,14 +24,14 @@ TEST(InputSystem_KeyBindings) {
 
   for (const auto& keyTest : keys) {
     resetEventBus();
-    InputSystem inputSystem(nullptr);
+    InputSystem inputSystem(nullptr, nullptr, nullptr);
 
     LocalInputEvent downEvent =
         publishKeyAndUpdate(inputSystem, keyTest.sdlKey, true);
     assert(*keyTest.flagPtr(downEvent) == true);
 
     resetEventBus();
-    InputSystem inputSystem2(nullptr);
+    InputSystem inputSystem2(nullptr, nullptr, nullptr);
     LocalInputEvent upEvent =
         publishKeyAndUpdate(inputSystem2, keyTest.sdlKey, false);
     assert(*keyTest.flagPtr(upEvent) == false);
@@ -37,7 +40,8 @@ TEST(InputSystem_KeyBindings) {
 
 TEST(InputSystem_AllDirections) {
   resetEventBus();
-  InputSystem inputSystem(nullptr);
+  GameStateManager::instance().transitionTo(GameState::Playing);
+  InputSystem inputSystem(nullptr, nullptr, nullptr);
 
   EventBus::instance().publish(KeyDownEvent{SDLK_w});
   EventBus::instance().publish(KeyDownEvent{SDLK_a});
@@ -56,7 +60,8 @@ TEST(InputSystem_AllDirections) {
 
 TEST(InputSystem_SequenceIncrement) {
   resetEventBus();
-  InputSystem inputSystem(nullptr);
+  GameStateManager::instance().transitionTo(GameState::Playing);
+  InputSystem inputSystem(nullptr, nullptr, nullptr);
 
   uint32_t sequences[3] = {0};
   int count = 0;

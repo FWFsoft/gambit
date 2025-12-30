@@ -92,12 +92,14 @@ struct AttackEnemyPacket {
   float damage;
 };
 
-struct EnemyDamagedPacket {
-  PacketType type = PacketType::EnemyDamaged;
-  uint32_t enemyId;
-  float newHealth;
-  uint32_t attackerId;
-};
+// Dead code - EnemyDamagedPacket is never used
+// TODO: Remove entirely if combat damage system doesn't need it
+// struct EnemyDamagedPacket {
+//   PacketType type = PacketType::EnemyDamaged;
+//   uint32_t enemyId;
+//   float newHealth;
+//   uint32_t attackerId;
+// };
 
 struct EnemyDiedPacket {
   PacketType type = PacketType::EnemyDied;
@@ -159,7 +161,8 @@ std::vector<uint8_t> serialize(const PlayerDiedPacket& packet);
 std::vector<uint8_t> serialize(const PlayerRespawnedPacket& packet);
 std::vector<uint8_t> serialize(const EnemyStateUpdatePacket& packet);
 std::vector<uint8_t> serialize(const AttackEnemyPacket& packet);
-std::vector<uint8_t> serialize(const EnemyDamagedPacket& packet);
+// std::vector<uint8_t> serialize(const EnemyDamagedPacket& packet);  // Dead
+// code
 std::vector<uint8_t> serialize(const EnemyDiedPacket& packet);
 std::vector<uint8_t> serialize(const InventoryUpdatePacket& packet);
 std::vector<uint8_t> serialize(const UseItemPacket& packet);
@@ -179,7 +182,8 @@ PlayerLeftPacket deserializePlayerLeft(const uint8_t* data, size_t size);
 EnemyStateUpdatePacket deserializeEnemyStateUpdate(const uint8_t* data,
                                                    size_t size);
 AttackEnemyPacket deserializeAttackEnemy(const uint8_t* data, size_t size);
-EnemyDamagedPacket deserializeEnemyDamaged(const uint8_t* data, size_t size);
+// EnemyDamagedPacket deserializeEnemyDamaged(const uint8_t* data, size_t size);
+// // Dead code
 EnemyDiedPacket deserializeEnemyDied(const uint8_t* data, size_t size);
 InventoryUpdatePacket deserializeInventoryUpdate(const uint8_t* data,
                                                  size_t size);

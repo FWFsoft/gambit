@@ -37,6 +37,7 @@ struct Enemy : public Animatable {
   // Respawn tracking
   uint32_t spawnIndex;  // Which spawn point this enemy came from
   float deathTime;      // Timestamp when enemy died (milliseconds)
+  float respawnDelay;   // Random respawn delay in milliseconds (1-5 seconds)
 
   // Animation
   AnimationController animController;
@@ -69,5 +70,6 @@ struct Enemy : public Animatable {
         lastAttackTime(0.0f),
         targetPlayerId(0),
         spawnIndex(0),
-        deathTime(0.0f) {}
+        deathTime(0.0f),
+        respawnDelay(0.0f) {}
 };

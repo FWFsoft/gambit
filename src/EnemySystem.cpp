@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <random>
 
 #include "Logger.h"
 #include "config/GameplayConfig.h"
@@ -53,11 +54,9 @@ void EnemySystem::update(float deltaTime,
   accumulatedTime += deltaTime * 1000.0f;
 
   for (auto& [id, enemy] : enemies) {
-    // Check if dead enemy should respawn (5 second delay)
+    // Check if dead enemy should respawn (random 1-5 second delay)
     if (enemy.state == EnemyState::Dead) {
-      constexpr float RESPAWN_DELAY_MS = 5000.0f;
-
-      if (accumulatedTime - enemy.deathTime >= RESPAWN_DELAY_MS) {
+      if (accumulatedTime - enemy.deathTime >= enemy.respawnDelay) {
         // Respawn enemy at original spawn point
         assert(enemy.spawnIndex < spawns.size() && "Invalid spawn index");
         const EnemySpawn& spawn = spawns[enemy.spawnIndex];
@@ -70,6 +69,7 @@ void EnemySystem::update(float deltaTime,
         enemy.state = EnemyState::Idle;
         enemy.targetPlayerId = 0;
         enemy.deathTime = 0.0f;
+        enemy.respawnDelay = 0.0f;
 
         Logger::info("Enemy " + std::to_string(id) + " respawned at spawn " +
                      std::to_string(enemy.spawnIndex));
@@ -278,8 +278,15 @@ void EnemySystem::damageEnemy(uint32_t enemyId, float damage,
     enemy.vy = 0.0f;
     enemy.deathTime = accumulatedTime;
 
+    // Generate random respawn delay (1-5 seconds)
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    std::uniform_real_distribution<float> dist(1000.0f, 5000.0f);
+    enemy.respawnDelay = dist(gen);
+
     Logger::info("Enemy " + std::to_string(enemyId) + " killed by player " +
-                 std::to_string(attackerId));
+                 std::to_string(attackerId) + " (respawn in " +
+                 std::to_string(enemy.respawnDelay / 1000.0f) + "s)");
 
     // Track death for broadcasting
     diedThisFrame.push_back({enemyId, attackerId});

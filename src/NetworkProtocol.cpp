@@ -288,17 +288,19 @@ std::vector<uint8_t> serialize(const AttackEnemyPacket& packet) {
   return buffer;
 }
 
-std::vector<uint8_t> serialize(const EnemyDamagedPacket& packet) {
-  std::vector<uint8_t> buffer;
-
-  writeUint8(buffer, static_cast<uint8_t>(packet.type));
-  writeUint32(buffer, packet.enemyId);
-  writeFloat(buffer, packet.newHealth);
-  writeUint32(buffer, packet.attackerId);
-
-  assert(buffer.size() == 13);  // 1 + 4 + 4 + 4 = 13 bytes
-  return buffer;
-}
+// Dead code - EnemyDamagedPacket is never used
+// TODO: Remove entirely if combat damage system doesn't need it
+// std::vector<uint8_t> serialize(const EnemyDamagedPacket& packet) {
+//   std::vector<uint8_t> buffer;
+//
+//   writeUint8(buffer, static_cast<uint8_t>(packet.type));
+//   writeUint32(buffer, packet.enemyId);
+//   writeFloat(buffer, packet.newHealth);
+//   writeUint32(buffer, packet.attackerId);
+//
+//   assert(buffer.size() == 13);  // 1 + 4 + 4 + 4 = 13 bytes
+//   return buffer;
+// }
 
 std::vector<uint8_t> serialize(const EnemyDiedPacket& packet) {
   std::vector<uint8_t> buffer;
@@ -362,17 +364,20 @@ AttackEnemyPacket deserializeAttackEnemy(const uint8_t* data, size_t size) {
   return packet;
 }
 
-EnemyDamagedPacket deserializeEnemyDamaged(const uint8_t* data, size_t size) {
-  assert(size >= 13);
-  assert(data[0] == static_cast<uint8_t>(PacketType::EnemyDamaged));
-
-  EnemyDamagedPacket packet;
-  packet.enemyId = readUint32(data + 1);
-  packet.newHealth = readFloat(data + 5);
-  packet.attackerId = readUint32(data + 9);
-
-  return packet;
-}
+// Dead code - EnemyDamagedPacket is never used
+// TODO: Remove entirely if combat damage system doesn't need it
+// EnemyDamagedPacket deserializeEnemyDamaged(const uint8_t* data, size_t size)
+// {
+//   assert(size >= 13);
+//   assert(data[0] == static_cast<uint8_t>(PacketType::EnemyDamaged));
+//
+//   EnemyDamagedPacket packet;
+//   packet.enemyId = readUint32(data + 1);
+//   packet.newHealth = readFloat(data + 5);
+//   packet.attackerId = readUint32(data + 9);
+//
+//   return packet;
+// }
 
 EnemyDiedPacket deserializeEnemyDied(const uint8_t* data, size_t size) {
   assert(size >= 9);

@@ -295,6 +295,40 @@ add_executable(test_music_system
 target_include_directories(test_music_system PRIVATE include tests)
 target_link_libraries(test_music_system PRIVATE spdlog::spdlog SDL2::SDL2 $<IF:$<TARGET_EXISTS:SDL2_mixer::SDL2_mixer>,SDL2_mixer::SDL2_mixer,$<IF:$<TARGET_EXISTS:SDL2_mixer::SDL2_mixer-static>,SDL2_mixer::SDL2_mixer-static,SDL2_mixer::SDL2_mixer>>)
 
+add_executable(test_animation_controller
+    tests/test_animation_controller.cpp
+    src/Logger.cpp
+    src/AnimationController.cpp
+    src/AnimationSystem.cpp
+    src/AnimationAssetLoader.cpp
+    src/NetworkProtocol.cpp
+)
+target_include_directories(test_animation_controller SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
+target_include_directories(test_animation_controller PRIVATE include tests)
+target_link_libraries(test_animation_controller PRIVATE spdlog::spdlog SDL2::SDL2)
+
+add_executable(test_animation_system
+    tests/test_animation_system.cpp
+    src/Logger.cpp
+    src/AnimationController.cpp
+    src/AnimationSystem.cpp
+    src/AnimationAssetLoader.cpp
+    src/NetworkProtocol.cpp
+)
+target_include_directories(test_animation_system SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
+target_include_directories(test_animation_system PRIVATE include tests)
+target_link_libraries(test_animation_system PRIVATE spdlog::spdlog SDL2::SDL2)
+
+add_executable(test_gameloop
+    tests/test_gameloop.cpp
+    src/Logger.cpp
+    src/GameLoop.cpp
+    src/NetworkProtocol.cpp
+)
+target_include_directories(test_gameloop SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
+target_include_directories(test_gameloop PRIVATE include tests)
+target_link_libraries(test_gameloop PRIVATE spdlog::spdlog SDL2::SDL2)
+
 # Register tests with CTest
 add_test(NAME PlayerMovement COMMAND test_player)
 add_test(NAME NetworkProtocol COMMAND test_network_protocol)
@@ -305,6 +339,9 @@ add_test(NAME ClientPrediction COMMAND test_client_prediction)
 add_test(NAME CollisionSystem COMMAND test_collision)
 add_test(NAME MusicZone COMMAND test_music_zone)
 add_test(NAME MusicSystem COMMAND test_music_system)
+add_test(NAME AnimationController COMMAND test_animation_controller)
+add_test(NAME AnimationSystem COMMAND test_animation_system)
+add_test(NAME GameLoop COMMAND test_gameloop)
 
 # Enable code coverage for test targets
 if(ENABLE_COVERAGE)
@@ -326,5 +363,11 @@ if(ENABLE_COVERAGE)
     target_link_options(test_music_zone PRIVATE --coverage)
     target_compile_options(test_music_system PRIVATE --coverage)
     target_link_options(test_music_system PRIVATE --coverage)
+    target_compile_options(test_animation_controller PRIVATE --coverage)
+    target_link_options(test_animation_controller PRIVATE --coverage)
+    target_compile_options(test_animation_system PRIVATE --coverage)
+    target_link_options(test_animation_system PRIVATE --coverage)
+    target_compile_options(test_gameloop PRIVATE --coverage)
+    target_link_options(test_gameloop PRIVATE --coverage)
 endif()
 
