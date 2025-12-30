@@ -32,7 +32,8 @@
       "Skill(search)",
       "Bash(uv run python:*)",
       "Bash(pkill:*)",
-      "Bash(killall:*)"
+      "Bash(killall:*)",
+      "Bash(NUM_CLIENTS=1 make dev:*)"
     ]
   }
 }

@@ -5,6 +5,7 @@
 #include "CollisionDebugRenderer.h"
 #include "CollisionSystem.h"
 #include "CombatSystem.h"
+#include "DamageNumberSystem.h"
 #include "EnemyInterpolation.h"
 #include "EventBus.h"
 #include "GameLoop.h"
@@ -90,7 +91,11 @@ int main() {
                             &enemyInterpolation, &camera, &map,
                             &collisionDebugRenderer, &musicZoneDebugRenderer);
 
-  UISystem uiSystem(&window, &clientPrediction, &client);
+  // Create damage number system
+  DamageNumberSystem damageNumberSystem(&camera,
+                                        renderSystem.getSpriteRenderer());
+
+  UISystem uiSystem(&window, &clientPrediction, &client, &damageNumberSystem);
 
   // Load local player animations
   Player& localPlayer = clientPrediction.getLocalPlayerMutable();

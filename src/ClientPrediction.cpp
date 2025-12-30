@@ -2,6 +2,7 @@
 
 #include <cmath>
 
+#include "DamageNumberSystem.h"
 #include "ItemRegistry.h"
 #include "Logger.h"
 #include "NetworkClient.h"
@@ -194,7 +195,20 @@ void ClientPrediction::reconcile(const StateUpdatePacket& stateUpdate) {
   localPlayer.y = serverState->y;
   localPlayer.vx = serverState->vx;
   localPlayer.vy = serverState->vy;
+
+  // Check for health decrease (player took damage)
+  float oldHealth = localPlayer.health;
   localPlayer.health = serverState->health;
+
+  if (localPlayer.health < oldHealth && localPlayer.isAlive()) {
+    // Player took damage - publish event for damage numbers
+    float damageTaken = oldHealth - localPlayer.health;
+    DamageReceivedEvent damageEvent;
+    damageEvent.x = localPlayer.x;
+    damageEvent.y = localPlayer.y;
+    damageEvent.damageAmount = damageTaken;
+    EventBus::instance().publish(damageEvent);
+  }
   localPlayer.r = serverState->r;
   localPlayer.g = serverState->g;
   localPlayer.b = serverState->b;

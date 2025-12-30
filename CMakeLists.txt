@@ -156,6 +156,7 @@ add_executable(Client
     src/MusicZoneDebugRenderer.cpp
     src/EnemyInterpolation.cpp
     src/CombatSystem.cpp
+    src/DamageNumberSystem.cpp
     src/UISystem.cpp
     src/GameStateManager.cpp
     src/Settings.cpp

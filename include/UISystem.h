@@ -12,6 +12,7 @@ class Window;
 class ClientPrediction;
 class NetworkClient;
 class Texture;
+class DamageNumberSystem;
 struct ItemDefinition;
 
 // UISystem manages ImGui frame lifecycle and rendering
@@ -19,7 +20,7 @@ struct ItemDefinition;
 class UISystem {
  public:
   UISystem(Window* window, ClientPrediction* clientPrediction,
-           NetworkClient* client);
+           NetworkClient* client, DamageNumberSystem* damageNumbers);
   ~UISystem();
 
   // Called each frame to render UI
@@ -56,6 +57,7 @@ class UISystem {
   Window* window;
   ClientPrediction* clientPrediction;
   NetworkClient* client;
+  DamageNumberSystem* damageNumberSystem;
   Settings settings;
   Settings tempSettings;  // Temporary settings during editing
   bool showSettings;

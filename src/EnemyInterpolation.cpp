@@ -4,6 +4,7 @@
 
 #include "AnimationAssetLoader.h"
 #include "AnimationSystem.h"
+#include "DamageNumberSystem.h"
 #include "Logger.h"
 
 EnemyInterpolation::EnemyInterpolation(AnimationSystem* animSystem)
@@ -56,7 +57,7 @@ void EnemyInterpolation::updateEnemyState(const NetworkEnemyState& state) {
 
     // Load animations (POC: same as player for now)
     AnimationAssetLoader::loadPlayerAnimations(enemy.animController,
-                                                "assets/player_animated.png");
+                                               "assets/player_animated.png");
 
     enemies[enemyId] = enemy;
 
@@ -70,8 +71,22 @@ void EnemyInterpolation::updateEnemyState(const NetworkEnemyState& state) {
   // Update enemy state
   Enemy& enemy = enemies[enemyId];
   enemy.state = static_cast<::EnemyState>(state.state);
+
+  // Check for health decrease (damage dealt to enemy)
+  float oldHealth = enemy.health;
   enemy.health = state.health;
   enemy.maxHealth = state.maxHealth;
+
+  if (enemy.health < oldHealth && enemy.state != ::EnemyState::Dead) {
+    // Enemy took damage - publish event for damage numbers
+    float damageTaken = oldHealth - enemy.health;
+    DamageDealtEvent damageEvent;
+    damageEvent.x = state.x;  // Use server's authoritative position
+    damageEvent.y = state.y;
+    damageEvent.damageAmount = damageTaken;
+    damageEvent.isCritical = false;  // TODO: Add crit system later
+    EventBus::instance().publish(damageEvent);
+  }
 
   // Add snapshot for interpolation
   EnemySnapshot snapshot;

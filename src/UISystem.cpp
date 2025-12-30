@@ -7,6 +7,7 @@
 #include <cmath>
 
 #include "ClientPrediction.h"
+#include "DamageNumberSystem.h"
 #include "GameStateManager.h"
 #include "ItemRegistry.h"
 #include "Logger.h"
@@ -19,10 +20,11 @@
 #include "config/PlayerConfig.h"
 
 UISystem::UISystem(Window* window, ClientPrediction* clientPrediction,
-                   NetworkClient* client)
+                   NetworkClient* client, DamageNumberSystem* damageNumbers)
     : window(window),
       clientPrediction(clientPrediction),
       client(client),
+      damageNumberSystem(damageNumbers),
       showSettings(false),
       currentTime(0.0f),
       titleScreenBackground(nullptr),
@@ -138,6 +140,11 @@ void UISystem::render() {
   // Render pickup notifications (always on top, except in main menu)
   if (currentState != GameState::MainMenu) {
     renderNotifications();
+  }
+
+  // Render damage numbers (only during gameplay)
+  if (currentState == GameState::Playing && damageNumberSystem) {
+    damageNumberSystem->render();
   }
 
   // Render ImGui

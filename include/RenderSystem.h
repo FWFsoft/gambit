@@ -28,6 +28,9 @@ class RenderSystem {
 
   ~RenderSystem() = default;
 
+  // Access to sprite renderer for other systems
+  SpriteRenderer* getSpriteRenderer() { return spriteRenderer.get(); }
+
  private:
   Window* window;
   ClientPrediction* clientPrediction;
