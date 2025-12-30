@@ -63,7 +63,7 @@ run-client: build  ## Start a single Gambit client
 	./build/Client
 
 dev: build  ## Full dev environment: 1 server + N clients
-	@./dev.sh $(NUM_CLIENTS)
+	@./scripts/dev.sh $(NUM_CLIENTS)
 
 
 .PHONY: pre-commit

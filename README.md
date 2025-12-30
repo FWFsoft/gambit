@@ -48,10 +48,12 @@ This project includes Claude Code skills that streamline development workflows. 
 |-------|-------------|
 | `/build` | Build both Server and Client executables |
 | `/clean` | Remove build artifacts for a fresh build |
+| `/test` | Run all tests for the game engine |
+| `/dev` | Full dev environment: builds + runs 1 server + 4 clients |
 | `/run-server` | Start the game server on 0.0.0.0:1234 |
 | `/run-client` | Start a single client (connects to 127.0.0.1:1234) |
-| `/dev` | Full dev environment: builds + runs 1 server + 4 clients |
-| `/test` | Run tests (placeholder for when tests are added) |
+| `/pre-commit` | Run pre-commit hooks (clang-format, clang-tidy) on all files |
+| `/search <symbol>` | Find definitions and usages of a symbol across the entire codebase |
 
 ### How Skills Work
 
@@ -59,11 +61,14 @@ Skills follow the Claude Agent Skills format with YAML frontmatter. Each skill i
 
 ```
 .claude/skills/
-├── build/
-│   └── SKILL.md
-├── dev/
-│   └── SKILL.md
-└── ...
+├── build/          # Build the project
+├── clean/          # Clean build artifacts
+├── dev/            # Development environment (1 server + 4 clients)
+├── pre-commit/     # Run pre-commit hooks (clang-format, clang-tidy)
+├── run-client/     # Run a single client
+├── run-server/     # Run the server
+├── search/         # Advanced code search tool
+└── test/           # Run tests
 ```
 
 Each `SKILL.md` has frontmatter that tells Claude when to use the skill:
@@ -148,12 +153,14 @@ Claude will automatically recognize when to use the appropriate skill.
 You can also invoke skills directly by typing the skill name with a `/` prefix:
 
 ```
-/build
-/dev
-/clean
-/run-server
-/run-client
-/test
+/build              # Build the project
+/clean              # Clean build artifacts
+/test               # Run all tests
+/dev                # Full dev environment (1 server + 4 clients)
+/run-server         # Start the game server
+/run-client         # Start a game client
+/pre-commit         # Run pre-commit hooks (clang-format, clang-tidy)
+/search <symbol>    # Search for definitions and usages
 ```
 
 ## Development Workflow
@@ -172,6 +179,23 @@ Use `/dev` to simulate a 4-player co-op environment:
 - Starts 4 clients (1-second delays between each)
 - Press Enter to terminate all processes
 
+### Code Search
+
+Use `/search` to find symbols across the entire codebase:
+
+```bash
+/search Window          # Find all usages of Window class
+/search pollEvents      # Find all usages of pollEvents method
+/search NetworkClient   # Find all usages of NetworkClient
+```
+
+The search tool:
+- Finds definitions (classes, functions, structs, etc.)
+- Locates all usages across code, tests, examples, benchmarks
+- Shows file paths, line numbers, and context
+- Groups results by category (definitions, code, tests, etc.)
+- More powerful than grep - understands C++ code structure
+
 ### Full Rebuild
 
 ```bash
@@ -185,15 +209,19 @@ Use `/dev` to simulate a 4-player co-op environment:
 gambit/
 ├── .claude/
 │   └── skills/         # Claude Code skills (SKILL.md format)
-│       ├── build/
-│       ├── clean/
-│       ├── dev/
-│       ├── run-client/
-│       ├── run-server/
-│       └── test/
+│       ├── build/      # Build the project
+│       ├── clean/      # Clean build artifacts
+│       ├── dev/        # Development environment (1 server + 4 clients)
+│       ├── pre-commit/ # Run pre-commit hooks (clang-format, clang-tidy)
+│       ├── run-client/ # Run a single client
+│       ├── run-server/ # Run the server
+│       ├── search/     # Advanced code search tool
+│       └── test/       # Run tests
 ├── CMakeLists.txt      # Build configuration
+├── ARCHITECTURE.md     # Detailed architecture documentation
 ├── CLAUDE.md           # Comprehensive guide for Claude
 ├── DESIGN.md           # Design requirements and decisions
+├── KNOWN_BUGS.md       # List of known issues
 ├── README.md           # This file
 ├── include/            # Public headers
 ├── src/                # Implementation files

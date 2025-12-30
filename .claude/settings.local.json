@@ -25,7 +25,8 @@
       "Bash(./build/Server:*)",
       "Bash(cat:*)",
       "Bash(vcpkg search:*)",
-      "Bash(timeout 3 ./build/Client:*)"
+      "Bash(timeout 3 ./build/Client:*)",
+      "Bash(python3:*)"
     ]
   }
 }

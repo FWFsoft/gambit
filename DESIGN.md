@@ -1,95 +1,160 @@
 # Requirements
 
-* A game engine for building 2D isometric ARPG games  
-  * Maybe we could support RTS games technically? I think the tooling would be useful within our game and those typically follow a very similar perspective and map design to what we are building  
-  * Thinking about RTS has me thinking … maybe we change the movement system to click to move? The pathfinding is broadly useful for things like collision detection with the terrain and then directly translates to enemies  
-* A focus on debuggability, stability, and performance  
-  * Builds, boots, and loads very fast  
-  * [Tiger style dev](https://github.com/tigerbeetle/tigerbeetle/blob/main/docs/TIGER_STYLE.md)?  
-    * Assert on negative space, crashing the application  
-    * Fuzz the crap out of the mother trucker  
-  * Able to attach a debugger?  
-* “High-Code” experience  
-  * Avoid tooling that makes things more complicated and less performant for the purpose of removing the developers need to … understand the basics of programming  
-  * APIs over UIs  
-* Hot Reloadable?  
-  * I think hot reload might be a trap  
-  * What might be more in line with the vision here is save-states since the game will be fast to boot and load back in  
-* Asset Pipeline  
-  * Supports importing maps from Tiled  
-  * Supports sprite sheets (Aseprite integration?)  
-* Physics Engine?  
-  * I don't know if we need one at all, but we can use a library for this if needed   
-* Networking?  
-  * The game we are making needs to support four players fighting together in a PvE game  
-  * The game needs matchmaking  
-* Platform support?  
-  * PC (Windows/Linux)  
-  * Any other platforms are nice to have but not required  
-* Level Editor?  
-  * Might require custom meta-data in Tiled to be able to place objects that have behavior in our game (interactables, spawners, etc.)  
-  * Will need to consider the experience of editing a map in Tiled and wanting to play-test it as you go  
-    * This might be a non-issue if the game builds, reboots, and reloads very fast; just save and restart  
-  * How do we handle things that *change* the environment without a level editor? Like where our ship crash lands?  
-    * Might be able to handle this with a *Scene Graph* \- essentially we can associate a point, or an event with a traversal from one map to another  
-* Nice to have features (that I’m thinking about right now)  
-  * Foreground/Background elements with parallaxing (I’m thinking about this, because I’m not quite visualizing how to put these together using Tiled layers)
+## Core Vision
+
+* **A game engine for building 2D isometric ARPG games**
+  * Potential for RTS game support (similar perspective and map design)
+  * Click-to-move system with pathfinding (useful for both player movement and enemy AI)
+
+## Performance & Quality
+
+* **Focus on debuggability, stability, and performance**
+  * Builds, boots, and loads very fast
+  * [Tiger Style development](https://github.com/tigerbeetle/tigerbeetle/blob/main/docs/TIGER_STYLE.md)
+    * Assert on negative space, crashing the application early
+    * Extensive fuzz testing
+  * Full debugger support
+
+## Developer Experience
+
+* **"High-Code" philosophy**
+  * Avoid abstraction layers that hide fundamental programming concepts
+  * APIs over UIs
+  * Direct control over performance-critical code
+
+* **No Hot Reload**
+  * Fast build/boot/load cycle eliminates need for hot reload
+  * Consider save-states for rapid iteration
+
+## Asset Pipeline
+
+* **Map Editor**: Tiled integration
+  * Import maps with custom metadata
+  * Support for invisible game objects (interactables, spawners, etc.)
+  * Fast iteration: edit in Tiled, save, rebuild, test
+
+* **Sprite Assets**: Aseprite integration
+  * Seamless sprite sheet importing
+  * Define sprites, hitboxes, and hurtboxes in Aseprite
+
+* **UI Builder**: [Rive](https://rive.app/) integration
+
+## Technical Requirements
+
+* **Physics Engine**: Optional (use library if needed)
+
+* **Networking**
+  * 4-player co-op PvE
+  * Matchmaking support
+  * Client-server architecture with prediction and interpolation
+
+* **Platform Support**
+  * Primary: PC (Windows/Linux/macOS)
+  * Other platforms: nice to have
+
+* **Scene System**
+  * Scene Graph for environment changes and map transitions
+  * Event-driven scene traversal
+
+## Nice-to-Have Features
+
+* Foreground/Background elements with parallax scrolling
+* Advanced particle effects
+* Dynamic lighting
+
+# Design Decisions
+
+## Technology Stack
+
+* **Programming Language**: C++17
+* **Build System**: CMake + vcpkg for dependency management
+* **Graphics**: SDL2 + OpenGL
+* **Networking**: ENet (UDP-based, reliable)
+  * Abstract network layer for future changes
+  * Client-server architecture (started with P2P capability)
+  * Steamworks API for lobbying and matchmaking
+* **Logging**: spdlog (fast, structured logging)
+
+## Asset Pipeline
+
+* **Level Editor**: Tiled
+  * Import maps with custom metadata
+  * Invisible game objects defined via Tiled metadata
+  * Behavior properties (visibility, interactivity, etc.)
+
+* **Sprite Pipeline**: Aseprite
+  * Seamless import of sprite sheets
+  * Designers define sprites, hitboxes, and hurtboxes in Aseprite
+  * Alignment techniques:
+    1. Identical canvas sizes with center-point alignment
+    2. Anchor points via hex color codes
+
+* **UI Builder**: [Rive](https://rive.app/)
+
+## Architecture Principles
+
+### Event-Based Architecture
+
+Games built on the engine operate over an **asynchronous event-based architecture** rather than traditional update/render loops.
+
+**Why Event-Driven?**
+* Avoids coupling to engine update/render loops
+* No "MonoBehavior" pattern - developers aren't forced into engine lifecycle management
+* Subscribe only to events you need, when you need them
+* Better separation of concerns
+* Easier testing and debugging
+
+### Fixed 60 FPS Game Loop
+
+* **Update loop**: ALWAYS fires at 60 FPS (16.67ms intervals)
+  * Deterministic gameplay
+  * Consistent physics simulation
+  * Predictable network behavior
+
+* **Render loop**: Variable rate, drops frames if needed
+  * If frame isn't ready in 16ms, skip rendering
+  * Gameplay never slows down
+  * Maintains smooth experience
 
 
-  # Decisions
+# Implementation Status
 
-* Programming Language  
-  * C++  
-* Networking  
-  * Abstract over what’s used so we can change it later  
-  * Start with P2P, but keep the engine unaware of where the host is  
-    * Need to handle when the host disconnects and needs to be reassigned  
-  * ENet seems promising: [http://enet.bespin.org/](http://enet.bespin.org/)  
-  * Steamworks API for extending the functionality of ENet with lobbying etc  
-* Graphics API  
-  *  SDL2 \+ OpenGL  
-* Level Editor  
-  * Use Tiled for building out maps, including all elements like laying in invisible game objects  
-  * Utilize metadata in Tiled to determine behavior (visibility, etc.)  
-* Sprites (including Players, Enemies, Hitboxes, Hurtboxes, Particle Effects, etc.)  
-  * Sprites will all be made with Aseprite, and we’ll build an Asset Pipeline (along with some conventions) that make importing from Aseprite seamless.  
-  * Designers will need to define not only the Sprites in Aseprite, but also the invisible elements like hitboxes and hurtboxes  
-    * We can use two techniques to align elements:  
-      1. You can make the assets have identical canvas sizes, and align them by center-point  
-      2. You can make an anchor point that matches an anchor point in another asset based on hex color codes  
-* UI Builder  
-  * [https://rive.app/](https://rive.app/)   
-* Games built on the engine don’t need to think about the render and update loops and instead operate strictly over an asynchronous event-based architecture  
-  * Why?  
-    * Needing to obey the update/render loops of the enginewithout pub-sub would force a lot down on the *technical design* of games built on the engine. Once you start considering pub-subbing the loops, then it just makes sense to have a design that abstracts over them and instead exposes a more well-thought-out subscriber API.  
-    * The main thing that jumps out to me is MonoBehavior classes from Unity, and Unity basically takes your object lifecycle hostage. This totally rules out objects that only last for the duration of a request. They generally need to do this so that the engine has access to a bean for that class that it can call the update/start/etc methods on.   
-    * Rather than having bean soup (sub to everything or else\!) we can just … allow game devs to just subscribe to exactly what they need when they need it (expressed in terms they care about), and that sounded like a better design  
-  * **Games built on the engine run at a fixed 60 FPS**—this will ensure that our devs   
-    * The update loop will ALWAYS fire events  
-    * The **render loop will drop frames that aren’t ready in 16ms**
+## Completed Systems
 
+* ✅ **Networking**: ENet-based client-server with binary protocol
+* ✅ **Game Loop**: Fixed 60 FPS update loop with event system
+* ✅ **Event Bus**: Type-safe publish-subscribe architecture
+* ✅ **Input System**: WASD keyboard input with state tracking
+* ✅ **Rendering**: OpenGL-based isometric tile rendering
+* ✅ **Combat**: Player health, damage, and respawn system
+* ✅ **Enemies**: Enemy spawning and basic AI
+* ✅ **UI**: ImGui integration for settings and HUD
+* ✅ **Music**: Background music with combat layer support
+* ✅ **Items**: Item registry with CSV loading
+* ✅ **Client Prediction**: Instant local response with server reconciliation
+* ✅ **Remote Interpolation**: Smooth remote player movement
 
-  
+## In Development
 
-# Work Breakdown
-* Basic networking  
-* Update/Render loops with SSE design for client API  
-* Asset Pipeline  
-  * Tiled asset pipeline  
-    * Custom Tags for assigning behavior to Tiled objects/layers  
-  * Rive asset pipeline  
-  * Aseprite pipeline  
-* Consider using an AI driven pipeline as well
-  * Nano banana
-  * ChatGPT + friends
-  * Pixel labs
-* For sound effects and voice overs, consider elevenlabs
+* 🚧 **Asset Pipeline**
+  * Tiled integration with custom metadata
+  * Aseprite sprite sheet importing
+  * Rive UI integration
 
-# Possible future increments
-* Combat
-  * Spawning/creating enemies
-  * Allowing players to attack the enemies/be attacked by them
-* UI
-  * ImGui initial integration for a UI
-* Music
-  * Layered music (drums etc. for combat)
+## Future Enhancements
+
+* **AI-Driven Asset Pipeline**
+  * Procedural generation tools
+  * AI-assisted sprite creation
+  * Automated asset optimization
+
+* **Audio**
+  * Sound effects system
+  * Voice over support (consider ElevenLabs)
+  * 3D spatial audio
+
+* **Advanced Gameplay**
+  * More complex enemy AI
+  * Advanced combat mechanics
+  * Skill/ability system
+  * Inventory management

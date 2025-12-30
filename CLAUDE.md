@@ -39,8 +39,10 @@ gambit/
 │       ├── build/          # Build the project
 │       ├── clean/          # Clean build artifacts
 │       ├── dev/            # Development environment (1 server + 4 clients)
+│       ├── pre-commit/     # Run pre-commit hooks (clang-format, clang-tidy)
 │       ├── run-client/     # Run a single client
 │       ├── run-server/     # Run the server
+│       ├── search/         # Advanced code search tool
 │       └── test/           # Run tests
 ├── CMakeLists.txt          # CMake build configuration
 ├── CLAUDE.md               # This file - comprehensive guide for Claude
@@ -144,6 +146,19 @@ Clients connect to `127.0.0.1:1234` by default.
 
 ## Development Workflow
 
+### Available Skills
+
+The project includes several Claude Code skills for common development tasks:
+
+- **`/build`**: Build the project (Server and Client executables)
+- **`/clean`**: Remove build artifacts for a fresh rebuild
+- **`/test`**: Run all tests for the game engine
+- **`/dev`**: Full development environment (1 server + 4 clients)
+- **`/run-server`**: Start the game server on 0.0.0.0:1234
+- **`/run-client`**: Start a single client connecting to 127.0.0.1:1234
+- **`/pre-commit`**: Run pre-commit hooks (clang-format, clang-tidy) on all files
+- **`/search <symbol>`**: Advanced code search - finds definitions and usages across code, tests, examples, and benchmarks
+
 ### Full Development Environment
 
 The `/dev` skill (or `./dev` script) provides a complete local development environment:
@@ -161,6 +176,33 @@ For rapid iteration during development:
 2. Run `/build` to rebuild
 3. Run `/run-server` or `/run-client` as needed
 4. The fast build/boot cycle enables quick testing without save-states
+
+### Code Search
+
+The `/search` skill provides intelligent code search across the entire codebase:
+
+```bash
+# Find a class and all its usages
+/search Window
+
+# Find a function/method
+/search pollEvents
+
+# Find any symbol
+/search NetworkClient
+```
+
+The search tool:
+- Finds definitions (classes, functions, structs, etc.)
+- Locates all usages across code, tests, examples, benchmarks, and fuzz tests
+- Shows context (file path, line number, and the actual line)
+- Groups results by category for easy navigation
+- More powerful than grep - understands C++ code structure
+
+You can also run it directly:
+```bash
+uv run python .claude/skills/search/search.py <symbol>
+```
 
 ## Testing
 
