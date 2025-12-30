@@ -17,7 +17,8 @@ void GameStateManager::transitionTo(GameState newState) {
   currentState = newState;
 
   // Log state transition
-  const char* stateNames[] = {"MainMenu", "Playing", "Paused", "Inventory"};
+  const char* stateNames[] = {"TitleScreen", "MainMenu", "Playing", "Paused",
+                              "Inventory"};
   Logger::info("Game state transition: " +
                std::string(stateNames[static_cast<int>(previousState)]) +
                " -> " + std::string(stateNames[static_cast<int>(newState)]));

@@ -7,6 +7,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <vector>
 
+#include "GameStateManager.h"
 #include "Logger.h"
 #include "OpenGLUtils.h"
 #include "Texture.h"
@@ -65,6 +66,14 @@ RenderSystem::RenderSystem(Window* window, ClientPrediction* clientPrediction,
 }
 
 void RenderSystem::onRender(const RenderEvent& e) {
+  // Skip game world rendering during title screen
+  if (GameStateManager::instance().getCurrentState() ==
+      GameState::TitleScreen) {
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+    return;
+  }
+
   SDL_Window* sdlWindow = window->getWindow();
 
   const Player& localPlayer = clientPrediction->getLocalPlayer();

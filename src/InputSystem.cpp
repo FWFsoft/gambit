@@ -32,6 +32,12 @@ void InputSystem::onKeyDown(const KeyDownEvent& e) {
   GameStateManager& gsm = GameStateManager::instance();
   GameState currentState = gsm.getCurrentState();
 
+  // TitleScreen: any key advances to main menu
+  if (currentState == GameState::TitleScreen) {
+    gsm.transitionTo(GameState::MainMenu);
+    return;
+  }
+
   // ESC: Toggle pause (Playing <-> Paused)
   if (e.key == SDLK_ESCAPE) {
     if (currentState == GameState::Playing) {

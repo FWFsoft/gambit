@@ -73,7 +73,7 @@
    </properties>
    <point/>
   </object>
-  <object id="18" name="spawn_5" x="200" y="700">
+  <object id="18" name="spawn_5" x="300" y="300">
    <properties>
     <property name="enemy_type" value="slime"/>
    </properties>
@@ -81,7 +81,7 @@
   </object>
  </objectgroup>
  <objectgroup id="5" name="PlayerSpawns">
-  <object id="19" name="player_spawn_1" x="100" y="100">
+  <object id="19" name="player_spawn_1" x="200" y="700">
    <point/>
   </object>
   <object id="20" name="player_spawn_2" x="850" y="100">

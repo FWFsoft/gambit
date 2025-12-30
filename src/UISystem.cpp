@@ -4,12 +4,16 @@
 #include <imgui_impl_opengl3.h>
 #include <imgui_impl_sdl2.h>
 
+#include <cmath>
+
 #include "ClientPrediction.h"
 #include "GameStateManager.h"
 #include "ItemRegistry.h"
 #include "Logger.h"
 #include "NetworkClient.h"
 #include "Player.h"
+#include "Texture.h"
+#include "TextureManager.h"
 #include "Window.h"
 #include "config/PlayerConfig.h"
 
@@ -19,9 +23,51 @@ UISystem::UISystem(Window* window, ClientPrediction* clientPrediction,
       clientPrediction(clientPrediction),
       client(client),
       showSettings(false),
-      currentTime(0.0f) {
+      currentTime(0.0f),
+      titleScreenBackground(nullptr),
+      titleMusic(nullptr) {
   // Load settings
   settings.load(Settings::DEFAULT_FILENAME);
+
+  // Load title screen background
+  titleScreenBackground =
+      TextureManager::instance().get("assets/uis/blue_zone.png");
+  if (!titleScreenBackground) {
+    Logger::error("Failed to load title screen background");
+  }
+
+  // Load title screen music (SDL_mixer already initialized by MusicSystem)
+  titleMusic = Mix_LoadMUS("assets/music/landing_screen.wav");
+  if (!titleMusic) {
+    Logger::error("Failed to load title screen music: " +
+                  std::string(Mix_GetError()));
+  }
+
+  // Subscribe to state changes to control title music
+  EventBus::instance().subscribe<GameStateChangedEvent>(
+      [this](const GameStateChangedEvent& e) {
+        // Start title music when entering TitleScreen
+        if (e.newState == GameState::TitleScreen && titleMusic) {
+          Mix_VolumeMusic(64);                   // 50% volume
+          Mix_FadeInMusic(titleMusic, -1, 500);  // Loop forever, 500ms fade
+          Logger::info("Started title screen music");
+        }
+        // Fade out title music when leaving TitleScreen
+        else if (e.previousState == GameState::TitleScreen && titleMusic) {
+          Mix_FadeOutMusic(500);  // 500ms fade out
+          Logger::info("Faded out title screen music");
+        }
+      });
+
+  // If we're already in TitleScreen state (transition happened before UISystem
+  // was created), start the music now
+  if (GameStateManager::instance().getCurrentState() ==
+          GameState::TitleScreen &&
+      titleMusic) {
+    Mix_VolumeMusic(64);
+    Mix_FadeInMusic(titleMusic, -1, 500);
+    Logger::info("Started title screen music (initial state)");
+  }
 
   EventBus::instance().subscribe<RenderEvent>(
       [this](const RenderEvent& e) { onRender(e); });
@@ -42,6 +88,12 @@ UISystem::UISystem(Window* window, ClientPrediction* clientPrediction,
   Logger::info("UISystem initialized");
 }
 
+UISystem::~UISystem() {
+  if (titleMusic) {
+    Mix_FreeMusic(titleMusic);
+  }
+}
+
 void UISystem::onRender(const RenderEvent& e) { render(); }
 
 void UISystem::render() {
@@ -54,6 +106,9 @@ void UISystem::render() {
   GameState currentState = GameStateManager::instance().getCurrentState();
 
   switch (currentState) {
+    case GameState::TitleScreen:
+      renderTitleScreen();
+      break;
     case GameState::MainMenu:
       renderMainMenu();
       if (showSettings) {
@@ -83,6 +138,46 @@ void UISystem::render() {
   // Render ImGui
   ImGui::Render();
   ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+}
+
+void UISystem::renderTitleScreen() {
+  ImVec2 windowSize = ImGui::GetIO().DisplaySize;
+
+  // Fullscreen background image
+  if (titleScreenBackground) {
+    ImGui::SetNextWindowPos(ImVec2(0, 0));
+    ImGui::SetNextWindowSize(windowSize);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    ImGui::Begin("##TitleBackground", nullptr,
+                 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                     ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
+                     ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoBackground);
+
+    ImGui::Image((ImTextureID)(intptr_t)titleScreenBackground->getID(),
+                 windowSize);
+
+    ImGui::End();
+    ImGui::PopStyleVar();
+  }
+
+  // "Press any key to continue" prompt at bottom
+  ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+  float yPos = windowSize.y * 0.92f;
+  ImGui::SetNextWindowPos(ImVec2(center.x, yPos), ImGuiCond_Always,
+                          ImVec2(0.5f, 0.5f));
+  ImGui::SetNextWindowBgAlpha(0.0f);
+
+  ImGui::Begin("##TitlePrompt", nullptr,
+               ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                   ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize);
+
+  // Pulsing text effect
+  float alpha = 0.6f + 0.4f * sinf(currentTime * 3.0f);
+  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, alpha));
+  ImGui::Text("Press any key to continue");
+  ImGui::PopStyleColor();
+
+  ImGui::End();
 }
 
 void UISystem::renderMainMenu() {

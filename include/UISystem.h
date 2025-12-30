@@ -1,5 +1,7 @@
 #pragma once
 
+#include <SDL_mixer.h>
+
 #include <deque>
 #include <string>
 
@@ -9,6 +11,7 @@
 class Window;
 class ClientPrediction;
 class NetworkClient;
+class Texture;
 struct ItemDefinition;
 
 // UISystem manages ImGui frame lifecycle and rendering
@@ -17,7 +20,7 @@ class UISystem {
  public:
   UISystem(Window* window, ClientPrediction* clientPrediction,
            NetworkClient* client);
-  ~UISystem() = default;
+  ~UISystem();
 
   // Called each frame to render UI
   void render();
@@ -26,6 +29,7 @@ class UISystem {
   void onRender(const RenderEvent& e);
 
   // Menu rendering
+  void renderTitleScreen();
   void renderMainMenu();
   void renderSettingsPanel();
 
@@ -56,4 +60,8 @@ class UISystem {
   bool showSettings;
   std::deque<Notification> notifications;  // Active pickup notifications
   float currentTime;                       // Accumulated time in seconds
+
+  // Title screen assets
+  Texture* titleScreenBackground;
+  Mix_Music* titleMusic;
 };

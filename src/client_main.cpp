@@ -43,9 +43,8 @@ int main() {
     return EXIT_FAILURE;
   }
 
-  // Auto-start in Playing state since we connect before main menu
-  // TODO: Refactor to show main menu before connection
-  GameStateManager::instance().transitionTo(GameState::Playing);
+  // Start in title screen
+  GameStateManager::instance().transitionTo(GameState::TitleScreen);
 
   Window window("Gambit Client", Config::Screen::WIDTH, Config::Screen::HEIGHT);
   window.initImGui();

@@ -28,7 +28,11 @@
       "Bash(timeout 3 ./build/Client:*)",
       "Bash(python3:*)",
       "Bash(make test:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Skill(search)",
+      "Bash(uv run python:*)",
+      "Bash(pkill:*)",
+      "Bash(killall:*)"
     ]
   }
 }

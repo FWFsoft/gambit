@@ -4,13 +4,16 @@
 
 #include "ClientPrediction.h"
 #include "EventBus.h"
+#include "GameStateManager.h"
 #include "Logger.h"
 #include "Player.h"
 #include "TiledMap.h"
 
 MusicSystem::MusicSystem(const ClientPrediction* prediction,
                          const TiledMap* map)
-    : clientPrediction(prediction), tiledMap(map), volume(DEFAULT_VOLUME),
+    : clientPrediction(prediction),
+      tiledMap(map),
+      volume(DEFAULT_VOLUME),
       muted(false) {
   // Initialize SDL_mixer
   if (Mix_OpenAudio(AUDIO_FREQUENCY, MIX_DEFAULT_FORMAT, AUDIO_CHANNELS,
@@ -47,6 +50,13 @@ MusicSystem::~MusicSystem() {
 void MusicSystem::onUpdate(const UpdateEvent& e) { checkZoneTransition(); }
 
 void MusicSystem::checkZoneTransition() {
+  // Only check zone transitions when actively playing the game
+  // Don't interfere with title screen or menu music
+  GameState currentState = GameStateManager::instance().getCurrentState();
+  if (currentState != GameState::Playing) {
+    return;
+  }
+
   assert(clientPrediction != nullptr && "ClientPrediction is null");
   assert(tiledMap != nullptr && "TiledMap is null");
 
