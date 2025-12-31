@@ -187,6 +187,8 @@ void UISystem::renderTitleScreen() {
                           ImVec2(0.5f, 0.5f));
   ImGui::SetNextWindowBgAlpha(0.0f);
 
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+
   ImGui::Begin("##TitlePrompt", nullptr,
                ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                    ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize);
@@ -196,6 +198,7 @@ void UISystem::renderTitleScreen() {
   ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, alpha));
   ImGui::Text("Press any key to continue");
   ImGui::PopStyleColor();
+  ImGui::PopStyleVar();
 
   ImGui::End();
 
@@ -203,6 +206,8 @@ void UISystem::renderTitleScreen() {
   ImGui::SetNextWindowPos(ImVec2(windowSize.x - 20, windowSize.y - 20),
                           ImGuiCond_Always, ImVec2(1.0f, 1.0f));
   ImGui::SetNextWindowBgAlpha(0.5f);
+
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
 
   ImGui::Begin("##TitleButtons", nullptr,
                ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
@@ -219,6 +224,7 @@ void UISystem::renderTitleScreen() {
   }
 
   ImGui::End();
+  ImGui::PopStyleVar();
 
   // Render settings panel if open
   if (showSettings) {
@@ -237,6 +243,8 @@ void UISystem::renderCharacterSelect() {
   ImGui::SetNextWindowPos(ImVec2(center.x, 30), ImGuiCond_Always,
                           ImVec2(0.5f, 0.0f));
   ImGui::SetNextWindowBgAlpha(0.0f);
+
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
   ImGui::Begin("##CharacterSelectTitle", nullptr,
                ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                    ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize |
@@ -247,6 +255,7 @@ void UISystem::renderCharacterSelect() {
   ImGui::SetWindowFontScale(1.0f);
 
   ImGui::End();
+  ImGui::PopStyleVar();
 
   // TOP-LEFT: Character grid
   const CharacterRegistry& registry = CharacterRegistry::instance();
@@ -264,6 +273,7 @@ void UISystem::renderCharacterSelect() {
                           ImVec2(0.0f, 0.0f));
   ImGui::SetNextWindowSize(ImVec2(gridWidth + 40, gridHeight + 40),
                            ImGuiCond_Always);
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
 
   ImGui::Begin("Character Grid", nullptr,
                ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
@@ -285,14 +295,14 @@ void UISystem::renderCharacterSelect() {
 
       ImGui::PushID(character.id);
 
-      // Calculate size with selection animation
-      float size = portraitSize;
       bool isSelected = (selectedCharacterId == character.id);
 
+      // Calculate display size with selection animation (doesn't affect layout)
+      float displaySize = portraitSize;
       if (isSelected) {
         // Grow by 10% with subtle pulse
         float pulse = 1.0f + 0.05f * sinf(selectionAnimationTime * 4.0f);
-        size = portraitSize * 1.1f * pulse;
+        displaySize = portraitSize * 1.1f * pulse;
       }
 
       // Try to load portrait texture
@@ -301,18 +311,21 @@ void UISystem::renderCharacterSelect() {
 
       // If portrait exists, use it as image button
       if (portrait && portrait->isLoaded()) {
-        // Create invisible button for click detection
+        // Create invisible button for click detection (fixed size for layout)
         ImVec2 cursorPos = ImGui::GetCursorScreenPos();
-        bool clicked = ImGui::InvisibleButton("##portrait", ImVec2(size, size));
+        bool clicked = ImGui::InvisibleButton(
+            "##portrait", ImVec2(portraitSize, portraitSize));
 
-        // Draw portrait
-        ImVec2 topLeft = cursorPos;
-        ImVec2 bottomRight = ImVec2(cursorPos.x + size, cursorPos.y + size);
+        // Calculate centered position for scaled portrait
+        float offset = (displaySize - portraitSize) / 2.0f;
+        ImVec2 topLeft = ImVec2(cursorPos.x - offset, cursorPos.y - offset);
+        ImVec2 bottomRight =
+            ImVec2(topLeft.x + displaySize, topLeft.y + displaySize);
 
-        // Draw texture
-        ImGui::SetCursorScreenPos(topLeft);
-        ImGui::Image((ImTextureID)(intptr_t)portrait->getID(),
-                     ImVec2(size, size));
+        // Draw texture centered and scaled (doesn't affect layout)
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        drawList->AddImage((ImTextureID)(intptr_t)portrait->getID(), topLeft,
+                           bottomRight);
 
         if (clicked) {
           selectedCharacterId = character.id;
@@ -329,8 +342,8 @@ void UISystem::renderCharacterSelect() {
                               ImVec4(character.r / 255.0f, character.g / 255.0f,
                                      character.b / 255.0f, 1.0f));
 
-        bool clicked =
-            ImGui::Button(character.name.c_str(), ImVec2(size, size));
+        bool clicked = ImGui::Button(character.name.c_str(),
+                                     ImVec2(portraitSize, portraitSize));
 
         ImGui::PopStyleColor();
 
@@ -357,15 +370,18 @@ void UISystem::renderCharacterSelect() {
   }
 
   ImGui::End();
+  ImGui::PopStyleVar();
 
   // BOTTOM-RIGHT: Character preview
   ImGui::SetNextWindowPos(ImVec2(windowSize.x - 50, windowSize.y - 130),
                           ImGuiCond_Always, ImVec2(1.0f, 1.0f));
   ImGui::SetNextWindowSize(ImVec2(350, 400), ImGuiCond_Always);
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
 
   ImGui::Begin("Character Preview", nullptr,
                ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-                   ImGuiWindowFlags_NoBringToFrontOnFocus);
+                   ImGuiWindowFlags_NoBringToFrontOnFocus |
+                   ImGuiWindowFlags_NoCollapse);
 
   if (selectedCharacterId != 0) {
     const CharacterDefinition* character =
@@ -415,11 +431,13 @@ void UISystem::renderCharacterSelect() {
   }
 
   ImGui::End();
+  ImGui::PopStyleVar();
 
   // BOTTOM CENTER: Confirm button
-  ImGui::SetNextWindowPos(ImVec2(center.x, windowSize.y - 100),
+  ImGui::SetNextWindowPos(ImVec2(windowSize.x / 2, windowSize.y - 50),
                           ImGuiCond_Always, ImVec2(0.5f, 0.5f));
   ImGui::SetNextWindowBgAlpha(0.8f);
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
 
   ImGui::Begin("##ConfirmSelection", nullptr,
                ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
@@ -442,6 +460,7 @@ void UISystem::renderCharacterSelect() {
   }
 
   ImGui::End();
+  ImGui::PopStyleVar();
 }
 
 void UISystem::renderMainMenu() {
@@ -450,7 +469,7 @@ void UISystem::renderMainMenu() {
   ImGui::SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
   ImGui::SetNextWindowSize(ImVec2(300, 200), ImGuiCond_Always);
 
-  ImGui::Begin("Gambit", nullptr,
+  ImGui::Begin("Blue Zone", nullptr,
                ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
                    ImGuiWindowFlags_NoCollapse);
 
@@ -629,6 +648,7 @@ void UISystem::renderDeathScreen() {
   ImGui::SetNextWindowPos(ImVec2(0, 0));
   ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
   ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.2f, 0.0f, 0.0f, 0.7f));
+
   ImGui::Begin("DeathOverlay", nullptr,
                ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                    ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoInputs);
@@ -639,6 +659,8 @@ void UISystem::renderDeathScreen() {
   ImVec2 center = ImGui::GetMainViewport()->GetCenter();
   ImGui::SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
   ImGui::SetNextWindowBgAlpha(0.0f);
+
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 
   ImGui::Begin("DeathMessage", nullptr,
                ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
@@ -660,6 +682,7 @@ void UISystem::renderDeathScreen() {
   ImGui::SetWindowFontScale(1.0f);
 
   ImGui::PopStyleColor();
+  ImGui::PopStyleVar();
 
   ImGui::Spacing();
   ImGui::Spacing();

@@ -42,7 +42,8 @@ class EnemyInterpolation {
   std::unordered_map<uint32_t, Enemy> enemies;
   std::unordered_map<uint32_t, std::deque<EnemySnapshot>> snapshots;
 
-  static constexpr size_t MAX_SNAPSHOTS = 3;  // Same as RemotePlayerInterpolation
+  static constexpr size_t MAX_SNAPSHOTS =
+      3;  // Same as RemotePlayerInterpolation
 
   void onNetworkPacketReceived(const NetworkPacketReceivedEvent& e);
 };

@@ -117,7 +117,6 @@ void DamageNumberSystem::renderDamageNumber(const DamageNumber& num) {
                           ImVec2(0.5f, 0.5f));  // Center on position
   ImGui::SetNextWindowBgAlpha(0.0f);
 
-  // Push style vars BEFORE Begin() so they take effect
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
   ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
 
@@ -141,5 +140,5 @@ void DamageNumberSystem::renderDamageNumber(const DamageNumber& num) {
 
   ImGui::PopStyleColor();
   ImGui::End();
-  ImGui::PopStyleVar(2);  // Pop after End() since we pushed before Begin()
+  ImGui::PopStyleVar(2);
 }

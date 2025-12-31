@@ -23,8 +23,7 @@ class CombatSystem {
   void onAttackInput(const AttackInputEvent& e);
 
   // Find nearest enemy within attack range
-  uint32_t findNearestEnemy(float playerX, float playerY,
-                            float maxRange) const;
+  uint32_t findNearestEnemy(float playerX, float playerY, float maxRange) const;
 
   float distance(float x1, float y1, float x2, float y2) const;
 };
