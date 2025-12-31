@@ -32,10 +32,18 @@ void InputSystem::onKeyDown(const KeyDownEvent& e) {
   GameStateManager& gsm = GameStateManager::instance();
   GameState currentState = gsm.getCurrentState();
 
-  // TitleScreen: any key advances to main menu
+  // TitleScreen: any key advances to character select
   if (currentState == GameState::TitleScreen) {
-    gsm.transitionTo(GameState::MainMenu);
+    gsm.transitionTo(GameState::CharacterSelect);
     return;
+  }
+
+  // CharacterSelect: ESC returns to title screen
+  if (currentState == GameState::CharacterSelect) {
+    if (e.key == SDLK_ESCAPE) {
+      gsm.transitionTo(GameState::TitleScreen);
+    }
+    return;  // All other input handled by ImGui clicks
   }
 
   // ESC: Toggle pause (Playing <-> Paused)

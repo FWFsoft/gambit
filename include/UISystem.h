@@ -31,6 +31,7 @@ class UISystem {
 
   // Menu rendering
   void renderTitleScreen();
+  void renderCharacterSelect();
   void renderMainMenu();
   void renderSettingsPanel();
 
@@ -67,4 +68,9 @@ class UISystem {
   // Title screen assets
   Texture* titleScreenBackground;
   Mix_Music* titleMusic;
+
+  // Character selection state
+  uint32_t hoveredCharacterId;   // Character mouse is over (0 = none)
+  uint32_t selectedCharacterId;  // Character selected for preview (0 = none)
+  float selectionAnimationTime;  // For pulsing/growing effect
 };

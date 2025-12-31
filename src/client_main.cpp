@@ -1,6 +1,8 @@
 #include "AnimationAssetLoader.h"
 #include "AnimationSystem.h"
 #include "Camera.h"
+#include "CharacterRegistry.h"
+#include "CharacterSelectionState.h"
 #include "ClientPrediction.h"
 #include "CollisionDebugRenderer.h"
 #include "CollisionSystem.h"
@@ -102,6 +104,32 @@ int main() {
   AnimationAssetLoader::loadPlayerAnimations(
       *localPlayer.getAnimationController(), "assets/player_animated.png");
   animationSystem.registerEntity(&localPlayer);
+
+  // Apply character selection (color tint for now)
+  if (CharacterSelectionState::instance().hasSelection()) {
+    uint32_t selectedId =
+        CharacterSelectionState::instance().getSelectedCharacterId();
+    const CharacterDefinition* character =
+        CharacterRegistry::instance().getCharacter(selectedId);
+
+    if (character) {
+      // Apply character color tint to local player
+      localPlayer.r = character->r;
+      localPlayer.g = character->g;
+      localPlayer.b = character->b;
+
+      Logger::info("Applied character selection: " + character->name +
+                   " (RGB: " + std::to_string(character->r) + "," +
+                   std::to_string(character->g) + "," +
+                   std::to_string(character->b) + ")");
+    }
+  } else {
+    // Fallback: use default white if no selection
+    localPlayer.r = 255;
+    localPlayer.g = 255;
+    localPlayer.b = 255;
+    Logger::info("No character selected, using default appearance");
+  }
 
   // Add test items to inventory for demonstration
   localPlayer.inventory[0] = ItemStack(1, 5);    // 5x Health Potion

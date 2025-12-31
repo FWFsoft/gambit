@@ -156,6 +156,8 @@ add_executable(Client
     src/MusicZoneDebugRenderer.cpp
     src/EnemyInterpolation.cpp
     src/CombatSystem.cpp
+    src/CharacterRegistry.cpp
+    src/CharacterSelectionState.cpp
     src/DamageNumberSystem.cpp
     src/UISystem.cpp
     src/GameStateManager.cpp
@@ -263,6 +265,7 @@ add_executable(test_client_prediction
     src/AnimationController.cpp
     src/AnimationSystem.cpp
     src/AnimationAssetLoader.cpp
+    src/CharacterSelectionState.cpp
 )
 target_include_directories(test_client_prediction SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
 target_include_directories(test_client_prediction PRIVATE include tests)

@@ -66,9 +66,10 @@ RenderSystem::RenderSystem(Window* window, ClientPrediction* clientPrediction,
 }
 
 void RenderSystem::onRender(const RenderEvent& e) {
-  // Skip game world rendering during title screen
-  if (GameStateManager::instance().getCurrentState() ==
-      GameState::TitleScreen) {
+  // Skip game world rendering during title screen and character select
+  GameState currentState = GameStateManager::instance().getCurrentState();
+  if (currentState == GameState::TitleScreen ||
+      currentState == GameState::CharacterSelect) {
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
     return;

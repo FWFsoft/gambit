@@ -6,9 +6,9 @@
 namespace Config {
 namespace Screen {
 
-// Window dimensions
-constexpr int WIDTH = 800;
-constexpr int HEIGHT = 600;
+// Window dimensions (16:9 aspect ratio for character selection UI)
+constexpr int WIDTH = 1280;
+constexpr int HEIGHT = 720;
 
 // Viewport bounds for orthographic projection
 constexpr float ORTHO_LEFT = 0.0f;

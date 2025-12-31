@@ -6,6 +6,8 @@
 
 #include <cmath>
 
+#include "CharacterRegistry.h"
+#include "CharacterSelectionState.h"
 #include "ClientPrediction.h"
 #include "DamageNumberSystem.h"
 #include "GameStateManager.h"
@@ -28,7 +30,10 @@ UISystem::UISystem(Window* window, ClientPrediction* clientPrediction,
       showSettings(false),
       currentTime(0.0f),
       titleScreenBackground(nullptr),
-      titleMusic(nullptr) {
+      titleMusic(nullptr),
+      hoveredCharacterId(0),
+      selectedCharacterId(0),
+      selectionAnimationTime(0.0f) {
   // Load settings
   settings.load(Settings::DEFAULT_FILENAME);
 
@@ -112,6 +117,9 @@ void UISystem::render() {
     case GameState::TitleScreen:
       renderTitleScreen();
       break;
+    case GameState::CharacterSelect:
+      renderCharacterSelect();
+      break;
     case GameState::MainMenu:
       renderMainMenu();
       if (showSettings) {
@@ -188,6 +196,250 @@ void UISystem::renderTitleScreen() {
   ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, alpha));
   ImGui::Text("Press any key to continue");
   ImGui::PopStyleColor();
+
+  ImGui::End();
+
+  // Settings and Quit buttons in bottom-right corner
+  ImGui::SetNextWindowPos(ImVec2(windowSize.x - 20, windowSize.y - 20),
+                          ImGuiCond_Always, ImVec2(1.0f, 1.0f));
+  ImGui::SetNextWindowBgAlpha(0.5f);
+
+  ImGui::Begin("##TitleButtons", nullptr,
+               ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                   ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize);
+
+  if (ImGui::Button("Settings", ImVec2(100, 30))) {
+    showSettings = true;
+  }
+
+  ImGui::SameLine();
+
+  if (ImGui::Button("Quit", ImVec2(100, 30))) {
+    window->close();
+  }
+
+  ImGui::End();
+
+  // Render settings panel if open
+  if (showSettings) {
+    renderSettingsPanel();
+  }
+}
+
+void UISystem::renderCharacterSelect() {
+  // Update animation time
+  selectionAnimationTime = currentTime;
+
+  ImVec2 windowSize = ImGui::GetIO().DisplaySize;
+  ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+
+  // Title at top
+  ImGui::SetNextWindowPos(ImVec2(center.x, 30), ImGuiCond_Always,
+                          ImVec2(0.5f, 0.0f));
+  ImGui::SetNextWindowBgAlpha(0.0f);
+  ImGui::Begin("##CharacterSelectTitle", nullptr,
+               ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                   ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize |
+                   ImGuiWindowFlags_NoBringToFrontOnFocus);
+
+  ImGui::SetWindowFontScale(2.5f);
+  ImGui::Text("Select Your Character");
+  ImGui::SetWindowFontScale(1.0f);
+
+  ImGui::End();
+
+  // TOP-LEFT: Character grid
+  const CharacterRegistry& registry = CharacterRegistry::instance();
+  const auto& characters = registry.getAllCharacters();
+
+  // Grid layout: 5 columns x 4 rows for 19 characters
+  const int columns = 5;
+  const int rows = 4;
+  const float portraitSize = 120.0f;
+  const float padding = 20.0f;
+  const float gridWidth = columns * (portraitSize + padding);
+  const float gridHeight = rows * (portraitSize + padding);
+
+  ImGui::SetNextWindowPos(ImVec2(50, 100), ImGuiCond_Always,
+                          ImVec2(0.0f, 0.0f));
+  ImGui::SetNextWindowSize(ImVec2(gridWidth + 40, gridHeight + 40),
+                           ImGuiCond_Always);
+
+  ImGui::Begin("Character Grid", nullptr,
+               ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                   ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
+                   ImGuiWindowFlags_NoBringToFrontOnFocus);
+
+  hoveredCharacterId = 0;
+
+  for (int row = 0; row < rows; row++) {
+    for (int col = 0; col < columns; col++) {
+      int index = row * columns + col;
+      if (index >= static_cast<int>(characters.size())) break;
+
+      const CharacterDefinition& character = characters[index];
+
+      if (col > 0) {
+        ImGui::SameLine();
+      }
+
+      ImGui::PushID(character.id);
+
+      // Calculate size with selection animation
+      float size = portraitSize;
+      bool isSelected = (selectedCharacterId == character.id);
+
+      if (isSelected) {
+        // Grow by 10% with subtle pulse
+        float pulse = 1.0f + 0.05f * sinf(selectionAnimationTime * 4.0f);
+        size = portraitSize * 1.1f * pulse;
+      }
+
+      // Try to load portrait texture
+      Texture* portrait =
+          TextureManager::instance().get(character.portraitPath);
+
+      // If portrait exists, use it as image button
+      if (portrait && portrait->isLoaded()) {
+        // Create invisible button for click detection
+        ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+        bool clicked = ImGui::InvisibleButton("##portrait", ImVec2(size, size));
+
+        // Draw portrait
+        ImVec2 topLeft = cursorPos;
+        ImVec2 bottomRight = ImVec2(cursorPos.x + size, cursorPos.y + size);
+
+        // Draw texture
+        ImGui::SetCursorScreenPos(topLeft);
+        ImGui::Image((ImTextureID)(intptr_t)portrait->getID(),
+                     ImVec2(size, size));
+
+        if (clicked) {
+          selectedCharacterId = character.id;
+          Logger::info("Selected character: " + character.name);
+        }
+
+        if (ImGui::IsItemHovered()) {
+          hoveredCharacterId = character.id;
+        }
+
+      } else {
+        // Fallback: colored button with character name
+        ImGui::PushStyleColor(ImGuiCol_Button,
+                              ImVec4(character.r / 255.0f, character.g / 255.0f,
+                                     character.b / 255.0f, 1.0f));
+
+        bool clicked =
+            ImGui::Button(character.name.c_str(), ImVec2(size, size));
+
+        ImGui::PopStyleColor();
+
+        if (clicked) {
+          selectedCharacterId = character.id;
+          Logger::info("Selected character: " + character.name);
+        }
+
+        if (ImGui::IsItemHovered()) {
+          hoveredCharacterId = character.id;
+        }
+      }
+
+      // Show character name tooltip on hover
+      if (ImGui::IsItemHovered()) {
+        ImGui::BeginTooltip();
+        ImGui::Text("%s", character.name.c_str());
+        // Future: Add stats preview here
+        ImGui::EndTooltip();
+      }
+
+      ImGui::PopID();
+    }
+  }
+
+  ImGui::End();
+
+  // BOTTOM-RIGHT: Character preview
+  ImGui::SetNextWindowPos(ImVec2(windowSize.x - 50, windowSize.y - 130),
+                          ImGuiCond_Always, ImVec2(1.0f, 1.0f));
+  ImGui::SetNextWindowSize(ImVec2(350, 400), ImGuiCond_Always);
+
+  ImGui::Begin("Character Preview", nullptr,
+               ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                   ImGuiWindowFlags_NoBringToFrontOnFocus);
+
+  if (selectedCharacterId != 0) {
+    const CharacterDefinition* character =
+        registry.getCharacter(selectedCharacterId);
+
+    if (character) {
+      // Display character name
+      ImGui::SetWindowFontScale(1.5f);
+      ImGui::Text("%s", character->name.c_str());
+      ImGui::SetWindowFontScale(1.0f);
+
+      ImGui::Separator();
+      ImGui::Spacing();
+
+      // Render sprite preview using idle animation frame
+      // Idle animation: srcX=0, srcY=0, srcW=32, srcH=32 (from
+      // AnimationConfig.h)
+
+      Texture* playerTexture =
+          TextureManager::instance().get("assets/player_animated.png");
+      if (playerTexture && playerTexture->isLoaded()) {
+        // Calculate preview size (3x game size = 96x96)
+        float previewSize = 96.0f;
+
+        // Center the preview in the window
+        ImVec2 cursorPos = ImGui::GetCursorPos();
+        float centerX = (350 - previewSize) / 2.0f;
+        ImGui::SetCursorPos(ImVec2(centerX, cursorPos.y));
+
+        // Draw sprite with color tint applied
+        ImGui::Image((ImTextureID)(intptr_t)playerTexture->getID(),
+                     ImVec2(previewSize, previewSize),
+                     ImVec2(0, 0),  // UV top-left (idle frame)
+                     ImVec2(32.0f / 256.0f, 32.0f / 256.0f),  // UV bottom-right
+                     ImVec4(character->r / 255.0f, character->g / 255.0f,
+                            character->b / 255.0f, 1.0f),  // Color tint
+                     ImVec4(0, 0, 0, 0));                  // No border
+      }
+
+      // Future: Show character stats here
+    }
+  } else {
+    // No character selected
+    ImGui::SetWindowFontScale(1.2f);
+    ImGui::TextWrapped("Select a character from the grid");
+    ImGui::SetWindowFontScale(1.0f);
+  }
+
+  ImGui::End();
+
+  // BOTTOM CENTER: Confirm button
+  ImGui::SetNextWindowPos(ImVec2(center.x, windowSize.y - 100),
+                          ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+  ImGui::SetNextWindowBgAlpha(0.8f);
+
+  ImGui::Begin("##ConfirmSelection", nullptr,
+               ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                   ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize);
+
+  if (selectedCharacterId != 0) {
+    if (ImGui::Button("Confirm Selection", ImVec2(300, 50))) {
+      // Save selection to state
+      CharacterSelectionState::instance().setSelectedCharacter(
+          selectedCharacterId);
+
+      // Transition to Playing state (skip MainMenu as per user request)
+      GameStateManager::instance().transitionTo(GameState::Playing);
+    }
+  } else {
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+    ImGui::Button("Select a Character", ImVec2(300, 50));
+    ImGui::PopStyleColor(2);
+  }
 
   ImGui::End();
 }

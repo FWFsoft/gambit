@@ -33,7 +33,8 @@
       "Bash(uv run python:*)",
       "Bash(pkill:*)",
       "Bash(killall:*)",
-      "Bash(NUM_CLIENTS=1 make dev:*)"
+      "Bash(NUM_CLIENTS=1 make dev:*)",
+      "Bash(NUM_CLIENTS=1 timeout 10 make:*)"
     ]
   }
 }

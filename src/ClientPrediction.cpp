@@ -2,6 +2,7 @@
 
 #include <cmath>
 
+#include "CharacterSelectionState.h"
 #include "DamageNumberSystem.h"
 #include "ItemRegistry.h"
 #include "Logger.h"
@@ -91,12 +92,19 @@ void ClientPrediction::onNetworkPacketReceived(
       // Still have default white color, so this must be our player
       localPlayerId = packet.playerId;
       localPlayer.id = packet.playerId;
-      localPlayer.r = packet.r;
-      localPlayer.g = packet.g;
-      localPlayer.b = packet.b;
-      Logger::info("Local player ID: " + std::to_string(localPlayerId) +
-                   ", color: " + std::to_string(packet.r) + "," +
-                   std::to_string(packet.g) + "," + std::to_string(packet.b));
+
+      // DON'T override r,g,b from server if we have a character selection
+      if (!CharacterSelectionState::instance().hasSelection()) {
+        localPlayer.r = packet.r;
+        localPlayer.g = packet.g;
+        localPlayer.b = packet.b;
+        Logger::info("Local player ID: " + std::to_string(localPlayerId) +
+                     ", color: " + std::to_string(packet.r) + "," +
+                     std::to_string(packet.g) + "," + std::to_string(packet.b));
+      } else {
+        Logger::info("Local player ID: " + std::to_string(localPlayerId) +
+                     ", color preserved from character selection");
+      }
     }
   } else if (type == PacketType::PlayerDied) {
     PlayerDiedPacket packet = deserializePlayerDied(e.data, e.size);
