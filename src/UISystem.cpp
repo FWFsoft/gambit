@@ -559,14 +559,35 @@ void UISystem::renderSettingsPanel() {
 void UISystem::renderHUD() {
   const Player& localPlayer = clientPrediction->getLocalPlayer();
 
-  // Health bar in top-left corner
+  // HUD with portrait in top-left corner
   ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_Always);
-  ImGui::SetNextWindowSize(ImVec2(200, 60), ImGuiCond_Always);
+  ImGui::SetNextWindowSize(ImVec2(280, 80), ImGuiCond_Always);
 
   ImGui::Begin("HUD", nullptr,
                ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                    ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBackground);
 
+  // Get selected character portrait
+  if (CharacterSelectionState::instance().hasSelection()) {
+    uint32_t selectedId =
+        CharacterSelectionState::instance().getSelectedCharacterId();
+    const CharacterDefinition* character =
+        CharacterRegistry::instance().getCharacter(selectedId);
+
+    if (character) {
+      Texture* portrait =
+          TextureManager::instance().get(character->portraitPath);
+
+      if (portrait && portrait->isLoaded()) {
+        // Draw portrait on the left (60x60)
+        ImGui::Image((ImTextureID)(intptr_t)portrait->getID(), ImVec2(60, 60));
+        ImGui::SameLine();
+      }
+    }
+  }
+
+  // Health bar on the right
+  ImGui::BeginGroup();
   ImGui::Text("Health");
 
   // Calculate health percentage
@@ -583,8 +604,10 @@ void UISystem::renderHUD() {
   }
 
   ImGui::PushStyleColor(ImGuiCol_PlotHistogram, barColor);
-  ImGui::ProgressBar(healthPercent, ImVec2(-1, 0));
+  ImGui::ProgressBar(healthPercent, ImVec2(200, 0));
   ImGui::PopStyleColor();
+
+  ImGui::EndGroup();
 
   ImGui::End();
 }

@@ -50,8 +50,8 @@ void EnemySystem::update(float deltaTime,
   // Clear death events from last frame
   diedThisFrame.clear();
 
-  // Update accumulated time (convert seconds to milliseconds)
-  accumulatedTime += deltaTime * 1000.0f;
+  // Update accumulated time (deltaTime is already in milliseconds)
+  accumulatedTime += deltaTime;
 
   for (auto& [id, enemy] : enemies) {
     // Check if dead enemy should respawn (random delay)
