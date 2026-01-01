@@ -1,0 +1,20 @@
+<?xml version="1.0" ?>
+<map version="1.10" tiledversion="1.10.2" orientation="isometric" renderorder="right-down" width="10" height="10" tilewidth="128" tileheight="128" infinite="0" nextlayerid="2" nextobjectid="1">
+  <tileset firstgid="1" name="gambit_isometric" tilewidth="128" tileheight="128" tilecount="90" columns="9">
+    <image source="../../assets/maps/all_tiles.png" width="1152" height="1280"/>
+  </tileset>
+  <layer id="1" name="Ground" width="10" height="10">
+    <data encoding="csv">
+5,5,12,10,3,1,11,10,1,1,
+10,2,11,11,20,10,2,10,3,1,
+19,5,20,11,20,19,11,3,11,11,
+1,5,1,20,1,10,19,7,3,1,
+1,10,10,2,12,11,11,7,11,20,
+5,5,3,10,19,1,19,7,19,3,
+1,19,1,7,12,5,10,1,5,20,
+7,3,5,20,19,5,3,3,10,7,
+10,3,12,11,1,12,20,1,1,5,
+10,19,1,12,10,3,3,10,5,7
+</data>
+  </layer>
+</map>

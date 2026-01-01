@@ -1,0 +1,106 @@
+{
+  "tileset": {
+    "name": "gambit_isometric",
+    "image": "../../assets/maps/all_tiles.png",
+    "collision_map": "../../assets/maps/collison_map.png",
+    "tile_width": 128,
+    "tile_height": 128,
+    "columns": 8,
+    "description": "Isometric tileset with blocks, walls, stairs, and ramps"
+  },
+  "edge_types": {
+    "description": "Edge compatibility types for tile adjacency",
+    "types": [
+      "flat_top",
+      "flat_bottom",
+      "wall_face_north",
+      "wall_face_south",
+      "wall_face_east",
+      "wall_face_west",
+      "wall_side_vertical",
+      "wall_side_horizontal",
+      "ramp_up_north",
+      "ramp_up_south",
+      "ramp_up_east",
+      "ramp_up_west",
+      "stairs_up",
+      "stairs_down",
+      "empty"
+    ]
+  },
+  "tiles": [
+    {
+      "id": 0,
+      "name": "flat_block_full",
+      "row": 0,
+      "col": 0,
+      "description": "Full height isometric block - flat on top",
+      "edges": {
+        "north": "flat_top",
+        "south": "flat_top",
+        "east": "flat_top",
+        "west": "flat_top"
+      },
+      "weight": 10,
+      "collision_tile_id": 0,
+      "notes": "Basic ground tile - most common"
+    },
+    {
+      "id": 1,
+      "name": "flat_block_lowered_ne",
+      "row": 0,
+      "col": 1,
+      "description": "Block with NE corner lowered (tan colored)",
+      "edges": {
+        "north": "flat_top",
+        "south": "flat_top",
+        "east": "flat_top",
+        "west": "flat_top"
+      },
+      "weight": 2,
+      "collision_tile_id": 1,
+      "notes": "Decorative variant"
+    },
+    {
+      "id": 2,
+      "name": "flat_block_standard",
+      "row": 0,
+      "col": 2,
+      "description": "Standard flat block",
+      "edges": {
+        "north": "flat_top",
+        "south": "flat_top",
+        "east": "flat_top",
+        "west": "flat_top"
+      },
+      "weight": 10,
+      "collision_tile_id": 2
+    },
+    {
+      "id": 3,
+      "name": "example_wall_north",
+      "row": 0,
+      "col": 3,
+      "description": "PLACEHOLDER - Wall facing north (needs proper edge definition)",
+      "edges": {
+        "north": "wall_face_north",
+        "south": "flat_top",
+        "east": "wall_side_vertical",
+        "west": "wall_side_vertical"
+      },
+      "weight": 1,
+      "collision_tile_id": 3,
+      "notes": "TODO: Verify edge labels by analyzing tile geometry"
+    }
+  ],
+  "notes": {
+    "todo": [
+      "Complete tile definitions for all tiles in all_tiles.png",
+      "Analyze collision_map.png to map collision shapes to tile IDs",
+      "Define proper edge compatibility rules for isometric geometry",
+      "Add rotation variants (e.g., wall_north can rotate to wall_east/south/west)",
+      "Consider symmetry rules to reduce redundant definitions"
+    ],
+    "edge_philosophy": "For isometric tiles, edges represent what's visible on that side. A 'flat_top' edge can connect to another 'flat_top' edge. A 'wall_face' cannot connect to 'flat_top' unless it's intentional (cliff edge)."
+  }
+}
