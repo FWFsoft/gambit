@@ -109,6 +109,8 @@ add_executable(Server
     src/AnimationAssetLoader.cpp
     src/EnemySystem.cpp
     src/ItemRegistry.cpp
+    src/Effect.cpp
+    src/EffectManager.cpp
 )
 target_include_directories(Server SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
 target_include_directories(Server PRIVATE include)
@@ -266,6 +268,7 @@ add_executable(test_client_prediction
     src/AnimationSystem.cpp
     src/AnimationAssetLoader.cpp
     src/CharacterSelectionState.cpp
+    src/CharacterRegistry.cpp
 )
 target_include_directories(test_client_prediction SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
 target_include_directories(test_client_prediction PRIVATE include tests)

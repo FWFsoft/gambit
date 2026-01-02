@@ -117,9 +117,11 @@ int main() {
       localPlayer.r = character->r;
       localPlayer.g = character->g;
       localPlayer.b = character->b;
+      localPlayer.characterId = selectedId;
 
       Logger::info("Applied character selection: " + character->name +
-                   " (RGB: " + std::to_string(character->r) + "," +
+                   " (ID: " + std::to_string(selectedId) +
+                   ", RGB: " + std::to_string(character->r) + "," +
                    std::to_string(character->g) + "," +
                    std::to_string(character->b) + ")");
     }
@@ -128,6 +130,7 @@ int main() {
     localPlayer.r = 255;
     localPlayer.g = 255;
     localPlayer.b = 255;
+    localPlayer.characterId = 0;
     Logger::info("No character selected, using default appearance");
   }
 

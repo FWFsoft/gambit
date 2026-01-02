@@ -20,7 +20,11 @@ enum class PacketType : uint8_t {
   EquipItem = 13,
   ItemSpawned = 14,        // Server → Client (broadcast)
   ItemPickupRequest = 15,  // Client → Server
-  ItemPickedUp = 16        // Server → Client (broadcast)
+  ItemPickedUp = 16,       // Server → Client (broadcast)
+  EffectApplied = 17,      // Server → Client (broadcast)
+  EffectRemoved = 18,      // Server → Client (broadcast)
+  EffectUpdate = 19,       // Server → Client (broadcast)
+  CharacterSelected = 20   // Client → Server
 };
 
 struct ClientInputPacket {
@@ -152,6 +156,48 @@ struct ItemPickedUpPacket {
   uint32_t playerId;     // Who picked it up
 };
 
+// Effect-related packets
+
+struct EffectAppliedPacket {
+  PacketType type = PacketType::EffectApplied;
+  uint32_t targetId;   // Player or Enemy ID
+  bool isEnemy;        // true = enemy, false = player
+  uint8_t effectType;  // EffectType enum
+  uint8_t stacks;
+  float remainingDuration;  // Milliseconds
+  uint32_t sourceId;        // Who applied it
+};
+// Size: 16 bytes (1 + 4 + 1 + 1 + 1 + 4 + 4)
+
+struct EffectRemovedPacket {
+  PacketType type = PacketType::EffectRemoved;
+  uint32_t targetId;
+  bool isEnemy;
+  uint8_t effectType;
+};
+// Size: 7 bytes (1 + 4 + 1 + 1)
+
+struct NetworkEffect {
+  uint8_t effectType;
+  uint8_t stacks;
+  float remainingDuration;
+};
+
+struct EffectUpdatePacket {
+  PacketType type = PacketType::EffectUpdate;
+  uint32_t targetId;
+  bool isEnemy;
+  std::vector<NetworkEffect> effects;
+};
+// Size: Variable (1 + 4 + 1 + 2 + effectCount * 6)
+
+// Character selection packet
+struct CharacterSelectedPacket {
+  PacketType type = PacketType::CharacterSelected;
+  uint32_t characterId;  // Character ID (1-19)
+};
+// Size: 5 bytes (1 + 4)
+
 // Serialization functions
 std::vector<uint8_t> serialize(const ClientInputPacket& packet);
 std::vector<uint8_t> serialize(const StateUpdatePacket& packet);
@@ -170,6 +216,10 @@ std::vector<uint8_t> serialize(const EquipItemPacket& packet);
 std::vector<uint8_t> serialize(const ItemSpawnedPacket& packet);
 std::vector<uint8_t> serialize(const ItemPickupRequestPacket& packet);
 std::vector<uint8_t> serialize(const ItemPickedUpPacket& packet);
+std::vector<uint8_t> serialize(const EffectAppliedPacket& packet);
+std::vector<uint8_t> serialize(const EffectRemovedPacket& packet);
+std::vector<uint8_t> serialize(const EffectUpdatePacket& packet);
+std::vector<uint8_t> serialize(const CharacterSelectedPacket& packet);
 
 // Deserialization functions
 ClientInputPacket deserializeClientInput(const uint8_t* data, size_t size);
@@ -193,6 +243,11 @@ ItemSpawnedPacket deserializeItemSpawned(const uint8_t* data, size_t size);
 ItemPickupRequestPacket deserializeItemPickupRequest(const uint8_t* data,
                                                      size_t size);
 ItemPickedUpPacket deserializeItemPickedUp(const uint8_t* data, size_t size);
+EffectAppliedPacket deserializeEffectApplied(const uint8_t* data, size_t size);
+EffectRemovedPacket deserializeEffectRemoved(const uint8_t* data, size_t size);
+EffectUpdatePacket deserializeEffectUpdate(const uint8_t* data, size_t size);
+CharacterSelectedPacket deserializeCharacterSelected(const uint8_t* data,
+                                                     size_t size);
 
 // Helper functions for binary I/O
 void writeUint32(std::vector<uint8_t>& buffer, uint32_t value);

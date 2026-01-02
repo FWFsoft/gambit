@@ -569,3 +569,144 @@ ItemPickedUpPacket deserializeItemPickedUp(const uint8_t* data, size_t size) {
 
   return packet;
 }
+
+// Effect packet serialization
+
+std::vector<uint8_t> serialize(const EffectAppliedPacket& packet) {
+  std::vector<uint8_t> buffer;
+
+  writeUint8(buffer, static_cast<uint8_t>(packet.type));
+  writeUint32(buffer, packet.targetId);
+  writeUint8(buffer, packet.isEnemy ? 1 : 0);
+  writeUint8(buffer, packet.effectType);
+  writeUint8(buffer, packet.stacks);
+  writeFloat(buffer, packet.remainingDuration);
+  writeUint32(buffer, packet.sourceId);
+
+  assert(buffer.size() == 16);  // 1 + 4 + 1 + 1 + 1 + 4 + 4
+  return buffer;
+}
+
+std::vector<uint8_t> serialize(const EffectRemovedPacket& packet) {
+  std::vector<uint8_t> buffer;
+
+  writeUint8(buffer, static_cast<uint8_t>(packet.type));
+  writeUint32(buffer, packet.targetId);
+  writeUint8(buffer, packet.isEnemy ? 1 : 0);
+  writeUint8(buffer, packet.effectType);
+
+  assert(buffer.size() == 7);  // 1 + 4 + 1 + 1
+  return buffer;
+}
+
+std::vector<uint8_t> serialize(const EffectUpdatePacket& packet) {
+  std::vector<uint8_t> buffer;
+
+  writeUint8(buffer, static_cast<uint8_t>(packet.type));
+  writeUint32(buffer, packet.targetId);
+  writeUint8(buffer, packet.isEnemy ? 1 : 0);
+  writeUint16(buffer, static_cast<uint16_t>(packet.effects.size()));
+
+  for (const auto& effect : packet.effects) {
+    writeUint8(buffer, effect.effectType);
+    writeUint8(buffer, effect.stacks);
+    writeFloat(buffer, effect.remainingDuration);
+  }
+
+  assert(buffer.size() ==
+         8 + packet.effects.size() * 6);  // 1 + 4 + 1 + 2 + (count * 6)
+  return buffer;
+}
+
+// Effect packet deserialization
+
+EffectAppliedPacket deserializeEffectApplied(const uint8_t* data, size_t size) {
+  assert(size >= 16);
+  assert(data[0] == static_cast<uint8_t>(PacketType::EffectApplied));
+
+  EffectAppliedPacket packet;
+  size_t offset = 1;
+
+  packet.targetId = readUint32(data + offset);
+  offset += 4;
+  packet.isEnemy = readUint8(data + offset) != 0;
+  offset += 1;
+  packet.effectType = readUint8(data + offset);
+  offset += 1;
+  packet.stacks = readUint8(data + offset);
+  offset += 1;
+  packet.remainingDuration = readFloat(data + offset);
+  offset += 4;
+  packet.sourceId = readUint32(data + offset);
+
+  return packet;
+}
+
+EffectRemovedPacket deserializeEffectRemoved(const uint8_t* data, size_t size) {
+  assert(size >= 7);
+  assert(data[0] == static_cast<uint8_t>(PacketType::EffectRemoved));
+
+  EffectRemovedPacket packet;
+  size_t offset = 1;
+
+  packet.targetId = readUint32(data + offset);
+  offset += 4;
+  packet.isEnemy = readUint8(data + offset) != 0;
+  offset += 1;
+  packet.effectType = readUint8(data + offset);
+
+  return packet;
+}
+
+EffectUpdatePacket deserializeEffectUpdate(const uint8_t* data, size_t size) {
+  assert(size >= 8);
+  assert(data[0] == static_cast<uint8_t>(PacketType::EffectUpdate));
+
+  EffectUpdatePacket packet;
+  size_t offset = 1;
+
+  packet.targetId = readUint32(data + offset);
+  offset += 4;
+  packet.isEnemy = readUint8(data + offset) != 0;
+  offset += 1;
+  uint16_t effectCount = readUint16(data + offset);
+  offset += 2;
+
+  assert(size >= 8 + effectCount * 6);
+
+  for (uint16_t i = 0; i < effectCount; i++) {
+    NetworkEffect effect;
+    effect.effectType = readUint8(data + offset);
+    offset += 1;
+    effect.stacks = readUint8(data + offset);
+    offset += 1;
+    effect.remainingDuration = readFloat(data + offset);
+    offset += 4;
+
+    packet.effects.push_back(effect);
+  }
+
+  return packet;
+}
+
+// CharacterSelected packet serialization
+std::vector<uint8_t> serialize(const CharacterSelectedPacket& packet) {
+  std::vector<uint8_t> buffer;
+  buffer.reserve(5);  // 1 (type) + 4 (characterId)
+
+  writeUint8(buffer, static_cast<uint8_t>(packet.type));
+  writeUint32(buffer, packet.characterId);
+
+  assert(buffer.size() == 5 && "CharacterSelectedPacket size mismatch");
+  return buffer;
+}
+
+CharacterSelectedPacket deserializeCharacterSelected(const uint8_t* data,
+                                                     size_t size) {
+  assert(size >= 5 && "CharacterSelectedPacket too small");
+
+  CharacterSelectedPacket packet;
+  packet.characterId = readUint32(data + 1);
+
+  return packet;
+}

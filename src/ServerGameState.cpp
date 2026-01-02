@@ -37,6 +37,10 @@ ServerGameState::ServerGameState(NetworkServer* server,
     enemySystem->spawnAllEnemies();
   }
 
+  // Initialize effect manager
+  effectManager = std::make_unique<EffectManager>();
+  Logger::info("EffectManager initialized");
+
   // Subscribe to client connection events
   EventBus::instance().subscribe<ClientConnectedEvent>(
       [this](const ClientConnectedEvent& e) { onClientConnected(e); });
@@ -141,6 +145,110 @@ void ServerGameState::onNetworkPacketReceived(
       if (enemySystem) {
         enemySystem->damageEnemy(attackPacket.enemyId, attackPacket.damage,
                                  playerId);
+
+        // Apply effect based on character selection
+        if (effectManager) {
+          auto playerIt = players.find(playerId);
+          if (playerIt != players.end()) {
+            uint32_t characterId = playerIt->second.characterId;
+            EffectType effectToApply;
+            const char* effectName;
+
+            // Map character IDs to effects (testing multiple effects)
+            // Character IDs 1-19, map to different effects
+            switch (characterId) {
+              case 1:  // Eliana
+                effectToApply = EffectType::Slow;
+                effectName = "Slow";
+                break;
+              case 2:  // Fagan
+                effectToApply = EffectType::Weakened;
+                effectName = "Weakened";
+                break;
+              case 3:  // Gravon
+                effectToApply = EffectType::Vulnerable;
+                effectName = "Vulnerable";
+                break;
+              case 4:  // Isaac
+                effectToApply = EffectType::Wound;
+                effectName = "Wound (DoT)";
+                break;
+              case 5:  // Jeff
+                effectToApply = EffectType::Haste;
+                effectName = "Haste";
+                break;
+              case 6:  // Kade
+                effectToApply = EffectType::Empowered;
+                effectName = "Empowered";
+                break;
+              case 7:  // Lilith
+                effectToApply = EffectType::Fortified;
+                effectName = "Fortified";
+                break;
+              case 8:  // MILES
+                effectToApply = EffectType::Mend;
+                effectName = "Mend (HoT)";
+                break;
+              case 9:  // Mina
+                effectToApply = EffectType::Cursed;
+                effectName = "Cursed";
+                break;
+              case 10:  // Mordryn
+                effectToApply = EffectType::Blessed;
+                effectName = "Blessed";
+                break;
+              case 11:  // Namora
+                effectToApply = EffectType::Marked;
+                effectName = "Marked";
+                break;
+              case 12:  // Nolan
+                effectToApply = EffectType::Stealth;
+                effectName = "Stealth";
+                break;
+              case 13:  // Nyx
+                effectToApply = EffectType::Expose;
+                effectName = "Expose";
+                break;
+              case 14:  // Presidente
+                effectToApply = EffectType::Guard;
+                effectName = "Guard";
+                break;
+              case 15:  // Stitches
+                effectToApply = EffectType::Stunned;
+                effectName = "Stunned";
+                break;
+              case 16:  // Suds
+                effectToApply = EffectType::Berserk;
+                effectName = "Berserk";
+                break;
+              case 17:  // Valthor
+                effectToApply = EffectType::Snared;
+                effectName = "Snared";
+                break;
+              case 18:  // Volgore
+                effectToApply = EffectType::Unbounded;
+                effectName = "Unbounded";
+                break;
+              case 19:  // Wade
+                effectToApply = EffectType::Confused;
+                effectName = "Confused";
+                break;
+              default:  // No character selected - use Slow
+                effectToApply = EffectType::Slow;
+                effectName = "Slow (default)";
+                break;
+            }
+
+            Logger::info("Player " + std::to_string(playerId) + " (Character " +
+                         std::to_string(characterId) + ") applying " +
+                         std::string(effectName) + " to enemy " +
+                         std::to_string(attackPacket.enemyId));
+
+            effectManager->applyEffect(attackPacket.enemyId, effectToApply, 1,
+                                       3000.0f, playerId,
+                                       enemySystem->getEnemies());
+          }
+        }
       }
 
       break;
@@ -153,6 +261,30 @@ void ServerGameState::onNetworkPacketReceived(
     case PacketType::EquipItem:
       processEquipItem(e.peer, e.data, e.size);
       break;
+
+    case PacketType::CharacterSelected: {
+      if (e.size < 5) {
+        Logger::info("Invalid CharacterSelected packet size");
+        break;
+      }
+
+      CharacterSelectedPacket charPacket =
+          deserializeCharacterSelected(e.data, e.size);
+
+      // Get player ID from peer
+      auto it = peerToPlayerId.find(e.peer);
+      if (it != peerToPlayerId.end()) {
+        uint32_t playerId = it->second;
+        auto playerIt = players.find(playerId);
+        if (playerIt != players.end()) {
+          playerIt->second.characterId = charPacket.characterId;
+          Logger::info("Player " + std::to_string(playerId) +
+                       " selected character ID " +
+                       std::to_string(charPacket.characterId));
+        }
+      }
+      break;
+    }
 
     case PacketType::ItemPickupRequest:
       processItemPickupRequest(e.peer, e.data, e.size);
@@ -205,7 +337,12 @@ void ServerGameState::onUpdate(const UpdateEvent& e) {
 
   // Update enemy AI
   if (enemySystem) {
-    enemySystem->update(e.deltaTime, players);
+    enemySystem->update(e.deltaTime, players, effectManager.get());
+  }
+
+  // Update effects (DoT/HoT, duration ticking)
+  if (effectManager && enemySystem) {
+    effectManager->update(e.deltaTime, players, enemySystem->getEnemies());
   }
 
   // Check for player deaths
@@ -273,6 +410,50 @@ void ServerGameState::broadcastStateUpdate() {
       Logger::debug(
           "Broadcast EnemyDied: enemy=" + std::to_string(death.enemyId) +
           " killer=" + std::to_string(death.killerId));
+    }
+  }
+
+  // Broadcast effect updates for all entities with active effects
+  if (effectManager && enemySystem) {
+    // Player effects
+    for (const auto& [id, player] : players) {
+      const ActiveEffects& effects = effectManager->getPlayerEffects(id);
+      if (!effects.effects.empty()) {
+        EffectUpdatePacket packet;
+        packet.targetId = id;
+        packet.isEnemy = false;
+
+        for (const auto& effect : effects.effects) {
+          NetworkEffect ne;
+          ne.effectType = static_cast<uint8_t>(effect.type);
+          ne.stacks = effect.stacks;
+          ne.remainingDuration = effect.remainingDuration;
+          packet.effects.push_back(ne);
+        }
+
+        server->broadcastPacket(serialize(packet));
+      }
+    }
+
+    // Enemy effects
+    const auto& enemies = enemySystem->getEnemies();
+    for (const auto& [id, enemy] : enemies) {
+      const ActiveEffects& effects = effectManager->getEnemyEffects(id);
+      if (!effects.effects.empty()) {
+        EffectUpdatePacket packet;
+        packet.targetId = id;
+        packet.isEnemy = true;
+
+        for (const auto& effect : effects.effects) {
+          NetworkEffect ne;
+          ne.effectType = static_cast<uint8_t>(effect.type);
+          ne.stacks = effect.stacks;
+          ne.remainingDuration = effect.remainingDuration;
+          packet.effects.push_back(ne);
+        }
+
+        server->broadcastPacket(serialize(packet));
+      }
     }
   }
 }

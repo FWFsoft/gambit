@@ -8,6 +8,8 @@
 #include "EventBus.h"
 #include "Player.h"
 
+class EffectManager;
+
 // Server-side enemy management system
 // - Spawns enemies from spawn points
 // - Updates enemy AI state machines
@@ -21,12 +23,14 @@ class EnemySystem {
   void spawnAllEnemies();
 
   // Update all enemy AI (called every frame)
-  void update(float deltaTime, std::unordered_map<uint32_t, Player>& players);
+  void update(float deltaTime, std::unordered_map<uint32_t, Player>& players,
+              EffectManager* effectManager);
 
   // Combat: Apply damage to enemy
   void damageEnemy(uint32_t enemyId, float damage, uint32_t attackerId);
 
-  // Get all active enemies (for network broadcast)
+  // Get all active enemies (for network broadcast and effects)
+  std::unordered_map<uint32_t, Enemy>& getEnemies() { return enemies; }
   const std::unordered_map<uint32_t, Enemy>& getEnemies() const {
     return enemies;
   }
@@ -52,12 +56,12 @@ class EnemySystem {
   // AI behavior methods
   void updateEnemyAI(Enemy& enemy,
                      std::unordered_map<uint32_t, Player>& players,
-                     float deltaTime);
+                     float deltaTime, EffectManager* effectManager);
   void updateIdleState(Enemy& enemy,
                        const std::unordered_map<uint32_t, Player>& players);
   void updateChaseState(Enemy& enemy,
                         const std::unordered_map<uint32_t, Player>& players,
-                        float deltaTime);
+                        float deltaTime, EffectManager* effectManager);
   void updateAttackState(Enemy& enemy,
                          std::unordered_map<uint32_t, Player>& players,
                          float deltaTime);

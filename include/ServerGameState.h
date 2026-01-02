@@ -4,6 +4,7 @@
 #include <memory>
 #include <unordered_map>
 
+#include "EffectManager.h"
 #include "EventBus.h"
 #include "NetworkProtocol.h"
 #include "Player.h"
@@ -21,6 +22,7 @@ class ServerGameState {
   ~ServerGameState();
 
   EnemySystem* getEnemySystem() { return enemySystem.get(); }
+  EffectManager* getEffectManager() { return effectManager.get(); }
 
  private:
   NetworkServer* server;
@@ -32,6 +34,7 @@ class ServerGameState {
   std::unordered_map<ENetPeer*, uint32_t> peerToPlayerId;
   uint32_t serverTick;
   std::unique_ptr<EnemySystem> enemySystem;
+  std::unique_ptr<EffectManager> effectManager;
 
   // World item management
   std::unordered_map<uint32_t, WorldItem> worldItems;

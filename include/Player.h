@@ -19,6 +19,7 @@ constexpr int EQUIPMENT_SLOTS = 2;
 
 struct Player : public Animatable {
   uint32_t id;
+  uint32_t characterId;  // Character from selection screen (1-19)
   float x, y;
   float vx, vy;
   float health;
@@ -41,6 +42,7 @@ struct Player : public Animatable {
 
   Player()
       : id(0),
+        characterId(0),
         x(0),
         y(0),
         vx(0),

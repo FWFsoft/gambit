@@ -4,6 +4,7 @@
 #include <cmath>
 #include <random>
 
+#include "EffectManager.h"
 #include "Logger.h"
 #include "config/GameplayConfig.h"
 
@@ -46,7 +47,8 @@ void EnemySystem::spawnAllEnemies() {
 }
 
 void EnemySystem::update(float deltaTime,
-                         std::unordered_map<uint32_t, Player>& players) {
+                         std::unordered_map<uint32_t, Player>& players,
+                         EffectManager* effectManager) {
   // Clear death events from last frame
   diedThisFrame.clear();
 
@@ -80,20 +82,20 @@ void EnemySystem::update(float deltaTime,
       continue;  // Don't update AI for dead enemies
     }
 
-    updateEnemyAI(enemy, players, deltaTime);
+    updateEnemyAI(enemy, players, deltaTime, effectManager);
   }
 }
 
 void EnemySystem::updateEnemyAI(Enemy& enemy,
                                 std::unordered_map<uint32_t, Player>& players,
-                                float deltaTime) {
+                                float deltaTime, EffectManager* effectManager) {
   switch (enemy.state) {
     case EnemyState::Idle:
       updateIdleState(enemy, players);
       break;
 
     case EnemyState::Chase:
-      updateChaseState(enemy, players, deltaTime);
+      updateChaseState(enemy, players, deltaTime, effectManager);
       break;
 
     case EnemyState::Attack:
@@ -128,7 +130,7 @@ void EnemySystem::updateIdleState(
 
 void EnemySystem::updateChaseState(
     Enemy& enemy, const std::unordered_map<uint32_t, Player>& players,
-    float deltaTime) {
+    float deltaTime, EffectManager* effectManager) {
   // Find target player
   auto it = players.find(enemy.targetPlayerId);
   if (it == players.end()) {
@@ -184,8 +186,20 @@ void EnemySystem::updateChaseState(
     float normX = dx / dirLength;
     float normY = dy / dirLength;
 
-    enemy.vx = normX * enemy.speed;
-    enemy.vy = normY * enemy.speed;
+    // Apply effect modifiers to movement speed
+    float effectiveSpeed = enemy.speed;
+    if (effectManager) {
+      auto mods = effectManager->calculateModifiers(enemy.id, true);
+      effectiveSpeed *= mods.movementSpeedMultiplier;
+
+      // If can't move (stunned, snared, etc.), stop completely
+      if (!mods.canMove) {
+        effectiveSpeed = 0.0f;
+      }
+    }
+
+    enemy.vx = normX * effectiveSpeed;
+    enemy.vy = normY * effectiveSpeed;
 
     // Update position (deltaTime is in milliseconds, convert to seconds)
     float deltaSeconds = deltaTime / 1000.0f;

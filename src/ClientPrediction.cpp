@@ -2,6 +2,7 @@
 
 #include <cmath>
 
+#include "CharacterRegistry.h"
 #include "CharacterSelectionState.h"
 #include "DamageNumberSystem.h"
 #include "ItemRegistry.h"
@@ -82,6 +83,29 @@ void ClientPrediction::onNetworkPacketReceived(
   if (type == PacketType::StateUpdate) {
     StateUpdatePacket stateUpdate = deserializeStateUpdate(e.data, e.size);
     reconcile(stateUpdate);
+
+    // Send character selection to server after first state update (ensures
+    // connection is established)
+    static bool sentCharacterSelection = false;
+    if (!sentCharacterSelection &&
+        CharacterSelectionState::instance().hasSelection()) {
+      uint32_t selectedId =
+          CharacterSelectionState::instance().getSelectedCharacterId();
+      const CharacterDefinition* character =
+          CharacterRegistry::instance().getCharacter(selectedId);
+
+      if (character) {
+        CharacterSelectedPacket charPacket;
+        charPacket.characterId = selectedId;
+        client->send(serialize(charPacket));
+        Logger::info("Sent character selection to server: " + character->name +
+                     " (ID: " + std::to_string(selectedId) + ")");
+        sentCharacterSelection = true;
+
+        // Also update local player's characterId
+        localPlayer.characterId = selectedId;
+      }
+    }
   } else if (type == PacketType::PlayerJoined) {
     PlayerJoinedPacket packet = deserializePlayerJoined(e.data, e.size);
 
