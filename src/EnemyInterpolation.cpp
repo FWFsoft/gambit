@@ -72,7 +72,7 @@ void EnemyInterpolation::updateEnemyState(const NetworkEnemyState& state) {
   Enemy& enemy = enemies[enemyId];
   enemy.state = static_cast<::EnemyState>(state.state);
 
-  // Check for health decrease (damage dealt to enemy)
+  // Check for health changes (damage or healing)
   float oldHealth = enemy.health;
   enemy.health = state.health;
   enemy.maxHealth = state.maxHealth;
@@ -86,6 +86,14 @@ void EnemyInterpolation::updateEnemyState(const NetworkEnemyState& state) {
     damageEvent.damageAmount = damageTaken;
     damageEvent.isCritical = false;  // TODO: Add crit system later
     EventBus::instance().publish(damageEvent);
+  } else if (enemy.health > oldHealth && enemy.state != ::EnemyState::Dead) {
+    // Enemy was healed - publish event for healing numbers
+    float healAmount = enemy.health - oldHealth;
+    HealingEvent healEvent;
+    healEvent.x = state.x;
+    healEvent.y = state.y;
+    healEvent.healAmount = healAmount;
+    EventBus::instance().publish(healEvent);
   }
 
   // Add snapshot for interpolation

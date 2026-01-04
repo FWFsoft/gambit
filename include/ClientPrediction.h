@@ -24,6 +24,9 @@ class ClientPrediction {
     return worldItems;
   }
 
+  // Reset character selection state (for returning to character select)
+  void resetCharacterSelection() { sentCharacterSelection = false; }
+
  private:
   NetworkClient* client;
   uint32_t localPlayerId;
@@ -37,6 +40,9 @@ class ClientPrediction {
 
   // World items (items lying on the ground)
   std::unordered_map<uint32_t, WorldItem> worldItems;
+
+  // Character selection state
+  bool sentCharacterSelection;
 
   void onLocalInput(const LocalInputEvent& e);
   void onNetworkPacketReceived(const NetworkPacketReceivedEvent& e);

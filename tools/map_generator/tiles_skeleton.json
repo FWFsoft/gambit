@@ -115,8 +115,8 @@
     {
       "id": 7,
       "name": "tile_7",
-      "row": 0,
-      "col": 7,
+      "row": 1,
+      "col": 0,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -131,8 +131,8 @@
     {
       "id": 8,
       "name": "tile_8",
-      "row": 0,
-      "col": 8,
+      "row": 1,
+      "col": 1,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -148,7 +148,7 @@
       "id": 9,
       "name": "tile_9",
       "row": 1,
-      "col": 0,
+      "col": 2,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -164,7 +164,7 @@
       "id": 10,
       "name": "tile_10",
       "row": 1,
-      "col": 1,
+      "col": 3,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -180,7 +180,7 @@
       "id": 11,
       "name": "tile_11",
       "row": 1,
-      "col": 2,
+      "col": 4,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -196,7 +196,7 @@
       "id": 12,
       "name": "tile_12",
       "row": 1,
-      "col": 3,
+      "col": 5,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -212,7 +212,7 @@
       "id": 13,
       "name": "tile_13",
       "row": 1,
-      "col": 4,
+      "col": 6,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -227,8 +227,8 @@
     {
       "id": 14,
       "name": "tile_14",
-      "row": 1,
-      "col": 5,
+      "row": 2,
+      "col": 0,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -243,8 +243,8 @@
     {
       "id": 15,
       "name": "tile_15",
-      "row": 1,
-      "col": 6,
+      "row": 2,
+      "col": 1,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -259,8 +259,8 @@
     {
       "id": 16,
       "name": "tile_16",
-      "row": 1,
-      "col": 7,
+      "row": 2,
+      "col": 2,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -275,8 +275,8 @@
     {
       "id": 17,
       "name": "tile_17",
-      "row": 1,
-      "col": 8,
+      "row": 2,
+      "col": 3,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -292,7 +292,7 @@
       "id": 18,
       "name": "tile_18",
       "row": 2,
-      "col": 0,
+      "col": 4,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -308,7 +308,7 @@
       "id": 19,
       "name": "tile_19",
       "row": 2,
-      "col": 1,
+      "col": 5,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -324,7 +324,7 @@
       "id": 20,
       "name": "tile_20",
       "row": 2,
-      "col": 2,
+      "col": 6,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -339,8 +339,8 @@
     {
       "id": 21,
       "name": "tile_21",
-      "row": 2,
-      "col": 3,
+      "row": 3,
+      "col": 0,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -355,8 +355,8 @@
     {
       "id": 22,
       "name": "tile_22",
-      "row": 2,
-      "col": 4,
+      "row": 3,
+      "col": 1,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -371,8 +371,8 @@
     {
       "id": 23,
       "name": "tile_23",
-      "row": 2,
-      "col": 5,
+      "row": 3,
+      "col": 2,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -387,8 +387,8 @@
     {
       "id": 24,
       "name": "tile_24",
-      "row": 2,
-      "col": 6,
+      "row": 3,
+      "col": 3,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -403,8 +403,8 @@
     {
       "id": 25,
       "name": "tile_25",
-      "row": 2,
-      "col": 7,
+      "row": 3,
+      "col": 4,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -419,8 +419,8 @@
     {
       "id": 26,
       "name": "tile_26",
-      "row": 2,
-      "col": 8,
+      "row": 3,
+      "col": 5,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -436,7 +436,7 @@
       "id": 27,
       "name": "tile_27",
       "row": 3,
-      "col": 0,
+      "col": 6,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -451,8 +451,8 @@
     {
       "id": 28,
       "name": "tile_28",
-      "row": 3,
-      "col": 1,
+      "row": 4,
+      "col": 0,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -467,8 +467,8 @@
     {
       "id": 29,
       "name": "tile_29",
-      "row": 3,
-      "col": 2,
+      "row": 4,
+      "col": 1,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -483,8 +483,8 @@
     {
       "id": 30,
       "name": "tile_30",
-      "row": 3,
-      "col": 3,
+      "row": 4,
+      "col": 2,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -499,8 +499,8 @@
     {
       "id": 31,
       "name": "tile_31",
-      "row": 3,
-      "col": 4,
+      "row": 4,
+      "col": 3,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -515,8 +515,8 @@
     {
       "id": 32,
       "name": "tile_32",
-      "row": 3,
-      "col": 5,
+      "row": 4,
+      "col": 4,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -531,8 +531,8 @@
     {
       "id": 33,
       "name": "tile_33",
-      "row": 3,
-      "col": 6,
+      "row": 4,
+      "col": 5,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -547,8 +547,8 @@
     {
       "id": 34,
       "name": "tile_34",
-      "row": 3,
-      "col": 7,
+      "row": 4,
+      "col": 6,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -563,8 +563,8 @@
     {
       "id": 35,
       "name": "tile_35",
-      "row": 3,
-      "col": 8,
+      "row": 5,
+      "col": 0,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -579,8 +579,8 @@
     {
       "id": 36,
       "name": "tile_36",
-      "row": 4,
-      "col": 0,
+      "row": 5,
+      "col": 1,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -595,8 +595,8 @@
     {
       "id": 37,
       "name": "tile_37",
-      "row": 4,
-      "col": 1,
+      "row": 5,
+      "col": 2,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -611,8 +611,8 @@
     {
       "id": 38,
       "name": "tile_38",
-      "row": 4,
-      "col": 2,
+      "row": 5,
+      "col": 3,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -627,8 +627,8 @@
     {
       "id": 39,
       "name": "tile_39",
-      "row": 4,
-      "col": 3,
+      "row": 5,
+      "col": 4,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -643,8 +643,8 @@
     {
       "id": 40,
       "name": "tile_40",
-      "row": 4,
-      "col": 4,
+      "row": 5,
+      "col": 5,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -659,8 +659,8 @@
     {
       "id": 41,
       "name": "tile_41",
-      "row": 4,
-      "col": 5,
+      "row": 5,
+      "col": 6,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -675,8 +675,8 @@
     {
       "id": 42,
       "name": "tile_42",
-      "row": 4,
-      "col": 6,
+      "row": 6,
+      "col": 0,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -691,8 +691,8 @@
     {
       "id": 43,
       "name": "tile_43",
-      "row": 4,
-      "col": 7,
+      "row": 6,
+      "col": 1,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -707,8 +707,8 @@
     {
       "id": 44,
       "name": "tile_44",
-      "row": 4,
-      "col": 8,
+      "row": 6,
+      "col": 2,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -723,8 +723,8 @@
     {
       "id": 45,
       "name": "tile_45",
-      "row": 5,
-      "col": 0,
+      "row": 6,
+      "col": 3,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -739,8 +739,8 @@
     {
       "id": 46,
       "name": "tile_46",
-      "row": 5,
-      "col": 1,
+      "row": 6,
+      "col": 4,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -755,8 +755,8 @@
     {
       "id": 47,
       "name": "tile_47",
-      "row": 5,
-      "col": 2,
+      "row": 6,
+      "col": 5,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -771,8 +771,8 @@
     {
       "id": 48,
       "name": "tile_48",
-      "row": 5,
-      "col": 3,
+      "row": 6,
+      "col": 6,
       "description": "TODO: Add description",
       "edges": {
         "north": "TODO",
@@ -782,662 +782,6 @@
       },
       "weight": 1,
       "collision_tile_id": 48,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 49,
-      "name": "tile_49",
-      "row": 5,
-      "col": 4,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 49,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 50,
-      "name": "tile_50",
-      "row": 5,
-      "col": 5,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 50,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 51,
-      "name": "tile_51",
-      "row": 5,
-      "col": 6,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 51,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 52,
-      "name": "tile_52",
-      "row": 5,
-      "col": 7,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 52,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 53,
-      "name": "tile_53",
-      "row": 5,
-      "col": 8,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 53,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 54,
-      "name": "tile_54",
-      "row": 6,
-      "col": 0,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 54,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 55,
-      "name": "tile_55",
-      "row": 6,
-      "col": 1,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 55,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 56,
-      "name": "tile_56",
-      "row": 6,
-      "col": 2,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 56,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 57,
-      "name": "tile_57",
-      "row": 6,
-      "col": 3,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 57,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 58,
-      "name": "tile_58",
-      "row": 6,
-      "col": 4,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 58,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 59,
-      "name": "tile_59",
-      "row": 6,
-      "col": 5,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 59,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 60,
-      "name": "tile_60",
-      "row": 6,
-      "col": 6,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 60,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 61,
-      "name": "tile_61",
-      "row": 6,
-      "col": 7,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 61,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 62,
-      "name": "tile_62",
-      "row": 6,
-      "col": 8,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 62,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 63,
-      "name": "tile_63",
-      "row": 7,
-      "col": 0,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 63,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 64,
-      "name": "tile_64",
-      "row": 7,
-      "col": 1,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 64,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 65,
-      "name": "tile_65",
-      "row": 7,
-      "col": 2,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 65,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 66,
-      "name": "tile_66",
-      "row": 7,
-      "col": 3,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 66,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 67,
-      "name": "tile_67",
-      "row": 7,
-      "col": 4,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 67,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 68,
-      "name": "tile_68",
-      "row": 7,
-      "col": 5,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 68,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 69,
-      "name": "tile_69",
-      "row": 7,
-      "col": 6,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 69,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 70,
-      "name": "tile_70",
-      "row": 7,
-      "col": 7,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 70,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 71,
-      "name": "tile_71",
-      "row": 7,
-      "col": 8,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 71,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 72,
-      "name": "tile_72",
-      "row": 8,
-      "col": 0,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 72,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 73,
-      "name": "tile_73",
-      "row": 8,
-      "col": 1,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 73,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 74,
-      "name": "tile_74",
-      "row": 8,
-      "col": 2,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 74,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 75,
-      "name": "tile_75",
-      "row": 8,
-      "col": 3,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 75,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 76,
-      "name": "tile_76",
-      "row": 8,
-      "col": 4,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 76,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 77,
-      "name": "tile_77",
-      "row": 8,
-      "col": 5,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 77,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 78,
-      "name": "tile_78",
-      "row": 8,
-      "col": 6,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 78,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 79,
-      "name": "tile_79",
-      "row": 8,
-      "col": 7,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 79,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 80,
-      "name": "tile_80",
-      "row": 8,
-      "col": 8,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 80,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 81,
-      "name": "tile_81",
-      "row": 9,
-      "col": 0,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 81,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 82,
-      "name": "tile_82",
-      "row": 9,
-      "col": 1,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 82,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 83,
-      "name": "tile_83",
-      "row": 9,
-      "col": 2,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 83,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 84,
-      "name": "tile_84",
-      "row": 9,
-      "col": 3,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 84,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 85,
-      "name": "tile_85",
-      "row": 9,
-      "col": 4,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 85,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 86,
-      "name": "tile_86",
-      "row": 9,
-      "col": 5,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 86,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 87,
-      "name": "tile_87",
-      "row": 9,
-      "col": 6,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 87,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 88,
-      "name": "tile_88",
-      "row": 9,
-      "col": 7,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 88,
-      "notes": "Auto-generated - needs manual review"
-    },
-    {
-      "id": 89,
-      "name": "tile_89",
-      "row": 9,
-      "col": 8,
-      "description": "TODO: Add description",
-      "edges": {
-        "north": "TODO",
-        "south": "TODO",
-        "east": "TODO",
-        "west": "TODO"
-      },
-      "weight": 1,
-      "collision_tile_id": 89,
       "notes": "Auto-generated - needs manual review"
     }
   ],

@@ -100,7 +100,23 @@ struct Player : public Animatable {
   float getVelocityY() const override { return vy; }
 };
 
-inline void applyInput(Player& player, const MovementInput& input) {
+struct MovementModifiers {
+  float speedMultiplier;  // From effects (Slow/Haste)
+  bool canMove;           // From effects (Stunned/Snared)
+
+  MovementModifiers() : speedMultiplier(1.0f), canMove(true) {}
+};
+
+inline void applyInput(
+    Player& player, const MovementInput& input,
+    const MovementModifiers& modifiers = MovementModifiers()) {
+  // Check if player can move (stunned, snared, grappled)
+  if (!modifiers.canMove) {
+    player.vx = 0.0f;
+    player.vy = 0.0f;
+    return;
+  }
+
   float dx = 0, dy = 0;
 
   if (input.moveUp) {
@@ -126,8 +142,9 @@ inline void applyInput(Player& player, const MovementInput& input) {
     dy /= len;
   }
 
-  player.vx = dx * Config::Player::SPEED;
-  player.vy = dy * Config::Player::SPEED;
+  float effectiveSpeed = Config::Player::SPEED * modifiers.speedMultiplier;
+  player.vx = dx * effectiveSpeed;
+  player.vy = dy * effectiveSpeed;
 
   // Update animation state based on new velocity
   if (player.animationController) {

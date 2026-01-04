@@ -142,12 +142,27 @@ void ServerGameState::onNetworkPacketReceived(
       uint32_t playerId = it->second;
 
       // Apply damage (server-authoritative)
-      if (enemySystem) {
-        enemySystem->damageEnemy(attackPacket.enemyId, attackPacket.damage,
-                                 playerId);
+      if (enemySystem && effectManager) {
+        // Calculate modified damage based on player and enemy effects
+        float damage = attackPacket.damage;
+
+        // Apply player's damage dealt modifiers (Empowered/Weakened)
+        auto playerMods = effectManager->calculateModifiers(playerId, false);
+        damage *= playerMods.damageDealtMultiplier;
+
+        // Apply enemy's damage taken modifiers and consume Expose/Guard
+        effectManager->consumeOnDamage(attackPacket.enemyId, true, damage);
+
+        Logger::debug("Attack damage: " + std::to_string(attackPacket.damage) +
+                      " → modified: " + std::to_string(damage) +
+                      " (player mult: " +
+                      std::to_string(playerMods.damageDealtMultiplier) + ")");
+
+        // Apply final damage
+        enemySystem->damageEnemy(attackPacket.enemyId, damage, playerId);
 
         // Apply effect based on character selection
-        if (effectManager) {
+        if (true) {
           auto playerIt = players.find(playerId);
           if (playerIt != players.end()) {
             uint32_t characterId = playerIt->second.characterId;
@@ -326,7 +341,16 @@ void ServerGameState::processClientInput(ENetPeer* peer, const uint8_t* data,
   MovementInput movementInput(input.moveLeft, input.moveRight, input.moveUp,
                               input.moveDown, Config::Timing::TARGET_DELTA_MS,
                               worldWidth, worldHeight, collisionSystem);
-  applyInput(player, movementInput);
+
+  // Apply effect modifiers to movement
+  MovementModifiers modifiers;
+  if (effectManager) {
+    auto statMods = effectManager->calculateModifiers(playerId, false);
+    modifiers.speedMultiplier = statMods.movementSpeedMultiplier;
+    modifiers.canMove = statMods.canMove;
+  }
+
+  applyInput(player, movementInput, modifiers);
 }
 
 void ServerGameState::onUpdate(const UpdateEvent& e) {
@@ -342,7 +366,8 @@ void ServerGameState::onUpdate(const UpdateEvent& e) {
 
   // Update effects (DoT/HoT, duration ticking)
   if (effectManager && enemySystem) {
-    effectManager->update(e.deltaTime, players, enemySystem->getEnemies());
+    effectManager->update(e.deltaTime, players, enemySystem->getEnemies(),
+                          enemySystem.get());
   }
 
   // Check for player deaths

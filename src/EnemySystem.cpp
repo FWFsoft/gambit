@@ -99,7 +99,7 @@ void EnemySystem::updateEnemyAI(Enemy& enemy,
       break;
 
     case EnemyState::Attack:
-      updateAttackState(enemy, players, deltaTime);
+      updateAttackState(enemy, players, deltaTime, effectManager);
       break;
 
     case EnemyState::Dead:
@@ -210,7 +210,7 @@ void EnemySystem::updateChaseState(
 
 void EnemySystem::updateAttackState(
     Enemy& enemy, std::unordered_map<uint32_t, Player>& players,
-    float deltaTime) {
+    float deltaTime, EffectManager* effectManager) {
   // Find target player
   auto it = players.find(enemy.targetPlayerId);
   if (it == players.end()) {
@@ -239,11 +239,42 @@ void EnemySystem::updateAttackState(
     return;
   }
 
+  // Check if enemy can act (not stunned)
+  bool canAct = true;
+  if (effectManager) {
+    auto enemyMods = effectManager->calculateModifiers(enemy.id, true);
+    canAct = enemyMods.canAct;
+  }
+
+  if (!canAct) {
+    Logger::debug("Enemy " + std::to_string(enemy.id) +
+                  " is stunned, cannot attack");
+    return;
+  }
+
   // Check attack cooldown
   if (accumulatedTime - enemy.lastAttackTime >=
       Config::Gameplay::ENEMY_ATTACK_COOLDOWN) {
+    // Calculate modified damage based on enemy and player effects
+    float damage = enemy.damage;
+
+    if (effectManager) {
+      // Apply enemy's damage dealt modifiers (Empowered/Weakened if enemy has
+      // them)
+      auto enemyMods = effectManager->calculateModifiers(enemy.id, true);
+      damage *= enemyMods.damageDealtMultiplier;
+
+      // Apply player's damage taken modifiers and consume Expose/Guard
+      effectManager->consumeOnDamage(target.id, false, damage);
+
+      Logger::debug("Enemy attack damage: " + std::to_string(enemy.damage) +
+                    " → modified: " + std::to_string(damage) +
+                    " (enemy mult: " +
+                    std::to_string(enemyMods.damageDealtMultiplier) + ")");
+    }
+
     // Apply damage
-    target.health -= enemy.damage;
+    target.health -= damage;
     if (target.health < 0.0f) {
       target.health = 0.0f;
     }

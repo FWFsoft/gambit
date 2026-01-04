@@ -161,6 +161,8 @@ add_executable(Client
     src/CharacterRegistry.cpp
     src/CharacterSelectionState.cpp
     src/DamageNumberSystem.cpp
+    src/Effect.cpp
+    src/EffectTracker.cpp
     src/UISystem.cpp
     src/GameStateManager.cpp
     src/Settings.cpp

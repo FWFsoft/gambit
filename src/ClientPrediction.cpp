@@ -18,7 +18,8 @@ ClientPrediction::ClientPrediction(NetworkClient* client,
       worldWidth(world.width),
       worldHeight(world.height),
       collisionSystem(world.collisionSystem),
-      localInputSequence(0) {
+      localInputSequence(0),
+      sentCharacterSelection(false) {
   // Initialize local player
   localPlayer.id = localPlayerId;
   localPlayer.x =
@@ -86,7 +87,6 @@ void ClientPrediction::onNetworkPacketReceived(
 
     // Send character selection to server after first state update (ensures
     // connection is established)
-    static bool sentCharacterSelection = false;
     if (!sentCharacterSelection &&
         CharacterSelectionState::instance().hasSelection()) {
       uint32_t selectedId =

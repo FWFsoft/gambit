@@ -3,9 +3,10 @@
     "name": "gambit_isometric",
     "image": "../../assets/maps/all_tiles.png",
     "collision_map": "../../assets/maps/collison_map.png",
-    "tile_width": 128,
-    "tile_height": 128,
-    "columns": 8,
+    "tile_width": 173,
+    "tile_height": 197,
+    "spacing": 4,
+    "columns": 7,
     "description": "Isometric tileset with blocks, walls, stairs, and ramps"
   },
   "edge_types": {

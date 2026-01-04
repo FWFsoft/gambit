@@ -8,6 +8,7 @@
 #include "CollisionSystem.h"
 #include "CombatSystem.h"
 #include "DamageNumberSystem.h"
+#include "EffectTracker.h"
 #include "EnemyInterpolation.h"
 #include "EventBus.h"
 #include "GameLoop.h"
@@ -97,7 +98,11 @@ int main() {
   DamageNumberSystem damageNumberSystem(&camera,
                                         renderSystem.getSpriteRenderer());
 
-  UISystem uiSystem(&window, &clientPrediction, &client, &damageNumberSystem);
+  // Create effect tracker
+  EffectTracker effectTracker;
+
+  UISystem uiSystem(&window, &clientPrediction, &client, &damageNumberSystem,
+                    &effectTracker);
 
   // Load local player animations
   Player& localPlayer = clientPrediction.getLocalPlayerMutable();

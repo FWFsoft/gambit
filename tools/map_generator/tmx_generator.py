@@ -52,21 +52,35 @@ class TMXGenerator:
         })
 
         # Add tileset reference
-        tileset_elem = ET.SubElement(map_elem, "tileset", {
+        tileset_attrs = {
             "firstgid": str(self.tileset_info.get("firstgid", 1)),
             "name": self.tileset_info["name"],
             "tilewidth": str(self.tileset_info["tile_width"]),
             "tileheight": str(self.tileset_info["tile_height"]),
-            "tilecount": str(self.tileset_info["columns"] * 10),  # Assuming 10 rows
+            "tilecount": str(self.tileset_info["columns"] * 7),  # 7 rows in the tileset
             "columns": str(self.tileset_info["columns"])
-        })
+        }
+
+        # Add spacing if present
+        if "spacing" in self.tileset_info:
+            tileset_attrs["spacing"] = str(self.tileset_info["spacing"])
+
+        tileset_elem = ET.SubElement(map_elem, "tileset", tileset_attrs)
 
         # Add image source (relative path from output file)
         image_path = self.tileset_info["image"]
+        spacing = self.tileset_info.get("spacing", 0)
+        columns = self.tileset_info["columns"]
+        rows = 7  # 7 rows in the tileset
+
+        # Calculate image dimensions accounting for spacing
+        image_width = (self.tileset_info["tile_width"] * columns) + (spacing * (columns - 1))
+        image_height = (self.tileset_info["tile_height"] * rows) + (spacing * (rows - 1))
+
         ET.SubElement(tileset_elem, "image", {
             "source": image_path,
-            "width": str(self.tileset_info["tile_width"] * self.tileset_info["columns"]),
-            "height": str(self.tileset_info["tile_height"] * 10)  # Assuming 10 rows
+            "width": str(image_width),
+            "height": str(image_height)
         })
 
         # Add Ground layer

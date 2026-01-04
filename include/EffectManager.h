@@ -9,6 +9,7 @@
 // Forward declarations
 struct Player;
 struct Enemy;
+class EnemySystem;
 
 // Server-authoritative effect manager
 class EffectManager {
@@ -35,7 +36,8 @@ class EffectManager {
 
   // Update all active effects (tick durations, apply DoT/HoT)
   void update(float deltaTime, std::unordered_map<uint32_t, Player>& players,
-              std::unordered_map<uint32_t, Enemy>& enemies);
+              std::unordered_map<uint32_t, Enemy>& enemies,
+              EnemySystem* enemySystem = nullptr);
 
   // Apply effect to player
   void applyEffect(uint32_t playerId, EffectType type, uint8_t stacks,
@@ -79,7 +81,8 @@ class EffectManager {
                            bool isPlayer);
 
   void updateEntityEffects(uint32_t entityId, ActiveEffects& activeEffects,
-                           float& health, float maxHealth, bool isPlayer);
+                           float& health, float maxHealth, float deltaTime,
+                           float entityX, float entityY);
 
   bool canApplyEffect(const ActiveEffects& activeEffects,
                       EffectType type) const;
@@ -92,5 +95,5 @@ class EffectManager {
 
   // DoT/HoT tick logic (for Wound and Mend)
   void tickWoundMend(EffectInstance& instance, float deltaTime, float& health,
-                     float maxHealth);
+                     float maxHealth, float entityX, float entityY);
 };

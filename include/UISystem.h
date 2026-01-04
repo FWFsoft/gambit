@@ -13,6 +13,7 @@ class ClientPrediction;
 class NetworkClient;
 class Texture;
 class DamageNumberSystem;
+class EffectTracker;
 struct ItemDefinition;
 
 // UISystem manages ImGui frame lifecycle and rendering
@@ -20,7 +21,8 @@ struct ItemDefinition;
 class UISystem {
  public:
   UISystem(Window* window, ClientPrediction* clientPrediction,
-           NetworkClient* client, DamageNumberSystem* damageNumbers);
+           NetworkClient* client, DamageNumberSystem* damageNumbers,
+           EffectTracker* effectTracker);
   ~UISystem();
 
   // Called each frame to render UI
@@ -54,11 +56,15 @@ class UISystem {
   void onItemPickedUp(const ItemPickedUpEvent& e);
   void renderNotifications();
 
+  // Effect display
+  void renderEffectBars();
+
   // State
   Window* window;
   ClientPrediction* clientPrediction;
   NetworkClient* client;
   DamageNumberSystem* damageNumberSystem;
+  EffectTracker* effectTracker;
   Settings settings;
   Settings tempSettings;  // Temporary settings during editing
   bool showSettings;

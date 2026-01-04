@@ -21,23 +21,34 @@ except ImportError:
 
 
 class TileAnalyzer:
-    def __init__(self, tileset_path, collision_path=None, tile_width=128, tile_height=128):
+    def __init__(self, tileset_path, collision_path=None, tile_width=128, tile_height=128, padding=0):
         self.tileset_path = Path(tileset_path)
         self.collision_path = Path(collision_path) if collision_path else None
         self.tile_width = tile_width
         self.tile_height = tile_height
+        self.padding = padding
 
         # Load images
         self.tileset_img = Image.open(self.tileset_path).convert("RGBA")
         self.collision_img = Image.open(self.collision_path).convert("RGBA") if self.collision_path else None
 
-        # Calculate grid dimensions
-        self.columns = self.tileset_img.width // self.tile_width
-        self.rows = self.tileset_img.height // self.tile_height
+        # Calculate grid dimensions (accounting for padding between tiles)
+        # Formula: total_width = (num_tiles * tile_width) + ((num_tiles - 1) * padding)
+        # Solving for num_tiles: num_tiles = (total_width + padding) / (tile_width + padding)
+        if self.padding > 0:
+            self.columns = (self.tileset_img.width + self.padding) // (self.tile_width + self.padding)
+            self.rows = (self.tileset_img.height + self.padding) // (self.tile_height + self.padding)
+        else:
+            self.columns = self.tileset_img.width // self.tile_width
+            self.rows = self.tileset_img.height // self.tile_height
 
         print(f"Loaded tileset: {self.tileset_path.name}")
         print(f"Dimensions: {self.tileset_img.width}x{self.tileset_img.height}")
         print(f"Tile size: {self.tile_width}x{self.tile_height}")
+        if self.padding > 0:
+            cell_width = self.tile_width + self.padding
+            cell_height = self.tile_height + self.padding
+            print(f"Padding: {self.padding}px (cell size: {cell_width}x{cell_height})")
         print(f"Grid: {self.columns} columns x {self.rows} rows = {self.columns * self.rows} tiles")
 
     def create_grid_overlay(self, output_path="tileset_grid.png"):
@@ -52,21 +63,25 @@ class TileAnalyzer:
         except:
             font = ImageFont.load_default()
 
+        # Calculate cell dimensions
+        cell_width = self.tile_width + self.padding
+        cell_height = self.tile_height + self.padding
+
         # Draw grid lines
         for col in range(self.columns + 1):
-            x = col * self.tile_width
+            x = col * cell_width
             draw.line([(x, 0), (x, img.height)], fill=(255, 0, 0, 128), width=2)
 
         for row in range(self.rows + 1):
-            y = row * self.tile_height
+            y = row * cell_height
             draw.line([(0, y), (img.width, y)], fill=(255, 0, 0, 128), width=2)
 
         # Draw tile IDs and positions
         for row in range(self.rows):
             for col in range(self.columns):
                 tile_id = row * self.columns + col
-                x = col * self.tile_width + 5
-                y = row * self.tile_height + 5
+                x = col * cell_width + 5
+                y = row * cell_height + 5
 
                 text = f"ID:{tile_id}\n({row},{col})"
 
@@ -112,9 +127,13 @@ class TileAnalyzer:
         row = tile_id // self.columns
         col = tile_id % self.columns
 
-        x = col * self.tile_width
-        y = row * self.tile_height
+        # Calculate position accounting for padding
+        cell_width = self.tile_width + self.padding
+        cell_height = self.tile_height + self.padding
+        x = col * cell_width
+        y = row * cell_height
 
+        # Extract only the tile (excluding padding)
         tile = self.tileset_img.crop((x, y, x + self.tile_width, y + self.tile_height))
 
         if output_path:
@@ -125,13 +144,16 @@ class TileAnalyzer:
 
     def list_all_tiles(self):
         """Print a list of all tile IDs and their grid positions."""
+        cell_width = self.tile_width + self.padding
+        cell_height = self.tile_height + self.padding
+
         print("\nAll Tiles:")
         print("ID  | Row | Col | Position")
         print("----|-----|-----|----------")
         for row in range(self.rows):
             for col in range(self.columns):
                 tile_id = row * self.columns + col
-                print(f"{tile_id:3d} | {row:3d} | {col:3d} | ({col * self.tile_width}, {row * self.tile_height})")
+                print(f"{tile_id:3d} | {row:3d} | {col:3d} | ({col * cell_width}, {row * cell_height})")
 
     def generate_skeleton_json(self, output_path="tiles_skeleton.json"):
         """Generate a skeleton tiles.json with all tile IDs populated."""
@@ -173,15 +195,18 @@ class TileAnalyzer:
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python tile_analyzer.py <tileset.png> [collision_map.png]")
+        print("Usage: python tile_analyzer.py <tileset.png> [collision_map.png] [tile_width] [tile_height] [padding]")
         print("\nExample:")
-        print("  python tile_analyzer.py ../../assets/maps/all_tiles.png ../../assets/maps/collison_map.png")
+        print("  python tile_analyzer.py ../../assets/maps/all_tiles.png ../../assets/maps/collison_map.png 173 197 4")
         sys.exit(1)
 
     tileset_path = sys.argv[1]
     collision_path = sys.argv[2] if len(sys.argv) > 2 else None
+    tile_width = int(sys.argv[3]) if len(sys.argv) > 3 else 128
+    tile_height = int(sys.argv[4]) if len(sys.argv) > 4 else 128
+    padding = int(sys.argv[5]) if len(sys.argv) > 5 else 0
 
-    analyzer = TileAnalyzer(tileset_path, collision_path)
+    analyzer = TileAnalyzer(tileset_path, collision_path, tile_width, tile_height, padding)
 
     print("\n" + "="*60)
     print("Generating analysis outputs...")

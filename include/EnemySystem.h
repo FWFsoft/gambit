@@ -46,6 +46,11 @@ class EnemySystem {
     return diedThisFrame;
   }
 
+  // Record an enemy death (for DoT and other non-combat deaths)
+  void recordDeath(uint32_t enemyId, uint32_t killerId) {
+    diedThisFrame.push_back({enemyId, killerId});
+  }
+
  private:
   const std::vector<EnemySpawn>& spawns;
   std::unordered_map<uint32_t, Enemy> enemies;  // enemyId -> Enemy
@@ -64,7 +69,7 @@ class EnemySystem {
                         float deltaTime, EffectManager* effectManager);
   void updateAttackState(Enemy& enemy,
                          std::unordered_map<uint32_t, Player>& players,
-                         float deltaTime);
+                         float deltaTime, EffectManager* effectManager);
 
   // Helper: Find nearest player within range
   const Player* findNearestPlayer(

@@ -10,6 +10,8 @@
 #include "CharacterSelectionState.h"
 #include "ClientPrediction.h"
 #include "DamageNumberSystem.h"
+#include "Effect.h"
+#include "EffectTracker.h"
 #include "GameStateManager.h"
 #include "ItemRegistry.h"
 #include "Logger.h"
@@ -22,11 +24,13 @@
 #include "config/PlayerConfig.h"
 
 UISystem::UISystem(Window* window, ClientPrediction* clientPrediction,
-                   NetworkClient* client, DamageNumberSystem* damageNumbers)
+                   NetworkClient* client, DamageNumberSystem* damageNumbers,
+                   EffectTracker* effectTracker)
     : window(window),
       clientPrediction(clientPrediction),
       client(client),
       damageNumberSystem(damageNumbers),
+      effectTracker(effectTracker),
       showSettings(false),
       currentTime(0.0f),
       titleScreenBackground(nullptr),
@@ -148,6 +152,11 @@ void UISystem::render() {
   // Render pickup notifications (always on top, except in main menu)
   if (currentState != GameState::MainMenu) {
     renderNotifications();
+  }
+
+  // Render effect bars (only during gameplay)
+  if (currentState == GameState::Playing) {
+    renderEffectBars();
   }
 
   // Render damage numbers (only during gameplay)
@@ -651,9 +660,14 @@ void UISystem::renderPauseMenu() {
 
   ImGui::Spacing();
 
-  // Main Menu button
+  // Main Menu button (returns to character selection)
   if (ImGui::Button("Main Menu", ImVec2(-1, 40))) {
-    GameStateManager::instance().transitionTo(GameState::MainMenu);
+    // Reset character selection state
+    CharacterSelectionState::instance().reset();
+    clientPrediction->resetCharacterSelection();
+
+    // Return to character selection screen
+    GameStateManager::instance().transitionTo(GameState::CharacterSelect);
   }
 
   ImGui::Spacing();
@@ -1057,6 +1071,82 @@ void UISystem::renderNotifications() {
 
     ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.6f, alpha), "%s",
                        notification.message.c_str());
+  }
+
+  ImGui::End();
+}
+
+void UISystem::renderEffectBars() {
+  if (!effectTracker) {
+    return;
+  }
+
+  // Get nearby enemies from enemy interpolation
+  // For now, just show effects in top-right corner for all enemies with effects
+  ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x - 210, 10),
+                          ImGuiCond_Always);
+  ImGui::SetNextWindowSize(ImVec2(200, 0), ImGuiCond_Always);
+
+  ImGui::Begin("Active Effects", nullptr,
+               ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                   ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize);
+
+  ImGui::Text("Enemy Effects:");
+  ImGui::Separator();
+
+  // For now, we'll iterate over all possible enemy IDs (1-100)
+  // In a real implementation, you'd get the list from EnemyInterpolation
+  bool foundAny = false;
+  for (uint32_t enemyId = 1; enemyId < 100; ++enemyId) {
+    const auto& effects = effectTracker->getEffects(enemyId, true);
+    if (effects.empty()) {
+      continue;
+    }
+
+    foundAny = true;
+    ImGui::Text("Enemy %u:", enemyId);
+    ImGui::Indent();
+
+    for (const auto& effect : effects) {
+      const EffectDefinition& def = EffectRegistry::get(effect.type);
+
+      // Color based on effect category
+      ImVec4 color;
+      if (def.category == EffectCategory::Buff) {
+        color = ImVec4(0.2f, 0.8f, 0.2f, 1.0f);  // Green for buffs
+      } else if (def.category == EffectCategory::Debuff) {
+        color = ImVec4(0.8f, 0.2f, 0.2f, 1.0f);  // Red for debuffs
+      } else {
+        color = ImVec4(0.7f, 0.7f, 0.2f, 1.0f);  // Yellow for neutral
+      }
+
+      // Create colored box with effect name and stacks
+      ImGui::PushStyleColor(ImGuiCol_Button, color);
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color);
+      ImGui::PushStyleColor(ImGuiCol_ButtonActive, color);
+
+      char label[64];
+      if (effect.stacks > 1) {
+        snprintf(label, sizeof(label), "%s x%d", def.name, effect.stacks);
+      } else {
+        snprintf(label, sizeof(label), "%s", def.name);
+      }
+
+      ImGui::Button(label, ImVec2(180, 22));
+      ImGui::PopStyleColor(3);
+
+      // Show duration on same line
+      ImGui::SameLine();
+      float durationSec = effect.remainingDuration / 1000.0f;
+      ImGui::Text("%.1fs", durationSec);
+    }
+
+    ImGui::Unindent();
+    ImGui::Spacing();
+  }
+
+  if (!foundAny) {
+    ImGui::TextDisabled("No active effects");
   }
 
   ImGui::End();
