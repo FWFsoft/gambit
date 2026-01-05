@@ -72,8 +72,8 @@ class PixelLabProcessor:
                 # Resize if needed
                 tile_img = tile_img.resize((tile_size, tile_size), Image.Resampling.LANCZOS)
 
-            # Rotate tile 90 degrees counter-clockwise to match Tiled's orientation
-            tile_img = tile_img.rotate(90, expand=False)
+            # Rotate tile 90 degrees clockwise to match Tiled's orientation
+            #tile_img = tile_img.rotate(45, expand=False)
 
             sheet.paste(tile_img, (x, y))
             print(f"  Placed tile {idx}: {tile_path.name} at ({x}, {y})")

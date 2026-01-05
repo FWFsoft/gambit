@@ -119,21 +119,20 @@ inline void applyInput(
 
   float dx = 0, dy = 0;
 
+  // Simple orthogonal movement in isometric world space
+  // worldX/worldY are already screen-space isometric coordinates from
+  // gridToWorld
   if (input.moveUp) {
-    dx -= 1;
-    dy -= 1;
+    dy -= 1;  // Up on screen = decrease worldY
   }
   if (input.moveRight) {
-    dx += 1;
-    dy -= 1;
+    dx += 1;  // Right on screen = increase worldX
   }
   if (input.moveDown) {
-    dx += 1;
-    dy += 1;
+    dy += 1;  // Down on screen = increase worldY
   }
   if (input.moveLeft) {
-    dx -= 1;
-    dy += 1;
+    dx -= 1;  // Left on screen = decrease worldX
   }
 
   float len = std::sqrt(dx * dx + dy * dy);
@@ -166,7 +165,9 @@ inline void applyInput(
   player.x = newX;
   player.y = newY;
 
-  // Clamp to world bounds
-  player.x = std::clamp(player.x, 0.0f, input.worldWidth);
-  player.y = std::clamp(player.y, 0.0f, input.worldHeight);
+  // Clamp to world bounds (map is centered at origin)
+  float halfWidth = input.worldWidth / 2.0f;
+  float halfHeight = input.worldHeight / 2.0f;
+  player.x = std::clamp(player.x, -halfWidth, halfWidth);
+  player.y = std::clamp(player.y, -halfHeight, halfHeight);
 }

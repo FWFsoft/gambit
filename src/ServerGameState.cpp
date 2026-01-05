@@ -503,9 +503,9 @@ Player ServerGameState::createPlayer(uint32_t playerId) {
                  spawn.name + " (" + std::to_string(player.x) + ", " +
                  std::to_string(player.y) + ")");
   } else {
-    // Fallback: use world center
-    player.x = worldWidth / 2.0f;
-    player.y = worldHeight / 2.0f;
+    // Fallback: use world center (map is centered at origin)
+    player.x = 0.0f;
+    player.y = 0.0f;
     Logger::info("Player " + std::to_string(playerId) +
                  " spawned at world center (no spawn points)");
   }
@@ -539,10 +539,8 @@ bool ServerGameState::findValidSpawnPosition(float& x, float& y) {
          radius += Config::Gameplay::SPAWN_SEARCH_RADIUS_INCREMENT) {
       for (float angle = 0; angle < 360.0f;
            angle += Config::Gameplay::SPAWN_SEARCH_ANGLE_INCREMENT) {
-        float testX =
-            worldWidth / 2.0f + radius * std::cos(angle * 3.14159f / 180.0f);
-        float testY =
-            worldHeight / 2.0f + radius * std::sin(angle * 3.14159f / 180.0f);
+        float testX = 0.0f + radius * std::cos(angle * 3.14159f / 180.0f);
+        float testY = 0.0f + radius * std::sin(angle * 3.14159f / 180.0f);
         if (collisionSystem->isPositionValid(testX, testY,
                                              Config::Player::RADIUS)) {
           x = testX;
@@ -629,9 +627,9 @@ void ServerGameState::respawnPlayer(Player& player) {
                  spawn.name + " (" + std::to_string(player.x) + ", " +
                  std::to_string(player.y) + ")");
   } else {
-    // Fallback: world center
-    player.x = worldWidth / 2.0f;
-    player.y = worldHeight / 2.0f;
+    // Fallback: world center (map is centered at origin)
+    player.x = 0.0f;
+    player.y = 0.0f;
     if (!findValidSpawnPosition(player.x, player.y)) {
       Logger::error("Failed to find valid respawn position");
     }

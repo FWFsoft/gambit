@@ -23,16 +23,9 @@ uniform vec2 screenCenter;
 void main() {
     TexCoord = aTexCoord;
 
-    // Apply isometric projection
-    float isoX = aPos.x - aPos.y;
-    float isoY = (aPos.x + aPos.y) * 0.5;
-
-    // Apply camera transform
-    float camIsoX = cameraPos.x - cameraPos.y;
-    float camIsoY = (cameraPos.x + cameraPos.y) * 0.5;
-
-    float screenX = isoX - camIsoX + screenCenter.x;
-    float screenY = isoY - camIsoY + screenCenter.y;
+    // gridToWorld already converted to isometric, so just apply camera offset
+    float screenX = aPos.x - cameraPos.x + screenCenter.x;
+    float screenY = aPos.y - cameraPos.y + screenCenter.y;
 
     gl_Position = projection * vec4(screenX, screenY, 0.0, 1.0);
 }
@@ -176,8 +169,9 @@ void TileRenderer::buildTileBatch(const TiledMap& map) {
 
       // Use world coordinates instead of screen coordinates
       // Camera transformation will be applied in shader
+      // For isometric tiles, center the quad at the world position
       float x = worldX - tileWidth / 2.0f;
-      float y = worldY - tileHeight / 2.0f;
+      float y = worldY - tileHeight / 2.0f;  // Center anchor for proper overlap
 
       // Calculate UV coordinates for texture atlas
       float u1, v1, u2, v2;
@@ -281,6 +275,27 @@ void TileRenderer::gridToWorld(const TiledMap& map, int tileX, int tileY,
   // Tiled's isometric grid-to-world formula
   int tileWidth = map.getTileWidth();
   int tileHeight = map.getTileHeight();
+
+  // Calculate position using Tiled's formula
+  // Using tileHeight/4 for Y to increase vertical overlap for thick isometric
+  // tiles
   worldX = (tileX - tileY) * tileWidth / 2.0f;
-  worldY = (tileX + tileY) * tileHeight / 2.0f;
+  worldY = (tileX + tileY) * tileHeight / 4.0f;
+
+  // Center the map at origin
+  // The map's bounding box center needs to be at (0, 0)
+  int mapWidth = map.getWidth();
+  int mapHeight = map.getHeight();
+
+  // Map center in grid space
+  float centerTileX = (mapWidth - 1) / 2.0f;
+  float centerTileY = (mapHeight - 1) / 2.0f;
+
+  // Map center in world space (before offset)
+  float centerWorldX = (centerTileX - centerTileY) * tileWidth / 2.0f;
+  float centerWorldY = (centerTileX + centerTileY) * tileHeight / 4.0f;
+
+  // Offset to center the map at origin
+  worldX -= centerWorldX;
+  worldY -= centerWorldY;
 }

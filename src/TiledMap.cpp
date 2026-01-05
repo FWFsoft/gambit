@@ -30,6 +30,12 @@ bool TiledMap::load(const std::string& filepath) {
   extractEnemySpawns();
   extractPlayerSpawns();
 
+  // Calculate map centering offset for music zones
+  float centerTileX = (mapWidth - 1) / 2.0f;
+  float centerTileY = (mapHeight - 1) / 2.0f;
+  float centerWorldX = (centerTileX - centerTileY) * tileWidth / 2.0f;
+  float centerWorldY = (centerTileX + centerTileY) * tileHeight / 4.0f;
+
   // Extract music zones from object layers
   musicZones.clear();
   for (const auto& layer : layers) {
@@ -66,13 +72,13 @@ bool TiledMap::load(const std::string& filepath) {
           continue;
         }
 
-        // Create MusicZone
+        // Create MusicZone with centering offset
         const auto& aabb = object.getAABB();
         MusicZone zone;
         zone.name = object.getName();
         zone.trackName = trackName;
-        zone.x = aabb.left;
-        zone.y = aabb.top;
+        zone.x = aabb.left - centerWorldX;
+        zone.y = aabb.top - centerWorldY;
         zone.width = aabb.width;
         zone.height = aabb.height;
 
@@ -105,6 +111,17 @@ int TiledMap::getWorldHeight() const {
 void TiledMap::extractCollisionShapes() {
   collisionShapes.clear();
 
+  // Calculate map centering offset (same as in TileRenderer::gridToWorld)
+  int mapWidth = tmxMap.getTileCount().x;
+  int mapHeight = tmxMap.getTileCount().y;
+  int tileWidth = tmxMap.getTileSize().x;
+  int tileHeight = tmxMap.getTileSize().y;
+
+  float centerTileX = (mapWidth - 1) / 2.0f;
+  float centerTileY = (mapHeight - 1) / 2.0f;
+  float centerWorldX = (centerTileX - centerTileY) * tileWidth / 2.0f;
+  float centerWorldY = (centerTileX + centerTileY) * tileHeight / 4.0f;
+
   const auto& layers = tmxMap.getLayers();
   for (const auto& layer : layers) {
     if (layer->getType() == tmx::Layer::Type::Object) {
@@ -131,8 +148,9 @@ void TiledMap::extractCollisionShapes() {
           const auto& aabb = obj.getAABB();
           const auto& pos = obj.getPosition();
 
-          shape.aabb.x = pos.x;
-          shape.aabb.y = pos.y;
+          // Apply centering offset to match tile coordinate system
+          shape.aabb.x = pos.x - centerWorldX;
+          shape.aabb.y = pos.y - centerWorldY;
           shape.aabb.width = aabb.width;
           shape.aabb.height = aabb.height;
 
@@ -152,6 +170,14 @@ void TiledMap::extractCollisionShapes() {
 
 void TiledMap::extractEnemySpawns() {
   enemySpawns.clear();
+
+  // Calculate map centering offset
+  float centerTileX = (tmxMap.getTileCount().x - 1) / 2.0f;
+  float centerTileY = (tmxMap.getTileCount().y - 1) / 2.0f;
+  float centerWorldX =
+      (centerTileX - centerTileY) * tmxMap.getTileSize().x / 2.0f;
+  float centerWorldY =
+      (centerTileX + centerTileY) * tmxMap.getTileSize().y / 4.0f;
 
   const auto& layers = tmxMap.getLayers();
   for (const auto& layer : layers) {
@@ -201,12 +227,12 @@ void TiledMap::extractEnemySpawns() {
           continue;
         }
 
-        // Create spawn point
+        // Create spawn point with centering offset
         const auto& pos = object.getPosition();
         EnemySpawn spawn;
         spawn.type = type;
-        spawn.x = pos.x;
-        spawn.y = pos.y;
+        spawn.x = pos.x - centerWorldX;
+        spawn.y = pos.y - centerWorldY;
         spawn.name = object.getName();
 
         enemySpawns.push_back(spawn);
@@ -246,6 +272,14 @@ int TiledMap::getTilesetSpacing() const {
 void TiledMap::extractPlayerSpawns() {
   playerSpawns.clear();
 
+  // Calculate map centering offset
+  float centerTileX = (tmxMap.getTileCount().x - 1) / 2.0f;
+  float centerTileY = (tmxMap.getTileCount().y - 1) / 2.0f;
+  float centerWorldX =
+      (centerTileX - centerTileY) * tmxMap.getTileSize().x / 2.0f;
+  float centerWorldY =
+      (centerTileX + centerTileY) * tmxMap.getTileSize().y / 4.0f;
+
   const auto& layers = tmxMap.getLayers();
   for (const auto& layer : layers) {
     if (layer->getType() == tmx::Layer::Type::Object) {
@@ -262,11 +296,11 @@ void TiledMap::extractPlayerSpawns() {
           continue;
         }
 
-        // Create spawn point
+        // Create spawn point with centering offset
         const auto& pos = object.getPosition();
         PlayerSpawn spawn;
-        spawn.x = pos.x;
-        spawn.y = pos.y;
+        spawn.x = pos.x - centerWorldX;
+        spawn.y = pos.y - centerWorldY;
         spawn.name = object.getName();
 
         playerSpawns.push_back(spawn);

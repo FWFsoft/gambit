@@ -29,26 +29,18 @@ struct Camera {
 
   void worldToScreen(float worldX, float worldY, int& screenX,
                      int& screenY) const {
-    float isoX = worldX - worldY;
-    float isoY = (worldX + worldY) * 0.5f;
-
-    float camIsoX = x - y;
-    float camIsoY = (x + y) * 0.5f;
-
-    screenX = static_cast<int>(isoX - camIsoX + screenWidth / 2);
-    screenY = static_cast<int>(isoY - camIsoY + screenHeight / 2);
+    // gridToWorld already converts to isometric coordinates,
+    // so just apply camera offset like TileRenderer shader does
+    screenX = static_cast<int>(worldX - x + screenWidth / 2);
+    screenY = static_cast<int>(worldY - y + screenHeight / 2);
   }
 
   void screenToWorld(int screenX, int screenY, float& worldX,
                      float& worldY) const {
-    float camIsoX = x - y;
-    float camIsoY = (x + y) * 0.5f;
-
-    float isoX = screenX + camIsoX - screenWidth / 2;
-    float isoY = screenY + camIsoY - screenHeight / 2;
-
-    worldX = isoY + (isoX * 0.5f);
-    worldY = isoY - (isoX * 0.5f);
+    // Reverse of worldToScreen - simple offset since coordinates are already
+    // isometric
+    worldX = screenX + x - screenWidth / 2;
+    worldY = screenY + y - screenHeight / 2;
   }
 
  private:
