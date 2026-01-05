@@ -34,7 +34,11 @@
       "Bash(pkill:*)",
       "Bash(killall:*)",
       "Bash(NUM_CLIENTS=1 make dev:*)",
-      "Bash(NUM_CLIENTS=1 timeout 10 make:*)"
+      "Bash(NUM_CLIENTS=1 timeout 10 make:*)",
+      "Bash(wc:*)",
+      "mcp__pixellab__create_isometric_tile",
+      "mcp__pixellab__get_isometric_tile",
+      "Bash(curl:*)"
     ]
   }
 }

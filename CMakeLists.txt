@@ -195,6 +195,55 @@ elseif(TARGET PkgConfig::TMXLITE)
     )
 endif()
 
+# Headless Client executable (for testing without graphics)
+add_executable(HeadlessClient
+    src/headless_client_main.cpp
+    src/Logger.cpp
+    src/NetworkClient.cpp
+    src/FileSystem.cpp
+    src/MockWindow.cpp
+    src/GameLoop.cpp
+    src/InputSystem.cpp
+    src/NetworkProtocol.cpp
+    src/ClientPrediction.cpp
+    src/RemotePlayerInterpolation.cpp
+    src/HeadlessRenderSystem.cpp
+    src/HeadlessUISystem.cpp
+    src/InputScript.cpp
+    src/TiledMap.cpp
+    src/CollisionSystem.cpp
+    src/AnimationController.cpp
+    src/AnimationSystem.cpp
+    src/AnimationAssetLoader.cpp
+    src/MusicSystem.cpp
+    src/EnemyInterpolation.cpp
+    src/CombatSystem.cpp
+    src/CharacterRegistry.cpp
+    src/CharacterSelectionState.cpp
+    src/EffectTracker.cpp
+    src/GameStateManager.cpp
+    src/Settings.cpp
+    src/ItemRegistry.cpp
+)
+target_include_directories(HeadlessClient SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
+target_include_directories(HeadlessClient PRIVATE include tests)
+target_link_libraries(HeadlessClient PRIVATE
+    ${ENET_LIBRARY}
+    SDL2::SDL2
+    spdlog::spdlog
+    $<IF:$<TARGET_EXISTS:SDL2_mixer::SDL2_mixer>,SDL2_mixer::SDL2_mixer,$<IF:$<TARGET_EXISTS:SDL2_mixer::SDL2_mixer-static>,SDL2_mixer::SDL2_mixer-static,SDL2_mixer::SDL2_mixer>>
+)
+# Link tmxlite for map loading
+if(tmxlite_FOUND)
+    target_link_libraries(HeadlessClient PRIVATE tmxlite::tmxlite)
+elseif(TARGET PkgConfig::TMXLITE)
+    target_link_libraries(HeadlessClient PRIVATE
+        PkgConfig::TMXLITE
+        ZLIB::ZLIB
+        $<IF:$<TARGET_EXISTS:zstd::libzstd_shared>,zstd::libzstd_shared,zstd::libzstd_static>
+    )
+endif()
+
 # Enable testing
 enable_testing()
 
@@ -338,6 +387,54 @@ target_include_directories(test_gameloop SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
 target_include_directories(test_gameloop PRIVATE include tests)
 target_link_libraries(test_gameloop PRIVATE spdlog::spdlog SDL2::SDL2)
 
+add_executable(test_headless_movement
+    tests/test_headless_movement.cpp
+    src/Logger.cpp
+    src/NetworkClient.cpp
+    src/FileSystem.cpp
+    src/MockWindow.cpp
+    src/GameLoop.cpp
+    src/InputSystem.cpp
+    src/NetworkProtocol.cpp
+    src/ClientPrediction.cpp
+    src/RemotePlayerInterpolation.cpp
+    src/HeadlessRenderSystem.cpp
+    src/HeadlessUISystem.cpp
+    src/InputScript.cpp
+    src/TiledMap.cpp
+    src/CollisionSystem.cpp
+    src/AnimationController.cpp
+    src/AnimationSystem.cpp
+    src/AnimationAssetLoader.cpp
+    src/MusicSystem.cpp
+    src/EnemyInterpolation.cpp
+    src/CombatSystem.cpp
+    src/CharacterRegistry.cpp
+    src/CharacterSelectionState.cpp
+    src/EffectTracker.cpp
+    src/GameStateManager.cpp
+    src/Settings.cpp
+    src/ItemRegistry.cpp
+)
+target_include_directories(test_headless_movement SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
+target_include_directories(test_headless_movement PRIVATE include tests)
+target_link_libraries(test_headless_movement PRIVATE
+    ${ENET_LIBRARY}
+    SDL2::SDL2
+    spdlog::spdlog
+    $<IF:$<TARGET_EXISTS:SDL2_mixer::SDL2_mixer>,SDL2_mixer::SDL2_mixer,$<IF:$<TARGET_EXISTS:SDL2_mixer::SDL2_mixer-static>,SDL2_mixer::SDL2_mixer-static,SDL2_mixer::SDL2_mixer>>
+)
+# Link tmxlite for map loading
+if(tmxlite_FOUND)
+    target_link_libraries(test_headless_movement PRIVATE tmxlite::tmxlite)
+elseif(TARGET PkgConfig::TMXLITE)
+    target_link_libraries(test_headless_movement PRIVATE
+        PkgConfig::TMXLITE
+        ZLIB::ZLIB
+        $<IF:$<TARGET_EXISTS:zstd::libzstd_shared>,zstd::libzstd_shared,zstd::libzstd_static>
+    )
+endif()
+
 # Register tests with CTest
 add_test(NAME PlayerMovement COMMAND test_player)
 add_test(NAME NetworkProtocol COMMAND test_network_protocol)
@@ -351,6 +448,16 @@ add_test(NAME MusicSystem COMMAND test_music_system)
 add_test(NAME AnimationController COMMAND test_animation_controller)
 add_test(NAME AnimationSystem COMMAND test_animation_system)
 add_test(NAME GameLoop COMMAND test_gameloop)
+
+# Headless integration test (requires running server on localhost:1234)
+# Note: This test will fail if no server is available
+# Excluded from default `make test` - run explicitly with: ctest -L integration
+add_test(NAME HeadlessMovement COMMAND test_headless_movement)
+set_tests_properties(HeadlessMovement PROPERTIES
+    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    LABELS "integration;manual"
+    DISABLED TRUE  # Disabled by default, enable with: ctest -L integration
+)
 
 # Enable code coverage for test targets
 if(ENABLE_COVERAGE)

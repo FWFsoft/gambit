@@ -39,6 +39,7 @@ gambit/
 │       ├── build/          # Build the project
 │       ├── clean/          # Clean build artifacts
 │       ├── dev/            # Development environment (1 server + 4 clients)
+│       ├── headless-test/  # Run headless client for automated testing
 │       ├── pre-commit/     # Run pre-commit hooks (clang-format, clang-tidy)
 │       ├── run-client/     # Run a single client
 │       ├── run-server/     # Run the server
@@ -156,6 +157,7 @@ The project includes several Claude Code skills for common development tasks:
 - **`/dev`**: Full development environment (1 server + 4 clients)
 - **`/run-server`**: Start the game server on 0.0.0.0:1234
 - **`/run-client`**: Start a single client connecting to 127.0.0.1:1234
+- **`/headless-test`**: Run headless client for automated testing and verification
 - **`/pre-commit`**: Run pre-commit hooks (clang-format, clang-tidy) on all files
 - **`/search <symbol>`**: Advanced code search - finds definitions and usages across code, tests, examples, and benchmarks
 
@@ -206,14 +208,59 @@ uv run python .claude/skills/search/search.py <symbol>
 
 ## Testing
 
-Currently, there is no formal test suite. The `/test` skill is available for when tests are added.
+The engine has a comprehensive test suite with 13 test executables covering core systems.
 
-### Future Testing Strategy
+### Running Tests
 
-Based on the Tiger Style approach:
+Run all unit tests:
+```bash
+make test
+# or
+/test
+```
+
+This runs 12 unit tests covering:
+- PlayerMovement, NetworkProtocol, EventBus, InputSystem
+- RemotePlayerInterpolation, ClientPrediction, CollisionSystem
+- MusicZone, MusicSystem, AnimationController, AnimationSystem, GameLoop
+
+### Headless Testing (Integration Tests)
+
+The engine supports headless testing for automated verification of game logic without graphics.
+
+**Run headless client:**
+```bash
+./build/HeadlessClient --frames 60 --log-events
+```
+
+**Run integration tests** (requires server):
+```bash
+# Terminal 1: Start server
+./build/Server
+
+# Terminal 2: Run integration test
+ctest -R HeadlessMovement --output-on-failure
+```
+
+**Note:** Integration tests are excluded from `make test` by default (they require a running server). Run them explicitly when needed.
+
+### Headless Testing Features
+
+- **EventCapture<T>**: Capture and assert on events during tests
+- **InputScript**: Programmatically inject keyboard input
+- **EventLogger**: Debug event streams with frame-by-frame logging
+- **No graphics**: Runs completely headless (no SDL window, OpenGL, or ImGui)
+- **CI/CD ready**: Can run in automated pipelines
+
+See `.claude/skills/headless-test/SKILL.md` for detailed documentation.
+
+### Testing Strategy
+
+Following the Tiger Style approach:
 - Extensive assertions in code to crash on invalid states
-- Fuzz testing for critical systems (networking, asset loading, etc.)
-- Integration tests for multiplayer scenarios
+- Unit tests for core systems (EventBus, networking, prediction, etc.)
+- Headless integration tests for multiplayer scenarios
+- Event-driven assertions matching the engine's architecture
 
 ## Planned Features
 
