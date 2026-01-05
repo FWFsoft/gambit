@@ -316,7 +316,7 @@ void UISystem::renderCharacterSelect() {
 
       // Try to load portrait texture
       Texture* portrait =
-          TextureManager::instance().get(character.portraitPath);
+          TextureManager::instance().get(character.getCharacterPortraitPath());
 
       // If portrait exists, use it as image button
       if (portrait && portrait->isLoaded()) {
@@ -384,7 +384,7 @@ void UISystem::renderCharacterSelect() {
   // BOTTOM-RIGHT: Character preview
   ImGui::SetNextWindowPos(ImVec2(windowSize.x - 50, windowSize.y - 130),
                           ImGuiCond_Always, ImVec2(1.0f, 1.0f));
-  ImGui::SetNextWindowSize(ImVec2(350, 400), ImGuiCond_Always);
+  ImGui::SetNextWindowSize(ImVec2(350, 500), ImGuiCond_Always);
   ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
 
   ImGui::Begin("Character Preview", nullptr,
@@ -405,29 +405,21 @@ void UISystem::renderCharacterSelect() {
       ImGui::Separator();
       ImGui::Spacing();
 
-      // Render sprite preview using idle animation frame
-      // Idle animation: srcX=0, srcY=0, srcW=32, srcH=32 (from
-      // AnimationConfig.h)
-
+      // Display character using relevant character image asset
       Texture* playerTexture =
-          TextureManager::instance().get("assets/player_animated.png");
+          TextureManager::instance().get(character->getCharacterPreviewPath());
       if (playerTexture && playerTexture->isLoaded()) {
         // Calculate preview size (3x game size = 96x96)
-        float previewSize = 96.0f;
+        float previewSize = 250.0f;
+        float previewSizeY = previewSize * 1.44;
 
         // Center the preview in the window
         ImVec2 cursorPos = ImGui::GetCursorPos();
         float centerX = (350 - previewSize) / 2.0f;
         ImGui::SetCursorPos(ImVec2(centerX, cursorPos.y));
 
-        // Draw sprite with color tint applied
         ImGui::Image((ImTextureID)(intptr_t)playerTexture->getID(),
-                     ImVec2(previewSize, previewSize),
-                     ImVec2(0, 0),  // UV top-left (idle frame)
-                     ImVec2(32.0f / 256.0f, 32.0f / 256.0f),  // UV bottom-right
-                     ImVec4(character->r / 255.0f, character->g / 255.0f,
-                            character->b / 255.0f, 1.0f),  // Color tint
-                     ImVec4(0, 0, 0, 0));                  // No border
+                     ImVec2(previewSize, previewSizeY));
       }
 
       // Future: Show character stats here
@@ -585,7 +577,7 @@ void UISystem::renderHUD() {
 
     if (character) {
       Texture* portrait =
-          TextureManager::instance().get(character->portraitPath);
+          TextureManager::instance().get(character->getCharacterPreviewPath());
 
       if (portrait && portrait->isLoaded()) {
         // Draw portrait on the left (60x60)

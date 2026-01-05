@@ -20,9 +20,8 @@ struct CharacterClass {
 
 // Character definition - cosmetic for now, extensible for stats/classes later
 struct CharacterDefinition {
-  uint32_t id;               // Unique character ID
-  std::string name;          // Display name
-  std::string portraitPath;  // Path to parallelogram portrait image
+  uint32_t id;       // Unique character ID
+  std::string name;  // Display name
   std::string
       spriteSheetPath;  // Path to character sprite sheet (unused for now)
 
@@ -33,14 +32,21 @@ struct CharacterDefinition {
   // CharacterStats baseStats;
   // CharacterClass characterClass;
 
-  CharacterDefinition(uint32_t id, const std::string& name,
-                      const std::string& portraitPath, uint8_t r, uint8_t g,
-                      uint8_t b)
+  CharacterDefinition(uint32_t id, const std::string& name, uint8_t r,
+                      uint8_t g, uint8_t b)
       : id(id),
         name(name),
-        portraitPath(portraitPath),
         spriteSheetPath("assets/player_animated.png"),  // Use default for now
         r(r),
         g(g),
         b(b) {}
+
+  // TODO: Path joining?
+  std::string const getCharacterPortraitPath() const {
+    return "assets/portraits/" + this->name + ".png";
+  };
+
+  std::string getCharacterPreviewPath() const {
+    return "assets/previews/" + this->name + ".png";
+  };
 };

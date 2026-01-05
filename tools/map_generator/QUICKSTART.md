@@ -140,6 +140,14 @@ uv run --with Pillow python generate_map.py \
   --output ../../assets/generated_map_001.tmx
 ```
 
+```bash
+uv run python generate_map.py \
+ --tiles tiles_venoxarid_test.json \
+ --width 15 --height 15 \
+ --seed 42 \
+ --output ../../assets/test_map.tmx
+```
+
 ### 4. Test in Game
 
 ```bash

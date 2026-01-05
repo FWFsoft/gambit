@@ -278,7 +278,9 @@ void TileRenderer::renderBatch() {
 
 void TileRenderer::gridToWorld(const TiledMap& map, int tileX, int tileY,
                                float& worldX, float& worldY) {
-  float unit = map.getTileWidth() / 2.0f;
-  worldX = tileX * unit;
-  worldY = tileY * unit;
+  // Tiled's isometric grid-to-world formula
+  int tileWidth = map.getTileWidth();
+  int tileHeight = map.getTileHeight();
+  worldX = (tileX - tileY) * tileWidth / 2.0f;
+  worldY = (tileX + tileY) * tileHeight / 2.0f;
 }
