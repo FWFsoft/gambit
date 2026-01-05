@@ -1,0 +1,97 @@
+{
+  "tileset": {
+    "name": "venoxarid_organic_test",
+    "image": "../../assets/maps/venoxarid_tileset.png",
+    "tile_width": 64,
+    "tile_height": 64,
+    "spacing": 4,
+    "columns": 7,
+    "firstgid": 1,
+    "description": "Venoxarid organic terrain with moss, bioluminescence, and toxic pools"
+  },
+  "edge_types": [
+    "flat_moss",
+    "flat_moss_dense",
+    "flat_moss_vine",
+    "flat_moss_sparse",
+    "toxic_pool",
+    "void"
+  ],
+  "tiles": [
+    {
+      "id": 0,
+      "name": "dense_moss_pink_mushrooms",
+      "row": 0,
+      "col": 0,
+      "edges": {
+        "north": "flat_moss",
+        "south": "flat_moss",
+        "east": "flat_moss",
+        "west": "flat_moss"
+      },
+      "weight": 10,
+      "pixellab_tile_id": "2cfd0359-e52b-4386-b126-cef2c979f731",
+      "description": "dense moss-covered ground with small glowing pink mushrooms and yellow bioluminescent roots"
+    },
+    {
+      "id": 1,
+      "name": "moss_yellow_vines",
+      "row": 0,
+      "col": 1,
+      "edges": {
+        "north": "flat_moss",
+        "south": "flat_moss",
+        "east": "flat_moss",
+        "west": "flat_moss"
+      },
+      "weight": 8,
+      "pixellab_tile_id": "1965d7e0-c9b3-48ea-82c8-0428f5252f38",
+      "description": "moss-covered ground with twisted yellow glowing vines and organic root systems"
+    },
+    {
+      "id": 2,
+      "name": "dark_moss_pink_fungi",
+      "row": 0,
+      "col": 2,
+      "edges": {
+        "north": "flat_moss",
+        "south": "flat_moss",
+        "east": "flat_moss",
+        "west": "flat_moss"
+      },
+      "weight": 10,
+      "pixellab_tile_id": "4566a7db-aa3e-4291-9a73-bb7671dffaa2",
+      "description": "dark green moss with small pink bioluminescent fungi clusters"
+    },
+    {
+      "id": 3,
+      "name": "sparse_moss_spores",
+      "row": 0,
+      "col": 3,
+      "edges": {
+        "north": "flat_moss",
+        "south": "flat_moss",
+        "east": "flat_moss",
+        "west": "flat_moss"
+      },
+      "weight": 6,
+      "pixellab_tile_id": "b41e1a6a-dd45-4b70-84b0-40065b4c929a",
+      "description": "sparse moss transitioning to dark organic matter with small glowing pink spores"
+    },
+    {
+      "id": 4,
+      "name": "toxic_pool",
+      "row": 0,
+      "col": 4,
+      "edges": {
+        "north": "toxic_pool",
+        "south": "toxic_pool",
+        "east": "toxic_pool",
+        "west": "toxic_pool"
+      },
+      "weight": 2,
+      "pixellab_tile_id": "4604c034-2350-45be-969f-d8e7059c15a3",
+      "description": "bubbling toxic green liquid pool with sickly yellow edges and pink bioluminescent algae"
+    }
+  ]
+}

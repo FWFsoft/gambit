@@ -56,3 +56,6 @@ CTestTestfile.cmake
 _deps
 #clangd
 .cache
+
+# python
+*.pyc

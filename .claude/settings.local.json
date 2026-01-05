@@ -38,7 +38,8 @@
       "Bash(wc:*)",
       "mcp__pixellab__create_isometric_tile",
       "mcp__pixellab__get_isometric_tile",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(sips:*)"
     ]
   }
 }
