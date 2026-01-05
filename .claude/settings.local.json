@@ -39,7 +39,8 @@
       "mcp__pixellab__create_isometric_tile",
       "mcp__pixellab__get_isometric_tile",
       "Bash(curl:*)",
-      "Bash(sips:*)"
+      "Bash(sips:*)",
+      "Bash(./build/Client)"
     ]
   }
 }

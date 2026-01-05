@@ -35,6 +35,12 @@ class TiledMap {
     return playerSpawns;
   }
 
+  // Tileset information
+  std::string getTilesetImagePath() const;
+  int getTilesetColumns() const;
+  int getTilesetSpacing() const;
+  const tmx::Map& getTmxMap() const { return tmxMap; }
+
  private:
   tmx::Map tmxMap;
   int mapWidth = 0;

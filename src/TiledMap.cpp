@@ -219,6 +219,30 @@ void TiledMap::extractEnemySpawns() {
   }
 }
 
+std::string TiledMap::getTilesetImagePath() const {
+  const auto& tilesets = tmxMap.getTilesets();
+  if (tilesets.empty()) {
+    return "";
+  }
+  return tilesets[0].getImagePath();
+}
+
+int TiledMap::getTilesetColumns() const {
+  const auto& tilesets = tmxMap.getTilesets();
+  if (tilesets.empty()) {
+    return 1;
+  }
+  return tilesets[0].getColumnCount();
+}
+
+int TiledMap::getTilesetSpacing() const {
+  const auto& tilesets = tmxMap.getTilesets();
+  if (tilesets.empty()) {
+    return 0;
+  }
+  return tilesets[0].getSpacing();
+}
+
 void TiledMap::extractPlayerSpawns() {
   playerSpawns.clear();
 

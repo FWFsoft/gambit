@@ -95,9 +95,15 @@ class TMXGenerator:
 
         # Convert grid to CSV format
         # NOTE: TMX tile IDs are 1-indexed (firstgid=1), so we add 1 to each tile ID
+        # For isometric maps with renderorder="right-down", we need to transpose the grid
+        # so that grid[y][x] becomes grid[x][y]
         firstgid = self.tileset_info.get("firstgid", 1)
+
+        # Transpose the grid: swap rows and columns
+        transposed_grid = [[grid[y][x] for y in range(height)] for x in range(width)]
+
         csv_lines = []
-        for row in grid:
+        for row in transposed_grid:
             csv_line = ",".join(str(tile_id + firstgid) for tile_id in row)
             csv_lines.append(csv_line)
 

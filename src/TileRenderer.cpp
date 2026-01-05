@@ -56,15 +56,9 @@ TileRenderer::TileRenderer(Camera* camera, SpriteRenderer* spriteRenderer,
     : camera(camera),
       spriteRenderer(spriteRenderer),
       whitePixel(whitePixel),
+      tilesetTexture(nullptr),
       batchBuilt(false),
       verticesUploaded(false) {
-  // Try to load tileset (fallback to colored rectangles if not found)
-  tilesetTexture = TextureManager::instance().get("assets/tileset.png");
-  if (!tilesetTexture) {
-    Logger::info("Tileset not found, using colored rectangles for tiles");
-    tilesetTexture = whitePixel;
-  }
-
   initBatchRenderer();
 }
 
@@ -118,6 +112,24 @@ void TileRenderer::render(const TiledMap& map,
     return;
   }
 
+  // Load tileset if not already loaded
+  if (!tilesetTexture) {
+    std::string tilesetPath = map.getTilesetImagePath();
+    if (!tilesetPath.empty()) {
+      tilesetTexture = TextureManager::instance().get(tilesetPath);
+      if (!tilesetTexture) {
+        Logger::info("Failed to load tileset: " + tilesetPath +
+                     ", using placeholder");
+        tilesetTexture = whitePixel;
+      } else {
+        Logger::info("Loaded tileset: " + tilesetPath);
+      }
+    } else {
+      Logger::info("No tileset found in map, using placeholder");
+      tilesetTexture = whitePixel;
+    }
+  }
+
   // Build all tile vertices into a single batch (only once - tiles are static)
   if (!batchBuilt) {
     buildTileBatch(map);
@@ -147,6 +159,8 @@ void TileRenderer::buildTileBatch(const TiledMap& map) {
 
   int tileWidth = map.getTileWidth();
   int tileHeight = map.getTileHeight();
+  int columns = map.getTilesetColumns();
+  int spacing = map.getTilesetSpacing();
 
   bool isPlaceholder = (tilesetTexture == whitePixel);
 
@@ -174,15 +188,17 @@ void TileRenderer::buildTileBatch(const TiledMap& map) {
         v2 = 1.0f;
       } else {
         int tileTextureIndex = gid - 1;
-        int column = tileTextureIndex % 2;
-        int row = tileTextureIndex / 2;
-        int srcX = column * Config::Tile::WIDTH;
-        int srcY = row * Config::Tile::HEIGHT;
+        // FIX: Use actual column count from tileset, not hardcoded 2
+        int column = tileTextureIndex % columns;
+        int row = tileTextureIndex / columns;
+        // Account for spacing between tiles
+        int srcX = column * (tileWidth + spacing);
+        int srcY = row * (tileHeight + spacing);
 
         u1 = srcX / (float)tilesetTexture->getWidth();
         v1 = srcY / (float)tilesetTexture->getHeight();
-        u2 = (srcX + Config::Tile::WIDTH) / (float)tilesetTexture->getWidth();
-        v2 = (srcY + Config::Tile::HEIGHT) / (float)tilesetTexture->getHeight();
+        u2 = (srcX + tileWidth) / (float)tilesetTexture->getWidth();
+        v2 = (srcY + tileHeight) / (float)tilesetTexture->getHeight();
       }
 
       // Build 6 vertices (2 triangles) for this tile
