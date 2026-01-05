@@ -92,7 +92,7 @@ void MusicZoneDebugRenderer::render() {
     renderZone(zones[i], i);
   }
 
-  glDisable(GL_BLEND);
+  // Leave blending enabled for subsequent renderers
 }
 
 void MusicZoneDebugRenderer::renderZone(const MusicZone& zone, size_t index) {

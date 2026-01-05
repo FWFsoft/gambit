@@ -12,6 +12,7 @@ class CollisionDebugRenderer {
   ~CollisionDebugRenderer();
 
   void render();
+  void renderMapBounds(float worldWidth, float worldHeight);
   void setEnabled(bool enabled) { this->enabled = enabled; }
   bool isEnabled() const { return enabled; }
   void toggle() { enabled = !enabled; }

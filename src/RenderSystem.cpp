@@ -205,6 +205,11 @@ void RenderSystem::onRender(const RenderEvent& e) {
   // Render collision debug overlay (if enabled)
   if (collisionDebugRenderer) {
     collisionDebugRenderer->render();
+    // Also render map bounds in debug mode
+    if (tiledMap) {
+      collisionDebugRenderer->renderMapBounds(tiledMap->getWorldWidth(),
+                                              tiledMap->getWorldHeight());
+    }
   }
 
   // NOTE: Buffer swap moved to GameLoop to ensure UI renders after game world

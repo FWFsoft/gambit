@@ -91,6 +91,59 @@ void CollisionDebugRenderer::render() {
   }
 }
 
+void CollisionDebugRenderer::renderMapBounds(float worldWidth,
+                                             float worldHeight) {
+  if (!enabled) {
+    return;
+  }
+
+  // Draw diamond-shaped map bounds
+  // Diamond corners: top (0, -halfH), right (halfW, 0), bottom (0, halfH), left
+  // (-halfW, 0)
+  float halfW = worldWidth / 2.0f;
+  float halfH = worldHeight / 2.0f;
+
+  int screenX1, screenY1, screenX2, screenY2, screenX3, screenY3, screenX4,
+      screenY4;
+
+  // Top corner
+  camera->worldToScreen(0, -halfH, screenX1, screenY1);
+  // Right corner
+  camera->worldToScreen(halfW, 0, screenX2, screenY2);
+  // Bottom corner
+  camera->worldToScreen(0, halfH, screenX3, screenY3);
+  // Left corner
+  camera->worldToScreen(-halfW, 0, screenX4, screenY4);
+
+  // Build line vertices for diamond outline (4 lines)
+  float vertices[] = {
+      // Line 1: top to right
+      (float)screenX1, (float)screenY1, (float)screenX2, (float)screenY2,
+      // Line 2: right to bottom
+      (float)screenX2, (float)screenY2, (float)screenX3, (float)screenY3,
+      // Line 3: bottom to left
+      (float)screenX3, (float)screenY3, (float)screenX4, (float)screenY4,
+      // Line 4: left to top
+      (float)screenX4, (float)screenY4, (float)screenX1, (float)screenY1};
+
+  // Upload line data
+  glBindBuffer(GL_ARRAY_BUFFER, VBO);
+  glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+  // Set line color (yellow for map bounds)
+  glUseProgram(shaderProgram);
+  GLint colorLoc = glGetUniformLocation(shaderProgram, "lineColor");
+  glUniform4f(colorLoc, 1.0f, 1.0f, 0.0f, 1.0f);  // Yellow
+
+  // Draw lines
+  glBindVertexArray(VAO);
+  glDrawArrays(GL_LINES, 0, 8);  // 8 vertices = 4 lines
+  glBindVertexArray(0);
+
+  OpenGLUtils::checkGLError("CollisionDebugRenderer::renderMapBounds");
+}
+
 void CollisionDebugRenderer::renderShape(const CollisionShape& shape) {
   if (shape.type == CollisionShape::Type::Rectangle) {
     renderAABB(shape.aabb, 255, 0, 0);  // Red for rectangles

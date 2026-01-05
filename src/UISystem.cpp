@@ -577,7 +577,7 @@ void UISystem::renderHUD() {
 
     if (character) {
       Texture* portrait =
-          TextureManager::instance().get(character->getCharacterPreviewPath());
+          TextureManager::instance().get(character->getCharacterPortraitPath());
 
       if (portrait && portrait->isLoaded()) {
         // Draw portrait on the left (60x60)

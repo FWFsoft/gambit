@@ -1,5 +1,6 @@
 #include "TiledMap.h"
 
+#include <algorithm>
 #include <cassert>
 
 #include "Logger.h"
@@ -101,11 +102,21 @@ bool TiledMap::load(const std::string& filepath) {
 }
 
 int TiledMap::getWorldWidth() const {
-  return mapWidth * (tileWidth / 2) + (tileHeight / 2);
+  // For centered isometric map, width is the horizontal extent of the diamond
+  // worldX = (tileX - tileY) * tileWidth/2
+  // Max occurs at right corner (mapWidth-1, 0): worldX = (mapWidth-1) *
+  // tileWidth/2 After centering offset, max is still the same distance from
+  // origin
+  return (mapWidth - 1) * tileWidth;  // Full width is 2x maxX
 }
 
 int TiledMap::getWorldHeight() const {
-  return mapHeight * (tileWidth / 2) + (tileHeight / 2);
+  // For centered isometric map, height is the vertical extent of the diamond
+  // worldY = (tileX + tileY) * tileHeight/4
+  // Max occurs at bottom corner (mapWidth-1, mapHeight-1):
+  // worldY = (mapWidth-1 + mapHeight-1) * tileHeight/4
+  // After centering, max is still the same distance from origin
+  return (mapWidth + mapHeight - 2) * tileHeight / 4;  // Full height is 2x maxY
 }
 
 void TiledMap::extractCollisionShapes() {

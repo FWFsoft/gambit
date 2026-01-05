@@ -236,6 +236,10 @@ void TileRenderer::renderBatch() {
     return;
   }
 
+  // Ensure proper OpenGL state for tile rendering
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
   glUseProgram(shaderProgram);
 
   // Set projection matrix

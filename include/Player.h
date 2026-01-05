@@ -165,9 +165,22 @@ inline void applyInput(
   player.x = newX;
   player.y = newY;
 
-  // Clamp to world bounds (map is centered at origin)
+  // Clamp to diamond-shaped isometric map bounds
+  // For isometric diamond: |x/maxX| + |y/maxY| <= 1
   float halfWidth = input.worldWidth / 2.0f;
   float halfHeight = input.worldHeight / 2.0f;
-  player.x = std::clamp(player.x, -halfWidth, halfWidth);
-  player.y = std::clamp(player.y, -halfHeight, halfHeight);
+
+  // Check if player is outside the diamond
+  if (halfWidth > 0 && halfHeight > 0) {
+    float normX = std::abs(player.x) / halfWidth;
+    float normY = std::abs(player.y) / halfHeight;
+
+    if (normX + normY > 1.0f) {
+      // Player is outside diamond, clamp to diamond edge
+      // Project back onto the diamond boundary
+      float scale = 1.0f / (normX + normY);
+      player.x *= scale;
+      player.y *= scale;
+    }
+  }
 }
