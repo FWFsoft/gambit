@@ -18,7 +18,7 @@ def distance(p1, p2):
     return math.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
 
 
-def generate_spawn_points(width, height, tile_width, tile_height, num_spawns, min_distance):
+def generate_spawn_points(width, height, tile_width, tile_height, num_spawns, min_distance, edge_margin=3):
     """
     Generate spawn points using Poisson disc sampling.
 
@@ -29,6 +29,7 @@ def generate_spawn_points(width, height, tile_width, tile_height, num_spawns, mi
         tile_height: Tile height in pixels (use tileHeight/4 for isometric)
         num_spawns: Number of spawns to generate
         min_distance: Minimum distance between spawns in world units
+        edge_margin: Number of tiles to avoid from map edges (default: 3)
 
     Returns:
         List of (x, y) spawn positions in world coordinates
@@ -36,6 +37,15 @@ def generate_spawn_points(width, height, tile_width, tile_height, num_spawns, mi
     spawns = []
     attempts = 0
     max_attempts = num_spawns * 50  # Avoid infinite loop
+
+    # Calculate valid tile range (stay within map bounds with margin)
+    min_tile = edge_margin
+    max_tile_x = width - edge_margin - 1
+    max_tile_y = height - edge_margin - 1
+
+    # Validate margin isn't too large for map
+    if min_tile >= max_tile_x or min_tile >= max_tile_y:
+        raise ValueError(f"Edge margin {edge_margin} too large for map {width}x{height}")
 
     # Convert tile coordinates to isometric world coordinates
     def tile_to_world(tile_x, tile_y):
@@ -51,9 +61,10 @@ def generate_spawn_points(width, height, tile_width, tile_height, num_spawns, mi
         return world_x - center_world_x, world_y - center_world_y
 
     while len(spawns) < num_spawns and attempts < max_attempts:
-        # Random tile position (avoid edges)
-        tile_x = random.uniform(1, width - 2)
-        tile_y = random.uniform(1, height - 2)
+        # Random INTEGER tile position (discrete grid positions only)
+        # Use randint for exact tile centers, avoiding edges
+        tile_x = random.randint(min_tile, max_tile_x)
+        tile_y = random.randint(min_tile, max_tile_y)
 
         world_x, world_y = tile_to_world(tile_x, tile_y)
 
@@ -153,6 +164,8 @@ def main():
     parser.add_argument('--skeletons', type=int, default=3, help='Number of skeleton spawns')
     parser.add_argument('--min-distance', type=float, default=150.0,
                         help='Minimum distance between spawns (world units)')
+    parser.add_argument('--edge-margin', type=int, default=3,
+                        help='Number of tiles to avoid from map edges (default: 3)')
 
     args = parser.parse_args()
 
@@ -166,6 +179,7 @@ def main():
     tile_height = int(root.get('tileheight'))
 
     print(f"Map dimensions: {width}x{height} tiles ({tile_width}x{tile_height}px)")
+    print(f"Valid spawn area: tiles [{args.edge_margin}, {width-args.edge_margin-1}] x [{args.edge_margin}, {height-args.edge_margin-1}]")
 
     total_spawns = args.slimes + args.goblins + args.skeletons
     print(f"Generating {total_spawns} spawns ({args.slimes} slimes, {args.goblins} goblins, {args.skeletons} skeletons)")
@@ -173,7 +187,7 @@ def main():
     # Generate spawn points
     spawns = generate_spawn_points(
         width, height, tile_width, tile_height,
-        total_spawns, args.min_distance
+        total_spawns, args.min_distance, args.edge_margin
     )
 
     # Assign enemy types based on requested counts
