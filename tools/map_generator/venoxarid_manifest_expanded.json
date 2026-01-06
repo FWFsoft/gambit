@@ -1,0 +1,75 @@
+{
+  "tileset_name": "venoxarid_organic_expanded",
+  "pixellab_params": {
+    "size": 64,
+    "tile_shape": "thin tile",
+    "detail": "medium detail",
+    "shading": "medium shading",
+    "outline": "lineless"
+  },
+  "tiles": [
+    {
+      "name": "sparse_light_moss",
+      "description": "sparse light green moss on dark organic ground",
+      "theme": "light_moss",
+      "pixellab_id": "6fc23e51-ff57-4ff8-bc44-97c3a4d7d7dd",
+      "file": "pixellab_tiles/venoxarid_full/sparse_light_moss.png"
+    },
+    {
+      "name": "light_moss_patches",
+      "description": "light moss patches with small yellow roots",
+      "theme": "light_moss",
+      "pixellab_id": "d3af058c-2aa2-473d-b926-d93f432acff9",
+      "file": "pixellab_tiles/venoxarid_full/light_moss_patches.png"
+    },
+    {
+      "name": "thin_moss_spores",
+      "description": "thin moss covering with scattered pink spores",
+      "theme": "light_moss",
+      "pixellab_id": "ba078796-031c-49a1-ac9b-c52e06a6bb6b",
+      "file": "pixellab_tiles/venoxarid_full/thin_moss_spores.png"
+    },
+    {
+      "name": "light_moss_biolum",
+      "description": "light green moss with small bioluminescent spots",
+      "theme": "light_moss",
+      "pixellab_id": "aabc1b3f-d38b-4f9c-a269-fa9cdec6fde7",
+      "file": "pixellab_tiles/venoxarid_full/light_moss_biolum.png"
+    },
+    {
+      "name": "moss_transition",
+      "description": "sparse moss transitioning to darker moss",
+      "theme": "light_moss",
+      "pixellab_id": "4ce002c2-8ad1-4807-8e8b-9c1c8c9b5207",
+      "file": "pixellab_tiles/venoxarid_full/moss_transition.png"
+    },
+    {
+      "name": "dense_dark_moss",
+      "description": "dense dark green moss carpet",
+      "theme": "dense_moss",
+      "pixellab_id": "2ee88427-157a-415b-99ff-f02c93971d03",
+      "file": "pixellab_tiles/venoxarid_full/dense_dark_moss.png"
+    },
+    {
+      "name": "heavy_moss_fungi",
+      "description": "heavy dark moss with pink bioluminescent fungi",
+      "theme": "bioluminescent",
+      "pixellab_id": "31ba56bc-89dc-43b7-87c5-53ed82d64b79",
+      "file": "pixellab_tiles/venoxarid_full/heavy_moss_fungi.png"
+    },
+    {
+      "name": "roots_pink_spores",
+      "description": "moss with thick organic yellow roots and pink spores",
+      "theme": "root_systems",
+      "pixellab_id": "8b0dde63-f692-45c4-8267-2bf5f23bd94d",
+      "file": "pixellab_tiles/venoxarid_full/roots_pink_spores.png"
+    },
+    {
+      "name": "contaminated_moss",
+      "description": "contaminated moss with yellow-green toxic seepage",
+      "theme": "toxic_transition",
+      "pixellab_id": "9b639d0b-0fca-4be0-8e2f-7e5ecf1079e1",
+      "file": "pixellab_tiles/venoxarid_full/contaminated_moss.png"
+    }
+  ]
+}

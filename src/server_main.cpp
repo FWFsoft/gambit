@@ -32,7 +32,8 @@ int main() {
   }
 
   TiledMap map;
-  assert(map.load("assets/test_map.tmx") && "Failed to load required map");
+  // Server uses default map (could be made configurable via command line)
+  assert(map.load("assets/maps/test_map.tmx") && "Failed to load required map");
 
   CollisionSystem collisionSystem(map.getCollisionShapes());
   Logger::info("Collision system initialized with " +

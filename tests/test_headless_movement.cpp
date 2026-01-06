@@ -72,7 +72,7 @@ TEST(HeadlessMovement_RightMovement) {
                     Config::Screen::HEIGHT);
 
   TiledMap map;
-  assert(map.load("assets/test_map.tmx"));
+  assert(map.load("assets/maps/test_map.tmx"));
 
   CollisionSystem collisionSystem(map.getCollisionShapes());
   Camera camera(Config::Screen::WIDTH, Config::Screen::HEIGHT);
@@ -173,7 +173,7 @@ TEST(HeadlessMovement_DiagonalMovement) {
                     Config::Screen::HEIGHT);
 
   TiledMap map;
-  assert(map.load("assets/test_map.tmx"));
+  assert(map.load("assets/maps/test_map.tmx"));
 
   CollisionSystem collisionSystem(map.getCollisionShapes());
   Camera camera(Config::Screen::WIDTH, Config::Screen::HEIGHT);

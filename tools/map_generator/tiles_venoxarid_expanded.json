@@ -1,0 +1,157 @@
+{
+  "tileset": {
+    "name": "venoxarid_organic_expanded",
+    "image": "../../assets/maps/venoxarid_tileset_expanded.png",
+    "tile_width": 64,
+    "tile_height": 64,
+    "spacing": 4,
+    "columns": 7,
+    "firstgid": 1,
+    "description": "Venoxarid organic terrain tileset - expanded edition with 9 tiles"
+  },
+  "edge_types": [
+    "moss_light",
+    "moss_dense",
+    "moss_biolum",
+    "moss_root",
+    "moss_toxic",
+    "void"
+  ],
+  "tiles": [
+    {
+      "id": 0,
+      "name": "sparse_light_moss",
+      "row": 0,
+      "col": 0,
+      "edges": {
+        "north": "moss_light",
+        "south": "moss_light",
+        "east": "moss_light",
+        "west": "moss_light"
+      },
+      "weight": 12,
+      "pixellab_tile_id": "6fc23e51-ff57-4ff8-bc44-97c3a4d7d7dd",
+      "description": "sparse light green moss on dark organic ground"
+    },
+    {
+      "id": 1,
+      "name": "light_moss_patches",
+      "row": 0,
+      "col": 1,
+      "edges": {
+        "north": "moss_light",
+        "south": "moss_light",
+        "east": "moss_light",
+        "west": "moss_light"
+      },
+      "weight": 10,
+      "pixellab_tile_id": "d3af058c-2aa2-473d-b926-d93f432acff9",
+      "description": "light moss patches with small yellow roots"
+    },
+    {
+      "id": 2,
+      "name": "thin_moss_spores",
+      "row": 0,
+      "col": 2,
+      "edges": {
+        "north": "moss_light",
+        "south": "moss_light",
+        "east": "moss_light",
+        "west": "moss_light"
+      },
+      "weight": 11,
+      "pixellab_tile_id": "ba078796-031c-49a1-ac9b-c52e06a6bb6b",
+      "description": "thin moss covering with scattered pink spores"
+    },
+    {
+      "id": 3,
+      "name": "light_moss_biolum",
+      "row": 0,
+      "col": 3,
+      "edges": {
+        "north": "moss_light",
+        "south": "moss_light",
+        "east": "moss_light",
+        "west": "moss_light"
+      },
+      "weight": 5,
+      "pixellab_tile_id": "aabc1b3f-d38b-4f9c-a269-fa9cdec6fde7",
+      "description": "light green moss with small bioluminescent spots"
+    },
+    {
+      "id": 4,
+      "name": "moss_transition",
+      "row": 0,
+      "col": 4,
+      "edges": {
+        "north": "moss_light",
+        "south": "moss_dense",
+        "east": "moss_light",
+        "west": "moss_dense"
+      },
+      "weight": 8,
+      "pixellab_tile_id": "4ce002c2-8ad1-4807-8e8b-9c1c8c9b5207",
+      "description": "sparse moss transitioning to darker moss"
+    },
+    {
+      "id": 5,
+      "name": "dense_dark_moss",
+      "row": 0,
+      "col": 5,
+      "edges": {
+        "north": "moss_dense",
+        "south": "moss_dense",
+        "east": "moss_dense",
+        "west": "moss_dense"
+      },
+      "weight": 9,
+      "pixellab_tile_id": "2ee88427-157a-415b-99ff-f02c93971d03",
+      "description": "dense dark green moss carpet"
+    },
+    {
+      "id": 6,
+      "name": "heavy_moss_fungi",
+      "row": 0,
+      "col": 6,
+      "edges": {
+        "north": "moss_dense",
+        "south": "moss_dense",
+        "east": "moss_dense",
+        "west": "moss_dense"
+      },
+      "weight": 4,
+      "pixellab_tile_id": "31ba56bc-89dc-43b7-87c5-53ed82d64b79",
+      "description": "heavy dark moss with pink bioluminescent fungi"
+    },
+    {
+      "id": 7,
+      "name": "roots_pink_spores",
+      "row": 1,
+      "col": 0,
+      "edges": {
+        "north": "moss_light",
+        "south": "moss_light",
+        "east": "moss_light",
+        "west": "moss_light"
+      },
+      "weight": 4,
+      "pixellab_tile_id": "8b0dde63-f692-45c4-8267-2bf5f23bd94d",
+      "description": "moss with thick organic yellow roots and pink spores"
+    },
+    {
+      "id": 8,
+      "name": "contaminated_moss",
+      "row": 1,
+      "col": 1,
+      "edges": {
+        "north": "moss_toxic",
+        "south": "moss_toxic",
+        "east": "moss_toxic",
+        "west": "moss_toxic"
+      },
+      "weight": 2,
+      "pixellab_tile_id": "9b639d0b-0fca-4be0-8e2f-7e5ecf1079e1",
+      "description": "contaminated moss with yellow-green toxic seepage"
+    }
+  ]
+}

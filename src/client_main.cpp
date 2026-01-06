@@ -16,6 +16,7 @@
 #include "InputSystem.h"
 #include "ItemRegistry.h"
 #include "Logger.h"
+#include "MapSelectionState.h"
 #include "MusicSystem.h"
 #include "MusicZoneDebugRenderer.h"
 #include "NetworkClient.h"
@@ -55,7 +56,8 @@ int main() {
   GameLoop gameLoop;
 
   TiledMap map;
-  assert(map.load("assets/test_map.tmx") && "Failed to load required map");
+  std::string mapPath = MapSelectionState::instance().getSelectedMapPath();
+  assert(map.load(mapPath) && "Failed to load required map");
 
   CollisionSystem collisionSystem(map.getCollisionShapes());
   Logger::info("Client collision system initialized");

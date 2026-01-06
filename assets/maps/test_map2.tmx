@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.10.2" orientation="isometric" renderorder="right-down" width="30" height="30" tilewidth="64" tileheight="32" infinite="0" nextlayerid="6" nextobjectid="23">
+ <tileset firstgid="1" name="test_tiles" tilewidth="64" tileheight="32" tilecount="4" columns="2">
+  <image source="tileset.png" width="128" height="64"/>
+ </tileset>
+ <layer id="1" name="Ground" width="30" height="30">
+  <data encoding="csv">
+1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,
+1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,1,
+1,2,1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,2,1,
+1,2,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,1,2,1,
+1,2,1,2,1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,2,1,2,1,
+1,2,1,2,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,1,2,1,2,1,
+1,2,1,2,1,2,1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,2,1,2,1,2,1,
+1,2,1,2,1,2,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,1,2,1,2,1,2,1,
+1,2,1,2,1,2,1,2,1,2,2,2,2,2,2,2,2,2,2,2,2,1,2,1,2,1,2,1,2,1,
+1,2,1,2,1,2,1,2,1,2,1,1,1,1,1,1,1,1,1,1,2,1,2,1,2,1,2,1,2,1,
+1,2,1,2,1,2,1,2,1,2,1,2,2,2,2,2,2,2,2,1,2,1,2,1,2,1,2,1,2,1,
+1,2,1,2,1,2,1,2,1,2,1,2,1,1,1,1,1,1,2,1,2,1,2,1,2,1,2,1,2,1,
+1,2,1,2,1,2,1,2,1,2,1,2,1,2,2,2,2,1,2,1,2,1,2,1,2,1,2,1,2,1,
+1,2,1,2,1,2,1,2,1,2,1,2,1,2,3,3,2,1,2,1,2,1,2,1,2,1,2,1,2,1,
+1,2,1,2,1,2,1,2,1,2,1,2,1,2,3,3,2,1,2,1,2,1,2,1,2,1,2,1,2,1,
+1,2,1,2,1,2,1,2,1,2,1,2,1,2,2,2,2,1,2,1,2,1,2,1,2,1,2,1,2,1,
+1,2,1,2,1,2,1,2,1,2,1,2,1,1,1,1,1,1,2,1,2,1,2,1,2,1,2,1,2,1,
+1,2,1,2,1,2,1,2,1,2,1,2,2,2,2,2,2,2,2,1,2,1,2,1,2,1,2,1,2,1,
+1,2,1,2,1,2,1,2,1,2,1,1,1,1,1,1,1,1,1,1,2,1,2,1,2,1,2,1,2,1,
+1,2,1,2,1,2,1,2,1,2,2,2,2,2,2,2,2,2,2,2,2,1,2,1,2,1,2,1,2,1,
+1,2,1,2,1,2,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,1,2,1,2,1,2,1,
+1,2,1,2,1,2,1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,2,1,2,1,2,1,
+1,2,1,2,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,1,2,1,2,1,
+1,2,1,2,1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,2,1,2,1,
+1,2,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,1,2,1,
+1,2,1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,2,1,
+1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,1,
+1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,
+1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+</data>
+ </layer>
+ <objectgroup id="2" name="Collision">
+  <object id="1" name="wall_top" type="solid" x="0" y="0" width="960" height="32"/>
+  <object id="2" name="wall_bottom" type="solid" x="0" y="928" width="960" height="32"/>
+  <object id="3" name="wall_left" type="solid" x="0" y="0" width="32" height="960"/>
+  <object id="4" name="wall_right" type="solid" x="928" y="0" width="32" height="960"/>
+  <object id="5" name="inner_wall_1" type="solid" x="64" y="64" width="832" height="32"/>
+  <object id="6" name="inner_wall_2" type="solid" x="64" y="64" width="32" height="832"/>
+  <object id="7" name="inner_wall_3" type="solid" x="128" y="128" width="704" height="32"/>
+  <object id="8" name="inner_wall_4" type="solid" x="128" y="128" width="32" height="704"/>
+  <object id="9" name="center_obstacle" type="solid" x="400" y="400" width="160" height="160"/>
+ </objectgroup>
+ <objectgroup id="4" name="EnemySpawns">
+  <object id="14" name="spawn_1" x="300" y="300">
+   <properties>
+    <property name="enemy_type" value="slime"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="15" name="spawn_2" x="600" y="600">
+   <properties>
+    <property name="enemy_type" value="slime"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="16" name="spawn_3" x="400" y="200">
+   <properties>
+    <property name="enemy_type" value="slime"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="17" name="spawn_4" x="700" y="300">
+   <properties>
+    <property name="enemy_type" value="slime"/>
+   </properties>
+   <point/>
+  </object>
+  <object id="18" name="spawn_5" x="300" y="300">
+   <properties>
+    <property name="enemy_type" value="slime"/>
+   </properties>
+   <point/>
+  </object>
+ </objectgroup>
+ <objectgroup id="5" name="PlayerSpawns">
+  <object id="19" name="player_spawn_1" x="200" y="700">
+   <point/>
+  </object>
+  <object id="20" name="player_spawn_2" x="850" y="100">
+   <point/>
+  </object>
+  <object id="21" name="player_spawn_3" x="100" y="850">
+   <point/>
+  </object>
+  <object id="22" name="player_spawn_4" x="850" y="850">
+   <point/>
+  </object>
+ </objectgroup>
+ <objectgroup id="3" name="Music">
+  <object id="10" name="northwest_zone" type="zone" x="0" y="0" width="488" height="488">
+   <properties>
+    <property name="music_track" value="ambient_outer.ogg"/>
+   </properties>
+  </object>
+  <object id="11" name="northeast_zone" type="zone" x="488" y="0" width="488" height="488">
+   <properties>
+    <property name="music_track" value="ambient_middle.ogg"/>
+   </properties>
+  </object>
+  <object id="12" name="southwest_zone" type="zone" x="0" y="488" width="488" height="488">
+   <properties>
+    <property name="music_track" value="ambient_center.ogg"/>
+   </properties>
+  </object>
+  <object id="13" name="southeast_zone" type="zone" x="488" y="488" width="488" height="488">
+   <properties>
+    <property name="music_track" value="ambient_outer.ogg"/>
+   </properties>
+  </object>
+ </objectgroup>
+</map>

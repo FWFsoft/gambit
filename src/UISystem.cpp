@@ -15,6 +15,7 @@
 #include "GameStateManager.h"
 #include "ItemRegistry.h"
 #include "Logger.h"
+#include "MapSelectionState.h"
 #include "NetworkClient.h"
 #include "Player.h"
 #include "Texture.h"
@@ -375,6 +376,58 @@ void UISystem::renderCharacterSelect() {
       }
 
       ImGui::PopID();
+    }
+  }
+
+  ImGui::End();
+  ImGui::PopStyleVar();
+
+  // CENTER-RIGHT: Map selection (positioned to the right of character grid)
+  const float mapSelectorX = 50 + gridWidth + 80;  // Right of grid with gap
+  const float mapSelectorY = 300;                  // Middle of screen
+  ImGui::SetNextWindowPos(ImVec2(mapSelectorX, mapSelectorY), ImGuiCond_Always,
+                          ImVec2(0.0f, 0.0f));
+  ImGui::SetNextWindowSize(ImVec2(280, 150), ImGuiCond_Always);
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+
+  ImGui::Begin("Map Selection", nullptr,
+               ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                   ImGuiWindowFlags_NoCollapse |
+                   ImGuiWindowFlags_NoBringToFrontOnFocus);
+
+  ImGui::SetWindowFontScale(1.5f);
+  ImGui::Text("Select Map");
+  ImGui::SetWindowFontScale(1.0f);
+  ImGui::Separator();
+  ImGui::Spacing();
+
+  // List of available maps
+  struct MapInfo {
+    std::string name;
+    std::string path;
+  };
+  static const MapInfo maps[] = {
+      {"Test Map 1", "assets/maps/test_map.tmx"},
+      {"Test Map 2", "assets/maps/test_map2.tmx"},
+  };
+
+  std::string currentMapPath =
+      MapSelectionState::instance().getSelectedMapPath();
+
+  for (size_t i = 0; i < sizeof(maps) / sizeof(maps[0]); i++) {
+    bool isSelected = (currentMapPath == maps[i].path);
+
+    if (isSelected) {
+      ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.6f, 0.2f, 1.0f));
+    }
+
+    if (ImGui::Button(maps[i].name.c_str(), ImVec2(250, 40))) {
+      MapSelectionState::instance().setSelectedMap(maps[i].path);
+      Logger::info("Selected map: " + maps[i].name);
+    }
+
+    if (isSelected) {
+      ImGui::PopStyleColor();
     }
   }
 

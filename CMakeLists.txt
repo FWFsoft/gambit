@@ -160,6 +160,7 @@ add_executable(Client
     src/CombatSystem.cpp
     src/CharacterRegistry.cpp
     src/CharacterSelectionState.cpp
+    src/MapSelectionState.cpp
     src/DamageNumberSystem.cpp
     src/Effect.cpp
     src/EffectTracker.cpp
@@ -220,6 +221,7 @@ add_executable(HeadlessClient
     src/CombatSystem.cpp
     src/CharacterRegistry.cpp
     src/CharacterSelectionState.cpp
+    src/MapSelectionState.cpp
     src/EffectTracker.cpp
     src/GameStateManager.cpp
     src/Settings.cpp
@@ -319,6 +321,7 @@ add_executable(test_client_prediction
     src/AnimationSystem.cpp
     src/AnimationAssetLoader.cpp
     src/CharacterSelectionState.cpp
+    src/MapSelectionState.cpp
     src/CharacterRegistry.cpp
 )
 target_include_directories(test_client_prediction SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
@@ -411,6 +414,7 @@ add_executable(test_headless_movement
     src/CombatSystem.cpp
     src/CharacterRegistry.cpp
     src/CharacterSelectionState.cpp
+    src/MapSelectionState.cpp
     src/EffectTracker.cpp
     src/GameStateManager.cpp
     src/Settings.cpp

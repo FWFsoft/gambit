@@ -51,7 +51,8 @@ TileRenderer::TileRenderer(Camera* camera, SpriteRenderer* spriteRenderer,
       whitePixel(whitePixel),
       tilesetTexture(nullptr),
       batchBuilt(false),
-      verticesUploaded(false) {
+      verticesUploaded(false),
+      vboCapacity(0) {
   initBatchRenderer();
 }
 
@@ -76,9 +77,9 @@ void TileRenderer::initBatchRenderer() {
   glGenBuffers(1, &VBO);
 
   glBindBuffer(GL_ARRAY_BUFFER, VBO);
-  // Allocate enough space for max tiles
-  glBufferData(GL_ARRAY_BUFFER, Config::Tile::BATCH_BUFFER_SIZE * sizeof(float),
-               nullptr, GL_DYNAMIC_DRAW);
+  // Start with zero capacity - will allocate on first render based on actual
+  // map size
+  vboCapacity = 0;
 
   glBindVertexArray(VAO);
 
@@ -94,8 +95,7 @@ void TileRenderer::initBatchRenderer() {
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   glBindVertexArray(0);
 
-  // Reserve space for vertices
-  batchVertices.reserve(Config::Tile::BATCH_BUFFER_SIZE);
+  // Vector will auto-grow in buildTileBatch() based on actual map size
 }
 
 void TileRenderer::render(const TiledMap& map,
@@ -261,8 +261,27 @@ void TileRenderer::renderBatch() {
   // Upload vertex data only once (tiles are static in world space)
   if (!verticesUploaded) {
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, batchVertices.size() * sizeof(float),
-                    batchVertices.data());
+
+    size_t requiredCapacity = batchVertices.size();
+
+    // Check if we need to resize the buffer
+    if (requiredCapacity > vboCapacity) {
+      // Allocate new buffer with actual size needed (not fixed size)
+      glBufferData(GL_ARRAY_BUFFER, requiredCapacity * sizeof(float),
+                   batchVertices.data(), GL_STATIC_DRAW);
+      vboCapacity = requiredCapacity;
+
+      Logger::info(
+          "TileRenderer: Allocated GPU buffer for " +
+          std::to_string(requiredCapacity / 24) + " tiles (" +
+          std::to_string(requiredCapacity * sizeof(float) / 1024 / 1024) +
+          " MB)");
+    } else {
+      // Buffer is large enough, just update data
+      glBufferSubData(GL_ARRAY_BUFFER, 0, requiredCapacity * sizeof(float),
+                      batchVertices.data());
+    }
+
     verticesUploaded = true;
   }
 
