@@ -1,5 +1,7 @@
 #include "ObjectiveSystem.h"
 
+#include <limits>
+
 #include "Logger.h"
 
 ObjectiveSystem::ObjectiveSystem() = default;
