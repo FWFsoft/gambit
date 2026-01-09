@@ -49,5 +49,6 @@ class RenderSystem {
   void drawPlayer(const Player& player);
   void drawEnemy(const Enemy& enemy);
   void drawWorldItem(const WorldItem& worldItem);
+  void drawObjective(const ClientObjective& objective);
   void drawHealthBar(int x, int y, float health, float maxHealth);
 };

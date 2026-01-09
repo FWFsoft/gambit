@@ -12,6 +12,7 @@ InputSystem::InputSystem(ClientPrediction* clientPrediction,
       moveRight(false),
       moveUp(false),
       moveDown(false),
+      interactHeld(false),
       inputSequence(0),
       clientPrediction(clientPrediction),
       collisionDebugRenderer(collisionDebugRenderer),
@@ -107,6 +108,15 @@ void InputSystem::onKeyDown(const KeyDownEvent& e) {
     EventBus::instance().publish(AttackInputEvent{});
   }
 
+  // Interact input (E key) - for objectives
+  if (e.key == SDLK_e) {
+    if (!interactHeld) {
+      interactHeld = true;
+      Logger::info("InputSystem: E PRESSED - publishing InteractInputEvent");
+      EventBus::instance().publish(InteractInputEvent{});
+    }
+  }
+
   if (e.key == SDLK_a || e.key == SDLK_LEFT) moveLeft = true;
   if (e.key == SDLK_d || e.key == SDLK_RIGHT) moveRight = true;
   if (e.key == SDLK_w || e.key == SDLK_UP) moveUp = true;
@@ -123,6 +133,7 @@ void InputSystem::onKeyUp(const KeyUpEvent& e) {
   if (e.key == SDLK_d || e.key == SDLK_RIGHT) moveRight = false;
   if (e.key == SDLK_w || e.key == SDLK_UP) moveUp = false;
   if (e.key == SDLK_s || e.key == SDLK_DOWN) moveDown = false;
+  if (e.key == SDLK_e) interactHeld = false;
 }
 
 void InputSystem::onUpdate(const UpdateEvent& e) {

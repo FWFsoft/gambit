@@ -269,3 +269,21 @@ void ClientPrediction::reconcile(const StateUpdatePacket& stateUpdate) {
     inputHistory.pop_front();
   }
 }
+
+void ClientPrediction::updateObjective(const ObjectiveStatePacket& packet) {
+  ClientObjective& obj = objectives[packet.objectiveId];
+  obj.id = packet.objectiveId;
+  obj.type = static_cast<ObjectiveType>(packet.objectiveType);
+  obj.state = static_cast<ObjectiveState>(packet.objectiveState);
+  obj.x = packet.x;
+  obj.y = packet.y;
+  obj.radius = packet.radius;
+  obj.progress = packet.progress;
+  obj.enemiesRequired = packet.enemiesRequired;
+  obj.enemiesKilled = packet.enemiesKilled;
+
+  Logger::debug("Updated objective " + std::to_string(packet.objectiveId) +
+                " at (" + std::to_string(packet.x) + ", " +
+                std::to_string(packet.y) +
+                ") radius=" + std::to_string(packet.radius));
+}

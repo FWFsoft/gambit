@@ -88,6 +88,9 @@ UISystem::UISystem(Window* window, ClientPrediction* clientPrediction,
   EventBus::instance().subscribe<ItemPickedUpEvent>(
       [this](const ItemPickedUpEvent& e) { onItemPickedUp(e); });
 
+  EventBus::instance().subscribe<ObjectiveUpdatedEvent>(
+      [this](const ObjectiveUpdatedEvent& e) { onObjectiveUpdated(e); });
+
   EventBus::instance().subscribe<UpdateEvent>([this](const UpdateEvent& e) {
     currentTime += e.deltaTime / 1000.0f;  // Convert ms to seconds
 
@@ -95,6 +98,12 @@ UISystem::UISystem(Window* window, ClientPrediction* clientPrediction,
     while (!notifications.empty() &&
            currentTime - notifications.front().timestamp > 3.0f) {
       notifications.pop_front();
+    }
+
+    // Remove old objective notifications (after 5 seconds)
+    while (!objectiveNotifications.empty() &&
+           currentTime - objectiveNotifications.front().timestamp > 5.0f) {
+      objectiveNotifications.pop_front();
     }
   });
 
@@ -153,6 +162,7 @@ void UISystem::render() {
   // Render pickup notifications (always on top, except in main menu)
   if (currentState != GameState::MainMenu) {
     renderNotifications();
+    renderObjectiveActivity();
   }
 
   // Render effect bars (only during gameplay)
@@ -1192,6 +1202,99 @@ void UISystem::renderEffectBars() {
 
   if (!foundAny) {
     ImGui::TextDisabled("No active effects");
+  }
+
+  ImGui::End();
+}
+
+void UISystem::onObjectiveUpdated(const ObjectiveUpdatedEvent& e) {
+  // Check if we already have a notification for this objective
+  for (auto& notification : objectiveNotifications) {
+    if (notification.objectiveId == e.objectiveId) {
+      // Update existing notification
+      notification.state = e.state;
+      notification.progress = e.progress;
+      notification.name = e.name;
+      notification.timestamp = currentTime;
+      return;
+    }
+  }
+
+  // Create new notification
+  ObjectiveNotification notification;
+  notification.objectiveId = e.objectiveId;
+  notification.name = e.name;
+  notification.state = e.state;
+  notification.progress = e.progress;
+  notification.timestamp = currentTime;
+  objectiveNotifications.push_back(notification);
+
+  // Keep only last 5 objective notifications
+  while (objectiveNotifications.size() > 5) {
+    objectiveNotifications.pop_front();
+  }
+
+  Logger::info("Objective updated: " + e.name +
+               " - State: " + std::to_string(e.state) +
+               " Progress: " + std::to_string(e.progress));
+}
+
+void UISystem::renderObjectiveActivity() {
+  if (objectiveNotifications.empty()) {
+    return;
+  }
+
+  // Render objective notifications in top-left corner below HUD
+  ImGui::SetNextWindowPos(ImVec2(10, 100), ImGuiCond_Always);
+  ImGui::SetNextWindowBgAlpha(0.8f);
+
+  ImGui::Begin("Objectives", nullptr,
+               ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                   ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
+                   ImGuiWindowFlags_AlwaysAutoResize);
+
+  for (const auto& notification : objectiveNotifications) {
+    float age = currentTime - notification.timestamp;
+    float alpha = 1.0f;
+
+    // Fade out in last 1 second
+    if (age > 4.0f) {
+      alpha = 1.0f - ((age - 4.0f) / 1.0f);
+    }
+
+    // Color based on state: Yellow=Inactive, Blue=InProgress, Green=Completed
+    ImVec4 color;
+    const char* stateText;
+    switch (notification.state) {
+      case 0:                                     // Inactive
+        color = ImVec4(1.0f, 1.0f, 0.2f, alpha);  // Yellow
+        stateText = "Available";
+        break;
+      case 1:                                     // InProgress
+        color = ImVec4(0.2f, 0.6f, 1.0f, alpha);  // Blue
+        stateText = "In Progress";
+        break;
+      case 2:                                     // Completed
+        color = ImVec4(0.2f, 1.0f, 0.2f, alpha);  // Green
+        stateText = "Completed!";
+        break;
+      default:
+        color = ImVec4(0.8f, 0.8f, 0.8f, alpha);  // Gray
+        stateText = "Unknown";
+        break;
+    }
+
+    ImGui::TextColored(color, "%s", notification.name.c_str());
+    ImGui::SameLine();
+    ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, alpha), "- %s", stateText);
+
+    // Show progress bar for in-progress objectives
+    if (notification.state == 1) {  // InProgress
+      ImGui::PushStyleColor(ImGuiCol_PlotHistogram,
+                            ImVec4(0.2f, 0.6f, 1.0f, alpha));
+      ImGui::ProgressBar(notification.progress, ImVec2(200, 0));
+      ImGui::PopStyleColor();
+    }
   }
 
   ImGui::End();

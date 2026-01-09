@@ -7,6 +7,8 @@
 #include "EffectManager.h"
 #include "EventBus.h"
 #include "NetworkProtocol.h"
+#include "Objective.h"
+#include "ObjectiveSystem.h"
 #include "Player.h"
 #include "PlayerSpawn.h"
 #include "WorldConfig.h"
@@ -23,6 +25,7 @@ class ServerGameState {
 
   EnemySystem* getEnemySystem() { return enemySystem.get(); }
   EffectManager* getEffectManager() { return effectManager.get(); }
+  ObjectiveSystem* getObjectiveSystem() { return objectiveSystem.get(); }
 
  private:
   NetworkServer* server;
@@ -35,6 +38,7 @@ class ServerGameState {
   uint32_t serverTick;
   std::unique_ptr<EnemySystem> enemySystem;
   std::unique_ptr<EffectManager> effectManager;
+  std::unique_ptr<ObjectiveSystem> objectiveSystem;
 
   // World item management
   std::unordered_map<uint32_t, WorldItem> worldItems;
@@ -66,4 +70,10 @@ class ServerGameState {
   void spawnWorldItem(uint32_t itemId, float x, float y);
   void processItemPickupRequest(ENetPeer* peer, const uint8_t* data,
                                 size_t size);
+  void processObjectiveInteract(ENetPeer* peer, const uint8_t* data,
+                                size_t size);
+
+  // Objective management methods
+  void broadcastObjectiveState(uint32_t objectiveId);
+  void broadcastAllObjectives(ENetPeer* peer);
 };

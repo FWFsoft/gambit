@@ -9,6 +9,7 @@
 #include "CollisionShape.h"
 #include "EnemySpawn.h"
 #include "MusicZone.h"
+#include "Objective.h"
 #include "PlayerSpawn.h"
 
 class TiledMap {
@@ -34,6 +35,7 @@ class TiledMap {
   const std::vector<PlayerSpawn>& getPlayerSpawns() const {
     return playerSpawns;
   }
+  const std::vector<Objective>& getObjectives() const { return objectives; }
 
   // Tileset information
   std::string getTilesetImagePath() const;
@@ -52,8 +54,10 @@ class TiledMap {
   std::vector<MusicZone> musicZones;
   std::vector<EnemySpawn> enemySpawns;
   std::vector<PlayerSpawn> playerSpawns;
+  std::vector<Objective> objectives;
 
   void extractCollisionShapes();
   void extractEnemySpawns();
   void extractPlayerSpawns();
+  void extractObjectives();
 };

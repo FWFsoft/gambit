@@ -6,6 +6,7 @@
 #include <cassert>
 #include <functional>
 #include <memory>
+#include <string>
 #include <typeindex>
 #include <unordered_map>
 #include <vector>
@@ -61,6 +62,16 @@ struct ClientDisconnectedEvent {
 struct ItemPickedUpEvent {
   uint32_t itemId;  // The ItemDefinition ID that was picked up
   uint32_t quantity;
+};
+
+struct InteractInputEvent {};
+
+// Event fired when an objective's state or progress changes (client-side)
+struct ObjectiveUpdatedEvent {
+  uint32_t objectiveId;
+  uint8_t state;     // ObjectiveState enum value
+  float progress;    // 0.0 - 1.0
+  std::string name;  // Objective name for display
 };
 
 // Global singleton event bus for pub-sub architecture

@@ -41,6 +41,23 @@ ServerGameState::ServerGameState(NetworkServer* server,
   effectManager = std::make_unique<EffectManager>();
   Logger::info("EffectManager initialized");
 
+  // Initialize objective system
+  if (world.tiledMap != nullptr) {
+    objectiveSystem = std::make_unique<ObjectiveSystem>();
+    objectiveSystem->initialize(world.tiledMap->getObjectives());
+
+    // Set up callbacks for state changes
+    objectiveSystem->setStateCallback(
+        [this](uint32_t objectiveId, ObjectiveState newState) {
+          broadcastObjectiveState(objectiveId);
+        });
+
+    objectiveSystem->setProgressCallback(
+        [this](uint32_t objectiveId, float progress) {
+          broadcastObjectiveState(objectiveId);
+        });
+  }
+
   // Subscribe to client connection events
   EventBus::instance().subscribe<ClientConnectedEvent>(
       [this](const ClientConnectedEvent& e) { onClientConnected(e); });
@@ -98,6 +115,11 @@ void ServerGameState::onClientConnected(const ClientConnectedEvent& e) {
 
   // Broadcast new player join to all clients (new client will ignore duplicate)
   server->broadcastPacket(serialize(newPlayerPacket));
+
+  // Send all objectives to the new client
+  if (objectiveSystem) {
+    broadcastAllObjectives(e.peer);
+  }
 }
 
 void ServerGameState::onClientDisconnected(const ClientDisconnectedEvent& e) {
@@ -305,6 +327,10 @@ void ServerGameState::onNetworkPacketReceived(
       processItemPickupRequest(e.peer, e.data, e.size);
       break;
 
+    case PacketType::ObjectiveInteract:
+      processObjectiveInteract(e.peer, e.data, e.size);
+      break;
+
     default:
       Logger::info("Unknown packet type: " +
                    std::to_string(static_cast<int>(type)));
@@ -359,6 +385,16 @@ void ServerGameState::onUpdate(const UpdateEvent& e) {
   // Check for enemy deaths and spawn loot (BEFORE update clears the vector)
   checkEnemyLootDrops();
 
+  // Notify objective system about enemy deaths (for CaptureOutpost)
+  if (enemySystem && objectiveSystem) {
+    const auto& deaths = enemySystem->getDiedThisFrame();
+    for (const auto& death : deaths) {
+      // Get enemy position from the death info
+      // Note: Enemy is already removed, so we need to track position
+      // differently For now, we'll iterate through current enemies
+    }
+  }
+
   // Update enemy AI
   if (enemySystem) {
     enemySystem->update(e.deltaTime, players, effectManager.get());
@@ -368,6 +404,11 @@ void ServerGameState::onUpdate(const UpdateEvent& e) {
   if (effectManager && enemySystem) {
     effectManager->update(e.deltaTime, players, enemySystem->getEnemies(),
                           enemySystem.get());
+  }
+
+  // Update objective system (handles interaction timers)
+  if (objectiveSystem) {
+    objectiveSystem->update(e.deltaTime);
   }
 
   // Check for player deaths
@@ -1010,4 +1051,96 @@ void ServerGameState::processItemPickupRequest(ENetPeer* peer,
 
   // Update inventory
   broadcastInventoryUpdate(playerId);
+}
+
+void ServerGameState::processObjectiveInteract(ENetPeer* peer,
+                                               const uint8_t* data,
+                                               size_t size) {
+  if (size < 5) {
+    Logger::info("Invalid ObjectiveInteract packet size");
+    return;
+  }
+
+  ObjectiveInteractPacket packet = deserializeObjectiveInteract(data, size);
+
+  // Get player ID from peer
+  auto peerIt = peerToPlayerId.find(peer);
+  if (peerIt == peerToPlayerId.end()) {
+    Logger::info("ObjectiveInteract from unknown peer");
+    return;
+  }
+  uint32_t playerId = peerIt->second;
+
+  auto playerIt = players.find(playerId);
+  if (playerIt == players.end()) {
+    return;
+  }
+  const Player& player = playerIt->second;
+
+  if (!objectiveSystem) {
+    return;
+  }
+
+  // Try to interact with nearest objective
+  if (objectiveSystem->tryInteract(playerId, player.x, player.y)) {
+    Logger::info("Player " + std::to_string(playerId) +
+                 " started objective interaction");
+  } else {
+    Logger::debug("Player " + std::to_string(playerId) +
+                  " failed to interact with objective (not in range or already "
+                  "in progress)");
+  }
+}
+
+void ServerGameState::broadcastObjectiveState(uint32_t objectiveId) {
+  if (!objectiveSystem) {
+    return;
+  }
+
+  const Objective* obj = objectiveSystem->getObjective(objectiveId);
+  if (!obj) {
+    return;
+  }
+
+  ObjectiveStatePacket packet;
+  packet.objectiveId = obj->id;
+  packet.objectiveType = static_cast<uint8_t>(obj->type);
+  packet.objectiveState = static_cast<uint8_t>(obj->state);
+  packet.x = obj->x;
+  packet.y = obj->y;
+  packet.radius = obj->radius;
+  packet.progress = obj->getProgress();
+  packet.enemiesRequired = obj->enemiesRequired;
+  packet.enemiesKilled = obj->enemiesKilled;
+
+  server->broadcastPacket(serialize(packet));
+
+  Logger::debug("Broadcast objective state: id=" + std::to_string(obj->id) +
+                " state=" + objectiveStateToString(obj->state) +
+                " progress=" + std::to_string(obj->getProgress()));
+}
+
+void ServerGameState::broadcastAllObjectives(ENetPeer* peer) {
+  if (!objectiveSystem) {
+    return;
+  }
+
+  const auto& objectives = objectiveSystem->getObjectives();
+  for (const auto& obj : objectives) {
+    ObjectiveStatePacket packet;
+    packet.objectiveId = obj.id;
+    packet.objectiveType = static_cast<uint8_t>(obj.type);
+    packet.objectiveState = static_cast<uint8_t>(obj.state);
+    packet.x = obj.x;
+    packet.y = obj.y;
+    packet.radius = obj.radius;
+    packet.progress = obj.getProgress();
+    packet.enemiesRequired = obj.enemiesRequired;
+    packet.enemiesKilled = obj.enemiesKilled;
+
+    server->send(peer, serialize(packet));
+  }
+
+  Logger::info("Sent " + std::to_string(objectives.size()) +
+               " objectives to new client");
 }

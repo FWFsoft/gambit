@@ -24,7 +24,9 @@ enum class PacketType : uint8_t {
   EffectApplied = 17,      // Server → Client (broadcast)
   EffectRemoved = 18,      // Server → Client (broadcast)
   EffectUpdate = 19,       // Server → Client (broadcast)
-  CharacterSelected = 20   // Client → Server
+  CharacterSelected = 20,  // Client → Server
+  ObjectiveState = 21,     // Server → Client (broadcast objective status)
+  ObjectiveInteract = 22   // Client → Server (request to interact)
 };
 
 struct ClientInputPacket {
@@ -198,6 +200,27 @@ struct CharacterSelectedPacket {
 };
 // Size: 5 bytes (1 + 4)
 
+// Objective-related packets
+
+struct ObjectiveStatePacket {
+  PacketType type = PacketType::ObjectiveState;
+  uint32_t objectiveId;
+  uint8_t objectiveType;   // ObjectiveType enum
+  uint8_t objectiveState;  // ObjectiveState enum
+  float x, y;              // Position
+  float radius;            // Interaction radius
+  float progress;          // 0.0 - 1.0
+  int32_t enemiesRequired;
+  int32_t enemiesKilled;
+};
+// Size: 30 bytes (1 + 4 + 1 + 1 + 4 + 4 + 4 + 4 + 4 + 4)
+
+struct ObjectiveInteractPacket {
+  PacketType type = PacketType::ObjectiveInteract;
+  uint32_t objectiveId;  // Which objective to interact with (0 = nearest)
+};
+// Size: 5 bytes (1 + 4)
+
 // Serialization functions
 std::vector<uint8_t> serialize(const ClientInputPacket& packet);
 std::vector<uint8_t> serialize(const StateUpdatePacket& packet);
@@ -220,6 +243,8 @@ std::vector<uint8_t> serialize(const EffectAppliedPacket& packet);
 std::vector<uint8_t> serialize(const EffectRemovedPacket& packet);
 std::vector<uint8_t> serialize(const EffectUpdatePacket& packet);
 std::vector<uint8_t> serialize(const CharacterSelectedPacket& packet);
+std::vector<uint8_t> serialize(const ObjectiveStatePacket& packet);
+std::vector<uint8_t> serialize(const ObjectiveInteractPacket& packet);
 
 // Deserialization functions
 ClientInputPacket deserializeClientInput(const uint8_t* data, size_t size);
@@ -247,6 +272,10 @@ EffectAppliedPacket deserializeEffectApplied(const uint8_t* data, size_t size);
 EffectRemovedPacket deserializeEffectRemoved(const uint8_t* data, size_t size);
 EffectUpdatePacket deserializeEffectUpdate(const uint8_t* data, size_t size);
 CharacterSelectedPacket deserializeCharacterSelected(const uint8_t* data,
+                                                     size_t size);
+ObjectiveStatePacket deserializeObjectiveState(const uint8_t* data,
+                                               size_t size);
+ObjectiveInteractPacket deserializeObjectiveInteract(const uint8_t* data,
                                                      size_t size);
 
 // Helper functions for binary I/O

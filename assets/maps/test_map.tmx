@@ -1528,5 +1528,52 @@
         <property name="enemy_type" type="string" value="slime" />
       </properties>
     </object>
+    <object id="221" name="Outpost_Spawn_skeleton_01" x="-1785.8057646720406" y="-1705.1143014254462">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="skeleton" />
+      </properties>
+    </object>
+    <object id="222" name="Outpost_Spawn_skeleton_02" x="-1784.5300671627776" y="-1745.8189349542527">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="skeleton" />
+      </properties>
+    </object>
+    <object id="223" name="Outpost_Spawn_slime_03" x="-1699.139901905168" y="-1715.3387693600914">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="slime" />
+      </properties>
+    </object>
+  </objectgroup>
+  <objectgroup id="4" name="Objectives">
+    <object id="1" name="Scrapyard_01" x="1184.0" y="-928.0">
+      <point />
+      <properties>
+        <property name="objective_type" type="string" value="alien_scrapyard" />
+        <property name="description" type="string" value="Salvage alien scrap materials" />
+        <property name="radius" type="float" value="50.0" />
+        <property name="interaction_time" type="float" value="3.0" />
+      </properties>
+    </object>
+    <object id="2" name="Scrapyard_02" x="832.0" y="-1296.0">
+      <point />
+      <properties>
+        <property name="objective_type" type="string" value="alien_scrapyard" />
+        <property name="description" type="string" value="Salvage alien scrap materials" />
+        <property name="radius" type="float" value="50.0" />
+        <property name="interaction_time" type="float" value="3.0" />
+      </properties>
+    </object>
+    <object id="3" name="Outpost_03" x="-1760.0" y="-1696.0">
+      <point />
+      <properties>
+        <property name="objective_type" type="string" value="capture_outpost" />
+        <property name="description" type="string" value="Clear the enemy outpost" />
+        <property name="radius" type="float" value="100.0" />
+        <property name="enemies_required" type="int" value="3" />
+      </properties>
+    </object>
   </objectgroup>
 </map>

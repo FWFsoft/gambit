@@ -17,6 +17,7 @@ class InputSystem {
   bool moveRight;
   bool moveUp;
   bool moveDown;
+  bool interactHeld;  // E key held for objective interaction
   uint32_t inputSequence;
   ClientPrediction* clientPrediction;
   CollisionDebugRenderer* collisionDebugRenderer;

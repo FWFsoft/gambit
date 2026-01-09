@@ -111,6 +111,7 @@ add_executable(Server
     src/ItemRegistry.cpp
     src/Effect.cpp
     src/EffectManager.cpp
+    src/ObjectiveSystem.cpp
 )
 target_include_directories(Server SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
 target_include_directories(Server PRIVATE include)

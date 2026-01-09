@@ -30,6 +30,7 @@ bool TiledMap::load(const std::string& filepath) {
   extractCollisionShapes();
   extractEnemySpawns();
   extractPlayerSpawns();
+  extractObjectives();
 
   // Calculate map centering offset for music zones
   float centerTileX = (mapWidth - 1) / 2.0f;
@@ -322,4 +323,98 @@ void TiledMap::extractPlayerSpawns() {
       }
     }
   }
+}
+
+void TiledMap::extractObjectives() {
+  objectives.clear();
+
+  // Calculate map centering offset
+  float centerTileX = (tmxMap.getTileCount().x - 1) / 2.0f;
+  float centerTileY = (tmxMap.getTileCount().y - 1) / 2.0f;
+  float centerWorldX =
+      (centerTileX - centerTileY) * tmxMap.getTileSize().x / 2.0f;
+  float centerWorldY =
+      (centerTileX + centerTileY) * tmxMap.getTileSize().y / 4.0f;
+
+  uint32_t objectiveId = 0;
+
+  const auto& layers = tmxMap.getLayers();
+  for (const auto& layer : layers) {
+    if (layer->getType() == tmx::Layer::Type::Object) {
+      const auto& objectLayer = layer->getLayerAs<tmx::ObjectGroup>();
+
+      // Only process "Objectives" layer
+      if (objectLayer.getName() != "Objectives") {
+        continue;
+      }
+
+      for (const auto& object : objectLayer.getObjects()) {
+        // Only process point objects (objective locations)
+        if (object.getShape() != tmx::Object::Shape::Point) {
+          continue;
+        }
+
+        // Extract properties
+        std::string objectiveTypeStr;
+        std::string description;
+        float radius = 50.0f;
+        float interactionTime = 3.0f;
+        int enemiesRequired = 0;
+
+        const auto& properties = object.getProperties();
+        for (const auto& prop : properties) {
+          if (prop.getName() == "objective_type" &&
+              prop.getType() == tmx::Property::Type::String) {
+            objectiveTypeStr = prop.getStringValue();
+          } else if (prop.getName() == "description" &&
+                     prop.getType() == tmx::Property::Type::String) {
+            description = prop.getStringValue();
+          } else if (prop.getName() == "radius" &&
+                     prop.getType() == tmx::Property::Type::Float) {
+            radius = prop.getFloatValue();
+          } else if (prop.getName() == "interaction_time" &&
+                     prop.getType() == tmx::Property::Type::Float) {
+            interactionTime = prop.getFloatValue();
+          } else if (prop.getName() == "enemies_required" &&
+                     prop.getType() == tmx::Property::Type::Int) {
+            enemiesRequired = prop.getIntValue();
+          }
+        }
+
+        // Skip if no objective_type property
+        if (objectiveTypeStr.empty()) {
+          Logger::info("Objective '" + object.getName() +
+                       "' missing objective_type property, skipping");
+          continue;
+        }
+
+        // Create objective with centering offset
+        const auto& pos = object.getPosition();
+        Objective objective;
+        objective.id = objectiveId++;
+        objective.type = parseObjectiveType(objectiveTypeStr);
+        objective.state = ObjectiveState::Inactive;
+        objective.name = object.getName();
+        objective.description = description.empty()
+                                    ? objectiveTypeToString(objective.type)
+                                    : description;
+        objective.x = pos.x - centerWorldX;
+        objective.y = pos.y - centerWorldY;
+        objective.radius = radius;
+        objective.interactionTime = interactionTime;
+        objective.enemiesRequired = enemiesRequired;
+
+        objectives.push_back(objective);
+
+        Logger::info("Loaded objective: " + objective.name +
+                     " type=" + objectiveTypeToString(objective.type) +
+                     " at (" + std::to_string(objective.x) + ", " +
+                     std::to_string(objective.y) +
+                     ") radius=" + std::to_string(objective.radius));
+      }
+    }
+  }
+
+  Logger::info("Loaded " + std::to_string(objectives.size()) +
+               " objectives from map");
 }

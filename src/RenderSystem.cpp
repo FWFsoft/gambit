@@ -3,6 +3,7 @@
 #include <glad/glad.h>
 
 #include <algorithm>
+#include <cmath>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <vector>
@@ -185,6 +186,12 @@ void RenderSystem::onRender(const RenderEvent& e) {
 
   // Render tiles first, then all entities in depth order (single callback)
   tileRenderer->render(*tiledMap, [&](float minDepth, float maxDepth) {
+    // Draw objective zones first (as ground markers)
+    const auto& objectives = clientPrediction->getObjectives();
+    for (const auto& [id, objective] : objectives) {
+      drawObjective(objective);
+    }
+
     // Render all entities in sorted order
     for (const auto& entity : entitiesToRender) {
       if (entity.type == EntityToRender::Player) {
@@ -307,4 +314,99 @@ void RenderSystem::drawHealthBar(int x, int y, float health, float maxHealth) {
 
   spriteRenderer->draw(*whitePixelTexture, x - BAR_WIDTH / 2, y, filledWidth,
                        BAR_HEIGHT, r, g, 0.0f, 1.0f);
+}
+
+void RenderSystem::drawObjective(const ClientObjective& objective) {
+  int screenX, screenY;
+  camera->worldToScreen(objective.x, objective.y, screenX, screenY);
+
+  // Choose color based on state
+  float r, g, b, alpha;
+  switch (objective.state) {
+    case ObjectiveState::Inactive:
+      r = 1.0f;
+      g = 1.0f;
+      b = 0.2f;  // Yellow
+      alpha = 0.3f;
+      break;
+    case ObjectiveState::InProgress:
+      r = 0.2f;
+      g = 0.6f;
+      b = 1.0f;  // Blue
+      alpha = 0.4f;
+      break;
+    case ObjectiveState::Completed:
+      r = 0.2f;
+      g = 1.0f;
+      b = 0.2f;  // Green
+      alpha = 0.2f;
+      break;
+    default:
+      r = 0.5f;
+      g = 0.5f;
+      b = 0.5f;  // Gray
+      alpha = 0.3f;
+      break;
+  }
+
+  // Draw a diamond shape for the objective zone
+  // We approximate by drawing a rotated square (4 triangles from center)
+  // For simplicity, draw as a filled circle approximation using multiple
+  // rectangles
+
+  // Draw as a series of horizontal bars to approximate a circle/diamond
+  float radius = objective.radius;
+  constexpr int NUM_SEGMENTS = 16;
+
+  for (int i = 0; i < NUM_SEGMENTS; i++) {
+    // Calculate Y offset for this segment
+    float t =
+        (static_cast<float>(i) / (NUM_SEGMENTS - 1)) * 2.0f - 1.0f;  // -1 to 1
+    float yOffset = t * radius;
+
+    // Width at this Y (diamond shape: width = radius - |yOffset|)
+    float width = radius - std::abs(yOffset);
+    if (width <= 0) continue;
+
+    // Convert to screen coordinates
+    // In isometric view, we need to account for the projection
+    int segScreenX, segScreenY;
+    camera->worldToScreen(objective.x, objective.y + yOffset, segScreenX,
+                          segScreenY);
+
+    // Draw horizontal bar at this Y level
+    spriteRenderer->draw(
+        *whitePixelTexture, static_cast<float>(segScreenX - width),
+        static_cast<float>(segScreenY - 2), width * 2.0f, 4.0f, r, g, b, alpha);
+  }
+
+  // Draw a small icon in the center based on objective type
+  float iconR, iconG, iconB;
+  if (objective.type == ObjectiveType::AlienScrapyard) {
+    iconR = 0.8f;
+    iconG = 0.6f;
+    iconB = 0.2f;  // Orange/brown for scrapyard
+  } else {
+    iconR = 1.0f;
+    iconG = 0.2f;
+    iconB = 0.2f;  // Red for outpost
+  }
+
+  // Draw center marker (small square)
+  constexpr float ICON_SIZE = 12.0f;
+  spriteRenderer->draw(*whitePixelTexture,
+                       static_cast<float>(screenX - ICON_SIZE / 2),
+                       static_cast<float>(screenY - ICON_SIZE / 2), ICON_SIZE,
+                       ICON_SIZE, iconR, iconG, iconB, 0.9f);
+
+  // Draw progress ring for in-progress objectives
+  if (objective.state == ObjectiveState::InProgress &&
+      objective.progress > 0.0f) {
+    // Draw a progress indicator arc (simplified as a bar below the icon)
+    float progressWidth = ICON_SIZE * 2.0f * objective.progress;
+    spriteRenderer->draw(
+        *whitePixelTexture, static_cast<float>(screenX - ICON_SIZE),
+        static_cast<float>(screenY + ICON_SIZE / 2 + 4), progressWidth, 4.0f,
+        0.2f, 1.0f, 0.2f, 0.9f);  // Green progress bar
+  }
 }

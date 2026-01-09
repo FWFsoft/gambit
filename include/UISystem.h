@@ -56,6 +56,17 @@ class UISystem {
   void onItemPickedUp(const ItemPickedUpEvent& e);
   void renderNotifications();
 
+  // Objective notification system
+  struct ObjectiveNotification {
+    uint32_t objectiveId;
+    std::string name;
+    uint8_t state;    // ObjectiveState enum value
+    float progress;   // 0.0 - 1.0
+    float timestamp;  // Time when notification was created/updated
+  };
+  void onObjectiveUpdated(const ObjectiveUpdatedEvent& e);
+  void renderObjectiveActivity();
+
   // Effect display
   void renderEffectBars();
 
@@ -69,7 +80,9 @@ class UISystem {
   Settings tempSettings;  // Temporary settings during editing
   bool showSettings;
   std::deque<Notification> notifications;  // Active pickup notifications
-  float currentTime;                       // Accumulated time in seconds
+  std::deque<ObjectiveNotification>
+      objectiveNotifications;  // Active objective notifications
+  float currentTime;           // Accumulated time in seconds
 
   // Title screen assets
   Texture* titleScreenBackground;

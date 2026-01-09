@@ -710,3 +710,77 @@ CharacterSelectedPacket deserializeCharacterSelected(const uint8_t* data,
 
   return packet;
 }
+
+// Objective packet serialization
+
+std::vector<uint8_t> serialize(const ObjectiveStatePacket& packet) {
+  std::vector<uint8_t> buffer;
+  buffer.reserve(31);
+
+  writeUint8(buffer, static_cast<uint8_t>(packet.type));
+  writeUint32(buffer, packet.objectiveId);
+  writeUint8(buffer, packet.objectiveType);
+  writeUint8(buffer, packet.objectiveState);
+  writeFloat(buffer, packet.x);
+  writeFloat(buffer, packet.y);
+  writeFloat(buffer, packet.radius);
+  writeFloat(buffer, packet.progress);
+  writeInt32(buffer, packet.enemiesRequired);
+  writeInt32(buffer, packet.enemiesKilled);
+
+  assert(buffer.size() == 31);  // 1 + 4 + 1 + 1 + 4 + 4 + 4 + 4 + 4 + 4
+  return buffer;
+}
+
+std::vector<uint8_t> serialize(const ObjectiveInteractPacket& packet) {
+  std::vector<uint8_t> buffer;
+  buffer.reserve(5);
+
+  writeUint8(buffer, static_cast<uint8_t>(packet.type));
+  writeUint32(buffer, packet.objectiveId);
+
+  assert(buffer.size() == 5);  // 1 + 4
+  return buffer;
+}
+
+// Objective packet deserialization
+
+ObjectiveStatePacket deserializeObjectiveState(const uint8_t* data,
+                                               size_t size) {
+  assert(size >= 31 && "ObjectiveStatePacket too small");
+  assert(data[0] == static_cast<uint8_t>(PacketType::ObjectiveState));
+
+  ObjectiveStatePacket packet;
+  size_t offset = 1;
+
+  packet.objectiveId = readUint32(data + offset);
+  offset += 4;
+  packet.objectiveType = readUint8(data + offset);
+  offset += 1;
+  packet.objectiveState = readUint8(data + offset);
+  offset += 1;
+  packet.x = readFloat(data + offset);
+  offset += 4;
+  packet.y = readFloat(data + offset);
+  offset += 4;
+  packet.radius = readFloat(data + offset);
+  offset += 4;
+  packet.progress = readFloat(data + offset);
+  offset += 4;
+  packet.enemiesRequired = readInt32(data + offset);
+  offset += 4;
+  packet.enemiesKilled = readInt32(data + offset);
+
+  return packet;
+}
+
+ObjectiveInteractPacket deserializeObjectiveInteract(const uint8_t* data,
+                                                     size_t size) {
+  assert(size >= 5 && "ObjectiveInteractPacket too small");
+  assert(data[0] == static_cast<uint8_t>(PacketType::ObjectiveInteract));
+
+  ObjectiveInteractPacket packet;
+  packet.objectiveId = readUint32(data + 1);
+
+  return packet;
+}
