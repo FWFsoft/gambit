@@ -2,6 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
   "name": "gambit",
   "version-string": "0.1.0",
+  "builtin-baseline": "39922dbab0cafd7a7150d459c6a181c7dee5dfbe",
   "dependencies": [
     "sdl2",
     "enet",
@@ -11,6 +12,9 @@
     "glm",
     "sdl2-image",
     "sdl2-mixer",
-    "imgui"
+    {
+      "name": "imgui",
+      "version>=": "1.91.5"
+    }
   ]
 }
