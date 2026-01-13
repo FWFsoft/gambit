@@ -157,6 +157,7 @@ add_executable(Client
     src/AnimationAssetLoader.cpp
     src/MusicSystem.cpp
     src/MusicZoneDebugRenderer.cpp
+    src/ObjectiveDebugRenderer.cpp
     src/EnemyInterpolation.cpp
     src/CombatSystem.cpp
     src/CharacterRegistry.cpp
@@ -169,6 +170,7 @@ add_executable(Client
     src/GameStateManager.cpp
     src/Settings.cpp
     src/ItemRegistry.cpp
+    src/TestInputReader.cpp
     src/imgui_backends/imgui_impl_sdl2.cpp
     src/imgui_backends/imgui_impl_opengl3.cpp
 )

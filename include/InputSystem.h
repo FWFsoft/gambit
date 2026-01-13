@@ -3,6 +3,7 @@
 #include "CollisionDebugRenderer.h"
 #include "EventBus.h"
 #include "MusicZoneDebugRenderer.h"
+#include "ObjectiveDebugRenderer.h"
 
 class ClientPrediction;
 
@@ -10,7 +11,8 @@ class InputSystem {
  public:
   InputSystem(ClientPrediction* clientPrediction,
               CollisionDebugRenderer* collisionDebugRenderer = nullptr,
-              MusicZoneDebugRenderer* musicZoneDebugRenderer = nullptr);
+              MusicZoneDebugRenderer* musicZoneDebugRenderer = nullptr,
+              ObjectiveDebugRenderer* objectiveDebugRenderer = nullptr);
 
  private:
   bool moveLeft;
@@ -22,6 +24,7 @@ class InputSystem {
   ClientPrediction* clientPrediction;
   CollisionDebugRenderer* collisionDebugRenderer;
   MusicZoneDebugRenderer* musicZoneDebugRenderer;
+  ObjectiveDebugRenderer* objectiveDebugRenderer;
 
   void onKeyDown(const KeyDownEvent& e);
   void onKeyUp(const KeyUpEvent& e);

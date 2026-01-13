@@ -10,6 +10,7 @@
 #include "EnemyInterpolation.h"
 #include "EventBus.h"
 #include "MusicZoneDebugRenderer.h"
+#include "ObjectiveDebugRenderer.h"
 #include "RemotePlayerInterpolation.h"
 #include "SpriteRenderer.h"
 #include "TileRenderer.h"
@@ -24,12 +25,16 @@ class RenderSystem {
                EnemyInterpolation* enemyInterpolation, Camera* camera,
                TiledMap* tiledMap,
                CollisionDebugRenderer* collisionDebugRenderer,
-               MusicZoneDebugRenderer* musicZoneDebugRenderer);
+               MusicZoneDebugRenderer* musicZoneDebugRenderer,
+               ObjectiveDebugRenderer* objectiveDebugRenderer);
 
   ~RenderSystem() = default;
 
   // Access to sprite renderer for other systems
   SpriteRenderer* getSpriteRenderer() { return spriteRenderer.get(); }
+
+  // Test mode: capture screenshot
+  void captureScreenshot(const std::string& path);
 
  private:
   Window* window;
@@ -40,6 +45,7 @@ class RenderSystem {
   TiledMap* tiledMap;
   CollisionDebugRenderer* collisionDebugRenderer;
   MusicZoneDebugRenderer* musicZoneDebugRenderer;
+  ObjectiveDebugRenderer* objectiveDebugRenderer;
   std::unique_ptr<SpriteRenderer> spriteRenderer;
   std::unique_ptr<Texture> whitePixelTexture;
   std::unique_ptr<TileRenderer> tileRenderer;

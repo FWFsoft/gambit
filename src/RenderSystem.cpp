@@ -1,9 +1,11 @@
 #include "RenderSystem.h"
 
+#include <SDL2/SDL_image.h>
 #include <glad/glad.h>
 
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <vector>
@@ -21,7 +23,8 @@ RenderSystem::RenderSystem(Window* window, ClientPrediction* clientPrediction,
                            EnemyInterpolation* enemyInterpolation,
                            Camera* camera, TiledMap* tiledMap,
                            CollisionDebugRenderer* collisionDebugRenderer,
-                           MusicZoneDebugRenderer* musicZoneDebugRenderer)
+                           MusicZoneDebugRenderer* musicZoneDebugRenderer,
+                           ObjectiveDebugRenderer* objectiveDebugRenderer)
     : window(window),
       clientPrediction(clientPrediction),
       remoteInterpolation(remoteInterpolation),
@@ -29,7 +32,8 @@ RenderSystem::RenderSystem(Window* window, ClientPrediction* clientPrediction,
       camera(camera),
       tiledMap(tiledMap),
       collisionDebugRenderer(collisionDebugRenderer),
-      musicZoneDebugRenderer(musicZoneDebugRenderer) {
+      musicZoneDebugRenderer(musicZoneDebugRenderer),
+      objectiveDebugRenderer(objectiveDebugRenderer) {
   // Initialize sprite renderer
   spriteRenderer = std::make_unique<SpriteRenderer>();
 
@@ -217,6 +221,11 @@ void RenderSystem::onRender(const RenderEvent& e) {
       collisionDebugRenderer->renderMapBounds(tiledMap->getWorldWidth(),
                                               tiledMap->getWorldHeight());
     }
+  }
+
+  // Render objective debug overlay (if enabled)
+  if (objectiveDebugRenderer) {
+    objectiveDebugRenderer->render();
   }
 
   // NOTE: Buffer swap moved to GameLoop to ensure UI renders after game world
@@ -409,4 +418,66 @@ void RenderSystem::drawObjective(const ClientObjective& objective) {
         static_cast<float>(screenY + ICON_SIZE / 2 + 4), progressWidth, 4.0f,
         0.2f, 1.0f, 0.2f, 0.9f);  // Green progress bar
   }
+}
+
+void RenderSystem::captureScreenshot(const std::string& path) {
+  // Ensure output directory exists
+  std::filesystem::path filePath(path);
+  if (filePath.has_parent_path()) {
+    std::filesystem::create_directories(filePath.parent_path());
+  }
+
+  // Read pixels from OpenGL framebuffer
+  int width = Config::Screen::WIDTH;
+  int height = Config::Screen::HEIGHT;
+
+  std::vector<uint8_t> pixels(width * height * 4);
+  glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+
+  // Create SDL surface from pixel data
+  SDL_Surface* surface =
+      SDL_CreateRGBSurfaceFrom(pixels.data(), width, height, 32, width * 4,
+                               0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000);
+
+  if (!surface) {
+    Logger::error("Failed to create surface for screenshot: " +
+                  std::string(SDL_GetError()));
+    return;
+  }
+
+  // Flip image vertically (OpenGL has origin at bottom-left)
+  SDL_Surface* flipped = SDL_CreateRGBSurface(
+      0, width, height, 32, 0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000);
+
+  if (!flipped) {
+    SDL_FreeSurface(surface);
+    Logger::error("Failed to create flipped surface: " +
+                  std::string(SDL_GetError()));
+    return;
+  }
+
+  SDL_LockSurface(surface);
+  SDL_LockSurface(flipped);
+
+  uint8_t* srcPixels = static_cast<uint8_t*>(surface->pixels);
+  uint8_t* dstPixels = static_cast<uint8_t*>(flipped->pixels);
+
+  for (int y = 0; y < height; y++) {
+    memcpy(dstPixels + y * flipped->pitch,
+           srcPixels + (height - 1 - y) * surface->pitch, width * 4);
+  }
+
+  SDL_UnlockSurface(flipped);
+  SDL_UnlockSurface(surface);
+
+  // Save to PNG
+  if (IMG_SavePNG(flipped, path.c_str()) != 0) {
+    Logger::error("Failed to save screenshot to " + path + ": " +
+                  std::string(IMG_GetError()));
+  } else {
+    Logger::info("Screenshot saved to " + path);
+  }
+
+  SDL_FreeSurface(flipped);
+  SDL_FreeSurface(surface);
 }

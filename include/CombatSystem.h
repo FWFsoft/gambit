@@ -18,7 +18,7 @@ class CombatSystem {
   EnemyInterpolation* enemyInterpolation;
 
   static constexpr float ATTACK_RANGE = 150.0f;  // Increased from 50px to 150px
-  static constexpr float ATTACK_DAMAGE = 2.0f;
+  static constexpr float ATTACK_DAMAGE = 6.0f;   // 3x boost for faster combat
 
   void onAttackInput(const AttackInputEvent& e);
 

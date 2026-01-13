@@ -22,8 +22,10 @@
 #include "NetworkClient.h"
 #include "NetworkProtocol.h"
 #include "Objective.h"
+#include "ObjectiveDebugRenderer.h"
 #include "RemotePlayerInterpolation.h"
 #include "RenderSystem.h"
+#include "TestInputReader.h"
 #include "TileRenderer.h"
 #include "TiledMap.h"
 #include "UISystem.h"
@@ -31,10 +33,20 @@
 #include "WorldConfig.h"
 #include "config/NetworkConfig.h"
 #include "config/ScreenConfig.h"
+#include "config/TestMode.h"
 #include "config/TimingConfig.h"
 
-int main() {
+int main(int argc, char* argv[]) {
   Logger::init();
+
+  // Parse command line arguments for test mode
+  for (int i = 1; i < argc; i++) {
+    std::string arg = argv[i];
+    if (arg == "--test-mode") {
+      Config::TestMode::testConfig.enabled = true;
+      Logger::info("Test mode enabled");
+    }
+  }
 
   // Load item definitions
   if (!ItemRegistry::instance().loadFromCSV("assets/items.csv")) {
@@ -75,8 +87,10 @@ int main() {
                     &collisionSystem);
   ClientPrediction clientPrediction(&client, localPlayerId, world);
 
+  ObjectiveDebugRenderer objectiveDebugRenderer(&camera, &clientPrediction);
+
   InputSystem inputSystem(&clientPrediction, &collisionDebugRenderer,
-                          &musicZoneDebugRenderer);
+                          &musicZoneDebugRenderer, &objectiveDebugRenderer);
 
   // Initialize animation system first
   AnimationSystem animationSystem;
@@ -96,7 +110,8 @@ int main() {
 
   RenderSystem renderSystem(&window, &clientPrediction, &remoteInterpolation,
                             &enemyInterpolation, &camera, &map,
-                            &collisionDebugRenderer, &musicZoneDebugRenderer);
+                            &collisionDebugRenderer, &musicZoneDebugRenderer,
+                            &objectiveDebugRenderer);
 
   // Create damage number system
   DamageNumberSystem damageNumberSystem(&camera,
@@ -156,8 +171,67 @@ int main() {
       ItemStack(5, 1);  // Dragon Sword
   localPlayer.equipment[EQUIPMENT_ARMOR_SLOT] = ItemStack(7, 1);  // Iron Armor
 
+  // Initialize test input reader if test mode enabled
+  std::unique_ptr<TestInputReader> testInputReader;
+  if (Config::TestMode::testConfig.enabled) {
+    testInputReader = std::make_unique<TestInputReader>(
+        Config::TestMode::testConfig.inputCommandPath);
+  }
+
   // Subscribe to UpdateEvent for network processing
   EventBus::instance().subscribe<UpdateEvent>([&](const UpdateEvent& e) {
+    // Test mode: process input commands and capture screenshots
+    if (Config::TestMode::testConfig.enabled && testInputReader) {
+      testInputReader->tick();
+
+      // Try to read next command
+      auto command = testInputReader->readNextCommand();
+      if (command) {
+        switch (command->type) {
+          case TestInputReader::CommandType::KEY_DOWN: {
+            SDL_Scancode scancode =
+                TestInputReader::stringToScancode(command->stringArg);
+            if (scancode != SDL_SCANCODE_UNKNOWN) {
+              SDL_Event keyEvent;
+              keyEvent.type = SDL_KEYDOWN;
+              keyEvent.key.keysym.scancode = scancode;
+              SDL_PushEvent(&keyEvent);
+            }
+            break;
+          }
+          case TestInputReader::CommandType::KEY_UP: {
+            SDL_Scancode scancode =
+                TestInputReader::stringToScancode(command->stringArg);
+            if (scancode != SDL_SCANCODE_UNKNOWN) {
+              SDL_Event keyEvent;
+              keyEvent.type = SDL_KEYUP;
+              keyEvent.key.keysym.scancode = scancode;
+              SDL_PushEvent(&keyEvent);
+            }
+            break;
+          }
+          case TestInputReader::CommandType::SCREENSHOT: {
+            std::string filename = Config::TestMode::testConfig.screenshotPath;
+            if (!command->stringArg.empty()) {
+              filename = "test_output/" + command->stringArg + ".png";
+            }
+            renderSystem.captureScreenshot(filename);
+            break;
+          }
+          default:
+            break;
+        }
+      }
+
+      // Periodic screenshot capture
+      Config::TestMode::testConfig.frameCount++;
+      if (Config::TestMode::testConfig.frameCount %
+              Config::TestMode::testConfig.screenshotInterval ==
+          0) {
+        renderSystem.captureScreenshot(
+            Config::TestMode::testConfig.screenshotPath);
+      }
+    }
     // Poll window events
     window.pollEvents();
 

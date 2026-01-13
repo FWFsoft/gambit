@@ -7,7 +7,8 @@
 
 InputSystem::InputSystem(ClientPrediction* clientPrediction,
                          CollisionDebugRenderer* collisionDebugRenderer,
-                         MusicZoneDebugRenderer* musicZoneDebugRenderer)
+                         MusicZoneDebugRenderer* musicZoneDebugRenderer,
+                         ObjectiveDebugRenderer* objectiveDebugRenderer)
     : moveLeft(false),
       moveRight(false),
       moveUp(false),
@@ -16,7 +17,8 @@ InputSystem::InputSystem(ClientPrediction* clientPrediction,
       inputSequence(0),
       clientPrediction(clientPrediction),
       collisionDebugRenderer(collisionDebugRenderer),
-      musicZoneDebugRenderer(musicZoneDebugRenderer) {
+      musicZoneDebugRenderer(musicZoneDebugRenderer),
+      objectiveDebugRenderer(objectiveDebugRenderer) {
   // Subscribe to key events
   EventBus::instance().subscribe<KeyDownEvent>(
       [this](const KeyDownEvent& e) { onKeyDown(e); });
@@ -80,16 +82,26 @@ void InputSystem::onKeyDown(const KeyDownEvent& e) {
     return;
   }
 
-  // Toggle collision and music zone debug with F1
-  if (e.key == SDLK_F1 && collisionDebugRenderer) {
-    collisionDebugRenderer->toggle();
-    Logger::info(
-        "Collision debug: " +
-        std::string(collisionDebugRenderer->isEnabled() ? "ON" : "OFF"));
-    musicZoneDebugRenderer->toggle();
-    Logger::info(
-        "Music zone debug: " +
-        std::string(musicZoneDebugRenderer->isEnabled() ? "ON" : "OFF"));
+  // Toggle all debug renderers with F1
+  if (e.key == SDLK_F1) {
+    if (collisionDebugRenderer) {
+      collisionDebugRenderer->toggle();
+      Logger::info(
+          "Collision debug: " +
+          std::string(collisionDebugRenderer->isEnabled() ? "ON" : "OFF"));
+    }
+    if (musicZoneDebugRenderer) {
+      musicZoneDebugRenderer->toggle();
+      Logger::info(
+          "Music zone debug: " +
+          std::string(musicZoneDebugRenderer->isEnabled() ? "ON" : "OFF"));
+    }
+    if (objectiveDebugRenderer) {
+      objectiveDebugRenderer->toggle();
+      Logger::info(
+          "Objective debug: " +
+          std::string(objectiveDebugRenderer->isEnabled() ? "ON" : "OFF"));
+    }
   }
 
   // Toggle mute with M or F2

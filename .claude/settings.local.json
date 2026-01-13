@@ -40,7 +40,13 @@
       "mcp__pixellab__get_isometric_tile",
       "Bash(curl:*)",
       "Bash(sips:*)",
-      "Bash(./build/Client)"
+      "Bash(./build/Client)",
+      "Bash(git diff:*)",
+      "Bash(/build:*)",
+      "Skill(visual-test)",
+      "Bash(./.claude/skills/visual-test/interactive_test.sh:*)",
+      "Bash(lsof:*)",
+      "Bash(make:*)"
     ]
   }
 }

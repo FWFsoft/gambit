@@ -9,7 +9,8 @@ namespace Config {
 namespace Player {
 
 // Movement
-constexpr float SPEED = 200.0f;  // Pixels per second
+constexpr float SPEED =
+    600.0f;  // Pixels per second (3x boost for faster gameplay)
 
 // Dimensions
 constexpr int SIZE = 32;  // Player sprite size (pixels)
