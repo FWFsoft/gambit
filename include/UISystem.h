@@ -92,4 +92,8 @@ class UISystem {
   uint32_t hoveredCharacterId;   // Character mouse is over (0 = none)
   uint32_t selectedCharacterId;  // Character selected for preview (0 = none)
   float selectionAnimationTime;  // For pulsing/growing effect
+  int keyboardFocusedIndex;      // Character focused by keyboard (-1 = none)
+
+  // Keyboard navigation event handlers
+  void onKeyDown(const KeyDownEvent& e);
 };

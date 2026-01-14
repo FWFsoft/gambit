@@ -16,15 +16,16 @@ class TestInputReader {
     KEY_DOWN,     // Press key down
     KEY_UP,       // Release key
     SCREENSHOT,   // Capture screenshot
-    MOUSE_MOVE,   // Move mouse (future)
-    MOUSE_CLICK,  // Click mouse (future)
+    MOUSE_MOVE,   // Move mouse to (x, y)
+    MOUSE_CLICK,  // Click mouse button at current position
   };
 
   struct Command {
     CommandType type;
     std::string stringArg;  // For KEY_DOWN/KEY_UP: key name, for SCREENSHOT:
-                            // filename
-    int intArg;             // For WAIT: frame count
+                            // filename, for MOUSE_CLICK: button name
+    int intArg;             // For WAIT: frame count, MOUSE_MOVE: x coordinate
+    int intArg2;            // For MOUSE_MOVE: y coordinate
   };
 
   explicit TestInputReader(const std::string& commandFilePath);

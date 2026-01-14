@@ -46,7 +46,8 @@
       "Skill(visual-test)",
       "Bash(./.claude/skills/visual-test/interactive_test.sh:*)",
       "Bash(lsof:*)",
-      "Bash(make:*)"
+      "Bash(make:*)",
+      "Bash(./.claude/skills/visual-test/run.sh:*)"
     ]
   }
 }

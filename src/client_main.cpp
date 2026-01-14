@@ -195,6 +195,8 @@ int main(int argc, char* argv[]) {
               SDL_Event keyEvent;
               keyEvent.type = SDL_KEYDOWN;
               keyEvent.key.keysym.scancode = scancode;
+              keyEvent.key.keysym.sym = SDL_GetKeyFromScancode(scancode);
+              keyEvent.key.keysym.mod = 0;
               SDL_PushEvent(&keyEvent);
             }
             break;
@@ -206,6 +208,8 @@ int main(int argc, char* argv[]) {
               SDL_Event keyEvent;
               keyEvent.type = SDL_KEYUP;
               keyEvent.key.keysym.scancode = scancode;
+              keyEvent.key.keysym.sym = SDL_GetKeyFromScancode(scancode);
+              keyEvent.key.keysym.mod = 0;
               SDL_PushEvent(&keyEvent);
             }
             break;
@@ -216,6 +220,48 @@ int main(int argc, char* argv[]) {
               filename = "test_output/" + command->stringArg + ".png";
             }
             renderSystem.captureScreenshot(filename);
+            break;
+          }
+          case TestInputReader::CommandType::MOUSE_MOVE: {
+            SDL_Event mouseEvent;
+            mouseEvent.type = SDL_MOUSEMOTION;
+            mouseEvent.motion.x = command->intArg;
+            mouseEvent.motion.y = command->intArg2;
+            mouseEvent.motion.xrel = 0;
+            mouseEvent.motion.yrel = 0;
+            mouseEvent.motion.state = 0;
+            SDL_PushEvent(&mouseEvent);
+            break;
+          }
+          case TestInputReader::CommandType::MOUSE_CLICK: {
+            // Determine button
+            Uint8 button = SDL_BUTTON_LEFT;
+            if (command->stringArg == "right") {
+              button = SDL_BUTTON_RIGHT;
+            } else if (command->stringArg == "middle") {
+              button = SDL_BUTTON_MIDDLE;
+            }
+
+            // Mouse down event
+            SDL_Event mouseDownEvent;
+            mouseDownEvent.type = SDL_MOUSEBUTTONDOWN;
+            mouseDownEvent.button.button = button;
+            mouseDownEvent.button.clicks = 1;
+            // Get current mouse position
+            int mouseX, mouseY;
+            SDL_GetMouseState(&mouseX, &mouseY);
+            mouseDownEvent.button.x = mouseX;
+            mouseDownEvent.button.y = mouseY;
+            SDL_PushEvent(&mouseDownEvent);
+
+            // Mouse up event (immediately after)
+            SDL_Event mouseUpEvent;
+            mouseUpEvent.type = SDL_MOUSEBUTTONUP;
+            mouseUpEvent.button.button = button;
+            mouseUpEvent.button.clicks = 1;
+            mouseUpEvent.button.x = mouseX;
+            mouseUpEvent.button.y = mouseY;
+            SDL_PushEvent(&mouseUpEvent);
             break;
           }
           default:

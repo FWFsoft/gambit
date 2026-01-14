@@ -103,15 +103,13 @@ void ObjectiveDebugRenderer::render() {
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-  // Increase line width for better visibility
-  glLineWidth(3.0f);
+  // Note: glLineWidth() is deprecated in OpenGL Core Profile (macOS)
+  // Line width other than 1.0 causes GL_INVALID_VALUE on macOS
+  // For thicker lines, we'd need to use geometry shaders or quad rendering
 
   for (const auto& [id, objective] : objectives) {
     renderObjective(objective);
   }
-
-  // Reset line width
-  glLineWidth(1.0f);
 
   OpenGLUtils::checkGLError("ObjectiveDebugRenderer::render");
 }

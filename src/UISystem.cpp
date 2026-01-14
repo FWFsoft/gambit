@@ -38,9 +38,14 @@ UISystem::UISystem(Window* window, ClientPrediction* clientPrediction,
       titleMusic(nullptr),
       hoveredCharacterId(0),
       selectedCharacterId(0),
-      selectionAnimationTime(0.0f) {
+      selectionAnimationTime(0.0f),
+      keyboardFocusedIndex(-1) {
   // Load settings
   settings.load(Settings::DEFAULT_FILENAME);
+
+  // Subscribe to keyboard events for navigation
+  EventBus::instance().subscribe<KeyDownEvent>(
+      [this](const KeyDownEvent& e) { onKeyDown(e); });
 
   // Load title screen background
   titleScreenBackground =
@@ -316,6 +321,7 @@ void UISystem::renderCharacterSelect() {
       ImGui::PushID(character.id);
 
       bool isSelected = (selectedCharacterId == character.id);
+      bool isFocused = (keyboardFocusedIndex == index);
 
       // Calculate display size with selection animation (doesn't affect layout)
       float displaySize = portraitSize;
@@ -347,8 +353,15 @@ void UISystem::renderCharacterSelect() {
         drawList->AddImage((ImTextureID)(intptr_t)portrait->getID(), topLeft,
                            bottomRight);
 
+        // Draw keyboard focus border (yellow)
+        if (isFocused) {
+          drawList->AddRect(topLeft, bottomRight, IM_COL32(255, 255, 0, 255),
+                            0.0f, 0, 3.0f);
+        }
+
         if (clicked) {
           selectedCharacterId = character.id;
+          keyboardFocusedIndex = index;  // Sync keyboard focus with click
           Logger::info("Selected character: " + character.name);
         }
 
@@ -1298,4 +1311,93 @@ void UISystem::renderObjectiveActivity() {
   }
 
   ImGui::End();
+}
+
+void UISystem::onKeyDown(const KeyDownEvent& e) {
+  // Only handle keyboard navigation in CharacterSelect state
+  if (GameStateManager::instance().getCurrentState() !=
+      GameState::CharacterSelect) {
+    return;
+  }
+
+  const CharacterRegistry& registry = CharacterRegistry::instance();
+  const auto& characters = registry.getAllCharacters();
+  int totalCharacters = static_cast<int>(characters.size());
+
+  if (totalCharacters == 0) {
+    return;
+  }
+
+  const int columns = 5;
+
+  // Initialize focus to first character if not set
+  if (keyboardFocusedIndex == -1) {
+    keyboardFocusedIndex = 0;
+  }
+
+  // Handle arrow key navigation
+  switch (e.key) {
+    case SDLK_LEFT:
+      if (keyboardFocusedIndex > 0) {
+        keyboardFocusedIndex--;
+      }
+      break;
+
+    case SDLK_RIGHT:
+      if (keyboardFocusedIndex < totalCharacters - 1) {
+        keyboardFocusedIndex++;
+      }
+      break;
+
+    case SDLK_UP:
+      if (keyboardFocusedIndex >= columns) {
+        keyboardFocusedIndex -= columns;
+      }
+      break;
+
+    case SDLK_DOWN:
+      if (keyboardFocusedIndex + columns < totalCharacters) {
+        keyboardFocusedIndex += columns;
+      }
+      break;
+
+    case SDLK_SPACE:
+      // Space: Select the focused character
+      if (keyboardFocusedIndex >= 0 && keyboardFocusedIndex < totalCharacters) {
+        const CharacterDefinition& character = characters[keyboardFocusedIndex];
+        selectedCharacterId = character.id;
+        Logger::info("Selected character via keyboard: " + character.name);
+      }
+      break;
+
+    case SDLK_RETURN:
+      // Enter: Confirm selection (or select and confirm if nothing selected)
+      if (keyboardFocusedIndex >= 0 && keyboardFocusedIndex < totalCharacters) {
+        // If nothing selected yet, select the focused character first
+        if (selectedCharacterId == 0) {
+          const CharacterDefinition& character =
+              characters[keyboardFocusedIndex];
+          selectedCharacterId = character.id;
+          Logger::info("Selected character via keyboard: " + character.name);
+        }
+
+        // Now confirm the selection and enter game
+        CharacterSelectionState::instance().setSelectedCharacter(
+            selectedCharacterId);
+        GameStateManager::instance().transitionTo(GameState::Playing);
+        Logger::info("Confirmed character selection, entering game");
+      }
+      break;
+
+    default:
+      break;
+  }
+
+  // Ensure focused index is valid
+  if (keyboardFocusedIndex < 0) {
+    keyboardFocusedIndex = 0;
+  }
+  if (keyboardFocusedIndex >= totalCharacters) {
+    keyboardFocusedIndex = totalCharacters - 1;
+  }
 }

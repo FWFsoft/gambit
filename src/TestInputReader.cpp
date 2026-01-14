@@ -13,6 +13,7 @@ const std::unordered_map<std::string, SDL_Scancode> TestInputReader::keyMap = {
     {"Space", SDL_SCANCODE_SPACE},   {"Enter", SDL_SCANCODE_RETURN},
     {"Escape", SDL_SCANCODE_ESCAPE}, {"E", SDL_SCANCODE_E},
     {"I", SDL_SCANCODE_I},           {"Tab", SDL_SCANCODE_TAB},
+    {"F1", SDL_SCANCODE_F1},
 };
 
 TestInputReader::TestInputReader(const std::string& commandFilePath)
@@ -121,6 +122,25 @@ std::optional<TestInputReader::Command> TestInputReader::parseLine(
       cmd.stringArg = "screenshot";
     }
     Logger::info("TestInput: SCREENSHOT " + cmd.stringArg);
+    return cmd;
+  } else if (commandStr == "MOUSE_MOVE") {
+    cmd.type = CommandType::MOUSE_MOVE;
+    iss >> cmd.intArg >> cmd.intArg2;
+    if (iss.fail()) {
+      Logger::error("TestInput: Invalid MOUSE_MOVE coordinates on line " +
+                    std::to_string(lineNumber));
+      return std::nullopt;
+    }
+    Logger::info("TestInput: MOUSE_MOVE " + std::to_string(cmd.intArg) + " " +
+                 std::to_string(cmd.intArg2));
+    return cmd;
+  } else if (commandStr == "MOUSE_CLICK") {
+    cmd.type = CommandType::MOUSE_CLICK;
+    iss >> cmd.stringArg;
+    if (cmd.stringArg.empty()) {
+      cmd.stringArg = "left";  // Default to left click
+    }
+    Logger::info("TestInput: MOUSE_CLICK " + cmd.stringArg);
     return cmd;
   }
 

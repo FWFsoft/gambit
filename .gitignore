@@ -59,3 +59,7 @@ _deps
 
 # python
 *.pyc
+
+# testing
+test_input.txt
+test_output/
