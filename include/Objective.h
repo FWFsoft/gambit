@@ -6,7 +6,8 @@
 // Types of objectives available in the game
 enum class ObjectiveType : uint8_t {
   AlienScrapyard,  // Interact to collect scrap, timer-based completion
-  CaptureOutpost   // Kill all enemies in zone to complete
+  CaptureOutpost,  // Kill all enemies in zone to complete
+  SalvageMedpacks  // Kill enemies, then interact with pod for healing
 };
 
 // Current state of an objective
@@ -50,6 +51,7 @@ struct Objective {
       case ObjectiveType::AlienScrapyard:
         return interactionProgress;
       case ObjectiveType::CaptureOutpost:
+      case ObjectiveType::SalvageMedpacks:
         if (enemiesRequired == 0) return 1.0f;
         return static_cast<float>(enemiesKilled) /
                static_cast<float>(enemiesRequired);
@@ -66,6 +68,8 @@ inline std::string objectiveTypeToString(ObjectiveType type) {
       return "AlienScrapyard";
     case ObjectiveType::CaptureOutpost:
       return "CaptureOutpost";
+    case ObjectiveType::SalvageMedpacks:
+      return "SalvageMedpacks";
     default:
       return "Unknown";
   }
@@ -91,6 +95,8 @@ inline ObjectiveType parseObjectiveType(const std::string& str) {
     return ObjectiveType::AlienScrapyard;
   } else if (str == "capture_outpost" || str == "CaptureOutpost") {
     return ObjectiveType::CaptureOutpost;
+  } else if (str == "salvage_medpacks" || str == "SalvageMedpacks") {
+    return ObjectiveType::SalvageMedpacks;
   }
   // Default to AlienScrapyard if unknown
   return ObjectiveType::AlienScrapyard;

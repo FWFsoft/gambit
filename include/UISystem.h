@@ -96,4 +96,7 @@ class UISystem {
 
   // Keyboard navigation event handlers
   void onKeyDown(const KeyDownEvent& e);
+
+  // Debug coordinate display
+  bool showCoordinates;
 };

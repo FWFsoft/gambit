@@ -17,7 +17,7 @@ constexpr int SIZE = 32;  // Player sprite size (pixels)
 constexpr float RADIUS = static_cast<float>(SIZE) / 2.0f;  // Collision radius
 
 // Stats
-constexpr float MAX_HEALTH = 100.0f;
+constexpr float MAX_HEALTH = 1000.0f;  // Increased for testing objectives
 
 // Spawn location (center of screen by default)
 constexpr float DEFAULT_SPAWN_X = 400.0f;

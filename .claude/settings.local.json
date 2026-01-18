@@ -47,7 +47,11 @@
       "Bash(./.claude/skills/visual-test/interactive_test.sh:*)",
       "Bash(lsof:*)",
       "Bash(make:*)",
-      "Bash(./.claude/skills/visual-test/run.sh:*)"
+      "Bash(./.claude/skills/visual-test/run.sh:*)",
+      "Bash(cmake --build:*)",
+      "Bash(python tools/map_generator/add_objectives.py:*)",
+      "Skill(remember)",
+      "Bash(kill:*)"
     ]
   }
 }

@@ -54,8 +54,18 @@ bool ObjectiveSystem::tryInteract(uint32_t playerId, float playerX,
   float nearestDistSq = std::numeric_limits<float>::max();
 
   for (auto& obj : objectives) {
-    if (obj.state != ObjectiveState::Inactive) {
-      continue;  // Skip non-inactive objectives
+    // Can interact with Inactive objectives (to start them)
+    // OR SalvageMedpacks that are InProgress with all enemies cleared
+    bool canInteract = (obj.state == ObjectiveState::Inactive);
+
+    if (obj.type == ObjectiveType::SalvageMedpacks &&
+        obj.state == ObjectiveState::InProgress &&
+        obj.enemiesKilled >= obj.enemiesRequired) {
+      canInteract = true;  // Pod ready to collect
+    }
+
+    if (!canInteract) {
+      continue;
     }
 
     float dx = playerX - obj.x;
@@ -70,7 +80,15 @@ bool ObjectiveSystem::tryInteract(uint32_t playerId, float playerX,
   }
 
   if (nearestObj) {
-    startObjective(*nearestObj, playerId);
+    // If SalvageMedpacks with enemies cleared, complete it
+    if (nearestObj->type == ObjectiveType::SalvageMedpacks &&
+        nearestObj->state == ObjectiveState::InProgress &&
+        nearestObj->enemiesKilled >= nearestObj->enemiesRequired) {
+      completeObjective(*nearestObj);
+    } else {
+      // Otherwise start the objective
+      startObjective(*nearestObj, playerId);
+    }
     return true;
   }
 
@@ -107,9 +125,10 @@ void ObjectiveSystem::stopInteraction(uint32_t playerId) {
 }
 
 void ObjectiveSystem::onEnemyDeath(float enemyX, float enemyY) {
-  // Check all CaptureOutpost objectives
+  // Check CaptureOutpost and SalvageMedpacks objectives
   for (auto& obj : objectives) {
-    if (obj.type != ObjectiveType::CaptureOutpost) {
+    if (obj.type != ObjectiveType::CaptureOutpost &&
+        obj.type != ObjectiveType::SalvageMedpacks) {
       continue;
     }
 
@@ -121,8 +140,8 @@ void ObjectiveSystem::onEnemyDeath(float enemyX, float enemyY) {
     if (obj.isInRange(enemyX, enemyY)) {
       obj.enemiesKilled++;
 
-      Logger::info("Enemy killed in outpost '" + obj.name +
-                   "': " + std::to_string(obj.enemiesKilled) + "/" +
+      Logger::info("Enemy killed in " + objectiveTypeToString(obj.type) + " '" +
+                   obj.name + "': " + std::to_string(obj.enemiesKilled) + "/" +
                    std::to_string(obj.enemiesRequired));
 
       // Notify progress update
@@ -132,7 +151,15 @@ void ObjectiveSystem::onEnemyDeath(float enemyX, float enemyY) {
 
       // Check for completion
       if (obj.enemiesKilled >= obj.enemiesRequired) {
-        completeObjective(obj);
+        // CaptureOutpost auto-completes when all enemies dead
+        if (obj.type == ObjectiveType::CaptureOutpost) {
+          completeObjective(obj);
+        }
+        // SalvageMedpacks requires pod interaction after enemies are dead
+        else if (obj.type == ObjectiveType::SalvageMedpacks) {
+          Logger::info("All enemies cleared for '" + obj.name +
+                       "' - pod ready for interaction");
+        }
       }
     }
   }

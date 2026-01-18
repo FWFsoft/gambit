@@ -1546,9 +1546,99 @@
         <property name="enemy_type" type="string" value="slime" />
       </properties>
     </object>
+    <object id="224" name="Outpost_Spawn_skeleton_01" x="265.87037565100405" y="2298.0850300850248">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="skeleton" />
+      </properties>
+    </object>
+    <object id="225" name="Outpost_Spawn_skeleton_02" x="261.4192104399504" y="2235.64045115076">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="skeleton" />
+      </properties>
+    </object>
+    <object id="226" name="Outpost_Spawn_goblin_03" x="201.16651613537255" y="2205.5554634501673">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="goblin" />
+      </properties>
+    </object>
+    <object id="227" name="Outpost_Spawn_skeleton_01" x="265.87037565100405" y="-885.9149699149751">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="skeleton" />
+      </properties>
+    </object>
+    <object id="228" name="Outpost_Spawn_skeleton_02" x="261.4192104399504" y="-948.3595488492404">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="skeleton" />
+      </properties>
+    </object>
+    <object id="229" name="Outpost_Spawn_goblin_03" x="201.16651613537255" y="-978.4445365498327">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="goblin" />
+      </properties>
+    </object>
+    <object id="230" name="Outpost_Spawn_skeleton_01" x="265.87037565100405" y="2298.0850300850248">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="skeleton" />
+      </properties>
+    </object>
+    <object id="231" name="Outpost_Spawn_skeleton_02" x="261.4192104399504" y="2235.64045115076">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="skeleton" />
+      </properties>
+    </object>
+    <object id="232" name="Outpost_Spawn_goblin_03" x="201.16651613537255" y="2205.5554634501673">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="goblin" />
+      </properties>
+    </object>
+    <object id="233" name="Outpost_Spawn_goblin_01" x="-1738.2213051834847" y="3242.273403189283">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="goblin" />
+      </properties>
+    </object>
+    <object id="234" name="Outpost_Spawn_goblin_02" x="-1711.4333516716854" y="3170.843717142521">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="goblin" />
+      </properties>
+    </object>
+    <object id="235" name="Outpost_Spawn_skeleton_03" x="-1778.7433564001688" y="3207.903949091781">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="skeleton" />
+      </properties>
+    </object>
+    <object id="236" name="Outpost_Spawn_skeleton_04" x="-2439.103281577586" y="3571.3765636788557">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="skeleton" />
+      </properties>
+    </object>
+    <object id="237" name="Outpost_Spawn_skeleton_05" x="-2445.3190424804825" y="3640.1145861385316">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="skeleton" />
+      </properties>
+    </object>
+    <object id="238" name="Outpost_Spawn_skeleton_06" x="-2517.0198224690707" y="3516.3233881560927">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="skeleton" />
+      </properties>
+    </object>
   </objectgroup>
   <objectgroup id="4" name="Objectives">
-    <object id="1" name="Scrapyard_01" x="1184.0" y="-928.0">
+    <object id="1" name="Scrapyard_01" x="2720.0" y="3312.0">
       <point />
       <properties>
         <property name="objective_type" type="string" value="alien_scrapyard" />
@@ -1557,20 +1647,20 @@
         <property name="interaction_time" type="float" value="3.0" />
       </properties>
     </object>
-    <object id="2" name="Scrapyard_02" x="832.0" y="-1296.0">
-      <point />
-      <properties>
-        <property name="objective_type" type="string" value="alien_scrapyard" />
-        <property name="description" type="string" value="Salvage alien scrap materials" />
-        <property name="radius" type="float" value="50.0" />
-        <property name="interaction_time" type="float" value="3.0" />
-      </properties>
-    </object>
-    <object id="3" name="Outpost_03" x="-1760.0" y="-1696.0">
+    <object id="2" name="Outpost_02" x="-1760.0" y="3216.0">
       <point />
       <properties>
         <property name="objective_type" type="string" value="capture_outpost" />
         <property name="description" type="string" value="Clear the enemy outpost" />
+        <property name="radius" type="float" value="100.0" />
+        <property name="enemies_required" type="int" value="3" />
+      </properties>
+    </object>
+    <object id="3" name="Medpacks_03" x="-2496.0" y="3584.0">
+      <point />
+      <properties>
+        <property name="objective_type" type="string" value="salvage_medpacks" />
+        <property name="description" type="string" value="Fight off enemies and salvage medical supplies" />
         <property name="radius" type="float" value="100.0" />
         <property name="enemies_required" type="int" value="3" />
       </properties>

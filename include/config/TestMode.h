@@ -16,7 +16,7 @@ struct TestConfig {
 
   // Screenshot capture settings
   int screenshotInterval =
-      30;  // Capture every N frames (30 = every 0.5s at 60fps)
+      60;  // Capture every N frames (60 = every 1.0s at 60fps)
 
   // Current frame counter
   int frameCount = 0;

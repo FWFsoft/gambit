@@ -39,7 +39,8 @@ UISystem::UISystem(Window* window, ClientPrediction* clientPrediction,
       hoveredCharacterId(0),
       selectedCharacterId(0),
       selectionAnimationTime(0.0f),
-      keyboardFocusedIndex(-1) {
+      keyboardFocusedIndex(-1),
+      showCoordinates(false) {
   // Load settings
   settings.load(Settings::DEFAULT_FILENAME);
 
@@ -610,7 +611,7 @@ void UISystem::renderSettingsPanel() {
     ImGui::Text("ESC - Pause");
     ImGui::Text("I - Inventory");
     ImGui::Text("M / F2 - Toggle Mute");
-    ImGui::Text("F1 - Toggle Debug Visualizations");
+    ImGui::Text("F1 - Toggle Coordinates & Debug Visualizations");
   }
 
   ImGui::Spacing();
@@ -687,6 +688,25 @@ void UISystem::renderHUD() {
   ImGui::EndGroup();
 
   ImGui::End();
+
+  // Debug coordinate display (toggled with F1)
+  if (showCoordinates) {
+    ImGui::SetNextWindowPos(ImVec2(10, 100), ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.8f);
+
+    ImGui::Begin("Coordinates", nullptr,
+                 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                     ImGuiWindowFlags_NoMove |
+                     ImGuiWindowFlags_AlwaysAutoResize);
+
+    ImGui::SetWindowFontScale(1.5f);
+    ImGui::TextColored(ImVec4(0.0f, 1.0f, 1.0f, 1.0f), "Position:");
+    ImGui::Text("X: %.1f", localPlayer.x);
+    ImGui::Text("Y: %.1f", localPlayer.y);
+    ImGui::SetWindowFontScale(1.0f);
+
+    ImGui::End();
+  }
 }
 
 void UISystem::renderPauseMenu() {
@@ -1314,9 +1334,19 @@ void UISystem::renderObjectiveActivity() {
 }
 
 void UISystem::onKeyDown(const KeyDownEvent& e) {
+  GameState currentState = GameStateManager::instance().getCurrentState();
+
+  // F1: Toggle coordinate display (during gameplay)
+  if (e.key == SDLK_F1 && (currentState == GameState::Playing ||
+                           currentState == GameState::Paused)) {
+    showCoordinates = !showCoordinates;
+    Logger::info("Coordinate display: " +
+                 std::string(showCoordinates ? "ON" : "OFF"));
+    return;
+  }
+
   // Only handle keyboard navigation in CharacterSelect state
-  if (GameStateManager::instance().getCurrentState() !=
-      GameState::CharacterSelect) {
+  if (currentState != GameState::CharacterSelect) {
     return;
   }
 

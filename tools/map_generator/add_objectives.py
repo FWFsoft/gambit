@@ -19,18 +19,40 @@ def distance(p1, p2):
     return math.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
 
 
-def tile_to_world(tile_x, tile_y, width, height, tile_width, tile_height):
-    """Convert tile coordinates to isometric world coordinates."""
-    world_x = (tile_x - tile_y) * tile_width / 2.0
-    world_y = (tile_x + tile_y) * tile_height / 4.0
+def tile_to_isometric(tile_x, tile_y, tile_width, tile_height):
+    """
+    Convert tile coordinates to un-centered isometric pixel coordinates.
 
-    # Center the map at origin
+    This matches what C++ expects in the TMX file before it applies centering.
+    C++ will read these coords and subtract the centering offset.
+    """
+    iso_x = (tile_x - tile_y) * tile_width / 2.0
+    iso_y = (tile_x + tile_y) * tile_height / 4.0
+    return iso_x, iso_y
+
+
+def tile_to_world(tile_x, tile_y, width, height, tile_width, tile_height):
+    """Convert tile coordinates to centered world coordinates (for distance checking)."""
+    iso_x, iso_y = tile_to_isometric(tile_x, tile_y, tile_width, tile_height)
+
+    # Calculate centering offset
     center_tile_x = (width - 1) / 2.0
     center_tile_y = (height - 1) / 2.0
-    center_world_x = (center_tile_x - center_tile_y) * tile_width / 2.0
-    center_world_y = (center_tile_x + center_tile_y) * tile_height / 4.0
+    center_iso_x, center_iso_y = tile_to_isometric(center_tile_x, center_tile_y, tile_width, tile_height)
 
-    return world_x - center_world_x, world_y - center_world_y
+    # Center at origin
+    return iso_x - center_iso_x, iso_y - center_iso_y
+
+
+def world_to_isometric(world_x, world_y, width, height, tile_width, tile_height):
+    """Convert centered world coordinates back to un-centered isometric coordinates for TMX."""
+    # Calculate centering offset
+    center_tile_x = (width - 1) / 2.0
+    center_tile_y = (height - 1) / 2.0
+    center_iso_x, center_iso_y = tile_to_isometric(center_tile_x, center_tile_y, tile_width, tile_height)
+
+    # Add centering offset back
+    return world_x + center_iso_x, world_y + center_iso_y
 
 
 def generate_objective_points(
@@ -68,19 +90,23 @@ def generate_objective_points(
         tile_x = random.randint(min_tile, max_tile_x)
         tile_y = random.randint(min_tile, max_tile_y)
 
+        # Get world coordinates for distance checking
         world_x, world_y = tile_to_world(
             tile_x, tile_y, width, height, tile_width, tile_height
         )
 
         # Check minimum distance from existing points
         too_close = False
-        for existing_x, existing_y in points:
-            if distance((world_x, world_y), (existing_x, existing_y)) < min_distance:
+        for _, _, existing_world_x, existing_world_y in points:
+            if distance((world_x, world_y), (existing_world_x, existing_world_y)) < min_distance:
                 too_close = True
                 break
 
         if not too_close:
-            points.append((world_x, world_y))
+            # Get un-centered isometric coordinates for TMX file
+            iso_x, iso_y = tile_to_isometric(tile_x, tile_y, tile_width, tile_height)
+            # Store both: isometric coords (for TMX) and world coords (for enemy placement)
+            points.append((iso_x, iso_y, world_x, world_y))
 
         attempts += 1
 
@@ -144,9 +170,12 @@ def add_objectives_to_tmx(
     tmx_path,
     scrapyard_count,
     outpost_count,
+    medpacks_count=0,
     scrapyard_radius=50.0,
     outpost_radius=100.0,
+    medpacks_radius=100.0,
     enemies_per_outpost=3,
+    enemies_per_medpacks=3,
     min_distance=200.0,
     edge_margin=4,
 ):
@@ -186,7 +215,7 @@ def add_objectives_to_tmx(
         print("Removed existing Objectives layer")
 
     # Generate objective positions
-    total_objectives = scrapyard_count + outpost_count
+    total_objectives = scrapyard_count + outpost_count + medpacks_count
     points = generate_objective_points(
         width,
         height,
@@ -202,23 +231,30 @@ def add_objectives_to_tmx(
 
     # Assign types to positions
     objectives = []
-    for i, (x, y) in enumerate(points):
+    for i, (iso_x, iso_y, world_x, world_y) in enumerate(points):
         if i < scrapyard_count:
             obj_type = "alien_scrapyard"
             radius = scrapyard_radius
             enemies = 0
             description = "Salvage alien scrap materials"
-        else:
+        elif i < scrapyard_count + outpost_count:
             obj_type = "capture_outpost"
             radius = outpost_radius
             enemies = enemies_per_outpost
             description = "Clear the enemy outpost"
+        else:
+            obj_type = "salvage_medpacks"
+            radius = medpacks_radius
+            enemies = enemies_per_medpacks
+            description = "Fight off enemies and salvage medical supplies"
 
         objectives.append(
             {
                 "type": obj_type,
-                "x": x,
-                "y": y,
+                "iso_x": iso_x,  # Un-centered isometric coords (for TMX file)
+                "iso_y": iso_y,
+                "world_x": world_x,  # Centered world coords (for enemy placement)
+                "world_y": world_y,
                 "radius": radius,
                 "enemies_required": enemies,
                 "description": description,
@@ -239,11 +275,14 @@ def add_objectives_to_tmx(
 
         if obj["type"] == "alien_scrapyard":
             obj_elem.set("name", f"Scrapyard_{idx + 1:02d}")
-        else:
+        elif obj["type"] == "capture_outpost":
             obj_elem.set("name", f"Outpost_{idx + 1:02d}")
+        else:
+            obj_elem.set("name", f"Medpacks_{idx + 1:02d}")
 
-        obj_elem.set("x", str(obj["x"]))
-        obj_elem.set("y", str(obj["y"]))
+        # Write un-centered isometric coordinates (C++ will subtract centering offset)
+        obj_elem.set("x", str(obj["iso_x"]))
+        obj_elem.set("y", str(obj["iso_y"]))
 
         # Add point marker
         ET.SubElement(obj_elem, "point")
@@ -272,15 +311,16 @@ def add_objectives_to_tmx(
             prop_time.set("type", "float")
             prop_time.set("value", "3.0")
         else:
+            # CaptureOutpost and SalvageMedpacks both need enemies_required
             prop_enemies = ET.SubElement(properties, "property")
             prop_enemies.set("name", "enemies_required")
             prop_enemies.set("type", "int")
             prop_enemies.set("value", str(obj["enemies_required"]))
 
-            # Generate enemies for this outpost
-            outpost_enemies = generate_enemies_in_zone(
-                obj["x"],
-                obj["y"],
+            # Generate enemies for this objective (use centered world coords)
+            objective_enemies = generate_enemies_in_zone(
+                obj["world_x"],
+                obj["world_y"],
                 obj["radius"],
                 obj["enemies_required"],
                 width,
@@ -288,7 +328,7 @@ def add_objectives_to_tmx(
                 tile_width,
                 tile_height,
             )
-            all_outpost_enemies.extend(outpost_enemies)
+            all_outpost_enemies.extend(objective_enemies)
 
     # Add outpost enemies to EnemySpawns layer
     if all_outpost_enemies:
@@ -311,13 +351,18 @@ def add_objectives_to_tmx(
             if obj_id > max_id:
                 max_id = obj_id
 
-        # Add outpost enemies
-        for idx, (x, y, enemy_type) in enumerate(all_outpost_enemies):
+        # Add outpost enemies (convert world coords to un-centered isometric)
+        for idx, (world_x, world_y, enemy_type) in enumerate(all_outpost_enemies):
+            # Convert from centered world coords to un-centered isometric coords
+            iso_x, iso_y = world_to_isometric(
+                world_x, world_y, width, height, tile_width, tile_height
+            )
+
             obj_elem = ET.SubElement(enemy_layer, "object")
             obj_elem.set("id", str(max_id + idx + 1))
             obj_elem.set("name", f"Outpost_Spawn_{enemy_type}_{idx + 1:02d}")
-            obj_elem.set("x", str(x))
-            obj_elem.set("y", str(y))
+            obj_elem.set("x", str(iso_x))
+            obj_elem.set("y", str(iso_y))
 
             ET.SubElement(obj_elem, "point")
 
@@ -336,8 +381,10 @@ def add_objectives_to_tmx(
     print(f"\nAdded {len(objectives)} objectives to {tmx_path}:")
     scrapyards = sum(1 for o in objectives if o["type"] == "alien_scrapyard")
     outposts = sum(1 for o in objectives if o["type"] == "capture_outpost")
+    medpacks = sum(1 for o in objectives if o["type"] == "salvage_medpacks")
     print(f"  - {scrapyards} Alien Scrapyards")
     print(f"  - {outposts} Capture Outposts")
+    print(f"  - {medpacks} Salvage Medpacks")
 
 
 def indent_xml(elem, level=0):
@@ -373,6 +420,12 @@ def main():
         help="Number of CaptureOutpost objectives (default: 1)",
     )
     parser.add_argument(
+        "--medpacks",
+        type=int,
+        default=0,
+        help="Number of SalvageMedpacks objectives (default: 0)",
+    )
+    parser.add_argument(
         "--scrapyard-radius",
         type=float,
         default=50.0,
@@ -385,10 +438,22 @@ def main():
         help="Zone radius for outposts (default: 100)",
     )
     parser.add_argument(
+        "--medpacks-radius",
+        type=float,
+        default=100.0,
+        help="Zone radius for medpacks (default: 100)",
+    )
+    parser.add_argument(
         "--enemies-per-outpost",
         type=int,
         default=3,
         help="Enemies to spawn per outpost (default: 3)",
+    )
+    parser.add_argument(
+        "--enemies-per-medpacks",
+        type=int,
+        default=3,
+        help="Enemies to spawn per medpacks objective (default: 3)",
     )
     parser.add_argument(
         "--min-distance",
@@ -416,9 +481,12 @@ def main():
         args.input,
         args.scrapyards,
         args.outposts,
+        args.medpacks,
         args.scrapyard_radius,
         args.outpost_radius,
+        args.medpacks_radius,
         args.enemies_per_outpost,
+        args.enemies_per_medpacks,
         args.min_distance,
         args.edge_margin,
     )

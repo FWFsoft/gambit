@@ -470,12 +470,21 @@ void RenderSystem::captureScreenshot(const std::string& path) {
   SDL_UnlockSurface(flipped);
   SDL_UnlockSurface(surface);
 
-  // Save to PNG
-  if (IMG_SavePNG(flipped, path.c_str()) != 0) {
+  // Save to PNG using atomic write (write to temp file, then rename)
+  // This prevents race conditions where readers get partial/corrupt files
+  std::string tempPath = path + ".tmp";
+  if (IMG_SavePNG(flipped, tempPath.c_str()) != 0) {
     Logger::error("Failed to save screenshot to " + path + ": " +
                   std::string(IMG_GetError()));
   } else {
-    Logger::info("Screenshot saved to " + path);
+    // Atomic rename - ensures readers never see partial file
+    std::error_code ec;
+    std::filesystem::rename(tempPath, path, ec);
+    if (ec) {
+      Logger::error("Failed to rename screenshot temp file: " + ec.message());
+    } else {
+      Logger::info("Screenshot saved to " + path);
+    }
   }
 
   SDL_FreeSurface(flipped);
