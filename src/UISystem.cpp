@@ -5,6 +5,7 @@
 #include <imgui_impl_sdl2.h>
 
 #include <cmath>
+#include <string>
 
 #include "CharacterRegistry.h"
 #include "CharacterSelectionState.h"

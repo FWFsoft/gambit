@@ -385,9 +385,16 @@ int main(int argc, char* argv[]) {
             event.name = "Alien Scrapyard";
           } else if (packet.objectiveType == 1) {  // CaptureOutpost
             event.name = "Capture Outpost";
+          } else if (packet.objectiveType == 2) {  // SalvageMedpacks
+            event.name = "Salvage Medpacks";
           } else {
             event.name = "Unknown Objective";
           }
+
+          // Log objective coordinates for easier testing
+          Logger::info("Objective: " + event.name + " at (" +
+                       std::to_string(static_cast<int>(packet.x)) + ", " +
+                       std::to_string(static_cast<int>(packet.y)) + ")");
 
           EventBus::instance().publish(event);
 
