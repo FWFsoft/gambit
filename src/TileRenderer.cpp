@@ -4,13 +4,15 @@
 
 #include "Logger.h"
 #include "OpenGLUtils.h"
+#include "ShaderCompat.h"
 #include "TextureManager.h"
 #include "config/ScreenConfig.h"
 #include "config/TileConfig.h"
 
 // Batch tile vertex shader
-const char* batchTileVertexShader = R"(
-#version 330 core
+const char* batchTileVertexShader =
+    GAMBIT_GLSL_VERSION
+    R"(
 layout (location = 0) in vec2 aPos;
 layout (location = 1) in vec2 aTexCoord;
 
@@ -32,8 +34,10 @@ void main() {
 )";
 
 // Batch tile fragment shader
-const char* batchTileFragmentShader = R"(
-#version 330 core
+const char* batchTileFragmentShader =
+    GAMBIT_GLSL_VERSION
+    GAMBIT_GLSL_PRECISION
+    R"(
 in vec2 TexCoord;
 out vec4 FragColor;
 

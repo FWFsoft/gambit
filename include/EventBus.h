@@ -1,7 +1,6 @@
 #pragma once
 
 #include <SDL2/SDL.h>
-#include <enet/enet.h>
 
 #include <cassert>
 #include <functional>
@@ -45,13 +44,12 @@ struct AttackInputEvent {};
 struct ToggleMuteEvent {};
 
 struct NetworkPacketReceivedEvent {
-  ENetPeer* peer;  // nullptr on client
-  uint8_t* data;
+  uint32_t clientId;  // 0 on client side
+  const uint8_t* data;
   size_t size;
 };
 
 struct ClientConnectedEvent {
-  ENetPeer* peer;
   uint32_t clientId;
 };
 

@@ -1,25 +1,24 @@
 #pragma once
 
-#include <enet/enet.h>
-
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
+#include "transport/INetworkTransport.h"
+
 class NetworkClient {
  public:
-  NetworkClient();
+  // Takes ownership of the transport
+  explicit NetworkClient(std::unique_ptr<INetworkTransport> transport);
   ~NetworkClient();
 
-  bool initialize();
   bool connect(const std::string& host, uint16_t port);
   void disconnect();
   void run();
   void send(const std::string& message);
-  void send(const std::vector<uint8_t>& data);  // Binary packet send
+  void send(const std::vector<uint8_t>& data);
 
  private:
-  ENetHost* client;
-  ENetPeer* peer;
-  bool connected;
+  std::unique_ptr<INetworkTransport> transport;
 };

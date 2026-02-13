@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/mckornfield/repo/claude-email/hooks/send_email_notification",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

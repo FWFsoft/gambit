@@ -40,8 +40,9 @@
 # debug information files
 *.dwo
 
-# Build folder
+# Build folders
 build/
+build-wasm/
 # CMake
 CMakeLists.txt.user
 CMakeCache.txt
@@ -63,3 +64,6 @@ _deps
 # testing
 test_input.txt
 test_output/
+
+# Deps
+vcpkg_installed/

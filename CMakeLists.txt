@@ -6,98 +6,135 @@ set(CMAKE_CXX_STANDARD 17)
 # Code coverage options
 option(ENABLE_COVERAGE "Enable code coverage" OFF)
 
-# Find packages
-find_package(SDL2 REQUIRED)
-find_package(spdlog REQUIRED)
-find_package(OpenGL REQUIRED)
-find_package(glad CONFIG REQUIRED)
-find_package(glm CONFIG REQUIRED)
-find_package(SDL2_image CONFIG REQUIRED)
-find_package(SDL2_mixer CONFIG REQUIRED)
-find_package(imgui CONFIG REQUIRED)
+# Emscripten detection
+if(EMSCRIPTEN)
+    message(STATUS "Building for WebAssembly with Emscripten")
 
-# Find ENet library and include directory
-if(APPLE)
-    include_directories(SYSTEM /opt/homebrew/include)
-endif()
-find_path(ENET_INCLUDE_DIR enet/enet.h)
-find_library(ENET_LIBRARY enet)
+    # Emscripten linker flags (replace find_package calls)
+    set(EM_COMMON_FLAGS
+        "-sUSE_SDL=2"
+        "-sUSE_SDL_IMAGE=2"
+        "-sUSE_SDL_MIXER=2"
+        "-sSDL2_IMAGE_FORMATS=[\"png\",\"jpg\"]"
+        "-sUSE_WEBGL2=1"
+        "-sMIN_WEBGL_VERSION=2"
+        "-sMAX_WEBGL_VERSION=2"
+        "-sFULL_ES3=1"
+        "-sALLOW_MEMORY_GROWTH=1"
+    )
 
-if(ENET_INCLUDE_DIR AND ENET_LIBRARY)
-    message(STATUS "Found ENet:")
-    message(STATUS "  Include directories: ${ENET_INCLUDE_DIR}")
-    message(STATUS "  Libraries: ${ENET_LIBRARY}")
+    set(EM_CLIENT_FLAGS
+        ${EM_COMMON_FLAGS}
+        "--preload-file" "${CMAKE_SOURCE_DIR}/assets@assets"
+    )
+
+    # Emscripten provides these via ports, no find_package needed
+    # spdlog needs special defines for single-threaded WASM
+    add_compile_definitions(SPDLOG_NO_THREAD_ID SPDLOG_NO_TLS)
+
+    # Set HTML output suffix for WASM client
+    set(CMAKE_EXECUTABLE_SUFFIX ".html")
+
 else()
-    message(FATAL_ERROR "ENet library not found")
-endif()
+    # Native build - find packages normally
 
-# Find tmxlite library
-# Try CMake config first (for vcpkg), then pkg-config, then manual search
-find_package(tmxlite CONFIG QUIET)
+    # Find packages
+    find_package(SDL2 REQUIRED)
+    find_package(spdlog REQUIRED)
+    find_package(OpenGL REQUIRED)
+    find_package(glad CONFIG REQUIRED)
+    find_package(glm CONFIG REQUIRED)
+    find_package(SDL2_image CONFIG REQUIRED)
+    find_package(SDL2_mixer CONFIG REQUIRED)
+    find_package(imgui CONFIG REQUIRED)
 
-if(NOT tmxlite_FOUND)
-    # Try pkg-config (for system installations)
-    find_package(PkgConfig QUIET)
-    if(PkgConfig_FOUND)
-        pkg_check_modules(TMXLITE IMPORTED_TARGET tmxlite)
+    # Find ENet library and include directory
+    find_path(ENET_INCLUDE_DIR enet/enet.h)
+    find_library(ENET_LIBRARY enet)
+
+    if(ENET_INCLUDE_DIR AND ENET_LIBRARY)
+        message(STATUS "Found ENet:")
+        message(STATUS "  Include directories: ${ENET_INCLUDE_DIR}")
+        message(STATUS "  Libraries: ${ENET_LIBRARY}")
+    else()
+        message(FATAL_ERROR "ENet library not found")
     endif()
 
-    # If pkg-config also failed, manually search for tmxlite (vcpkg fallback)
-    if(NOT TMXLITE_FOUND)
-        # Find tmxlite dependencies first (needed for manual linking)
+    # Find tmxlite library
+    # Try CMake config first (for vcpkg), then pkg-config, then manual search
+    find_package(tmxlite CONFIG QUIET)
+
+    if(NOT tmxlite_FOUND)
+        # Try pkg-config (for system installations)
+        find_package(PkgConfig QUIET)
+        if(PkgConfig_FOUND)
+            pkg_check_modules(TMXLITE IMPORTED_TARGET tmxlite)
+        endif()
+
+        # If pkg-config also failed, manually search for tmxlite (vcpkg fallback)
+        if(NOT TMXLITE_FOUND)
+            # Find tmxlite dependencies first (needed for manual linking)
+            find_package(ZLIB REQUIRED)
+            find_package(zstd CONFIG QUIET)
+
+            # Determine which zstd target is available
+            if(TARGET zstd::libzstd_shared)
+                set(ZSTD_TARGET zstd::libzstd_shared)
+            elseif(TARGET zstd::libzstd_static)
+                set(ZSTD_TARGET zstd::libzstd_static)
+            elseif(TARGET zstd::libzstd)
+                set(ZSTD_TARGET zstd::libzstd)
+            else()
+                message(FATAL_ERROR "zstd library not found")
+            endif()
+
+            find_path(TMXLITE_INCLUDE_DIR tmxlite/Map.hpp)
+            find_library(TMXLITE_LIBRARY NAMES tmxlite libtmxlite)
+
+            if(TMXLITE_INCLUDE_DIR AND TMXLITE_LIBRARY)
+                message(STATUS "Found tmxlite (manual):")
+                message(STATUS "  Include: ${TMXLITE_INCLUDE_DIR}")
+                message(STATUS "  Library: ${TMXLITE_LIBRARY}")
+
+                # Create imported target
+                add_library(tmxlite::tmxlite UNKNOWN IMPORTED)
+                set_target_properties(tmxlite::tmxlite PROPERTIES
+                    IMPORTED_LOCATION "${TMXLITE_LIBRARY}"
+                    INTERFACE_INCLUDE_DIRECTORIES "${TMXLITE_INCLUDE_DIR}"
+                )
+
+                # Link tmxlite dependencies
+                target_link_libraries(tmxlite::tmxlite INTERFACE ZLIB::ZLIB ${ZSTD_TARGET})
+
+                set(tmxlite_FOUND TRUE)
+            else()
+                message(FATAL_ERROR "tmxlite library not found")
+            endif()
+        endif()
+    endif()
+
+    # tmxlite dependencies (only needed when using pkg-config)
+    if(TARGET PkgConfig::TMXLITE)
         find_package(ZLIB REQUIRED)
         find_package(zstd CONFIG QUIET)
-
-        # Determine which zstd target is available
-        if(TARGET zstd::libzstd_shared)
-            set(ZSTD_TARGET zstd::libzstd_shared)
-        elseif(TARGET zstd::libzstd_static)
-            set(ZSTD_TARGET zstd::libzstd_static)
-        elseif(TARGET zstd::libzstd)
-            set(ZSTD_TARGET zstd::libzstd)
-        else()
-            message(FATAL_ERROR "zstd library not found")
-        endif()
-
-        find_path(TMXLITE_INCLUDE_DIR tmxlite/Map.hpp)
-        find_library(TMXLITE_LIBRARY NAMES tmxlite libtmxlite)
-
-        if(TMXLITE_INCLUDE_DIR AND TMXLITE_LIBRARY)
-            message(STATUS "Found tmxlite (manual):")
-            message(STATUS "  Include: ${TMXLITE_INCLUDE_DIR}")
-            message(STATUS "  Library: ${TMXLITE_LIBRARY}")
-
-            # Create imported target
-            add_library(tmxlite::tmxlite UNKNOWN IMPORTED)
-            set_target_properties(tmxlite::tmxlite PROPERTIES
-                IMPORTED_LOCATION "${TMXLITE_LIBRARY}"
-                INTERFACE_INCLUDE_DIRECTORIES "${TMXLITE_INCLUDE_DIR}"
-            )
-
-            # Link tmxlite dependencies
-            target_link_libraries(tmxlite::tmxlite INTERFACE ZLIB::ZLIB ${ZSTD_TARGET})
-
-            set(tmxlite_FOUND TRUE)
-        else()
-            message(FATAL_ERROR "tmxlite library not found")
+        if(NOT TARGET zstd::libzstd_shared AND NOT TARGET zstd::libzstd_static AND NOT TARGET zstd::libzstd)
+            message(FATAL_ERROR "zstd library not found for pkg-config tmxlite")
         endif()
     endif()
+
 endif()
 
-# tmxlite dependencies (only needed when using pkg-config)
-if(TARGET PkgConfig::TMXLITE)
-    find_package(ZLIB REQUIRED)
-    find_package(zstd CONFIG QUIET)
-    if(NOT TARGET zstd::libzstd_shared AND NOT TARGET zstd::libzstd_static AND NOT TARGET zstd::libzstd)
-        message(FATAL_ERROR "zstd library not found for pkg-config tmxlite")
-    endif()
-endif()
+# ============================================
+# Native-only targets (Server, Client, HeadlessClient, tests)
+# ============================================
+if(NOT EMSCRIPTEN)
 
 # Server executable
 add_executable(Server
     src/server_main.cpp
     src/Logger.cpp
     src/NetworkServer.cpp
+    src/transport/ENetServerTransport.cpp
     src/FileSystem.cpp
     src/NetworkProtocol.cpp
     src/GameLoop.cpp
@@ -136,6 +173,7 @@ add_executable(Client
     src/client_main.cpp
     src/Logger.cpp
     src/NetworkClient.cpp
+    src/transport/ENetTransport.cpp
     src/FileSystem.cpp
     src/Window.cpp
     src/GameLoop.cpp
@@ -173,6 +211,15 @@ add_executable(Client
     src/TestInputReader.cpp
     src/imgui_backends/imgui_impl_sdl2.cpp
     src/imgui_backends/imgui_impl_opengl3.cpp
+    # Embedded server mode support (--embedded flag)
+    src/transport/InMemoryTransport.cpp
+    src/transport/InMemoryServerTransport.cpp
+    src/GameSession.cpp
+    src/NetworkServer.cpp
+    src/ServerGameState.cpp
+    src/EnemySystem.cpp
+    src/EffectManager.cpp
+    src/ObjectiveSystem.cpp
 )
 target_include_directories(Client SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
 target_include_directories(Client PRIVATE include)
@@ -204,6 +251,7 @@ add_executable(HeadlessClient
     src/headless_client_main.cpp
     src/Logger.cpp
     src/NetworkClient.cpp
+    src/transport/ENetTransport.cpp
     src/FileSystem.cpp
     src/MockWindow.cpp
     src/GameLoop.cpp
@@ -319,6 +367,7 @@ add_executable(test_client_prediction
     src/NetworkProtocol.cpp
     src/ClientPrediction.cpp
     src/NetworkClient.cpp
+    src/transport/ENetTransport.cpp
     src/CollisionSystem.cpp
     src/AnimationController.cpp
     src/AnimationSystem.cpp
@@ -397,6 +446,7 @@ add_executable(test_headless_movement
     tests/test_headless_movement.cpp
     src/Logger.cpp
     src/NetworkClient.cpp
+    src/transport/ENetTransport.cpp
     src/FileSystem.cpp
     src/MockWindow.cpp
     src/GameLoop.cpp
@@ -493,4 +543,88 @@ if(ENABLE_COVERAGE)
     target_compile_options(test_gameloop PRIVATE --coverage)
     target_link_options(test_gameloop PRIVATE --coverage)
 endif()
+
+endif() # NOT EMSCRIPTEN (end of native-only targets)
+
+# ============================================
+# WASM-only targets (WasmClient)
+# ============================================
+if(EMSCRIPTEN)
+
+# Fetch and build tmxlite for Emscripten (not available as port)
+include(FetchContent)
+FetchContent_Declare(
+    tmxlite
+    GIT_REPOSITORY https://github.com/fallahn/tmxlite.git
+    GIT_TAG v1.4.4
+)
+FetchContent_MakeAvailable(tmxlite)
+
+# Shared source files for WASM client (same as Client but without ENet)
+set(WASM_CLIENT_SOURCES
+    src/wasm_client_main.cpp
+    src/Logger.cpp
+    src/NetworkClient.cpp
+    src/FileSystem.cpp
+    src/Window.cpp
+    src/GameLoop.cpp
+    src/InputSystem.cpp
+    src/NetworkProtocol.cpp
+    src/ClientPrediction.cpp
+    src/RemotePlayerInterpolation.cpp
+    src/RenderSystem.cpp
+    src/TiledMap.cpp
+    src/TileRenderer.cpp
+    src/CollisionSystem.cpp
+    src/CollisionDebugRenderer.cpp
+    src/OpenGLUtils.cpp
+    src/Texture.cpp
+    src/TextureManager.cpp
+    src/SpriteRenderer.cpp
+    src/AnimationController.cpp
+    src/AnimationSystem.cpp
+    src/AnimationAssetLoader.cpp
+    src/MusicSystem.cpp
+    src/MusicZoneDebugRenderer.cpp
+    src/ObjectiveDebugRenderer.cpp
+    src/EnemyInterpolation.cpp
+    src/CombatSystem.cpp
+    src/CharacterRegistry.cpp
+    src/CharacterSelectionState.cpp
+    src/MapSelectionState.cpp
+    src/DamageNumberSystem.cpp
+    src/Effect.cpp
+    src/EffectTracker.cpp
+    src/UISystem.cpp
+    src/GameStateManager.cpp
+    src/Settings.cpp
+    src/ItemRegistry.cpp
+    src/imgui_backends/imgui_impl_sdl2.cpp
+    src/imgui_backends/imgui_impl_opengl3.cpp
+    # Embedded server mode (client + server in same process)
+    src/transport/InMemoryTransport.cpp
+    src/transport/InMemoryServerTransport.cpp
+    src/GameSession.cpp
+    src/NetworkServer.cpp
+    src/ServerGameState.cpp
+    src/EnemySystem.cpp
+    src/EffectManager.cpp
+    src/ObjectiveSystem.cpp
+)
+
+add_executable(WasmClient ${WASM_CLIENT_SOURCES})
+target_include_directories(WasmClient PRIVATE include)
+target_include_directories(WasmClient SYSTEM PRIVATE src/imgui_backends)
+
+# Link tmxlite (fetched via FetchContent)
+target_link_libraries(WasmClient PRIVATE tmxlite)
+
+# Apply Emscripten flags
+target_compile_options(WasmClient PRIVATE ${EM_CLIENT_FLAGS})
+target_link_options(WasmClient PRIVATE ${EM_CLIENT_FLAGS})
+
+message(STATUS "WasmClient target configured for Emscripten")
+message(STATUS "  Output: WasmClient.html, WasmClient.js, WasmClient.wasm, WasmClient.data")
+
+endif() # EMSCRIPTEN
 

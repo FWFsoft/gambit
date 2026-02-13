@@ -2,6 +2,7 @@
 // Demonstrates using InputScript and EventCapture for automated testing
 
 #include <cmath>
+#include <memory>
 #include <thread>
 
 #include "AnimationSystem.h"
@@ -25,6 +26,7 @@
 #include "MusicSystem.h"
 #include "NetworkClient.h"
 #include "RemotePlayerInterpolation.h"
+#include "transport/ENetTransport.h"
 #include "TiledMap.h"
 #include "WorldConfig.h"
 #include "config/NetworkConfig.h"
@@ -60,8 +62,7 @@ TEST(HeadlessMovement_RightMovement) {
   ItemRegistry::instance().loadFromCSV("assets/items.csv");
 
   // Connect to server
-  NetworkClient client;
-  assert(client.initialize());
+  NetworkClient client(std::make_unique<ENetTransport>());
   assert(
       client.connect(Config::Network::SERVER_ADDRESS, Config::Network::PORT));
 
@@ -162,8 +163,7 @@ TEST(HeadlessMovement_DiagonalMovement) {
 
   ItemRegistry::instance().loadFromCSV("assets/items.csv");
 
-  NetworkClient client;
-  assert(client.initialize());
+  NetworkClient client(std::make_unique<ENetTransport>());
   assert(
       client.connect(Config::Network::SERVER_ADDRESS, Config::Network::PORT));
 

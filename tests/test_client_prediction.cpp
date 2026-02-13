@@ -1,13 +1,16 @@
+#include <memory>
+
 #include "ClientPrediction.h"
 #include "Logger.h"
 #include "NetworkClient.h"
 #include "WorldConfig.h"
 #include "config/ScreenConfig.h"
 #include "test_utils.h"
+#include "transport/ENetTransport.h"
 
 TEST(ClientPrediction_ColorSyncDuringReconciliation) {
   resetEventBus();
-  NetworkClient client;
+  NetworkClient client(std::make_unique<ENetTransport>());
   WorldConfig world(static_cast<float>(Config::Screen::WIDTH),
                     static_cast<float>(Config::Screen::HEIGHT), nullptr);
   ClientPrediction prediction(&client, 1, world);
@@ -23,7 +26,7 @@ TEST(ClientPrediction_ColorSyncDuringReconciliation) {
 
 TEST(ClientPrediction_ColorPersistsAcrossMultipleReconciles) {
   resetEventBus();
-  NetworkClient client;
+  NetworkClient client(std::make_unique<ENetTransport>());
   WorldConfig world(static_cast<float>(Config::Screen::WIDTH),
                     static_cast<float>(Config::Screen::HEIGHT), nullptr);
   ClientPrediction prediction(&client, 1, world);
@@ -45,7 +48,7 @@ TEST(ClientPrediction_ColorPersistsAcrossMultipleReconciles) {
 
 TEST(ClientPrediction_ObjectiveStorage) {
   resetEventBus();
-  NetworkClient client;
+  NetworkClient client(std::make_unique<ENetTransport>());
   WorldConfig world(static_cast<float>(Config::Screen::WIDTH),
                     static_cast<float>(Config::Screen::HEIGHT), nullptr);
   ClientPrediction prediction(&client, 1, world);

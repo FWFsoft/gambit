@@ -1,10 +1,16 @@
 #include "Window.h"
 
 #include <SDL2/SDL.h>
+#ifdef __EMSCRIPTEN__
+#include <GLES3/gl3.h>
+#else
 #include <glad/glad.h>
+#endif
 #include <imgui.h>
 #include <imgui_impl_opengl3.h>
 #include <imgui_impl_sdl2.h>
+
+#include "ShaderCompat.h"
 
 #include <stdexcept>
 
@@ -18,9 +24,15 @@ Window::Window(const std::string& title, int width, int height) : open(true) {
   }
 
   // Set OpenGL attributes before creating the window
+#ifdef __EMSCRIPTEN__
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+#else
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+#endif
   SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
   sdlWindow = SDL_CreateWindow(title.c_str(), SDL_WINDOWPOS_CENTERED,
@@ -42,10 +54,12 @@ Window::Window(const std::string& title, int width, int height) : open(true) {
   // Enable VSync
   SDL_GL_SetSwapInterval(1);
 
-  // Initialize GLAD
+#ifndef __EMSCRIPTEN__
+  // Initialize GLAD (not needed on Emscripten — WebGL provides GL directly)
   if (!gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress)) {
     throw std::runtime_error("Failed to initialize GLAD");
   }
+#endif
 
   // Subscribe to swap buffers event
   EventBus::instance().subscribe<SwapBuffersEvent>(
@@ -106,7 +120,7 @@ void Window::initImGui() {
 
   // Setup Platform/Renderer backends
   ImGui_ImplSDL2_InitForOpenGL(sdlWindow, glContext);
-  ImGui_ImplOpenGL3_Init("#version 330");  // Match our OpenGL version
+  ImGui_ImplOpenGL3_Init(GAMBIT_GLSL_VERSION_IMGUI);  // Cross-platform GL version
 
   // Setup Dear ImGui style (dark theme)
   ImGui::StyleColorsDark();

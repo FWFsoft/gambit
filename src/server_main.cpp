@@ -1,5 +1,6 @@
 #include <cassert>
 #include <csignal>
+#include <memory>
 
 #include "CollisionSystem.h"
 #include "EventBus.h"
@@ -11,6 +12,7 @@
 #include "TiledMap.h"
 #include "WorldConfig.h"
 #include "config/NetworkConfig.h"
+#include "transport/ENetServerTransport.h"
 
 volatile bool serverRunning = true;
 
@@ -25,9 +27,10 @@ int main() {
     Logger::error("Failed to load items.csv - inventory will be empty");
   }
 
-  NetworkServer server(Config::Network::SERVER_BIND_ADDRESS,
-                       Config::Network::PORT);
-  if (!server.initialize()) {
+  auto transport = std::make_unique<ENetServerTransport>();
+  NetworkServer server(std::move(transport));
+  if (!server.initialize(Config::Network::SERVER_BIND_ADDRESS,
+                         Config::Network::PORT)) {
     return EXIT_FAILURE;
   }
 

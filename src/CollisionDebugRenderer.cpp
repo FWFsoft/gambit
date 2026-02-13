@@ -1,17 +1,23 @@
 #include "CollisionDebugRenderer.h"
 
+#ifdef __EMSCRIPTEN__
+#include <GLES3/gl3.h>
+#else
 #include <glad/glad.h>
+#endif
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <vector>
 
 #include "OpenGLUtils.h"
+#include "ShaderCompat.h"
 #include "config/ScreenConfig.h"
 
 // Simple line vertex shader
-const char* lineVertexShader = R"(
-#version 330 core
+const char* lineVertexShader =
+    GAMBIT_GLSL_VERSION
+    R"(
 layout (location = 0) in vec2 aPos;
 
 uniform mat4 projection;
@@ -22,8 +28,10 @@ void main() {
 )";
 
 // Simple line fragment shader
-const char* lineFragmentShader = R"(
-#version 330 core
+const char* lineFragmentShader =
+    GAMBIT_GLSL_VERSION
+    GAMBIT_GLSL_PRECISION
+    R"(
 out vec4 FragColor;
 
 uniform vec4 lineColor;

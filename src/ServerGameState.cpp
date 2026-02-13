@@ -85,7 +85,6 @@ void ServerGameState::onClientConnected(const ClientConnectedEvent& e) {
   assignPlayerColor(player, players.size());
 
   players[playerId] = player;
-  peerToPlayerId[e.peer] = playerId;
 
   Logger::info("Player " + std::to_string(playerId) + " joined");
 
@@ -97,7 +96,7 @@ void ServerGameState::onClientConnected(const ClientConnectedEvent& e) {
   newPlayerPacket.r = player.r;
   newPlayerPacket.g = player.g;
   newPlayerPacket.b = player.b;
-  server->send(e.peer, serialize(newPlayerPacket));
+  server->send(e.clientId, serialize(newPlayerPacket));
 
   // Then send existing players to new client
   for (const auto& [existingId, existingPlayer] : players) {
@@ -107,7 +106,7 @@ void ServerGameState::onClientConnected(const ClientConnectedEvent& e) {
       existingPacket.r = existingPlayer.r;
       existingPacket.g = existingPlayer.g;
       existingPacket.b = existingPlayer.b;
-      server->send(e.peer, serialize(existingPacket));
+      server->send(e.clientId, serialize(existingPacket));
       Logger::info("Sent existing player " + std::to_string(existingId) +
                    " to new player " + std::to_string(playerId));
     }
@@ -118,7 +117,7 @@ void ServerGameState::onClientConnected(const ClientConnectedEvent& e) {
 
   // Send all objectives to the new client
   if (objectiveSystem) {
-    broadcastAllObjectives(e.peer);
+    broadcastAllObjectives(e.clientId);
   }
 }
 
@@ -140,11 +139,15 @@ void ServerGameState::onNetworkPacketReceived(
     const NetworkPacketReceivedEvent& e) {
   if (e.size == 0) return;
 
+  // In embedded mode, server and client share the same EventBus.
+  // Skip client-side events (clientId == 0) — only process real client messages.
+  if (e.clientId == 0) return;
+
   PacketType type = static_cast<PacketType>(e.data[0]);
 
   switch (type) {
     case PacketType::ClientInput:
-      processClientInput(e.peer, e.data, e.size);
+      processClientInput(e.clientId, e.data, e.size);
       break;
 
     case PacketType::AttackEnemy: {
@@ -155,13 +158,7 @@ void ServerGameState::onNetworkPacketReceived(
 
       AttackEnemyPacket attackPacket = deserializeAttackEnemy(e.data, e.size);
 
-      // Get player ID from peer
-      auto it = peerToPlayerId.find(e.peer);
-      if (it == peerToPlayerId.end()) {
-        Logger::info("Received AttackEnemy from unknown peer");
-        break;
-      }
-      uint32_t playerId = it->second;
+      uint32_t playerId = e.clientId;
 
       // Apply damage (server-authoritative)
       if (enemySystem && effectManager) {
@@ -292,11 +289,11 @@ void ServerGameState::onNetworkPacketReceived(
     }
 
     case PacketType::UseItem:
-      processUseItem(e.peer, e.data, e.size);
+      processUseItem(e.clientId, e.data, e.size);
       break;
 
     case PacketType::EquipItem:
-      processEquipItem(e.peer, e.data, e.size);
+      processEquipItem(e.clientId, e.data, e.size);
       break;
 
     case PacketType::CharacterSelected: {
@@ -308,10 +305,8 @@ void ServerGameState::onNetworkPacketReceived(
       CharacterSelectedPacket charPacket =
           deserializeCharacterSelected(e.data, e.size);
 
-      // Get player ID from peer
-      auto it = peerToPlayerId.find(e.peer);
-      if (it != peerToPlayerId.end()) {
-        uint32_t playerId = it->second;
+      uint32_t playerId = e.clientId;
+      {
         auto playerIt = players.find(playerId);
         if (playerIt != players.end()) {
           playerIt->second.characterId = charPacket.characterId;
@@ -324,11 +319,11 @@ void ServerGameState::onNetworkPacketReceived(
     }
 
     case PacketType::ItemPickupRequest:
-      processItemPickupRequest(e.peer, e.data, e.size);
+      processItemPickupRequest(e.clientId, e.data, e.size);
       break;
 
     case PacketType::ObjectiveInteract:
-      processObjectiveInteract(e.peer, e.data, e.size);
+      processObjectiveInteract(e.clientId, e.data, e.size);
       break;
 
     default:
@@ -338,14 +333,11 @@ void ServerGameState::onNetworkPacketReceived(
   }
 }
 
-void ServerGameState::processClientInput(ENetPeer* peer, const uint8_t* data,
+void ServerGameState::processClientInput(uint32_t clientId, const uint8_t* data,
                                          size_t size) {
   ClientInputPacket input = deserializeClientInput(data, size);
 
-  auto it = peerToPlayerId.find(peer);
-  assert(it != peerToPlayerId.end());
-
-  uint32_t playerId = it->second;
+  uint32_t playerId = clientId;
   auto playerIt = players.find(playerId);
   assert(playerIt != players.end());
 
@@ -687,7 +679,7 @@ void ServerGameState::respawnPlayer(Player& player) {
   server->broadcastPacket(serialize(packet));
 }
 
-void ServerGameState::processUseItem(ENetPeer* peer, const uint8_t* data,
+void ServerGameState::processUseItem(uint32_t clientId, const uint8_t* data,
                                      size_t size) {
   if (size < 2) {
     Logger::info("Invalid UseItem packet size");
@@ -696,13 +688,7 @@ void ServerGameState::processUseItem(ENetPeer* peer, const uint8_t* data,
 
   UseItemPacket packet = deserializeUseItem(data, size);
 
-  // Get player ID from peer
-  auto it = peerToPlayerId.find(peer);
-  if (it == peerToPlayerId.end()) {
-    Logger::info("Received UseItem from unknown peer");
-    return;
-  }
-  uint32_t playerId = it->second;
+  uint32_t playerId = clientId;
 
   auto playerIt = players.find(playerId);
   if (playerIt == players.end()) {
@@ -765,7 +751,7 @@ void ServerGameState::processUseItem(ENetPeer* peer, const uint8_t* data,
   broadcastInventoryUpdate(playerId);
 }
 
-void ServerGameState::processEquipItem(ENetPeer* peer, const uint8_t* data,
+void ServerGameState::processEquipItem(uint32_t clientId, const uint8_t* data,
                                        size_t size) {
   if (size < 3) {
     Logger::info("Invalid EquipItem packet size");
@@ -774,13 +760,7 @@ void ServerGameState::processEquipItem(ENetPeer* peer, const uint8_t* data,
 
   EquipItemPacket packet = deserializeEquipItem(data, size);
 
-  // Get player ID from peer
-  auto it = peerToPlayerId.find(peer);
-  if (it == peerToPlayerId.end()) {
-    Logger::info("Received EquipItem from unknown peer");
-    return;
-  }
-  uint32_t playerId = it->second;
+  uint32_t playerId = clientId;
 
   auto playerIt = players.find(playerId);
   if (playerIt == players.end()) {
@@ -946,7 +926,7 @@ void ServerGameState::spawnWorldItem(uint32_t itemId, float x, float y) {
                 std::to_string(x) + ", " + std::to_string(y) + ")");
 }
 
-void ServerGameState::processItemPickupRequest(ENetPeer* peer,
+void ServerGameState::processItemPickupRequest(uint32_t clientId,
                                                const uint8_t* data,
                                                size_t size) {
   if (size < 5) {
@@ -956,13 +936,7 @@ void ServerGameState::processItemPickupRequest(ENetPeer* peer,
 
   ItemPickupRequestPacket packet = deserializeItemPickupRequest(data, size);
 
-  // Get player ID
-  auto peerIt = peerToPlayerId.find(peer);
-  if (peerIt == peerToPlayerId.end()) {
-    Logger::info("ItemPickupRequest from unknown peer");
-    return;
-  }
-  uint32_t playerId = peerIt->second;
+  uint32_t playerId = clientId;
 
   auto playerIt = players.find(playerId);
   if (playerIt == players.end()) {
@@ -1053,7 +1027,7 @@ void ServerGameState::processItemPickupRequest(ENetPeer* peer,
   broadcastInventoryUpdate(playerId);
 }
 
-void ServerGameState::processObjectiveInteract(ENetPeer* peer,
+void ServerGameState::processObjectiveInteract(uint32_t clientId,
                                                const uint8_t* data,
                                                size_t size) {
   if (size < 5) {
@@ -1063,13 +1037,7 @@ void ServerGameState::processObjectiveInteract(ENetPeer* peer,
 
   ObjectiveInteractPacket packet = deserializeObjectiveInteract(data, size);
 
-  // Get player ID from peer
-  auto peerIt = peerToPlayerId.find(peer);
-  if (peerIt == peerToPlayerId.end()) {
-    Logger::info("ObjectiveInteract from unknown peer");
-    return;
-  }
-  uint32_t playerId = peerIt->second;
+  uint32_t playerId = clientId;
 
   auto playerIt = players.find(playerId);
   if (playerIt == players.end()) {
@@ -1120,7 +1088,7 @@ void ServerGameState::broadcastObjectiveState(uint32_t objectiveId) {
                 " progress=" + std::to_string(obj->getProgress()));
 }
 
-void ServerGameState::broadcastAllObjectives(ENetPeer* peer) {
+void ServerGameState::broadcastAllObjectives(uint32_t clientId) {
   if (!objectiveSystem) {
     return;
   }
@@ -1138,7 +1106,7 @@ void ServerGameState::broadcastAllObjectives(ENetPeer* peer) {
     packet.enemiesRequired = obj.enemiesRequired;
     packet.enemiesKilled = obj.enemiesKilled;
 
-    server->send(peer, serialize(packet));
+    server->send(clientId, serialize(packet));
   }
 
   Logger::info("Sent " + std::to_string(objectives.size()) +

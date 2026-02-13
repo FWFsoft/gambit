@@ -1,5 +1,6 @@
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 
 #include "AnimationSystem.h"
 #include "Camera.h"
@@ -24,6 +25,7 @@
 #include "MusicSystem.h"
 #include "NetworkClient.h"
 #include "RemotePlayerInterpolation.h"
+#include "transport/ENetTransport.h"
 #include "TiledMap.h"
 #include "WorldConfig.h"
 #include "config/NetworkConfig.h"
@@ -87,11 +89,8 @@ int main(int argc, char* argv[]) {
     Logger::error("Failed to load items.csv - inventory will be empty");
   }
 
-  NetworkClient client;
-  if (!client.initialize()) {
-    return EXIT_FAILURE;
-  }
-
+  auto transport = std::make_unique<ENetTransport>();
+  NetworkClient client(std::move(transport));
   if (!client.connect(Config::Network::SERVER_ADDRESS, Config::Network::PORT)) {
     return EXIT_FAILURE;
   }

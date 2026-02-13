@@ -112,6 +112,23 @@ The build process creates two executables:
 - `build/Server`: The game server
 - `build/Client`: The game client
 
+### WebAssembly Build
+
+To build for the browser (requires Emscripten SDK):
+
+```bash
+# Install Emscripten first (see README.md for details)
+mkdir -p build-wasm && cd build-wasm
+emcmake cmake ..
+make
+```
+
+This creates `WasmClient.html`, `.js`, `.wasm`, and `.data` files. Serve with:
+```bash
+python3 -m http.server 8080
+# Open http://localhost:8080/WasmClient.html
+```
+
 ## Running the Project
 
 ### Server
@@ -331,3 +348,10 @@ The repository uses `main` as the primary branch. When creating pull requests, t
 - Keep code **simple and direct** - avoid unnecessary abstractions
 - **No hot reload** - rely on fast build/boot cycles instead
 - Games run at **fixed 60 FPS** - render loop can drop frames, update loop never does
+
+## Active Technologies
+- C++17 + SDL2 (Emscripten port), OpenGL/WebGL2, ENet (native), Emscripten WebSocket API (WASM), spdlog, ImGui, tmxlite, glm (001-wasm-cross-platform)
+- Emscripten virtual filesystem (MEMFS) for bundled assets; native filesystem unchanged (001-wasm-cross-platform)
+
+## Recent Changes
+- 001-wasm-cross-platform: Added C++17 + SDL2 (Emscripten port), OpenGL/WebGL2, ENet (native), Emscripten WebSocket API (WASM), spdlog, ImGui, tmxlite, glm

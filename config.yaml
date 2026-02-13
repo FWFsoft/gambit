@@ -1,0 +1,9 @@
+# Minimal config for claude-email hook
+# This prevents the hook from erroring when used in this project
+email:
+  from_address: "noreply@localhost"
+  username: "noreply"
+  smtp_server: "localhost"
+  smtp_port: 587
+  password: "dummy"
+  use_oauth2: false

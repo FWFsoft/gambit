@@ -17,7 +17,7 @@ TEST(RemotePlayerInterpolation_PlayerLifecycle) {
   leftPacket.playerId = 2;
   auto leftSerialized = serialize(leftPacket);
   EventBus::instance().publish(NetworkPacketReceivedEvent{
-      nullptr, leftSerialized.data(), leftSerialized.size()});
+      0, leftSerialized.data(), leftSerialized.size()});
   assert(interpolation.getRemotePlayerIds().size() == 0);
 }
 

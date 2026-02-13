@@ -51,7 +51,27 @@
       "Bash(cmake --build:*)",
       "Bash(python tools/map_generator/add_objectives.py:*)",
       "Skill(remember)",
-      "Bash(kill:*)"
+      "Bash(kill:*)",
+      "Bash(uv run:*)",
+      "Bash(claude:*)",
+      "Bash(sqlite3:*)",
+      "Bash(.specify/scripts/bash/setup-plan.sh:*)",
+      "WebFetch(domain:emscripten.org)",
+      "Bash(.specify/scripts/bash/update-agent-context.sh:*)",
+      "Bash(env)",
+      "Bash(emcc:*)",
+      "Bash(.specify/scripts/bash/check-prerequisites.sh:*)",
+      "Bash(done)",
+      "Bash(cmake:*)",
+      "Bash(vcpkg install:*)",
+      "Bash(~/.vcpkg/vcpkg install:*)",
+      "Bash(vcpkg --version:*)",
+      "Bash(echo:*)",
+      "Bash(vcpkg integrate:*)",
+      "Bash(vcpkg list:*)"
     ]
+  },
+  "hooks": {
+    "Stop": []
   }
 }

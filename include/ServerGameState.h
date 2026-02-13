@@ -34,7 +34,6 @@ class ServerGameState {
   const CollisionSystem* collisionSystem;
   const std::vector<PlayerSpawn>* playerSpawns;
   std::unordered_map<uint32_t, Player> players;
-  std::unordered_map<ENetPeer*, uint32_t> peerToPlayerId;
   uint32_t serverTick;
   std::unique_ptr<EnemySystem> enemySystem;
   std::unique_ptr<EffectManager> effectManager;
@@ -49,9 +48,9 @@ class ServerGameState {
   void onNetworkPacketReceived(const NetworkPacketReceivedEvent& e);
   void onUpdate(const UpdateEvent& e);
 
-  void processClientInput(ENetPeer* peer, const uint8_t* data, size_t size);
-  void processUseItem(ENetPeer* peer, const uint8_t* data, size_t size);
-  void processEquipItem(ENetPeer* peer, const uint8_t* data, size_t size);
+  void processClientInput(uint32_t clientId, const uint8_t* data, size_t size);
+  void processUseItem(uint32_t clientId, const uint8_t* data, size_t size);
+  void processEquipItem(uint32_t clientId, const uint8_t* data, size_t size);
   void broadcastStateUpdate();
   void broadcastInventoryUpdate(uint32_t playerId);
 
@@ -68,12 +67,12 @@ class ServerGameState {
   // World item management methods
   void checkEnemyLootDrops();
   void spawnWorldItem(uint32_t itemId, float x, float y);
-  void processItemPickupRequest(ENetPeer* peer, const uint8_t* data,
+  void processItemPickupRequest(uint32_t clientId, const uint8_t* data,
                                 size_t size);
-  void processObjectiveInteract(ENetPeer* peer, const uint8_t* data,
+  void processObjectiveInteract(uint32_t clientId, const uint8_t* data,
                                 size_t size);
 
   // Objective management methods
   void broadcastObjectiveState(uint32_t objectiveId);
-  void broadcastAllObjectives(ENetPeer* peer);
+  void broadcastAllObjectives(uint32_t clientId);
 };

@@ -230,12 +230,86 @@ gambit/
 └── build/              # Build output (generated)
 ```
 
+## WebAssembly Build (Browser)
+
+The engine can be compiled to WebAssembly to run in modern browsers.
+
+### Prerequisites
+
+**Install Emscripten SDK**:
+```bash
+# Clone the Emscripten SDK
+git clone https://github.com/emscripten-core/emsdk.git
+cd emsdk
+
+# Install and activate the latest SDK
+./emsdk install latest
+./emsdk activate latest
+
+# Add to your shell (add to ~/.bashrc or ~/.zshrc for persistence)
+source ./emsdk_env.sh
+
+# Verify installation
+emcc --version
+```
+
+### Building for WebAssembly
+
+```bash
+# Create a separate build directory for WASM
+mkdir -p build-wasm && cd build-wasm
+
+# Configure with Emscripten
+emcmake cmake ..
+
+# Build
+make
+
+# Output files:
+#   WasmClient.html  - HTML shell
+#   WasmClient.js    - JavaScript glue code
+#   WasmClient.wasm  - WebAssembly binary
+#   WasmClient.data  - Preloaded assets
+```
+
+### Running in Browser
+
+```bash
+# Serve the build directory
+cd build-wasm
+python3 -m http.server 8080
+
+# Open in browser
+# http://localhost:8080/WasmClient.html
+```
+
+**Browser Requirements**:
+- WebGL2 support (Chrome 56+, Firefox 51+, Safari 15+, Edge 79+)
+- SharedArrayBuffer (for some features, requires HTTPS or localhost)
+
+### WASM Build Features
+
+| Feature | Status |
+|---------|--------|
+| Rendering (WebGL2) | ✓ Supported |
+| Input (keyboard/mouse) | ✓ Supported |
+| Audio (SDL2_mixer) | ✓ Supported |
+| Networking | Stub (single-player only) |
+| Embedded Server | Planned (Phase 4) |
+
+### Using Claude Code Skills
+
+```bash
+/build-wasm    # Build the WASM client (planned)
+/dev-wasm      # Full dev environment with browser client (planned)
+```
+
 ## Architecture
 
 - **Language**: C++17
 - **Build System**: CMake
-- **Graphics**: SDL2 + OpenGL
-- **Networking**: ENet (P2P with client-server topology)
+- **Graphics**: SDL2 + OpenGL (native) / WebGL2 (browser)
+- **Networking**: ENet (native) / WebSocket (browser, planned)
 - **Logging**: spdlog
 
 See [DESIGN.md](DESIGN.md) for detailed design decisions and [CLAUDE.md](CLAUDE.md) for a comprehensive guide to the codebase.

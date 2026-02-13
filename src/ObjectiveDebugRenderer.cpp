@@ -1,6 +1,10 @@
 #include "ObjectiveDebugRenderer.h"
 
+#ifdef __EMSCRIPTEN__
+#include <GLES3/gl3.h>
+#else
 #include <glad/glad.h>
+#endif
 
 #include <cmath>
 #include <glm/glm.hpp>
@@ -9,11 +13,13 @@
 
 #include "Logger.h"
 #include "OpenGLUtils.h"
+#include "ShaderCompat.h"
 #include "config/ScreenConfig.h"
 
 // Simple line vertex shader
-const char* objectiveVertexShader = R"(
-#version 330 core
+const char* objectiveVertexShader =
+    GAMBIT_GLSL_VERSION
+    R"(
 layout (location = 0) in vec2 aPos;
 
 uniform mat4 projection;
@@ -24,8 +30,10 @@ void main() {
 )";
 
 // Simple line fragment shader
-const char* objectiveFragmentShader = R"(
-#version 330 core
+const char* objectiveFragmentShader =
+    GAMBIT_GLSL_VERSION
+    GAMBIT_GLSL_PRECISION
+    R"(
 out vec4 FragColor;
 
 uniform vec4 lineColor;

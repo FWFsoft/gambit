@@ -1,108 +1,58 @@
 #include "NetworkServer.h"
 
+#include <SDL2/SDL.h>
+
 #include "EventBus.h"
 #include "Logger.h"
-#include "config/NetworkConfig.h"
 
-NetworkServer::NetworkServer(const std::string& addressStr, uint16_t port)
-    : server(nullptr), running(false) {
-  enet_address_set_host(&address, addressStr.c_str());
-  address.port = port;
-}
+NetworkServer::NetworkServer(std::unique_ptr<IServerTransport> transport)
+    : transport(std::move(transport)), running(false) {}
 
 NetworkServer::~NetworkServer() {
-  if (server) {
-    enet_host_destroy(server);
+  if (transport) {
+    transport->stop();
   }
-  enet_deinitialize();
 }
 
-bool NetworkServer::initialize() {
-  if (enet_initialize() != 0) {
-    Logger::error("An error occurred while initializing ENet.");
+bool NetworkServer::initialize(const std::string& address, uint16_t port) {
+  if (!transport->initialize(address, port)) {
+    Logger::error("Failed to initialize server transport.");
     return false;
   }
-
-  server = enet_host_create(&address, Config::Network::MAX_CLIENTS,
-                            Config::Network::CHANNEL_COUNT, 0, 0);
-  if (!server) {
-    Logger::error(
-        "An error occurred while trying to create an ENet server host.");
-    enet_deinitialize();
-    return false;
-  }
-
   Logger::info("Server initialized and listening on port " +
-               std::to_string(address.port));
+               std::to_string(port));
   return true;
 }
 
 void NetworkServer::run() {
   running = true;
-  ENetEvent event;
 
   while (running) {
-    while (enet_host_service(server, &event, Config::Network::POLL_TIMEOUT_MS) >
-           0) {
-      switch (event.type) {
-        case ENET_EVENT_TYPE_CONNECT: {
-          uint32_t clientId =
-              static_cast<uint32_t>(reinterpret_cast<uintptr_t>(event.peer));
-          EventBus::instance().publish(
-              ClientConnectedEvent{event.peer, clientId});
-          break;
-        }
-
-        case ENET_EVENT_TYPE_RECEIVE: {
-          EventBus::instance().publish(NetworkPacketReceivedEvent{
-              event.peer, event.packet->data, event.packet->dataLength});
-          enet_packet_destroy(event.packet);
-          break;
-        }
-
-        case ENET_EVENT_TYPE_DISCONNECT: {
-          uint32_t clientId =
-              static_cast<uint32_t>(reinterpret_cast<uintptr_t>(event.peer));
-          EventBus::instance().publish(ClientDisconnectedEvent{clientId});
-          break;
-        }
-
-        default:
-          break;
-      }
-    }
+    poll();
+    // Small sleep to avoid busy-waiting in blocking mode
+    SDL_Delay(1);
   }
   Logger::info("Server shutting down.");
 }
 
 void NetworkServer::poll() {
-  if (!server) return;
+  if (!transport) return;
 
-  ENetEvent event;
-  while (enet_host_service(server, &event, 0) >
-         0) {  // Non-blocking (0ms timeout)
+  TransportEvent event;
+  while (transport->poll(event)) {
     switch (event.type) {
-      case ENET_EVENT_TYPE_CONNECT: {
-        uint32_t clientId =
-            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(event.peer));
-        EventBus::instance().publish(
-            ClientConnectedEvent{event.peer, clientId});
+      case TransportEventType::CONNECT:
+        EventBus::instance().publish(ClientConnectedEvent{event.clientId});
         break;
-      }
 
-      case ENET_EVENT_TYPE_RECEIVE: {
+      case TransportEventType::RECEIVE:
         EventBus::instance().publish(NetworkPacketReceivedEvent{
-            event.peer, event.packet->data, event.packet->dataLength});
-        enet_packet_destroy(event.packet);
+            event.clientId, event.data.data(), event.data.size()});
         break;
-      }
 
-      case ENET_EVENT_TYPE_DISCONNECT: {
-        uint32_t clientId =
-            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(event.peer));
-        EventBus::instance().publish(ClientDisconnectedEvent{clientId});
+      case TransportEventType::DISCONNECT:
+        EventBus::instance().publish(ClientDisconnectedEvent{event.clientId});
         break;
-      }
 
       default:
         break;
@@ -113,19 +63,11 @@ void NetworkServer::poll() {
 void NetworkServer::stop() { running = false; }
 
 void NetworkServer::broadcastPacket(const std::vector<uint8_t>& data) {
-  if (!server) return;
-
-  ENetPacket* packet =
-      enet_packet_create(data.data(), data.size(), ENET_PACKET_FLAG_RELIABLE);
-  enet_host_broadcast(server, 0, packet);
-  enet_host_flush(server);
+  if (!transport) return;
+  transport->broadcast(data.data(), data.size());
 }
 
-void NetworkServer::send(ENetPeer* peer, const std::vector<uint8_t>& data) {
-  if (!peer) return;
-
-  ENetPacket* packet =
-      enet_packet_create(data.data(), data.size(), ENET_PACKET_FLAG_RELIABLE);
-  enet_peer_send(peer, 0, packet);
-  enet_host_flush(server);
+void NetworkServer::send(uint32_t clientId, const std::vector<uint8_t>& data) {
+  if (!transport) return;
+  transport->send(clientId, data.data(), data.size());
 }

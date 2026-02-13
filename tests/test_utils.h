@@ -50,7 +50,7 @@ void publishStateUpdate(uint32_t serverTick,
   packet.players = players;
   auto serialized = serialize(packet);
   EventBus::instance().publish(NetworkPacketReceivedEvent{
-      nullptr, serialized.data(), serialized.size()});
+      0, serialized.data(), serialized.size()});
 }
 
 void publishPlayerJoined(uint32_t playerId, uint8_t r, uint8_t g, uint8_t b) {
@@ -61,7 +61,7 @@ void publishPlayerJoined(uint32_t playerId, uint8_t r, uint8_t g, uint8_t b) {
   packet.b = b;
   auto serialized = serialize(packet);
   EventBus::instance().publish(NetworkPacketReceivedEvent{
-      nullptr, serialized.data(), serialized.size()});
+      0, serialized.data(), serialized.size()});
 }
 
 // Event Capture - Collects all events of a specific type for assertions

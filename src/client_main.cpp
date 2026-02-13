@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "AnimationAssetLoader.h"
 #include "AnimationSystem.h"
 #include "Camera.h"
@@ -35,16 +37,23 @@
 #include "config/ScreenConfig.h"
 #include "config/TestMode.h"
 #include "config/TimingConfig.h"
+#include "transport/ENetTransport.h"
+#include "transport/InMemoryTransport.h"
+#include "GameSession.h"
 
 int main(int argc, char* argv[]) {
   Logger::init();
 
-  // Parse command line arguments for test mode
+  // Parse command line arguments
+  bool embeddedMode = false;
   for (int i = 1; i < argc; i++) {
     std::string arg = argv[i];
     if (arg == "--test-mode") {
       Config::TestMode::testConfig.enabled = true;
       Logger::info("Test mode enabled");
+    } else if (arg == "--embedded") {
+      embeddedMode = true;
+      Logger::info("Embedded server mode enabled");
     }
   }
 
@@ -53,14 +62,30 @@ int main(int argc, char* argv[]) {
     Logger::error("Failed to load items.csv - inventory will be empty");
   }
 
-  NetworkClient client;
-  if (!client.initialize()) {
-    return EXIT_FAILURE;
+  // Create client with appropriate transport
+  std::unique_ptr<GameSession> gameSession;
+  NetworkClient* clientPtr = nullptr;
+
+  if (embeddedMode) {
+    // Embedded server mode: client and server in same process
+    gameSession = GameSession::create();
+    if (!gameSession) {
+      Logger::error("Failed to create embedded game session");
+      return EXIT_FAILURE;
+    }
+    clientPtr = gameSession->getClient();
+  } else {
+    // Network mode: connect to remote server
+    static auto transport = std::make_unique<ENetTransport>();
+    static NetworkClient networkClient(std::move(transport));
+    if (!networkClient.connect(Config::Network::SERVER_ADDRESS,
+                               Config::Network::PORT)) {
+      return EXIT_FAILURE;
+    }
+    clientPtr = &networkClient;
   }
 
-  if (!client.connect(Config::Network::SERVER_ADDRESS, Config::Network::PORT)) {
-    return EXIT_FAILURE;
-  }
+  NetworkClient& client = *clientPtr;
 
   // Start in title screen
   GameStateManager::instance().transitionTo(GameState::TitleScreen);
@@ -281,8 +306,12 @@ int main(int argc, char* argv[]) {
     // Poll window events
     window.pollEvents();
 
-    // Process network events
-    client.run();
+    // Process network events (embedded mode ticks both server and client)
+    if (gameSession) {
+      gameSession->tick();
+    } else {
+      client.run();
+    }
 
     // Auto-pickup detection for nearby world items
     GameState currentState = GameStateManager::instance().getCurrentState();
