@@ -42,7 +42,7 @@
 
 # Build folders
 build/
-build-wasm/
+build-wasm*/
 # CMake
 CMakeLists.txt.user
 CMakeCache.txt
@@ -67,3 +67,5 @@ test_output/
 
 # Deps
 vcpkg_installed/
+# Embedded emsdk
+emsdk

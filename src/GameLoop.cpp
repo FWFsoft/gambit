@@ -15,6 +15,29 @@ void GameLoop::tick() {
       std::chrono::duration<float, std::milli>(currentTime - lastFrameTime)
           .count();
 
+#ifdef __EMSCRIPTEN__
+  // In WASM, requestAnimationFrame may call us faster than 60fps on
+  // high-refresh displays. Accumulate time and only update at 60fps.
+  accumulator += elapsed;
+  lastFrameTime = currentTime;
+
+  // Cap accumulator to prevent lag spiral (max 1 catch-up frame)
+  if (accumulator > TARGET_DELTA_MS * 2.0f) {
+    accumulator = TARGET_DELTA_MS * 2.0f;
+  }
+
+  while (accumulator >= TARGET_DELTA_MS) {
+    UpdateEvent updateEvent{TARGET_DELTA_MS, frameNumber++};
+    EventBus::instance().publish(updateEvent);
+    accumulator -= TARGET_DELTA_MS;
+  }
+
+  // Always render (browser controls vsync via requestAnimationFrame)
+  float interpolation = accumulator / TARGET_DELTA_MS;
+  RenderEvent renderEvent{interpolation};
+  EventBus::instance().publish(renderEvent);
+  EventBus::instance().publish(SwapBuffersEvent{});
+#else
   // Update loop ALWAYS fires at 60 FPS
   UpdateEvent updateEvent{TARGET_DELTA_MS, frameNumber++};
   EventBus::instance().publish(updateEvent);
@@ -35,7 +58,6 @@ void GameLoop::tick() {
       std::chrono::duration<float, std::milli>(endTime - lastFrameTime)
           .count();
 
-#ifndef __EMSCRIPTEN__
   float sleepTime = TARGET_DELTA_MS - frameDuration;
 
   // Tiger Style: Warn if frame rate drops significantly (> 30ms = 33 FPS)
@@ -63,9 +85,9 @@ void GameLoop::tick() {
   if (sleepTime > 0) {
     SDL_Delay(static_cast<uint32_t>(sleepTime));
   }
-#endif
 
   lastFrameTime = std::chrono::steady_clock::now();
+#endif
 }
 
 void GameLoop::run() {

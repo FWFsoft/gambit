@@ -20,6 +20,7 @@ class GameLoop {
  private:
   bool running;
   uint64_t frameNumber;
+  float accumulator = 0.0f;
   std::chrono::steady_clock::time_point lastFrameTime;
 
   static constexpr float TARGET_DELTA_MS = 16.67f;  // 60 FPS

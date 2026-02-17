@@ -10,8 +10,15 @@ option(ENABLE_COVERAGE "Enable code coverage" OFF)
 if(EMSCRIPTEN)
     message(STATUS "Building for WebAssembly with Emscripten")
 
-    # Emscripten linker flags (replace find_package calls)
-    set(EM_COMMON_FLAGS
+    # Compile-time flags (Emscripten port headers)
+    set(EM_COMPILE_FLAGS
+        "-sUSE_SDL=2"
+        "-sUSE_SDL_IMAGE=2"
+        "-sUSE_SDL_MIXER=2"
+    )
+
+    # Link-time flags (all port and runtime settings)
+    set(EM_LINK_FLAGS
         "-sUSE_SDL=2"
         "-sUSE_SDL_IMAGE=2"
         "-sUSE_SDL_MIXER=2"
@@ -21,16 +28,11 @@ if(EMSCRIPTEN)
         "-sMAX_WEBGL_VERSION=2"
         "-sFULL_ES3=1"
         "-sALLOW_MEMORY_GROWTH=1"
-    )
-
-    set(EM_CLIENT_FLAGS
-        ${EM_COMMON_FLAGS}
         "--preload-file" "${CMAKE_SOURCE_DIR}/assets@assets"
     )
 
-    # Emscripten provides these via ports, no find_package needed
     # spdlog needs special defines for single-threaded WASM
-    add_compile_definitions(SPDLOG_NO_THREAD_ID SPDLOG_NO_TLS)
+    add_compile_definitions(SPDLOG_NO_THREAD_ID SPDLOG_NO_TLS SPDLOG_HEADER_ONLY)
 
     # Set HTML output suffix for WASM client
     set(CMAKE_EXECUTABLE_SUFFIX ".html")
@@ -551,14 +553,62 @@ endif() # NOT EMSCRIPTEN (end of native-only targets)
 # ============================================
 if(EMSCRIPTEN)
 
-# Fetch and build tmxlite for Emscripten (not available as port)
+# Fetch dependencies not available as Emscripten ports
 include(FetchContent)
+
+# tmxlite - tile map library (URL download avoids git sandbox issues)
 FetchContent_Declare(
     tmxlite
-    GIT_REPOSITORY https://github.com/fallahn/tmxlite.git
-    GIT_TAG v1.4.4
+    URL https://github.com/fallahn/tmxlite/archive/refs/tags/v1.4.4.tar.gz
+    SOURCE_SUBDIR tmxlite
 )
+
+# spdlog - logging (header-only for WASM, avoids fmt dependency issues)
+FetchContent_Declare(
+    spdlog
+    URL https://github.com/gabime/spdlog/archive/refs/tags/v1.14.1.tar.gz
+)
+
+# imgui - UI library (no CMakeLists.txt, just source files)
+FetchContent_Declare(
+    imgui
+    URL https://github.com/ocornut/imgui/archive/refs/tags/v1.91.9.tar.gz
+)
+
+# glm - math library (header-only)
+FetchContent_Declare(
+    glm
+    URL https://github.com/g-truc/glm/archive/refs/tags/1.0.1.tar.gz
+)
+
+# Only build tmxlite via CMake (it has a proper CMakeLists.txt)
+set(TMXLITE_STATIC_LIB TRUE CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(tmxlite)
+
+# Populate spdlog, imgui, and glm without running their CMakeLists.txt
+# (spdlog requires pthreads which isn't available in WASM; imgui has no CMakeLists.txt)
+FetchContent_Populate(spdlog)
+FetchContent_Populate(imgui)
+FetchContent_Populate(glm)
+
+# Create header-only spdlog target for WASM
+add_library(spdlog_wasm INTERFACE)
+target_include_directories(spdlog_wasm INTERFACE ${spdlog_SOURCE_DIR}/include)
+
+# Create header-only glm target for WASM
+add_library(glm_wasm INTERFACE)
+target_include_directories(glm_wasm INTERFACE ${glm_SOURCE_DIR})
+
+# Build imgui as a static library
+add_library(imgui_wasm STATIC
+    ${imgui_SOURCE_DIR}/imgui.cpp
+    ${imgui_SOURCE_DIR}/imgui_draw.cpp
+    ${imgui_SOURCE_DIR}/imgui_tables.cpp
+    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+    ${imgui_SOURCE_DIR}/imgui_demo.cpp
+)
+target_include_directories(imgui_wasm PUBLIC ${imgui_SOURCE_DIR})
+target_compile_options(imgui_wasm PRIVATE ${EM_COMPILE_FLAGS})
 
 # Shared source files for WASM client (same as Client but without ENet)
 set(WASM_CLIENT_SOURCES
@@ -615,13 +665,15 @@ set(WASM_CLIENT_SOURCES
 add_executable(WasmClient ${WASM_CLIENT_SOURCES})
 target_include_directories(WasmClient PRIVATE include)
 target_include_directories(WasmClient SYSTEM PRIVATE src/imgui_backends)
+# tmxlite include path (FetchContent doesn't always propagate from subdirectory)
+target_include_directories(WasmClient SYSTEM PRIVATE ${tmxlite_SOURCE_DIR}/tmxlite/include)
 
-# Link tmxlite (fetched via FetchContent)
-target_link_libraries(WasmClient PRIVATE tmxlite)
+# Link fetched libraries
+target_link_libraries(WasmClient PRIVATE tmxlite spdlog_wasm imgui_wasm glm_wasm)
 
-# Apply Emscripten flags
-target_compile_options(WasmClient PRIVATE ${EM_CLIENT_FLAGS})
-target_link_options(WasmClient PRIVATE ${EM_CLIENT_FLAGS})
+# Apply Emscripten flags (split compile vs link)
+target_compile_options(WasmClient PRIVATE ${EM_COMPILE_FLAGS})
+target_link_options(WasmClient PRIVATE ${EM_LINK_FLAGS})
 
 message(STATUS "WasmClient target configured for Emscripten")
 message(STATUS "  Output: WasmClient.html, WasmClient.js, WasmClient.wasm, WasmClient.data")

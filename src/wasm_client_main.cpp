@@ -62,8 +62,8 @@ int main(int argc, char* argv[]) {
 
   NetworkClient& client = *gameSession->getClient();
 
-  // Start in Playing state (skip menus for WASM)
-  GameStateManager::instance().transitionTo(GameState::Playing);
+  // Start in title screen (same as native client)
+  GameStateManager::instance().transitionTo(GameState::TitleScreen);
 
   Window window("Gambit WASM", Config::Screen::WIDTH, Config::Screen::HEIGHT);
   window.initImGui();

@@ -91,7 +91,8 @@ void Window::pollEvents() {
 
     if (event.type == SDL_QUIT) {
       open = false;
-    } else if (event.type == SDL_KEYDOWN) {
+    } else if (event.type == SDL_KEYDOWN && !event.key.repeat) {
+      // Ignore key repeat events (held keys) — InputSystem tracks key state
       // Always allow ESC and I for menu navigation
       bool isMenuKey = (event.key.keysym.sym == SDLK_ESCAPE ||
                         event.key.keysym.sym == SDLK_i);

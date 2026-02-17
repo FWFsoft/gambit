@@ -68,10 +68,18 @@
       "Bash(vcpkg --version:*)",
       "Bash(echo:*)",
       "Bash(vcpkg integrate:*)",
-      "Bash(vcpkg list:*)"
+      "Bash(vcpkg list:*)",
+      "WebFetch(domain:codeload.github.com)",
+      "Bash(export EMSDK=/Users/mckornfield/repo/emsdk:*)",
+      "Bash(export EMSDK_NODE=$EMSDK/node/22.16.0_64bit/bin/node:*)",
+      "Bash(export PATH=$EMSDK:$EMSDK/upstream/emscripten:$PATH)"
     ]
   },
   "hooks": {
     "Stop": []
+  },
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true
   }
 }
