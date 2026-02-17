@@ -57,7 +57,7 @@ UISystem::UISystem(Window* window, ClientPrediction* clientPrediction,
   }
 
   // Load title screen music (SDL_mixer already initialized by MusicSystem)
-  titleMusic = Mix_LoadMUS("assets/music/landing_screen.wav");
+  titleMusic = Mix_LoadMUS("assets/music/landing_screen.ogg");
   if (!titleMusic) {
     Logger::error("Failed to load title screen music: " +
                   std::string(Mix_GetError()));

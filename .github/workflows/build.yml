@@ -1,4 +1,4 @@
-name: CMake Build
+name: CI
 
 on:
   push:
@@ -6,8 +6,17 @@ on:
       - main
   pull_request:
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
 jobs:
-  build:
+  native-build:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -30,30 +39,76 @@ jobs:
     - name: Setup vcpkg
       uses: lukka/run-vcpkg@v11
       with:
-        vcpkgGitCommitId: 'a42af01b72c28a8e1d7b48107b33e4f286a55ef6'
+        vcpkgGitCommitId: '15e5f3820f0370f1ba7150853762cec0688cd396'
 
     - name: Configure CMake
       run: cmake -B build -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
 
     - name: Build
       run: cmake --build build
-#    - name: Install dependencies
-#      run: |
-#        sudo apt update
-#        sudo apt install -y \
-#          libsdl2-dev \
-#          libsdl2-2.0-0 \
-#          libenet-dev \
-#          libspdlog-dev
-#
-#    - name: Configure CMake
-#      run: |
-#        cmake -B build -S .
-
-#    - name: Build
-#      run: |
-#        cmake --build build
 
     - name: Run tests
+      run: cd build && ctest --output-on-failure
+
+  wasm-build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Emscripten
+      uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: '3.1.74'
+
+    - name: Cache FetchContent dependencies
+      uses: actions/cache@v4
+      with:
+        path: build-wasm/_deps
+        key: wasm-fetchcontent-${{ hashFiles('CMakeLists.txt') }}
+        restore-keys: |
+          wasm-fetchcontent-
+
+    - name: Configure CMake
       run: |
-        cd build && ctest --output-on-failure
+        mkdir -p build-wasm
+        cd build-wasm
+        emcmake cmake ..
+
+    - name: Build
+      run: cmake --build build-wasm
+
+    - name: Verify output files
+      run: |
+        test -f build-wasm/WasmClient.html
+        test -f build-wasm/WasmClient.js
+        test -f build-wasm/WasmClient.wasm
+        test -f build-wasm/WasmClient.data
+        echo "All WASM output files present"
+        ls -lh build-wasm/WasmClient.*
+
+    - name: Prepare Pages artifact
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      run: |
+        mkdir -p _site
+        cp build-wasm/WasmClient.html _site/index.html
+        cp build-wasm/WasmClient.js   _site/WasmClient.js
+        cp build-wasm/WasmClient.wasm _site/WasmClient.wasm
+        cp build-wasm/WasmClient.data _site/WasmClient.data
+
+    - name: Upload Pages artifact
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: _site
+
+  deploy-pages:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: wasm-build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
