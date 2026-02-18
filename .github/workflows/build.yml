@@ -34,7 +34,11 @@ jobs:
           libwayland-dev \
           libxkbcommon-dev \
           libegl1-mesa-dev \
-          libibus-1.0-dev
+          libibus-1.0-dev \
+          autoconf \
+          autoconf-archive \
+          automake \
+          libtool
 
     - name: Setup vcpkg
       uses: lukka/run-vcpkg@v11
