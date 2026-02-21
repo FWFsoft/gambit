@@ -45,6 +45,9 @@ class ClientPrediction {
   // Update an objective from network packet
   void updateObjective(const ObjectiveStatePacket& packet);
 
+  // Set up objective event handlers (InteractInputEvent + ObjectiveState packets)
+  void setupObjectiveEventHandlers();
+
   // Reset character selection state (for returning to character select)
   void resetCharacterSelection() { sentCharacterSelection = false; }
 

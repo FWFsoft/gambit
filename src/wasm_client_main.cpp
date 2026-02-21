@@ -91,6 +91,8 @@ int main(int argc, char* argv[]) {
                     &collisionSystem);
   ClientPrediction clientPrediction(&client, localPlayerId, world);
 
+  clientPrediction.setupObjectiveEventHandlers();
+
   ObjectiveDebugRenderer objectiveDebugRenderer(&camera, &clientPrediction);
 
   InputSystem inputSystem(&clientPrediction, &collisionDebugRenderer,

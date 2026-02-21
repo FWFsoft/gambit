@@ -75,7 +75,9 @@
       "Bash(export PATH=$EMSDK:$EMSDK/upstream/emscripten:$PATH)",
       "WebFetch(domain:api.github.com)",
       "Bash(ffmpeg:*)",
-      "Bash(gh run view:*)"
+      "Bash(gh run view:*)",
+      "Bash(emcmake cmake:*)",
+      "Bash(source:*)"
     ]
   },
   "hooks": {

@@ -368,70 +368,9 @@ int main(int argc, char* argv[]) {
         lastInputState = hasInput;
       });
 
-  // Subscribe to InteractInputEvent for objective interaction (E key)
-  EventBus::instance().subscribe<InteractInputEvent>(
-      [&](const InteractInputEvent&) {
-        GameState currentState = GameStateManager::instance().getCurrentState();
-        if (currentState != GameState::Playing) {
-          return;
-        }
-
-        const Player& localPlayer = clientPrediction.getLocalPlayer();
-        if (!localPlayer.isAlive()) {
-          return;
-        }
-
-        // Send interaction request to server (server will check if player is
-        // near objective) objectiveId = 0 means "nearest objective"
-        ObjectiveInteractPacket packet;
-        packet.objectiveId = 0;
-        client.send(serialize(packet));
-        Logger::debug("Sent objective interact request");
-      });
-
-  // Subscribe to NetworkPacketReceivedEvent for ObjectiveState packets
-  EventBus::instance().subscribe<NetworkPacketReceivedEvent>(
-      [&](const NetworkPacketReceivedEvent& e) {
-        if (e.size == 0) return;
-
-        PacketType type = static_cast<PacketType>(e.data[0]);
-
-        if (type == PacketType::ObjectiveState) {
-          ObjectiveStatePacket packet =
-              deserializeObjectiveState(e.data, e.size);
-
-          // Store objective in ClientPrediction for world-space rendering
-          clientPrediction.updateObjective(packet);
-
-          // Publish ObjectiveUpdatedEvent for UISystem to display
-          ObjectiveUpdatedEvent event;
-          event.objectiveId = packet.objectiveId;
-          event.state = packet.objectiveState;
-          event.progress = packet.progress;
-
-          // Generate name from objective type
-          if (packet.objectiveType == 0) {  // AlienScrapyard
-            event.name = "Alien Scrapyard";
-          } else if (packet.objectiveType == 1) {  // CaptureOutpost
-            event.name = "Capture Outpost";
-          } else if (packet.objectiveType == 2) {  // SalvageMedpacks
-            event.name = "Salvage Medpacks";
-          } else {
-            event.name = "Unknown Objective";
-          }
-
-          // Log objective coordinates for easier testing
-          Logger::info("Objective: " + event.name + " at (" +
-                       std::to_string(static_cast<int>(packet.x)) + ", " +
-                       std::to_string(static_cast<int>(packet.y)) + ")");
-
-          EventBus::instance().publish(event);
-
-          Logger::debug("Received objective state: " + event.name +
-                        " state=" + std::to_string(packet.objectiveState) +
-                        " progress=" + std::to_string(packet.progress));
-        }
-      });
+  // Set up objective event handlers (InteractInputEvent + ObjectiveState
+  // packets) in ClientPrediction (shared with WASM client)
+  clientPrediction.setupObjectiveEventHandlers();
 
   // Run the game loop
   gameLoop.run();

@@ -381,9 +381,11 @@ void ServerGameState::onUpdate(const UpdateEvent& e) {
   if (enemySystem && objectiveSystem) {
     const auto& deaths = enemySystem->getDiedThisFrame();
     for (const auto& death : deaths) {
-      // Get enemy position from the death info
-      // Note: Enemy is already removed, so we need to track position
-      // differently For now, we'll iterate through current enemies
+      const auto& enemies = enemySystem->getEnemies();
+      auto enemyIt = enemies.find(death.enemyId);
+      if (enemyIt != enemies.end()) {
+        objectiveSystem->onEnemyDeath(enemyIt->second.x, enemyIt->second.y);
+      }
     }
   }
 

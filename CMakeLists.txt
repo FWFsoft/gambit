@@ -377,6 +377,7 @@ add_executable(test_client_prediction
     src/CharacterSelectionState.cpp
     src/MapSelectionState.cpp
     src/CharacterRegistry.cpp
+    src/GameStateManager.cpp
 )
 target_include_directories(test_client_prediction SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
 target_include_directories(test_client_prediction PRIVATE include tests)
