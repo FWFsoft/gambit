@@ -59,11 +59,27 @@ void EnemySystem::update(float deltaTime,
     // Check if dead enemy should respawn (random delay)
     if (enemy.state == EnemyState::Dead) {
       if (accumulatedTime - enemy.deathTime >= enemy.respawnDelay) {
-        Logger::info("Enemy time" + std::to_string(enemy.deathTime) +
-                     " respawn delay " + std::to_string(enemy.respawnDelay));
         // Respawn enemy at original spawn point
         assert(enemy.spawnIndex < spawns.size() && "Invalid spawn index");
         const EnemySpawn& spawn = spawns[enemy.spawnIndex];
+
+        // Check if spawn point is in a disabled zone
+        bool inDisabledZone = false;
+        for (const auto& zone : disabledZones) {
+          if (distance(spawn.x, spawn.y, zone.x, zone.y) <= zone.radius) {
+            inDisabledZone = true;
+            break;
+          }
+        }
+
+        if (inDisabledZone) {
+          // Push respawn delay far into the future
+          enemy.respawnDelay = 999999999.0f;
+          continue;
+        }
+
+        Logger::info("Enemy time" + std::to_string(enemy.deathTime) +
+                     " respawn delay " + std::to_string(enemy.respawnDelay));
 
         enemy.x = spawn.x;
         enemy.y = spawn.y;
@@ -359,6 +375,34 @@ const Player* EnemySystem::findNearestPlayer(
   }
 
   return nearest;
+}
+
+void EnemySystem::disableSpawnsInRadius(float x, float y, float radius) {
+  disabledZones.push_back({x, y, radius});
+
+  // Kill or remove idle enemies within the zone
+  for (auto& [id, enemy] : enemies) {
+    if (enemy.state == EnemyState::Dead) continue;
+
+    float dist = distance(enemy.x, enemy.y, x, y);
+    if (dist <= radius && enemy.state == EnemyState::Idle) {
+      enemy.health = 0.0f;
+      enemy.state = EnemyState::Dead;
+      enemy.vx = 0.0f;
+      enemy.vy = 0.0f;
+      enemy.deathTime = accumulatedTime;
+      enemy.respawnDelay = 999999999.0f;  // Effectively never respawn
+
+      Logger::info("Enemy " + std::to_string(id) +
+                   " removed by disabled spawn zone at (" + std::to_string(x) +
+                   ", " + std::to_string(y) + ")");
+
+      diedThisFrame.push_back({id, 0});
+    }
+  }
+
+  Logger::info("Disabled spawns in radius " + std::to_string(radius) +
+               " at (" + std::to_string(x) + ", " + std::to_string(y) + ")");
 }
 
 float EnemySystem::distance(float x1, float y1, float x2, float y2) const {

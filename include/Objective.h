@@ -12,9 +12,10 @@ enum class ObjectiveType : uint8_t {
 
 // Current state of an objective
 enum class ObjectiveState : uint8_t {
-  Inactive,    // Not yet started, available to interact
-  InProgress,  // Player has initiated, working toward completion
-  Completed    // Finished successfully
+  Inactive,        // Not yet started, available to interact
+  InProgress,      // Player has initiated, working toward completion
+  ReadyToDeposit,  // AlienScrapyard: scrap collected, carry to deposit point
+  Completed        // Finished successfully
 };
 
 // Objective data structure loaded from TMX and tracked by server
@@ -35,6 +36,11 @@ struct Objective {
   float interactionTime = 3.0f;      // Seconds to complete
   float interactionProgress = 0.0f;  // Current progress (0.0 - 1.0)
 
+  // For AlienScrapyard: deposit point (carry scrap here to complete)
+  float depositX = 0.0f;
+  float depositY = 0.0f;
+  bool hasDepositPoint = false;  // True if deposit coords are set
+
   // Player currently interacting (0 = none)
   uint32_t interactingPlayerId = 0;
 
@@ -42,6 +48,14 @@ struct Objective {
   bool isInRange(float px, float py) const {
     float dx = px - x;
     float dy = py - y;
+    return (dx * dx + dy * dy) <= (radius * radius);
+  }
+
+  // Helper to check if a point is within deposit range
+  bool isInDepositRange(float px, float py) const {
+    if (!hasDepositPoint) return false;
+    float dx = px - depositX;
+    float dy = py - depositY;
     return (dx * dx + dy * dy) <= (radius * radius);
   }
 
@@ -82,6 +96,8 @@ inline std::string objectiveStateToString(ObjectiveState state) {
       return "Inactive";
     case ObjectiveState::InProgress:
       return "InProgress";
+    case ObjectiveState::ReadyToDeposit:
+      return "ReadyToDeposit";
     case ObjectiveState::Completed:
       return "Completed";
     default:

@@ -51,7 +51,16 @@ class EnemySystem {
     diedThisFrame.push_back({enemyId, killerId});
   }
 
+  // Disable enemy spawns within a radius (for CaptureOutpost completion)
+  // Kills idle enemies in the zone and prevents future respawns there
+  void disableSpawnsInRadius(float x, float y, float radius);
+
  private:
+  // Zones where spawns are disabled (from completed CaptureOutpost objectives)
+  struct DisabledZone {
+    float x, y, radius;
+  };
+  std::vector<DisabledZone> disabledZones;
   const std::vector<EnemySpawn>& spawns;
   std::unordered_map<uint32_t, Enemy> enemies;  // enemyId -> Enemy
   uint32_t nextEnemyId;

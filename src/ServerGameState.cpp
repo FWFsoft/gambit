@@ -56,6 +56,52 @@ ServerGameState::ServerGameState(NetworkServer* server,
         [this](uint32_t objectiveId, float progress) {
           broadcastObjectiveState(objectiveId);
         });
+
+    // Set up completion callback for rewards and effects
+    objectiveSystem->setCompletionCallback(
+        [this](uint32_t objectiveId, uint32_t playerId) {
+          const Objective* obj = objectiveSystem->getObjective(objectiveId);
+          if (!obj) return;
+
+          // Remove Slow debuff from player (applied during AlienScrapyard)
+          if (obj->type == ObjectiveType::AlienScrapyard && effectManager) {
+            effectManager->cleanseDebuff(playerId, EffectType::Slow);
+            Logger::info("Removed Slow from player " +
+                         std::to_string(playerId) +
+                         " on objective completion");
+          }
+
+          // CaptureOutpost: disable enemy spawns in radius
+          if (obj->type == ObjectiveType::CaptureOutpost && enemySystem) {
+            enemySystem->disableSpawnsInRadius(obj->x, obj->y, obj->radius);
+          }
+
+          // SalvageMedpacks: spawn healing pickups
+          if (obj->type == ObjectiveType::SalvageMedpacks) {
+            for (int i = 0; i < 3; i++) {
+              float offsetX = (i - 1) * 30.0f;
+              spawnWorldItem(1, obj->x + offsetX, obj->y);
+            }
+            Logger::info("Spawned 3 Health Potions for SalvageMedpacks at (" +
+                         std::to_string(obj->x) + ", " +
+                         std::to_string(obj->y) + ")");
+          }
+        });
+
+    // Set up stop callback for removing Slow when player stops interacting
+    objectiveSystem->setStopCallback(
+        [this](uint32_t objectiveId, uint32_t playerId) {
+          const Objective* obj = objectiveSystem->getObjective(objectiveId);
+          if (!obj) return;
+
+          // Remove Slow debuff when player stops interacting with AlienScrapyard
+          if (obj->type == ObjectiveType::AlienScrapyard && effectManager) {
+            effectManager->cleanseDebuff(playerId, EffectType::Slow);
+            Logger::info("Removed Slow from player " +
+                         std::to_string(playerId) +
+                         " on interaction stop");
+          }
+        });
   }
 
   // Subscribe to client connection events
@@ -403,6 +449,20 @@ void ServerGameState::onUpdate(const UpdateEvent& e) {
   // Update objective system (handles interaction timers)
   if (objectiveSystem) {
     objectiveSystem->update(e.deltaTime);
+
+    // Check if players moved out of objective range
+    auto interactions =
+        objectiveSystem->getPlayerInteractions();  // copy — stopInteraction
+                                                   // mutates
+    for (const auto& [playerId, objId] : interactions) {
+      auto playerIt = players.find(playerId);
+      const Objective* obj = objectiveSystem->getObjective(objId);
+      if (playerIt != players.end() && obj) {
+        if (!obj->isInRange(playerIt->second.x, playerIt->second.y)) {
+          objectiveSystem->stopInteraction(playerId);
+        }
+      }
+    }
   }
 
   // Check for player deaths
@@ -1055,6 +1115,23 @@ void ServerGameState::processObjectiveInteract(uint32_t clientId,
   if (objectiveSystem->tryInteract(playerId, player.x, player.y)) {
     Logger::info("Player " + std::to_string(playerId) +
                  " started objective interaction");
+
+    // Apply Slow debuff for AlienScrapyard interactions
+    if (effectManager) {
+      // Check if the player is now interacting with an AlienScrapyard
+      const auto& interactions = objectiveSystem->getPlayerInteractions();
+      auto interIt = interactions.find(playerId);
+      if (interIt != interactions.end()) {
+        const Objective* obj =
+            objectiveSystem->getObjective(interIt->second);
+        if (obj && obj->type == ObjectiveType::AlienScrapyard) {
+          effectManager->applyEffect(playerId, EffectType::Slow, 1, 999999.0f,
+                                     0, players);
+          Logger::info("Applied Slow to player " + std::to_string(playerId) +
+                       " for AlienScrapyard interaction");
+        }
+      }
+    }
   } else {
     Logger::debug("Player " + std::to_string(playerId) +
                   " failed to interact with objective (not in range or already "
@@ -1082,6 +1159,8 @@ void ServerGameState::broadcastObjectiveState(uint32_t objectiveId) {
   packet.progress = obj->getProgress();
   packet.enemiesRequired = obj->enemiesRequired;
   packet.enemiesKilled = obj->enemiesKilled;
+  packet.depositX = obj->depositX;
+  packet.depositY = obj->depositY;
 
   server->broadcastPacket(serialize(packet));
 
@@ -1107,6 +1186,8 @@ void ServerGameState::broadcastAllObjectives(uint32_t clientId) {
     packet.progress = obj.getProgress();
     packet.enemiesRequired = obj.enemiesRequired;
     packet.enemiesKilled = obj.enemiesKilled;
+    packet.depositX = obj.depositX;
+    packet.depositY = obj.depositY;
 
     server->send(clientId, serialize(packet));
   }

@@ -77,7 +77,8 @@
       "Bash(ffmpeg:*)",
       "Bash(gh run view:*)",
       "Bash(emcmake cmake:*)",
-      "Bash(source:*)"
+      "Bash(source:*)",
+      "WebFetch(domain:dc.services.visualstudio.com)"
     ]
   },
   "hooks": {

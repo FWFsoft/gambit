@@ -67,6 +67,8 @@ TEST(ClientPrediction_ObjectiveStorage) {
   packet.progress = 0.0f;
   packet.enemiesRequired = 0;
   packet.enemiesKilled = 0;
+  packet.depositX = 0.0f;
+  packet.depositY = 0.0f;
 
   prediction.updateObjective(packet);
 
@@ -92,6 +94,18 @@ TEST(ClientPrediction_ObjectiveStorage) {
   assert(objectives.at(1).state == ObjectiveState::InProgress);
   assert(objectives.at(1).progress == 0.5f);
 
+  // Update to ReadyToDeposit
+  packet.objectiveState = 2;  // ReadyToDeposit
+  packet.progress = 1.0f;
+  packet.depositX = 50.0f;
+  packet.depositY = 60.0f;
+  prediction.updateObjective(packet);
+
+  assert(objectives.at(1).state == ObjectiveState::ReadyToDeposit);
+  assert(objectives.at(1).progress == 1.0f);
+  assert(objectives.at(1).depositX == 50.0f);
+  assert(objectives.at(1).depositY == 60.0f);
+
   // Add a second objective (CaptureOutpost)
   ObjectiveStatePacket packet2;
   packet2.objectiveId = 2;
@@ -103,6 +117,8 @@ TEST(ClientPrediction_ObjectiveStorage) {
   packet2.progress = 0.0f;
   packet2.enemiesRequired = 5;
   packet2.enemiesKilled = 0;
+  packet2.depositX = 0.0f;
+  packet2.depositY = 0.0f;
 
   prediction.updateObjective(packet2);
 

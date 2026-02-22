@@ -20,6 +20,7 @@ struct ClientObjective {
   float progress;
   int enemiesRequired;
   int enemiesKilled;
+  float depositX, depositY;
 };
 
 class NetworkClient;

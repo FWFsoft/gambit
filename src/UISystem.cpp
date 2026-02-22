@@ -1296,7 +1296,8 @@ void UISystem::renderObjectiveActivity() {
       alpha = 1.0f - ((age - 4.0f) / 1.0f);
     }
 
-    // Color based on state: Yellow=Inactive, Blue=InProgress, Green=Completed
+    // Color based on state: Yellow=Inactive, Blue=InProgress,
+    // Orange=ReadyToDeposit, Green=Completed
     ImVec4 color;
     const char* stateText;
     switch (notification.state) {
@@ -1308,7 +1309,11 @@ void UISystem::renderObjectiveActivity() {
         color = ImVec4(0.2f, 0.6f, 1.0f, alpha);  // Blue
         stateText = "In Progress";
         break;
-      case 2:                                     // Completed
+      case 2:                                     // ReadyToDeposit
+        color = ImVec4(1.0f, 0.6f, 0.0f, alpha);  // Orange
+        stateText = "Return to deposit point";
+        break;
+      case 3:                                     // Completed
         color = ImVec4(0.2f, 1.0f, 0.2f, alpha);  // Green
         stateText = "Completed!";
         break;
@@ -1327,6 +1332,11 @@ void UISystem::renderObjectiveActivity() {
       ImGui::PushStyleColor(ImGuiCol_PlotHistogram,
                             ImVec4(0.2f, 0.6f, 1.0f, alpha));
       ImGui::ProgressBar(notification.progress, ImVec2(200, 0));
+      ImGui::PopStyleColor();
+    } else if (notification.state == 2) {  // ReadyToDeposit
+      ImGui::PushStyleColor(ImGuiCol_PlotHistogram,
+                            ImVec4(1.0f, 0.6f, 0.0f, alpha));
+      ImGui::ProgressBar(1.0f, ImVec2(200, 0), "Carry to deposit");
       ImGui::PopStyleColor();
     }
   }

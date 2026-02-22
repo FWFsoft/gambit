@@ -1645,6 +1645,8 @@
         <property name="description" type="string" value="Salvage alien scrap materials" />
         <property name="radius" type="float" value="50.0" />
         <property name="interaction_time" type="float" value="3.0" />
+        <property name="deposit_x" type="float" value="2400.0" />
+        <property name="deposit_y" type="float" value="3312.0" />
       </properties>
     </object>
     <object id="2" name="Outpost_02" x="-1760.0" y="3216.0">

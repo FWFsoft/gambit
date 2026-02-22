@@ -715,7 +715,7 @@ CharacterSelectedPacket deserializeCharacterSelected(const uint8_t* data,
 
 std::vector<uint8_t> serialize(const ObjectiveStatePacket& packet) {
   std::vector<uint8_t> buffer;
-  buffer.reserve(31);
+  buffer.reserve(39);
 
   writeUint8(buffer, static_cast<uint8_t>(packet.type));
   writeUint32(buffer, packet.objectiveId);
@@ -727,8 +727,10 @@ std::vector<uint8_t> serialize(const ObjectiveStatePacket& packet) {
   writeFloat(buffer, packet.progress);
   writeInt32(buffer, packet.enemiesRequired);
   writeInt32(buffer, packet.enemiesKilled);
+  writeFloat(buffer, packet.depositX);
+  writeFloat(buffer, packet.depositY);
 
-  assert(buffer.size() == 31);  // 1 + 4 + 1 + 1 + 4 + 4 + 4 + 4 + 4 + 4
+  assert(buffer.size() == 39);  // 1 + 4 + 1 + 1 + 4*6 + 4*2
   return buffer;
 }
 
@@ -747,7 +749,7 @@ std::vector<uint8_t> serialize(const ObjectiveInteractPacket& packet) {
 
 ObjectiveStatePacket deserializeObjectiveState(const uint8_t* data,
                                                size_t size) {
-  assert(size >= 31 && "ObjectiveStatePacket too small");
+  assert(size >= 39 && "ObjectiveStatePacket too small");
   assert(data[0] == static_cast<uint8_t>(PacketType::ObjectiveState));
 
   ObjectiveStatePacket packet;
@@ -770,6 +772,10 @@ ObjectiveStatePacket deserializeObjectiveState(const uint8_t* data,
   packet.enemiesRequired = readInt32(data + offset);
   offset += 4;
   packet.enemiesKilled = readInt32(data + offset);
+  offset += 4;
+  packet.depositX = readFloat(data + offset);
+  offset += 4;
+  packet.depositY = readFloat(data + offset);
 
   return packet;
 }

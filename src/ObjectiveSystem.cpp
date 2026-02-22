@@ -36,7 +36,21 @@ void ObjectiveSystem::update(float deltaTime) {
       // Check for completion
       if (obj->interactionProgress >= 1.0f) {
         obj->interactionProgress = 1.0f;
-        completeObjective(*obj);
+
+        if (obj->hasDepositPoint) {
+          // Two-phase: transition to ReadyToDeposit instead of completing
+          obj->state = ObjectiveState::ReadyToDeposit;
+          playerInteractions.erase(playerId);
+
+          Logger::info("Objective '" + obj->name +
+                       "' scrap collected - carry to deposit point");
+
+          if (stateCallback) {
+            stateCallback(obj->id, obj->state);
+          }
+        } else {
+          completeObjective(*obj);
+        }
       }
     }
   }
@@ -56,6 +70,7 @@ bool ObjectiveSystem::tryInteract(uint32_t playerId, float playerX,
   for (auto& obj : objectives) {
     // Can interact with Inactive objectives (to start them)
     // OR SalvageMedpacks that are InProgress with all enemies cleared
+    // OR AlienScrapyard that is ReadyToDeposit at the deposit point
     bool canInteract = (obj.state == ObjectiveState::Inactive);
 
     if (obj.type == ObjectiveType::SalvageMedpacks &&
@@ -64,12 +79,25 @@ bool ObjectiveSystem::tryInteract(uint32_t playerId, float playerX,
       canInteract = true;  // Pod ready to collect
     }
 
+    if (obj.type == ObjectiveType::AlienScrapyard &&
+        obj.state == ObjectiveState::ReadyToDeposit &&
+        obj.isInDepositRange(playerX, playerY)) {
+      canInteract = true;  // Ready to deposit scrap at deposit point
+    }
+
     if (!canInteract) {
       continue;
     }
 
-    float dx = playerX - obj.x;
-    float dy = playerY - obj.y;
+    // For ReadyToDeposit, check deposit range instead of objective range
+    float dx, dy;
+    if (obj.state == ObjectiveState::ReadyToDeposit && obj.hasDepositPoint) {
+      dx = playerX - obj.depositX;
+      dy = playerY - obj.depositY;
+    } else {
+      dx = playerX - obj.x;
+      dy = playerY - obj.y;
+    }
     float distSq = dx * dx + dy * dy;
     float radiusSq = obj.radius * obj.radius;
 
@@ -84,6 +112,12 @@ bool ObjectiveSystem::tryInteract(uint32_t playerId, float playerX,
     if (nearestObj->type == ObjectiveType::SalvageMedpacks &&
         nearestObj->state == ObjectiveState::InProgress &&
         nearestObj->enemiesKilled >= nearestObj->enemiesRequired) {
+      nearestObj->interactingPlayerId = playerId;
+      completeObjective(*nearestObj);
+    } else if (nearestObj->type == ObjectiveType::AlienScrapyard &&
+               nearestObj->state == ObjectiveState::ReadyToDeposit) {
+      // Depositing scrap at deposit point — complete the objective
+      nearestObj->interactingPlayerId = playerId;
       completeObjective(*nearestObj);
     } else {
       // Otherwise start the objective
@@ -121,6 +155,11 @@ void ObjectiveSystem::stopInteraction(uint32_t playerId) {
                    std::to_string(playerId));
     }
     // For CaptureOutpost, don't reset - it continues until enemies are dead
+  }
+
+  // Notify stop callback (for removing Slow debuff, etc.)
+  if (stopCallback) {
+    stopCallback(objectiveId, playerId);
   }
 }
 
@@ -206,6 +245,8 @@ void ObjectiveSystem::startObjective(Objective& objective, uint32_t playerId) {
 }
 
 void ObjectiveSystem::completeObjective(Objective& objective) {
+  uint32_t completingPlayerId = objective.interactingPlayerId;
+
   objective.state = ObjectiveState::Completed;
 
   // Remove from player interactions
@@ -218,5 +259,10 @@ void ObjectiveSystem::completeObjective(Objective& objective) {
 
   if (stateCallback) {
     stateCallback(objective.id, objective.state);
+  }
+
+  // Notify completion callback (for rewards, debuff removal, etc.)
+  if (completionCallback && completingPlayerId != 0) {
+    completionCallback(objective.id, completingPlayerId);
   }
 }

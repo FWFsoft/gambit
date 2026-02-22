@@ -212,8 +212,9 @@ struct ObjectiveStatePacket {
   float progress;          // 0.0 - 1.0
   int32_t enemiesRequired;
   int32_t enemiesKilled;
+  float depositX, depositY;  // Deposit point for AlienScrapyard
 };
-// Size: 30 bytes (1 + 4 + 1 + 1 + 4 + 4 + 4 + 4 + 4 + 4)
+// Size: 39 bytes (1 + 4 + 1 + 1 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4)
 
 struct ObjectiveInteractPacket {
   PacketType type = PacketType::ObjectiveInteract;

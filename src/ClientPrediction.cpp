@@ -314,7 +314,12 @@ void ClientPrediction::setupObjectiveEventHandlers() {
 
           // Generate name from objective type
           if (packet.objectiveType == 0) {  // AlienScrapyard
-            event.name = "Alien Scrapyard";
+            if (packet.objectiveState ==
+                static_cast<uint8_t>(ObjectiveState::ReadyToDeposit)) {
+              event.name = "Alien Scrapyard (Return to deposit)";
+            } else {
+              event.name = "Alien Scrapyard";
+            }
           } else if (packet.objectiveType == 1) {  // CaptureOutpost
             event.name = "Capture Outpost";
           } else if (packet.objectiveType == 2) {  // SalvageMedpacks
@@ -348,6 +353,8 @@ void ClientPrediction::updateObjective(const ObjectiveStatePacket& packet) {
   obj.progress = packet.progress;
   obj.enemiesRequired = packet.enemiesRequired;
   obj.enemiesKilled = packet.enemiesKilled;
+  obj.depositX = packet.depositX;
+  obj.depositY = packet.depositY;
 
   Logger::debug("Updated objective " + std::to_string(packet.objectiveId) +
                 " at (" + std::to_string(packet.x) + ", " +

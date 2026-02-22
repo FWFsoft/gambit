@@ -360,6 +360,9 @@ void TiledMap::extractObjectives() {
         float radius = 50.0f;
         float interactionTime = 3.0f;
         int enemiesRequired = 0;
+        float depositX = 0.0f;
+        float depositY = 0.0f;
+        bool hasDepositPoint = false;
 
         const auto& properties = object.getProperties();
         for (const auto& prop : properties) {
@@ -378,6 +381,14 @@ void TiledMap::extractObjectives() {
           } else if (prop.getName() == "enemies_required" &&
                      prop.getType() == tmx::Property::Type::Int) {
             enemiesRequired = prop.getIntValue();
+          } else if (prop.getName() == "deposit_x" &&
+                     prop.getType() == tmx::Property::Type::Float) {
+            depositX = prop.getFloatValue();
+            hasDepositPoint = true;
+          } else if (prop.getName() == "deposit_y" &&
+                     prop.getType() == tmx::Property::Type::Float) {
+            depositY = prop.getFloatValue();
+            hasDepositPoint = true;
           }
         }
 
@@ -403,6 +414,21 @@ void TiledMap::extractObjectives() {
         objective.radius = radius;
         objective.interactionTime = interactionTime;
         objective.enemiesRequired = enemiesRequired;
+
+        // Set deposit point for AlienScrapyard
+        if (hasDepositPoint) {
+          objective.depositX = depositX - centerWorldX;
+          objective.depositY = depositY - centerWorldY;
+          objective.hasDepositPoint = true;
+        } else if (objective.type == ObjectiveType::AlienScrapyard &&
+                   !playerSpawns.empty()) {
+          // Default to first player spawn as deposit point
+          objective.depositX = playerSpawns[0].x;
+          objective.depositY = playerSpawns[0].y;
+          objective.hasDepositPoint = true;
+          Logger::info("Objective '" + objective.name +
+                       "' using player spawn as deposit point");
+        }
 
         objectives.push_back(objective);
 

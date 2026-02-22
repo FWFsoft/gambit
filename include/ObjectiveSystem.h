@@ -18,6 +18,14 @@ using ObjectiveStateCallback =
 using ObjectiveProgressCallback =
     std::function<void(uint32_t objectiveId, float progress)>;
 
+// Callback type for objective completion (includes player who completed it)
+using ObjectiveCompletionCallback =
+    std::function<void(uint32_t objectiveId, uint32_t playerId)>;
+
+// Callback type for when a player stops interacting
+using ObjectiveStopCallback =
+    std::function<void(uint32_t objectiveId, uint32_t playerId)>;
+
 /**
  * ObjectiveSystem - Server-side objective tracking and management
  *
@@ -58,6 +66,11 @@ class ObjectiveSystem {
   // Find objective near a position (within radius)
   Objective* findObjectiveNear(float x, float y);
 
+  // Get player interactions (player ID -> objective ID)
+  const std::unordered_map<uint32_t, uint32_t>& getPlayerInteractions() const {
+    return playerInteractions;
+  }
+
   // Set callbacks for state changes
   void setStateCallback(ObjectiveStateCallback callback) {
     stateCallback = std::move(callback);
@@ -65,6 +78,14 @@ class ObjectiveSystem {
 
   void setProgressCallback(ObjectiveProgressCallback callback) {
     progressCallback = std::move(callback);
+  }
+
+  void setCompletionCallback(ObjectiveCompletionCallback callback) {
+    completionCallback = std::move(callback);
+  }
+
+  void setStopCallback(ObjectiveStopCallback callback) {
+    stopCallback = std::move(callback);
   }
 
  private:
@@ -76,6 +97,8 @@ class ObjectiveSystem {
   // Callbacks
   ObjectiveStateCallback stateCallback;
   ObjectiveProgressCallback progressCallback;
+  ObjectiveCompletionCallback completionCallback;
+  ObjectiveStopCallback stopCallback;
 
   // Helper to complete an objective
   void completeObjective(Objective& objective);
