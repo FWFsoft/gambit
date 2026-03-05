@@ -425,7 +425,9 @@ void ServerGameState::onUpdate(const UpdateEvent& e) {
 
   // Notify objective system about enemy deaths (for CaptureOutpost)
   if (enemySystem && objectiveSystem) {
-    const auto& deaths = enemySystem->getDiedThisFrame();
+    // Copy deaths vector — onEnemyDeath can trigger completeObjective which
+    // calls disableSpawnsInRadius, pushing to diedThisFrame during iteration
+    const auto deaths = enemySystem->getDiedThisFrame();
     for (const auto& death : deaths) {
       const auto& enemies = enemySystem->getEnemies();
       auto enemyIt = enemies.find(death.enemyId);
@@ -1111,6 +1113,10 @@ void ServerGameState::processObjectiveInteract(uint32_t clientId,
     return;
   }
 
+  Logger::info("ObjectiveInteract: player " + std::to_string(playerId) +
+               " pos=(" + std::to_string(player.x) + "," +
+               std::to_string(player.y) + ")");
+
   // Try to interact with nearest objective
   if (objectiveSystem->tryInteract(playerId, player.x, player.y)) {
     Logger::info("Player " + std::to_string(playerId) +
@@ -1133,9 +1139,10 @@ void ServerGameState::processObjectiveInteract(uint32_t clientId,
       }
     }
   } else {
-    Logger::debug("Player " + std::to_string(playerId) +
-                  " failed to interact with objective (not in range or already "
-                  "in progress)");
+    Logger::info("Player " + std::to_string(playerId) +
+                 " failed to interact: pos=(" + std::to_string(player.x) +
+                 "," + std::to_string(player.y) +
+                 ") not in range or already interacting");
   }
 }
 

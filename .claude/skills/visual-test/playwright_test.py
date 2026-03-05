@@ -216,7 +216,16 @@ async def main():
             stop_event.set()
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
+        browser = await p.chromium.launch(
+            headless=True,
+            args=[
+                "--use-angle=swiftshader-webgl",
+                "--enable-webgl",
+                "--ignore-gpu-blocklist",
+                "--enable-gpu-rasterization",
+                "--disable-software-rasterizer",
+            ],
+        )
         context = await browser.new_context(viewport={"width": 1024, "height": 768})
         page = await context.new_page()
 

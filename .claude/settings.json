@@ -11,5 +11,21 @@
         ]
       }
     ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(make *)",
+      "Bash(cmake *)",
+      "Bash(emmake *)",
+      "Bash(emcmake *)",
+      "Bash(cd *)",
+      "Bash(git *)",
+      "Bash(uv *)",
+      "Bash(python3 *)",
+      "Bash(ls *)",
+      "Bash(./.claude/*)",
+      "Bash(./build/*)",
+      "Bash(./dev*)"
+    ]
   }
 }

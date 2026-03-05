@@ -328,10 +328,9 @@ void ClientPrediction::setupObjectiveEventHandlers() {
             event.name = "Unknown Objective";
           }
 
-          // Log objective coordinates for easier testing
-          Logger::info("Objective: " + event.name + " at (" +
-                       std::to_string(static_cast<int>(packet.x)) + ", " +
-                       std::to_string(static_cast<int>(packet.y)) + ")");
+          Logger::debug("Objective: " + event.name + " at (" +
+                        std::to_string(static_cast<int>(packet.x)) + ", " +
+                        std::to_string(static_cast<int>(packet.y)) + ")");
 
           EventBus::instance().publish(event);
 

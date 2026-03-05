@@ -78,7 +78,10 @@
       "Bash(gh run view:*)",
       "Bash(emcmake cmake:*)",
       "Bash(source:*)",
-      "WebFetch(domain:dc.services.visualstudio.com)"
+      "WebFetch(domain:dc.services.visualstudio.com)",
+      "Bash(PATH=\"/Users/mckornfield/repo/emsdk/upstream/emscripten:/Users/mckornfield/repo/emsdk/upstream/bin:$PATH\" make:*)",
+      "Bash(PATH=\"/Users/mckornfield/repo/emsdk/upstream/emscripten:/Users/mckornfield/repo/emsdk/upstream/bin:$PATH\" /usr/bin/make:*)",
+      "Bash(head:*)"
     ]
   },
   "hooks": {

@@ -16,6 +16,11 @@ void ObjectiveSystem::initialize(const std::vector<Objective>& mapObjectives) {
 }
 
 void ObjectiveSystem::update(float deltaTime) {
+  // Collect deferred actions to avoid modifying playerInteractions during
+  // iteration (erasing during range-for is undefined behavior)
+  std::vector<uint32_t> playersToRemove;
+  std::vector<Objective*> objectivesToComplete;
+
   // Update interaction progress for AlienScrapyard objectives
   for (auto& [playerId, objectiveId] : playerInteractions) {
     Objective* obj = getObjective(objectiveId);
@@ -24,8 +29,10 @@ void ObjectiveSystem::update(float deltaTime) {
     }
 
     if (obj->type == ObjectiveType::AlienScrapyard) {
-      // Progress the interaction timer
-      float progressIncrement = deltaTime / obj->interactionTime;
+      // Progress the interaction timer (deltaTime is ms, interactionTime is
+      // seconds)
+      float progressIncrement =
+          deltaTime / (obj->interactionTime * 1000.0f);
       obj->interactionProgress += progressIncrement;
 
       // Notify progress update
@@ -40,7 +47,7 @@ void ObjectiveSystem::update(float deltaTime) {
         if (obj->hasDepositPoint) {
           // Two-phase: transition to ReadyToDeposit instead of completing
           obj->state = ObjectiveState::ReadyToDeposit;
-          playerInteractions.erase(playerId);
+          playersToRemove.push_back(playerId);
 
           Logger::info("Objective '" + obj->name +
                        "' scrap collected - carry to deposit point");
@@ -49,10 +56,18 @@ void ObjectiveSystem::update(float deltaTime) {
             stateCallback(obj->id, obj->state);
           }
         } else {
-          completeObjective(*obj);
+          objectivesToComplete.push_back(obj);
         }
       }
     }
+  }
+
+  // Apply deferred mutations after iteration
+  for (uint32_t pid : playersToRemove) {
+    playerInteractions.erase(pid);
+  }
+  for (Objective* obj : objectivesToComplete) {
+    completeObjective(*obj);
   }
 }
 
