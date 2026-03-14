@@ -27,12 +27,17 @@
 
 UISystem::UISystem(Window* window, ClientPrediction* clientPrediction,
                    NetworkClient* client, DamageNumberSystem* damageNumbers,
-                   EffectTracker* effectTracker)
+                   EffectTracker* effectTracker,
+                   RemotePlayerInterpolation* remoteInterpolation,
+                   EnemyInterpolation* enemyInterpolation, Camera* camera)
     : window(window),
       clientPrediction(clientPrediction),
       client(client),
       damageNumberSystem(damageNumbers),
       effectTracker(effectTracker),
+      remoteInterpolation(remoteInterpolation),
+      enemyInterpolation(enemyInterpolation),
+      camera(camera),
       showSettings(false),
       currentTime(0.0f),
       titleScreenBackground(nullptr),
@@ -708,6 +713,8 @@ void UISystem::renderHUD() {
 
     ImGui::End();
   }
+
+  renderMinimap();
 }
 
 void UISystem::renderPauseMenu() {
@@ -1441,4 +1448,111 @@ void UISystem::onKeyDown(const KeyDownEvent& e) {
   if (keyboardFocusedIndex >= totalCharacters) {
     keyboardFocusedIndex = totalCharacters - 1;
   }
+}
+
+void UISystem::renderMinimap() {
+  if (!camera || !clientPrediction) return;
+
+  static constexpr float MAP_W = 200.0f;
+  static constexpr float MAP_H = 150.0f;
+  static constexpr float PADDING = 10.0f;
+  const float screenW = static_cast<float>(Config::Screen::WIDTH);
+  const float screenH = static_cast<float>(Config::Screen::HEIGHT);
+
+  ImGui::SetNextWindowPos(
+      ImVec2(screenW - MAP_W - PADDING, screenH - MAP_H - PADDING),
+      ImGuiCond_Always);
+  ImGui::SetNextWindowSize(ImVec2(MAP_W, MAP_H), ImGuiCond_Always);
+  ImGui::SetNextWindowBgAlpha(0.6f);
+  ImGui::Begin("Minimap", nullptr,
+               ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                   ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoInputs |
+                   ImGuiWindowFlags_NoScrollbar);
+
+  ImDrawList* draw = ImGui::GetWindowDrawList();
+  const ImVec2 origin = ImGui::GetWindowPos();
+
+  // World bounds (world coords span [-worldWidth/2, worldWidth/2])
+  const float halfWorldW = camera->worldWidth / 2.0f;
+  const float halfWorldH = camera->worldHeight / 2.0f;
+
+  // Convert a world position to minimap pixel position
+  auto worldToMinimap = [&](float wx, float wy) -> ImVec2 {
+    float nx = (wx + halfWorldW) / camera->worldWidth;   // 0..1
+    float ny = (wy + halfWorldH) / camera->worldHeight;  // 0..1
+    return ImVec2(origin.x + nx * MAP_W, origin.y + ny * MAP_H);
+  };
+
+  // Draw border
+  draw->AddRect(origin, ImVec2(origin.x + MAP_W, origin.y + MAP_H),
+                IM_COL32(200, 200, 200, 200), 0.0f, 0, 1.5f);
+
+  // Draw objectives
+  const auto& objectives = clientPrediction->getObjectives();
+  for (const auto& [id, obj] : objectives) {
+    ImVec2 pos = worldToMinimap(obj.x, obj.y);
+    // Scale objective radius to minimap space
+    float radiusX = obj.radius / camera->worldWidth * MAP_W;
+    float radiusY = obj.radius / camera->worldHeight * MAP_H;
+    float displayRadius = (radiusX + radiusY) * 0.5f;
+    displayRadius = std::max(3.0f, std::min(displayRadius, 20.0f));
+
+    ImU32 color;
+    switch (static_cast<int>(obj.state)) {
+      case 0:  // Inactive
+        color = IM_COL32(180, 180, 60, 200);
+        break;
+      case 1:  // InProgress
+        color = IM_COL32(60, 120, 255, 220);
+        break;
+      case 2:  // ReadyToDeposit
+        color = IM_COL32(255, 140, 0, 220);
+        break;
+      case 3:  // Completed
+        color = IM_COL32(60, 220, 60, 200);
+        break;
+      default:
+        color = IM_COL32(180, 180, 180, 180);
+        break;
+    }
+    draw->AddCircle(pos, displayRadius, color, 0, 1.5f);
+    // Small filled center dot
+    draw->AddCircleFilled(pos, 2.0f, color);
+  }
+
+  // Draw enemies (red dots)
+  if (enemyInterpolation) {
+    const auto& enemyIds = enemyInterpolation->getEnemyIds();
+    for (uint32_t eid : enemyIds) {
+      Enemy enemy;
+      if (enemyInterpolation->getInterpolatedState(eid, 0.0f, enemy)) {
+        ImVec2 pos = worldToMinimap(enemy.x, enemy.y);
+        draw->AddCircleFilled(pos, 3.0f, IM_COL32(220, 60, 60, 230));
+      }
+    }
+  }
+
+  // Draw remote players (team color dots)
+  if (remoteInterpolation) {
+    const auto& remoteIds = remoteInterpolation->getRemotePlayerIds();
+    for (uint32_t pid : remoteIds) {
+      Player remote;
+      if (remoteInterpolation->getInterpolatedState(pid, 0.0f, remote)) {
+        ImVec2 pos = worldToMinimap(remote.x, remote.y);
+        ImU32 col = IM_COL32(remote.r, remote.g, remote.b, 230);
+        draw->AddCircleFilled(pos, 4.0f, col);
+        draw->AddCircle(pos, 4.0f, IM_COL32(255, 255, 255, 150), 0, 1.0f);
+      }
+    }
+  }
+
+  // Draw local player (bright white, slightly larger)
+  {
+    const Player& local = clientPrediction->getLocalPlayer();
+    ImVec2 pos = worldToMinimap(local.x, local.y);
+    draw->AddCircleFilled(pos, 5.0f, IM_COL32(255, 255, 255, 255));
+    draw->AddCircle(pos, 5.0f, IM_COL32(80, 80, 80, 200), 0, 1.0f);
+  }
+
+  ImGui::End();
 }

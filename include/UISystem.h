@@ -5,7 +5,10 @@
 #include <deque>
 #include <string>
 
+#include "Camera.h"
+#include "EnemyInterpolation.h"
 #include "EventBus.h"
+#include "RemotePlayerInterpolation.h"
 #include "Settings.h"
 
 class Window;
@@ -22,7 +25,9 @@ class UISystem {
  public:
   UISystem(Window* window, ClientPrediction* clientPrediction,
            NetworkClient* client, DamageNumberSystem* damageNumbers,
-           EffectTracker* effectTracker);
+           EffectTracker* effectTracker,
+           RemotePlayerInterpolation* remoteInterpolation,
+           EnemyInterpolation* enemyInterpolation, Camera* camera);
   ~UISystem();
 
   // Called each frame to render UI
@@ -70,12 +75,18 @@ class UISystem {
   // Effect display
   void renderEffectBars();
 
+  // Minimap
+  void renderMinimap();
+
   // State
   Window* window;
   ClientPrediction* clientPrediction;
   NetworkClient* client;
   DamageNumberSystem* damageNumberSystem;
   EffectTracker* effectTracker;
+  RemotePlayerInterpolation* remoteInterpolation;
+  EnemyInterpolation* enemyInterpolation;
+  Camera* camera;
   Settings settings;
   Settings tempSettings;  // Temporary settings during editing
   bool showSettings;

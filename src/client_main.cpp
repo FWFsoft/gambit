@@ -146,7 +146,8 @@ int main(int argc, char* argv[]) {
   EffectTracker effectTracker;
 
   UISystem uiSystem(&window, &clientPrediction, &client, &damageNumberSystem,
-                    &effectTracker);
+                    &effectTracker, &remoteInterpolation, &enemyInterpolation,
+                    &camera);
 
   // Load local player animations
   Player& localPlayer = clientPrediction.getLocalPlayerMutable();
