@@ -1518,6 +1518,19 @@ void UISystem::renderMinimap() {
     draw->AddCircle(pos, displayRadius, color, 0, 1.5f);
     // Small filled center dot
     draw->AddCircleFilled(pos, 2.0f, color);
+
+    // Draw deposit point as a diamond marker if present
+    if (obj.state != ObjectiveState::Completed) {
+      ImVec2 dp = worldToMinimap(obj.depositX, obj.depositY);
+      constexpr float D = 5.0f;
+      ImU32 depositColor = IM_COL32(255, 200, 50, 230);
+      draw->AddQuadFilled(ImVec2(dp.x, dp.y - D), ImVec2(dp.x + D, dp.y),
+                          ImVec2(dp.x, dp.y + D), ImVec2(dp.x - D, dp.y),
+                          depositColor);
+      draw->AddQuad(ImVec2(dp.x, dp.y - D), ImVec2(dp.x + D, dp.y),
+                    ImVec2(dp.x, dp.y + D), ImVec2(dp.x - D, dp.y),
+                    IM_COL32(255, 255, 255, 180), 1.0f);
+    }
   }
 
   // Draw enemies (red dots)
