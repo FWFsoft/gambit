@@ -1,0 +1,8 @@
+CompileFlags:
+  # Use the WASM build's compile_commands.json for include paths
+  CompilationDatabase: build-wasm6
+  # Strip Emscripten-specific -s flags that clangd doesn't understand
+  Remove:
+    - -sUSE_SDL=2
+    - -sUSE_SDL_IMAGE=2
+    - -sUSE_SDL_MIXER=2
