@@ -1756,6 +1756,48 @@
         <property name="enemy_type" type="string" value="goblin" />
       </properties>
     </object>
+    <object id="259" name="Outpost_Spawn_skeleton_01" x="220.01311836978184" y="2213.1500673587498">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="skeleton" />
+      </properties>
+    </object>
+    <object id="260" name="Outpost_Spawn_slime_02" x="234.86843231316197" y="2246.98235605152">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="slime" />
+      </properties>
+    </object>
+    <object id="261" name="Outpost_Spawn_goblin_03" x="269.20654712244755" y="2299.6346890431914">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="goblin" />
+      </properties>
+    </object>
+    <object id="262" name="Outpost_Spawn_goblin_04" x="683.0742056198015" y="1619.668624290521">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="goblin" />
+      </properties>
+    </object>
+    <object id="263" name="Outpost_Spawn_goblin_05" x="709.5674752816765" y="1597.0430024047982">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="goblin" />
+      </properties>
+    </object>
+    <object id="264" name="Outpost_Spawn_goblin_06" x="655.0697889406506" y="1548.778977436961">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="goblin" />
+      </properties>
+    </object>
+    <object id="265" name="Outpost_Spawn_skeleton_07" x="1376.5921376276108" y="4273.560773595764">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="skeleton" />
+      </properties>
+    </object>
   </objectgroup>
   <objectgroup id="5" name="Ship">
     <object id="239" name="The Ship" x="2400.0" y="3312.0">
@@ -1815,8 +1857,8 @@
         <property name="description" type="string" value="Rescue 3 frogs and bring them to the pond" />
         <property name="radius" type="float" value="60.0" />
         <property name="enemies_required" type="int" value="3" />
-        <property name="deposit_x" type="float" value="-586.9147712829147" />
-        <property name="deposit_y" type="float" value="5854.991238377855" />
+        <property name="deposit_x" type="float" value="-577.0087616221452" />
+        <property name="deposit_y" type="float" value="5877.225742942519" />
       </properties>
     </object>
     <object id="7" name="NoxiousGas_01" x="3744.0" y="2704.0">
@@ -1835,6 +1877,15 @@
         <property name="description" type="string" value="Open the gate guarded by a dormant sentinel" />
         <property name="radius" type="float" value="60.0" />
         <property name="enemies_required" type="int" value="1" />
+      </properties>
+    </object>
+    <object id="9" name="PitTrap_01" x="32.0" y="368.0">
+      <point />
+      <properties>
+        <property name="objective_type" type="string" value="dig_pit_trap" />
+        <property name="description" type="string" value="Carve spikes and dig a hidden pit trap in the foliage" />
+        <property name="radius" type="float" value="50.0" />
+        <property name="interaction_time" type="float" value="5.0" />
       </properties>
     </object>
   </objectgroup>

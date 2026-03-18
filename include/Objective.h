@@ -11,7 +11,8 @@ enum class ObjectiveType : uint8_t {
   RecoverProbe,    // Dig out probe (interact timer), carry to ship deposit
   SaveTheFrogs,    // Collect 3 frogs (repeating interact+deposit cycle)
   NoxiousGas,      // Kick spores in a damaging gas cloud (interact timer)
-  LittleJohn       // Gate guarded by passive enemy that activates on approach
+  LittleJohn,      // Gate guarded by passive enemy that activates on approach
+  DigPitTrap       // Build a hidden pit trap (interact timer); arms on completion
 };
 
 // Current state of an objective
@@ -56,6 +57,9 @@ struct Objective {
   // For LittleJohn: guardian enemy tracking
   uint32_t guardianEnemyId = 0;  // ID of the passive guardian (0 = none/dead)
 
+  // For DigPitTrap: whether the completed trap has already been triggered
+  bool pitTrapArmed = false;  // True after trap fires (one-time use)
+
   // Player currently interacting (0 = none)
   uint32_t interactingPlayerId = 0;
 
@@ -93,6 +97,8 @@ struct Objective {
         return interactionProgress;
       case ObjectiveType::LittleJohn:
         return (state == ObjectiveState::Completed) ? 1.0f : 0.0f;
+      case ObjectiveType::DigPitTrap:
+        return interactionProgress;
       default:
         return 0.0f;
     }
@@ -116,6 +122,8 @@ inline std::string objectiveTypeToString(ObjectiveType type) {
       return "NoxiousGas";
     case ObjectiveType::LittleJohn:
       return "LittleJohn";
+    case ObjectiveType::DigPitTrap:
+      return "DigPitTrap";
     default:
       return "Unknown";
   }
@@ -159,6 +167,9 @@ inline ObjectiveType parseObjectiveType(const std::string& str) {
   }
   if (str == "little_john" || str == "LittleJohn") {
     return ObjectiveType::LittleJohn;
+  }
+  if (str == "dig_pit_trap" || str == "DigPitTrap") {
+    return ObjectiveType::DigPitTrap;
   }
   // Default to AlienScrapyard if unknown
   return ObjectiveType::AlienScrapyard;

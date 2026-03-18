@@ -175,6 +175,7 @@ def add_objectives_to_tmx(
     frogs_count=0,
     noxious_count=0,
     littlejohn_count=0,
+    pittraps_count=0,
     scrapyard_radius=50.0,
     outpost_radius=100.0,
     medpacks_radius=100.0,
@@ -223,7 +224,8 @@ def add_objectives_to_tmx(
 
     # Generate objective positions
     total_objectives = (scrapyard_count + outpost_count + medpacks_count +
-                        probe_count + frogs_count + noxious_count + littlejohn_count)
+                        probe_count + frogs_count + noxious_count + littlejohn_count +
+                        pittraps_count)
     points = generate_objective_points(
         width,
         height,
@@ -283,12 +285,18 @@ def add_objectives_to_tmx(
             enemies = 0
             description = "Navigate the toxic gas cloud and kick the spores"
             extra = {"interaction_time": 3.0}
-        else:
+        elif i < scrapyard_count + outpost_count + medpacks_count + probe_count + frogs_count + noxious_count + littlejohn_count:
             obj_type = "little_john"
             radius = frogs_radius
             enemies = 1
             description = "Open the gate guarded by a dormant sentinel"
             extra = {}
+        else:
+            obj_type = "dig_pit_trap"
+            radius = scrapyard_radius
+            enemies = 0
+            description = "Carve spikes and dig a hidden pit trap in the foliage"
+            extra = {"interaction_time": 5.0}
 
         objectives.append(
             {
@@ -319,6 +327,7 @@ def add_objectives_to_tmx(
         "save_the_frogs": "Frogs",
         "noxious_gas": "NoxiousGas",
         "little_john": "LittleJohn",
+        "dig_pit_trap": "PitTrap",
     }
     type_counters = {k: 0 for k in name_prefixes}
 
@@ -359,7 +368,7 @@ def add_objectives_to_tmx(
 
         extra = obj.get("extra", {})
 
-        if obj["type"] in ("alien_scrapyard", "recover_probe", "noxious_gas"):
+        if obj["type"] in ("alien_scrapyard", "recover_probe", "noxious_gas", "dig_pit_trap"):
             # Timer-based interaction — write interaction_time
             t = extra.get("interaction_time", 3.0)
             prop_time = ET.SubElement(properties, "property")
@@ -573,6 +582,12 @@ def main():
         help="Number of LittleJohn objectives (default: 0)",
     )
     parser.add_argument(
+        "--pittraps",
+        type=int,
+        default=0,
+        help="Number of DigPitTrap objectives (default: 0)",
+    )
+    parser.add_argument(
         "--enemies-per-outpost",
         type=int,
         default=3,
@@ -615,6 +630,7 @@ def main():
         args.frogs,
         args.noxious,
         args.littlejohn,
+        args.pittraps,
         args.scrapyard_radius,
         args.outpost_radius,
         args.medpacks_radius,

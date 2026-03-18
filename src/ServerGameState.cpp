@@ -134,6 +134,12 @@ ServerGameState::ServerGameState(NetworkServer* server,
             }
           }
 
+          // DigPitTrap: trap is now armed — no immediate reward
+          if (obj->type == ObjectiveType::DigPitTrap) {
+            Logger::info("DigPitTrap '" + obj->name +
+                         "' armed and waiting for victims");
+          }
+
           // SaveTheFrogs: spawn healing pickups at pond
           if (obj->type == ObjectiveType::SaveTheFrogs) {
             float lootX = obj->hasDepositPoint ? obj->depositX : obj->x;
@@ -1308,6 +1314,50 @@ void ServerGameState::updateObjectiveSideEffects(float deltaTime) {
           if (player.isAlive() && obj.isInRange(player.x, player.y)) {
             effectManager->applyEffect(playerId, EffectType::Wound, 1,
                                        4000.0f, 0, players);
+          }
+        }
+      }
+    }
+
+    // DigPitTrap: once completed, fire Snared+Wound at any entity that enters
+    if (obj.type == ObjectiveType::DigPitTrap &&
+        obj.state == ObjectiveState::Completed && !obj.pitTrapArmed) {
+      // Collect entity IDs in range first to avoid mutation during iteration
+      std::vector<uint32_t> trappedPlayers;
+      std::vector<uint32_t> trappedEnemies;
+
+      for (const auto& [playerId, player] : players) {
+        if (player.isAlive() && obj.isInRange(player.x, player.y)) {
+          trappedPlayers.push_back(playerId);
+        }
+      }
+      if (enemySystem) {
+        for (const auto& [enemyId, enemy] : enemySystem->getEnemies()) {
+          if (enemy.state != EnemyState::Dead &&
+              obj.isInRange(enemy.x, enemy.y)) {
+            trappedEnemies.push_back(enemyId);
+          }
+        }
+      }
+
+      if (!trappedPlayers.empty() || !trappedEnemies.empty()) {
+        obj.pitTrapArmed = true;
+        Logger::info("DigPitTrap '" + obj.name + "' triggered!");
+
+        for (uint32_t pid : trappedPlayers) {
+          effectManager->applyEffect(pid, EffectType::Snared, 1, 5000.0f, 0,
+                                     players);
+          effectManager->applyEffect(pid, EffectType::Wound, 1, 5000.0f, 0,
+                                     players);
+          Logger::info("  Player " + std::to_string(pid) + " caught in trap");
+        }
+        if (enemySystem) {
+          for (uint32_t eid : trappedEnemies) {
+            effectManager->applyEffect(eid, EffectType::Snared, 1, 5000.0f, 0,
+                                       enemySystem->getEnemies());
+            effectManager->applyEffect(eid, EffectType::Wound, 1, 5000.0f, 0,
+                                       enemySystem->getEnemies());
+            Logger::info("  Enemy " + std::to_string(eid) + " caught in trap");
           }
         }
       }
