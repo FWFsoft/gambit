@@ -171,11 +171,16 @@ def add_objectives_to_tmx(
     scrapyard_count,
     outpost_count,
     medpacks_count=0,
+    probe_count=0,
+    frogs_count=0,
     scrapyard_radius=50.0,
     outpost_radius=100.0,
     medpacks_radius=100.0,
+    probe_radius=50.0,
+    frogs_radius=60.0,
     enemies_per_outpost=3,
     enemies_per_medpacks=3,
+    frogs_required=3,
     min_distance=200.0,
     edge_margin=4,
 ):
@@ -215,7 +220,7 @@ def add_objectives_to_tmx(
         print("Removed existing Objectives layer")
 
     # Generate objective positions
-    total_objectives = scrapyard_count + outpost_count + medpacks_count
+    total_objectives = scrapyard_count + outpost_count + medpacks_count + probe_count + frogs_count
     points = generate_objective_points(
         width,
         height,
@@ -237,27 +242,51 @@ def add_objectives_to_tmx(
             radius = scrapyard_radius
             enemies = 0
             description = "Salvage alien scrap materials"
+            extra = {"interaction_time": 3.0}
         elif i < scrapyard_count + outpost_count:
             obj_type = "capture_outpost"
             radius = outpost_radius
             enemies = enemies_per_outpost
             description = "Clear the enemy outpost"
-        else:
+            extra = {}
+        elif i < scrapyard_count + outpost_count + medpacks_count:
             obj_type = "salvage_medpacks"
             radius = medpacks_radius
             enemies = enemies_per_medpacks
             description = "Fight off enemies and salvage medical supplies"
+            extra = {}
+        elif i < scrapyard_count + outpost_count + medpacks_count + probe_count:
+            obj_type = "recover_probe"
+            radius = probe_radius
+            enemies = 0
+            description = "Dig out the embedded probe and return it to the ship"
+            extra = {"interaction_time": 4.0}
+        else:
+            obj_type = "save_the_frogs"
+            radius = frogs_radius
+            enemies = frogs_required  # reuse enemies_required field for frog count
+            description = f"Rescue {frogs_required} frogs and bring them to the pond"
+            # Generate a nearby deposit point (pond) offset from the frog zone
+            pond_offset_x = random.uniform(-80, 80)
+            pond_offset_y = random.uniform(-80, 80)
+            pond_world_x = world_x + pond_offset_x
+            pond_world_y = world_y + pond_offset_y
+            pond_iso_x, pond_iso_y = world_to_isometric(
+                pond_world_x, pond_world_y, width, height, tile_width, tile_height
+            )
+            extra = {"pond_iso_x": pond_iso_x, "pond_iso_y": pond_iso_y}
 
         objectives.append(
             {
                 "type": obj_type,
-                "iso_x": iso_x,  # Un-centered isometric coords (for TMX file)
+                "iso_x": iso_x,
                 "iso_y": iso_y,
-                "world_x": world_x,  # Centered world coords (for enemy placement)
+                "world_x": world_x,
                 "world_y": world_y,
                 "radius": radius,
                 "enemies_required": enemies,
                 "description": description,
+                "extra": extra,
             }
         )
 
@@ -267,18 +296,25 @@ def add_objectives_to_tmx(
     obj_layer.set("id", str(next_layer_id))
     obj_layer.set("name", "Objectives")
 
+    # Name prefixes for each type
+    name_prefixes = {
+        "alien_scrapyard": "Scrapyard",
+        "capture_outpost": "Outpost",
+        "salvage_medpacks": "Medpacks",
+        "recover_probe": "Probe",
+        "save_the_frogs": "Frogs",
+    }
+    type_counters = {k: 0 for k in name_prefixes}
+
     # Add objective objects
     all_outpost_enemies = []
     for idx, obj in enumerate(objectives):
         obj_elem = ET.SubElement(obj_layer, "object")
         obj_elem.set("id", str(idx + 1))
 
-        if obj["type"] == "alien_scrapyard":
-            obj_elem.set("name", f"Scrapyard_{idx + 1:02d}")
-        elif obj["type"] == "capture_outpost":
-            obj_elem.set("name", f"Outpost_{idx + 1:02d}")
-        else:
-            obj_elem.set("name", f"Medpacks_{idx + 1:02d}")
+        type_counters[obj["type"]] += 1
+        prefix = name_prefixes.get(obj["type"], "Objective")
+        obj_elem.set("name", f"{prefix}_{type_counters[obj['type']]:02d}")
 
         # Write un-centered isometric coordinates (C++ will subtract centering offset)
         obj_elem.set("x", str(obj["iso_x"]))
@@ -305,13 +341,36 @@ def add_objectives_to_tmx(
         prop_radius.set("type", "float")
         prop_radius.set("value", str(obj["radius"]))
 
-        if obj["type"] == "alien_scrapyard":
+        extra = obj.get("extra", {})
+
+        if obj["type"] in ("alien_scrapyard", "recover_probe"):
+            # Timer-based pickup — write interaction_time
+            t = extra.get("interaction_time", 3.0)
             prop_time = ET.SubElement(properties, "property")
             prop_time.set("name", "interaction_time")
             prop_time.set("type", "float")
-            prop_time.set("value", "3.0")
+            prop_time.set("value", str(t))
+
+        elif obj["type"] == "save_the_frogs":
+            # enemies_required holds frog count; deposit point is the pond
+            prop_enemies = ET.SubElement(properties, "property")
+            prop_enemies.set("name", "enemies_required")
+            prop_enemies.set("type", "int")
+            prop_enemies.set("value", str(obj["enemies_required"]))
+
+            # Pond deposit point
+            prop_dx = ET.SubElement(properties, "property")
+            prop_dx.set("name", "deposit_x")
+            prop_dx.set("type", "float")
+            prop_dx.set("value", str(extra["pond_iso_x"]))
+
+            prop_dy = ET.SubElement(properties, "property")
+            prop_dy.set("name", "deposit_y")
+            prop_dy.set("type", "float")
+            prop_dy.set("value", str(extra["pond_iso_y"]))
+
         else:
-            # CaptureOutpost and SalvageMedpacks both need enemies_required
+            # CaptureOutpost and SalvageMedpacks need enemies_required
             prop_enemies = ET.SubElement(properties, "property")
             prop_enemies.set("name", "enemies_required")
             prop_enemies.set("type", "int")
@@ -379,12 +438,10 @@ def add_objectives_to_tmx(
     tree.write(tmx_path, encoding="utf-8", xml_declaration=True)
 
     print(f"\nAdded {len(objectives)} objectives to {tmx_path}:")
-    scrapyards = sum(1 for o in objectives if o["type"] == "alien_scrapyard")
-    outposts = sum(1 for o in objectives if o["type"] == "capture_outpost")
-    medpacks = sum(1 for o in objectives if o["type"] == "salvage_medpacks")
-    print(f"  - {scrapyards} Alien Scrapyards")
-    print(f"  - {outposts} Capture Outposts")
-    print(f"  - {medpacks} Salvage Medpacks")
+    for obj_type, prefix in name_prefixes.items():
+        count = sum(1 for o in objectives if o["type"] == obj_type)
+        if count > 0:
+            print(f"  - {count} {prefix}")
 
 
 def indent_xml(elem, level=0):
@@ -426,6 +483,18 @@ def main():
         help="Number of SalvageMedpacks objectives (default: 0)",
     )
     parser.add_argument(
+        "--probes",
+        type=int,
+        default=0,
+        help="Number of RecoverProbe objectives (default: 0)",
+    )
+    parser.add_argument(
+        "--frogs",
+        type=int,
+        default=0,
+        help="Number of SaveTheFrogs objectives (default: 0)",
+    )
+    parser.add_argument(
         "--scrapyard-radius",
         type=float,
         default=50.0,
@@ -442,6 +511,24 @@ def main():
         type=float,
         default=100.0,
         help="Zone radius for medpacks (default: 100)",
+    )
+    parser.add_argument(
+        "--probe-radius",
+        type=float,
+        default=50.0,
+        help="Interaction radius for probes (default: 50)",
+    )
+    parser.add_argument(
+        "--frogs-radius",
+        type=float,
+        default=60.0,
+        help="Interaction radius for frog objectives (default: 60)",
+    )
+    parser.add_argument(
+        "--frogs-required",
+        type=int,
+        default=3,
+        help="Number of frogs to collect per SaveTheFrogs objective (default: 3)",
     )
     parser.add_argument(
         "--enemies-per-outpost",
@@ -482,11 +569,16 @@ def main():
         args.scrapyards,
         args.outposts,
         args.medpacks,
+        args.probes,
+        args.frogs,
         args.scrapyard_radius,
         args.outpost_radius,
         args.medpacks_radius,
+        args.probe_radius,
+        args.frogs_radius,
         args.enemies_per_outpost,
         args.enemies_per_medpacks,
+        args.frogs_required,
         args.min_distance,
         args.edge_margin,
     )

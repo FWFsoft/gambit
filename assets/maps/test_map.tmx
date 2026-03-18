@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='utf-8'?>
-<map version="1.10" tiledversion="1.10.2" orientation="isometric" renderorder="right-down" width="200" height="200" tilewidth="64" tileheight="64" infinite="0" nextlayerid="2" nextobjectid="1">
+<map version="1.10" tiledversion="1.10.2" orientation="isometric" renderorder="right-down" width="200" height="200" tilewidth="64" tileheight="64" infinite="0" nextlayerid="6" nextobjectid="240">
   <tileset firstgid="1" name="venoxarid_organic_expanded" tilewidth="64" tileheight="64" tilecount="49" columns="7" spacing="4">
     <image source="venoxarid_tileset_expanded.png" width="472" height="472" />
   </tileset>
@@ -1636,20 +1636,68 @@
         <property name="enemy_type" type="string" value="skeleton" />
       </properties>
     </object>
+    <object id="239" name="Outpost_Spawn_goblin_01" x="253.8973654078174" y="2241.1230864631434">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="goblin" />
+      </properties>
+    </object>
+    <object id="240" name="Outpost_Spawn_skeleton_02" x="272.42671305407936" y="2289.3274944228287">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="skeleton" />
+      </properties>
+    </object>
+    <object id="241" name="Outpost_Spawn_goblin_03" x="275.1891490685901" y="2187.5488065630116">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="goblin" />
+      </properties>
+    </object>
+    <object id="242" name="Outpost_Spawn_goblin_04" x="746.8516735200258" y="1663.4647777621242">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="goblin" />
+      </properties>
+    </object>
+    <object id="243" name="Outpost_Spawn_slime_05" x="710.460331328757" y="1604.2579440377433">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="slime" />
+      </properties>
+    </object>
+    <object id="244" name="Outpost_Spawn_skeleton_06" x="652.6643359932107" y="1560.8340924029214">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="skeleton" />
+      </properties>
+    </object>
   </objectgroup>
-  <objectgroup id="4" name="Objectives">
-    <object id="1" name="Scrapyard_01" x="2720.0" y="3312.0">
+  <objectgroup id="5" name="Ship">
+    <object id="239" name="The Ship" x="2400.0" y="3312.0">
+      <point />
+    </object>
+  </objectgroup>
+  <objectgroup id="5" name="Objectives">
+    <object id="1" name="Scrapyard_01" x="4320.0" y="3184.0">
       <point />
       <properties>
         <property name="objective_type" type="string" value="alien_scrapyard" />
         <property name="description" type="string" value="Salvage alien scrap materials" />
         <property name="radius" type="float" value="50.0" />
         <property name="interaction_time" type="float" value="3.0" />
-        <property name="deposit_x" type="float" value="2400.0" />
-        <property name="deposit_y" type="float" value="3312.0" />
       </properties>
     </object>
-    <object id="2" name="Outpost_02" x="-1760.0" y="3216.0">
+    <object id="2" name="Scrapyard_02" x="-5856.0" y="3248.0">
+      <point />
+      <properties>
+        <property name="objective_type" type="string" value="alien_scrapyard" />
+        <property name="description" type="string" value="Salvage alien scrap materials" />
+        <property name="radius" type="float" value="50.0" />
+        <property name="interaction_time" type="float" value="3.0" />
+      </properties>
+    </object>
+    <object id="3" name="Outpost_01" x="256.0" y="2240.0">
       <point />
       <properties>
         <property name="objective_type" type="string" value="capture_outpost" />
@@ -1658,13 +1706,33 @@
         <property name="enemies_required" type="int" value="3" />
       </properties>
     </object>
-    <object id="3" name="Medpacks_03" x="-2496.0" y="3584.0">
+    <object id="4" name="Medpacks_01" x="704.0" y="1600.0">
       <point />
       <properties>
         <property name="objective_type" type="string" value="salvage_medpacks" />
         <property name="description" type="string" value="Fight off enemies and salvage medical supplies" />
         <property name="radius" type="float" value="100.0" />
         <property name="enemies_required" type="int" value="3" />
+      </properties>
+    </object>
+    <object id="5" name="Probe_01" x="5184.0" y="3552.0">
+      <point />
+      <properties>
+        <property name="objective_type" type="string" value="recover_probe" />
+        <property name="description" type="string" value="Dig out the embedded probe and return it to the ship" />
+        <property name="radius" type="float" value="50.0" />
+        <property name="interaction_time" type="float" value="4.0" />
+      </properties>
+    </object>
+    <object id="6" name="Frogs_01" x="-512.0" y="5920.0">
+      <point />
+      <properties>
+        <property name="objective_type" type="string" value="save_the_frogs" />
+        <property name="description" type="string" value="Rescue 3 frogs and bring them to the pond" />
+        <property name="radius" type="float" value="60.0" />
+        <property name="enemies_required" type="int" value="3" />
+        <property name="deposit_x" type="float" value="-449.25126916722473" />
+        <property name="deposit_y" type="float" value="5853.910213220706" />
       </properties>
     </object>
   </objectgroup>

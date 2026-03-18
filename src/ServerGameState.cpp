@@ -41,6 +41,15 @@ ServerGameState::ServerGameState(NetworkServer* server,
   effectManager = std::make_unique<EffectManager>();
   Logger::info("EffectManager initialized");
 
+  // Load ship position from map
+  if (world.tiledMap != nullptr && world.tiledMap->hasShipPosition()) {
+    shipX = world.tiledMap->getShipX();
+    shipY = world.tiledMap->getShipY();
+    hasShip = true;
+    Logger::info("Ship position loaded: (" + std::to_string(shipX) + ", " +
+                 std::to_string(shipY) + ")");
+  }
+
   // Initialize objective system
   if (world.tiledMap != nullptr) {
     objectiveSystem = std::make_unique<ObjectiveSystem>();
@@ -63,8 +72,10 @@ ServerGameState::ServerGameState(NetworkServer* server,
           const Objective* obj = objectiveSystem->getObjective(objectiveId);
           if (!obj) return;
 
-          // Remove Slow debuff from player (applied during AlienScrapyard)
-          if (obj->type == ObjectiveType::AlienScrapyard && effectManager) {
+          // Remove Slow debuff from player (applied during pickup phase)
+          if ((obj->type == ObjectiveType::AlienScrapyard ||
+               obj->type == ObjectiveType::RecoverProbe) &&
+              effectManager) {
             effectManager->cleanseDebuff(playerId, EffectType::Slow);
             Logger::info("Removed Slow from player " +
                          std::to_string(playerId) +
@@ -86,6 +97,27 @@ ServerGameState::ServerGameState(NetworkServer* server,
                          std::to_string(obj->x) + ", " +
                          std::to_string(obj->y) + ")");
           }
+
+          // RecoverProbe: spawn a loot item at the deposit point
+          if (obj->type == ObjectiveType::RecoverProbe) {
+            float lootX = obj->hasDepositPoint ? obj->depositX : obj->x;
+            float lootY = obj->hasDepositPoint ? obj->depositY : obj->y;
+            spawnWorldItem(1, lootX, lootY);
+            Logger::info("Spawned probe reward at (" +
+                         std::to_string(lootX) + ", " +
+                         std::to_string(lootY) + ")");
+          }
+
+          // SaveTheFrogs: spawn healing pickups at pond
+          if (obj->type == ObjectiveType::SaveTheFrogs) {
+            float lootX = obj->hasDepositPoint ? obj->depositX : obj->x;
+            float lootY = obj->hasDepositPoint ? obj->depositY : obj->y;
+            for (int i = 0; i < 2; i++) {
+              float offsetX = (i == 0) ? -20.0f : 20.0f;
+              spawnWorldItem(1, lootX + offsetX, lootY);
+            }
+            Logger::info("Spawned frog rescue rewards at pond");
+          }
         });
 
     // Set up stop callback for removing Slow when player stops interacting
@@ -94,8 +126,10 @@ ServerGameState::ServerGameState(NetworkServer* server,
           const Objective* obj = objectiveSystem->getObjective(objectiveId);
           if (!obj) return;
 
-          // Remove Slow debuff when player stops interacting with AlienScrapyard
-          if (obj->type == ObjectiveType::AlienScrapyard && effectManager) {
+          // Remove Slow debuff when player stops interacting
+          if ((obj->type == ObjectiveType::AlienScrapyard ||
+               obj->type == ObjectiveType::RecoverProbe) &&
+              effectManager) {
             effectManager->cleanseDebuff(playerId, EffectType::Slow);
             Logger::info("Removed Slow from player " +
                          std::to_string(playerId) +
@@ -164,6 +198,14 @@ void ServerGameState::onClientConnected(const ClientConnectedEvent& e) {
   // Send all objectives to the new client
   if (objectiveSystem) {
     broadcastAllObjectives(e.clientId);
+  }
+
+  // Send ship position to new client
+  if (hasShip) {
+    ShipLocationPacket shipPacket;
+    shipPacket.x = shipX;
+    shipPacket.y = shipY;
+    server->send(e.clientId, serialize(shipPacket));
   }
 }
 
@@ -1130,11 +1172,13 @@ void ServerGameState::processObjectiveInteract(uint32_t clientId,
       if (interIt != interactions.end()) {
         const Objective* obj =
             objectiveSystem->getObjective(interIt->second);
-        if (obj && obj->type == ObjectiveType::AlienScrapyard) {
+        if (obj && (obj->type == ObjectiveType::AlienScrapyard ||
+                    obj->type == ObjectiveType::RecoverProbe)) {
           effectManager->applyEffect(playerId, EffectType::Slow, 1, 999999.0f,
                                      0, players);
           Logger::info("Applied Slow to player " + std::to_string(playerId) +
-                       " for AlienScrapyard interaction");
+                       " for " + objectiveTypeToString(obj->type) +
+                       " interaction");
         }
       }
     }
@@ -1164,8 +1208,14 @@ void ServerGameState::broadcastObjectiveState(uint32_t objectiveId) {
   packet.y = obj->y;
   packet.radius = obj->radius;
   packet.progress = obj->getProgress();
-  packet.enemiesRequired = obj->enemiesRequired;
-  packet.enemiesKilled = obj->enemiesKilled;
+  // SaveTheFrogs reuses enemiesRequired/Killed fields for frog counts
+  if (obj->type == ObjectiveType::SaveTheFrogs) {
+    packet.enemiesRequired = obj->frogsRequired;
+    packet.enemiesKilled = obj->frogsDeposited;
+  } else {
+    packet.enemiesRequired = obj->enemiesRequired;
+    packet.enemiesKilled = obj->enemiesKilled;
+  }
   packet.depositX = obj->depositX;
   packet.depositY = obj->depositY;
 
@@ -1191,8 +1241,13 @@ void ServerGameState::broadcastAllObjectives(uint32_t clientId) {
     packet.y = obj.y;
     packet.radius = obj.radius;
     packet.progress = obj.getProgress();
-    packet.enemiesRequired = obj.enemiesRequired;
-    packet.enemiesKilled = obj.enemiesKilled;
+    if (obj.type == ObjectiveType::SaveTheFrogs) {
+      packet.enemiesRequired = obj.frogsRequired;
+      packet.enemiesKilled = obj.frogsDeposited;
+    } else {
+      packet.enemiesRequired = obj.enemiesRequired;
+      packet.enemiesKilled = obj.enemiesKilled;
+    }
     packet.depositX = obj.depositX;
     packet.depositY = obj.depositY;
 

@@ -30,6 +30,7 @@ bool TiledMap::load(const std::string& filepath) {
   extractCollisionShapes();
   extractEnemySpawns();
   extractPlayerSpawns();
+  extractShip();
   extractObjectives();
 
   // Calculate map centering offset for music zones
@@ -325,6 +326,36 @@ void TiledMap::extractPlayerSpawns() {
   }
 }
 
+void TiledMap::extractShip() {
+  hasShip = false;
+
+  float centerTileX = (tmxMap.getTileCount().x - 1) / 2.0f;
+  float centerTileY = (tmxMap.getTileCount().y - 1) / 2.0f;
+  float centerWorldX =
+      (centerTileX - centerTileY) * tmxMap.getTileSize().x / 2.0f;
+  float centerWorldY =
+      (centerTileX + centerTileY) * tmxMap.getTileSize().y / 4.0f;
+
+  for (const auto& layer : tmxMap.getLayers()) {
+    if (layer->getType() != tmx::Layer::Type::Object) continue;
+    const auto& objectLayer = layer->getLayerAs<tmx::ObjectGroup>();
+    if (objectLayer.getName() != "Ship") continue;
+
+    for (const auto& object : objectLayer.getObjects()) {
+      if (object.getShape() != tmx::Object::Shape::Point) continue;
+      const auto& pos = object.getPosition();
+      shipX = pos.x - centerWorldX;
+      shipY = pos.y - centerWorldY;
+      hasShip = true;
+      Logger::info("Loaded ship position at (" + std::to_string(shipX) + ", " +
+                   std::to_string(shipY) + ")");
+      return;
+    }
+  }
+
+  Logger::info("No ship position found in map");
+}
+
 void TiledMap::extractObjectives() {
   objectives.clear();
 
@@ -415,14 +446,32 @@ void TiledMap::extractObjectives() {
         objective.interactionTime = interactionTime;
         objective.enemiesRequired = enemiesRequired;
 
-        // Set deposit point for AlienScrapyard
+        // Load frogs_required for SaveTheFrogs (stored in enemiesRequired field
+        // of TMX as enemies_required, mapped to frogsRequired in the struct)
+        if (objective.type == ObjectiveType::SaveTheFrogs) {
+          objective.frogsRequired =
+              (enemiesRequired > 0) ? enemiesRequired : 3;
+        }
+
+        // Set deposit point — AlienScrapyard and RecoverProbe default to ship
+        bool isDepositType =
+            (objective.type == ObjectiveType::AlienScrapyard ||
+             objective.type == ObjectiveType::RecoverProbe ||
+             objective.type == ObjectiveType::SaveTheFrogs);
+
         if (hasDepositPoint) {
           objective.depositX = depositX - centerWorldX;
           objective.depositY = depositY - centerWorldY;
           objective.hasDepositPoint = true;
-        } else if (objective.type == ObjectiveType::AlienScrapyard &&
-                   !playerSpawns.empty()) {
-          // Default to first player spawn as deposit point
+        } else if (isDepositType && hasShip) {
+          // Default to ship as deposit point
+          objective.depositX = shipX;
+          objective.depositY = shipY;
+          objective.hasDepositPoint = true;
+          Logger::info("Objective '" + objective.name +
+                       "' using ship as deposit point");
+        } else if (isDepositType && !playerSpawns.empty()) {
+          // Fallback to first player spawn if no ship defined
           objective.depositX = playerSpawns[0].x;
           objective.depositY = playerSpawns[0].y;
           objective.hasDepositPoint = true;

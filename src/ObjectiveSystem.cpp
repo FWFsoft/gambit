@@ -28,7 +28,9 @@ void ObjectiveSystem::update(float deltaTime) {
       continue;
     }
 
-    if (obj->type == ObjectiveType::AlienScrapyard) {
+    if (obj->type == ObjectiveType::AlienScrapyard ||
+        obj->type == ObjectiveType::RecoverProbe ||
+        obj->type == ObjectiveType::SaveTheFrogs) {
       // Progress the interaction timer (deltaTime is ms, interactionTime is
       // seconds)
       float progressIncrement =
@@ -40,7 +42,7 @@ void ObjectiveSystem::update(float deltaTime) {
         progressCallback(obj->id, obj->getProgress());
       }
 
-      // Check for completion
+      // Check for completion of current pickup
       if (obj->interactionProgress >= 1.0f) {
         obj->interactionProgress = 1.0f;
 
@@ -50,7 +52,7 @@ void ObjectiveSystem::update(float deltaTime) {
           playersToRemove.push_back(playerId);
 
           Logger::info("Objective '" + obj->name +
-                       "' scrap collected - carry to deposit point");
+                       "' item collected - carry to deposit point");
 
           if (stateCallback) {
             stateCallback(obj->id, obj->state);
@@ -94,10 +96,26 @@ bool ObjectiveSystem::tryInteract(uint32_t playerId, float playerX,
       canInteract = true;  // Pod ready to collect
     }
 
-    if (obj.type == ObjectiveType::AlienScrapyard &&
+    if ((obj.type == ObjectiveType::AlienScrapyard ||
+         obj.type == ObjectiveType::RecoverProbe) &&
         obj.state == ObjectiveState::ReadyToDeposit &&
         obj.isInDepositRange(playerX, playerY)) {
-      canInteract = true;  // Ready to deposit scrap at deposit point
+      canInteract = true;  // Ready to deposit item at deposit point
+    }
+
+    // SaveTheFrogs: allow re-pickup when InProgress (more frogs needed) and no
+    // one is currently picking up a frog, OR deposit when ReadyToDeposit
+    if (obj.type == ObjectiveType::SaveTheFrogs) {
+      if (obj.state == ObjectiveState::InProgress &&
+          obj.frogsDeposited < obj.frogsRequired &&
+          obj.interactingPlayerId == 0 &&
+          obj.isInRange(playerX, playerY)) {
+        canInteract = true;  // Pick up next frog
+      }
+      if (obj.state == ObjectiveState::ReadyToDeposit &&
+          obj.isInDepositRange(playerX, playerY)) {
+        canInteract = true;  // Deposit frog at pond
+      }
     }
 
     if (!canInteract) {
@@ -123,19 +141,49 @@ bool ObjectiveSystem::tryInteract(uint32_t playerId, float playerX,
   }
 
   if (nearestObj) {
-    // If SalvageMedpacks with enemies cleared, complete it
+    // SalvageMedpacks: complete when enemies cleared and player interacts
     if (nearestObj->type == ObjectiveType::SalvageMedpacks &&
         nearestObj->state == ObjectiveState::InProgress &&
         nearestObj->enemiesKilled >= nearestObj->enemiesRequired) {
       nearestObj->interactingPlayerId = playerId;
       completeObjective(*nearestObj);
-    } else if (nearestObj->type == ObjectiveType::AlienScrapyard &&
+    } else if ((nearestObj->type == ObjectiveType::AlienScrapyard ||
+                nearestObj->type == ObjectiveType::RecoverProbe) &&
                nearestObj->state == ObjectiveState::ReadyToDeposit) {
-      // Depositing scrap at deposit point — complete the objective
+      // Depositing item at deposit point — complete the objective
       nearestObj->interactingPlayerId = playerId;
       completeObjective(*nearestObj);
+    } else if (nearestObj->type == ObjectiveType::SaveTheFrogs &&
+               nearestObj->state == ObjectiveState::ReadyToDeposit) {
+      // Depositing a frog at the pond
+      nearestObj->interactingPlayerId = playerId;
+      nearestObj->frogsDeposited++;
+      nearestObj->interactionProgress = 0.0f;
+
+      Logger::info("Frog deposited for '" + nearestObj->name + "': " +
+                   std::to_string(nearestObj->frogsDeposited) + "/" +
+                   std::to_string(nearestObj->frogsRequired));
+
+      if (nearestObj->frogsDeposited >= nearestObj->frogsRequired) {
+        completeObjective(*nearestObj);
+      } else {
+        // More frogs needed — go back to InProgress for next pickup
+        nearestObj->state = ObjectiveState::InProgress;
+        nearestObj->interactingPlayerId = 0;
+
+        if (progressCallback) {
+          progressCallback(nearestObj->id, nearestObj->getProgress());
+        }
+        if (stateCallback) {
+          stateCallback(nearestObj->id, nearestObj->state);
+        }
+      }
     } else {
-      // Otherwise start the objective
+      // Start the objective (or re-start pick-up phase for SaveTheFrogs)
+      if (nearestObj->type == ObjectiveType::SaveTheFrogs) {
+        // Reset pickup progress for next frog
+        nearestObj->interactionProgress = 0.0f;
+      }
       startObjective(*nearestObj, playerId);
     }
     return true;
@@ -155,8 +203,9 @@ void ObjectiveSystem::stopInteraction(uint32_t playerId) {
 
   Objective* obj = getObjective(objectiveId);
   if (obj && obj->state == ObjectiveState::InProgress) {
-    // For AlienScrapyard, reset progress if player stops interacting
-    if (obj->type == ObjectiveType::AlienScrapyard) {
+    if (obj->type == ObjectiveType::AlienScrapyard ||
+        obj->type == ObjectiveType::RecoverProbe) {
+      // Reset entirely - player must start over
       obj->state = ObjectiveState::Inactive;
       obj->interactionProgress = 0.0f;
       obj->interactingPlayerId = 0;
@@ -168,6 +217,17 @@ void ObjectiveSystem::stopInteraction(uint32_t playerId) {
       Logger::info("Objective '" + obj->name +
                    "' interaction cancelled by player " +
                    std::to_string(playerId));
+    } else if (obj->type == ObjectiveType::SaveTheFrogs) {
+      // Cancel current frog pickup but keep deposited frogs
+      obj->interactionProgress = 0.0f;
+      obj->interactingPlayerId = 0;
+      // Stay InProgress so player can pick up next frog
+
+      Logger::info("Objective '" + obj->name +
+                   "' frog pickup cancelled by player " +
+                   std::to_string(playerId) + " (" +
+                   std::to_string(obj->frogsDeposited) + "/" +
+                   std::to_string(obj->frogsRequired) + " deposited)");
     }
     // For CaptureOutpost, don't reset - it continues until enemies are dead
   }

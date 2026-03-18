@@ -7,7 +7,9 @@
 enum class ObjectiveType : uint8_t {
   AlienScrapyard,  // Interact to collect scrap, timer-based completion
   CaptureOutpost,  // Kill all enemies in zone to complete
-  SalvageMedpacks  // Kill enemies, then interact with pod for healing
+  SalvageMedpacks,  // Kill enemies, then interact with pod for healing
+  RecoverProbe,    // Dig out probe (interact timer), carry to ship deposit
+  SaveTheFrogs     // Collect 3 frogs (repeating interact+deposit cycle)
 };
 
 // Current state of an objective
@@ -36,10 +38,15 @@ struct Objective {
   float interactionTime = 3.0f;      // Seconds to complete
   float interactionProgress = 0.0f;  // Current progress (0.0 - 1.0)
 
-  // For AlienScrapyard: deposit point (carry scrap here to complete)
+  // For AlienScrapyard/RecoverProbe: deposit point (carry item here to complete)
   float depositX = 0.0f;
   float depositY = 0.0f;
   bool hasDepositPoint = false;  // True if deposit coords are set
+
+  // For SaveTheFrogs: multi-deposit tracking (reuses enemiesRequired/Killed in
+  // packet)
+  int frogsRequired = 3;   // Total frogs to deposit (default 3)
+  int frogsDeposited = 0;  // How many frogs delivered so far
 
   // Player currently interacting (0 = none)
   uint32_t interactingPlayerId = 0;
@@ -63,12 +70,17 @@ struct Objective {
   float getProgress() const {
     switch (type) {
       case ObjectiveType::AlienScrapyard:
+      case ObjectiveType::RecoverProbe:
         return interactionProgress;
       case ObjectiveType::CaptureOutpost:
       case ObjectiveType::SalvageMedpacks:
         if (enemiesRequired == 0) return 1.0f;
         return static_cast<float>(enemiesKilled) /
                static_cast<float>(enemiesRequired);
+      case ObjectiveType::SaveTheFrogs:
+        if (frogsRequired == 0) return 1.0f;
+        return static_cast<float>(frogsDeposited) /
+               static_cast<float>(frogsRequired);
       default:
         return 0.0f;
     }
@@ -84,6 +96,10 @@ inline std::string objectiveTypeToString(ObjectiveType type) {
       return "CaptureOutpost";
     case ObjectiveType::SalvageMedpacks:
       return "SalvageMedpacks";
+    case ObjectiveType::RecoverProbe:
+      return "RecoverProbe";
+    case ObjectiveType::SaveTheFrogs:
+      return "SaveTheFrogs";
     default:
       return "Unknown";
   }
@@ -109,10 +125,18 @@ inline std::string objectiveStateToString(ObjectiveState state) {
 inline ObjectiveType parseObjectiveType(const std::string& str) {
   if (str == "alien_scrapyard" || str == "AlienScrapyard") {
     return ObjectiveType::AlienScrapyard;
-  } else if (str == "capture_outpost" || str == "CaptureOutpost") {
+  }
+  if (str == "capture_outpost" || str == "CaptureOutpost") {
     return ObjectiveType::CaptureOutpost;
-  } else if (str == "salvage_medpacks" || str == "SalvageMedpacks") {
+  }
+  if (str == "salvage_medpacks" || str == "SalvageMedpacks") {
     return ObjectiveType::SalvageMedpacks;
+  }
+  if (str == "recover_probe" || str == "RecoverProbe") {
+    return ObjectiveType::RecoverProbe;
+  }
+  if (str == "save_the_frogs" || str == "SaveTheFrogs") {
+    return ObjectiveType::SaveTheFrogs;
   }
   // Default to AlienScrapyard if unknown
   return ObjectiveType::AlienScrapyard;
