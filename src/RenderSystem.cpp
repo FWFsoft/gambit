@@ -68,6 +68,12 @@ RenderSystem::RenderSystem(Window* window, ClientPrediction* clientPrediction,
     playerTexture = whitePixelTexture.get();
   }
 
+  // Load ship sprite
+  shipTexture = TextureManager::instance().get("assets/ship.png");
+  if (!shipTexture) {
+    Logger::info("Ship sprite not found");
+  }
+
   Logger::info("RenderSystem initialized with OpenGL");
 
   EventBus::instance().subscribe<RenderEvent>(
@@ -144,14 +150,21 @@ void RenderSystem::onRender(const RenderEvent& e) {
     }
   }
 
+  // Fixed world position for the ship
+  constexpr float SHIP_WORLD_X = 400.0f;
+  constexpr float SHIP_WORLD_Y = 300.0f;
+
   // Collect all entities with their depths for sorting
   struct EntityToRender {
     float depth;
-    enum Type { Player, Enemy, WorldItem } type;
+    enum Type { Player, Enemy, WorldItem, Ship } type;
     union {
       const ::Player* player;
       const ::Enemy* enemy;
       const ::WorldItem* worldItem;
+      struct {
+        float x, y;
+      } shipPos;
     };
   };
 
@@ -160,7 +173,7 @@ void RenderSystem::onRender(const RenderEvent& e) {
 
   std::vector<EntityToRender> entitiesToRender;
   entitiesToRender.reserve(allPlayers.size() + allEnemies.size() +
-                           worldItems.size());
+                           worldItems.size() + 1);
 
   for (const Player& player : allPlayers) {
     EntityToRender entity;
@@ -186,6 +199,14 @@ void RenderSystem::onRender(const RenderEvent& e) {
     entitiesToRender.push_back(entity);
   }
 
+  {
+    EntityToRender entity;
+    entity.depth = SHIP_WORLD_X + SHIP_WORLD_Y;
+    entity.type = EntityToRender::Ship;
+    entity.shipPos = {SHIP_WORLD_X, SHIP_WORLD_Y};
+    entitiesToRender.push_back(entity);
+  }
+
   // Sort by depth (back to front for painter's algorithm)
   std::sort(entitiesToRender.begin(), entitiesToRender.end(),
             [](const EntityToRender& a, const EntityToRender& b) {
@@ -208,6 +229,8 @@ void RenderSystem::onRender(const RenderEvent& e) {
         drawEnemy(*entity.enemy);
       } else if (entity.type == EntityToRender::WorldItem) {
         drawWorldItem(*entity.worldItem);
+      } else if (entity.type == EntityToRender::Ship) {
+        drawShip(entity.shipPos.x, entity.shipPos.y);
       }
     }
   });
@@ -308,6 +331,20 @@ void RenderSystem::drawWorldItem(const WorldItem& worldItem) {
                        static_cast<float>(screenX - ITEM_SIZE / 2),
                        static_cast<float>(screenY - ITEM_SIZE / 2), ITEM_SIZE,
                        ITEM_SIZE, color.r, color.g, color.b, color.a);
+}
+
+void RenderSystem::drawShip(float worldX, float worldY) {
+  if (!shipTexture) return;
+
+  int screenX, screenY;
+  camera->worldToScreen(worldX, worldY, screenX, screenY);
+
+  constexpr float SHIP_W = 96.0f;
+  constexpr float SHIP_H = 96.0f;
+
+  spriteRenderer->draw(*shipTexture, static_cast<float>(screenX) - SHIP_W / 2,
+                       static_cast<float>(screenY) - SHIP_H / 2, SHIP_W,
+                       SHIP_H, 1.0f, 1.0f, 1.0f, 1.0f);
 }
 
 void RenderSystem::drawHealthBar(int x, int y, float health, float maxHealth) {

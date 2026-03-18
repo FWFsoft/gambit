@@ -50,11 +50,13 @@ class RenderSystem {
   std::unique_ptr<Texture> whitePixelTexture;
   std::unique_ptr<TileRenderer> tileRenderer;
   Texture* playerTexture;  // Managed by TextureManager, not owned
+  Texture* shipTexture;    // Managed by TextureManager, not owned
 
   void onRender(const RenderEvent& e);
   void drawPlayer(const Player& player);
   void drawEnemy(const Enemy& enemy);
   void drawWorldItem(const WorldItem& worldItem);
   void drawObjective(const ClientObjective& objective);
+  void drawShip(float worldX, float worldY);
   void drawHealthBar(int x, int y, float health, float maxHealth);
 };
