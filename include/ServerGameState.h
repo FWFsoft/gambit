@@ -39,6 +39,11 @@ class ServerGameState {
   std::unique_ptr<EffectManager> effectManager;
   std::unique_ptr<ObjectiveSystem> objectiveSystem;
 
+  // Ship (home base) position loaded from map
+  float shipX = 0.0f;
+  float shipY = 0.0f;
+  bool hasShip = false;
+
   // World item management
   std::unordered_map<uint32_t, WorldItem> worldItems;
   uint32_t nextWorldItemId;
@@ -75,4 +80,10 @@ class ServerGameState {
   // Objective management methods
   void broadcastObjectiveState(uint32_t objectiveId);
   void broadcastAllObjectives(uint32_t clientId);
+
+  // Per-frame objective side effects (gas damage, LittleJohn activation)
+  void updateObjectiveSideEffects(float deltaTime);
+
+  // Link LittleJohn objectives to their guardian enemies
+  void initializeLittleJohnGuardians();
 };

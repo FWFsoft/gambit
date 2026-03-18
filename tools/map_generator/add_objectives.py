@@ -173,6 +173,8 @@ def add_objectives_to_tmx(
     medpacks_count=0,
     probe_count=0,
     frogs_count=0,
+    noxious_count=0,
+    littlejohn_count=0,
     scrapyard_radius=50.0,
     outpost_radius=100.0,
     medpacks_radius=100.0,
@@ -220,7 +222,8 @@ def add_objectives_to_tmx(
         print("Removed existing Objectives layer")
 
     # Generate objective positions
-    total_objectives = scrapyard_count + outpost_count + medpacks_count + probe_count + frogs_count
+    total_objectives = (scrapyard_count + outpost_count + medpacks_count +
+                        probe_count + frogs_count + noxious_count + littlejohn_count)
     points = generate_objective_points(
         width,
         height,
@@ -261,12 +264,11 @@ def add_objectives_to_tmx(
             enemies = 0
             description = "Dig out the embedded probe and return it to the ship"
             extra = {"interaction_time": 4.0}
-        else:
+        elif i < scrapyard_count + outpost_count + medpacks_count + probe_count + frogs_count:
             obj_type = "save_the_frogs"
             radius = frogs_radius
-            enemies = frogs_required  # reuse enemies_required field for frog count
+            enemies = frogs_required
             description = f"Rescue {frogs_required} frogs and bring them to the pond"
-            # Generate a nearby deposit point (pond) offset from the frog zone
             pond_offset_x = random.uniform(-80, 80)
             pond_offset_y = random.uniform(-80, 80)
             pond_world_x = world_x + pond_offset_x
@@ -275,6 +277,18 @@ def add_objectives_to_tmx(
                 pond_world_x, pond_world_y, width, height, tile_width, tile_height
             )
             extra = {"pond_iso_x": pond_iso_x, "pond_iso_y": pond_iso_y}
+        elif i < scrapyard_count + outpost_count + medpacks_count + probe_count + frogs_count + noxious_count:
+            obj_type = "noxious_gas"
+            radius = frogs_radius
+            enemies = 0
+            description = "Navigate the toxic gas cloud and kick the spores"
+            extra = {"interaction_time": 3.0}
+        else:
+            obj_type = "little_john"
+            radius = frogs_radius
+            enemies = 1
+            description = "Open the gate guarded by a dormant sentinel"
+            extra = {}
 
         objectives.append(
             {
@@ -303,6 +317,8 @@ def add_objectives_to_tmx(
         "salvage_medpacks": "Medpacks",
         "recover_probe": "Probe",
         "save_the_frogs": "Frogs",
+        "noxious_gas": "NoxiousGas",
+        "little_john": "LittleJohn",
     }
     type_counters = {k: 0 for k in name_prefixes}
 
@@ -343,13 +359,27 @@ def add_objectives_to_tmx(
 
         extra = obj.get("extra", {})
 
-        if obj["type"] in ("alien_scrapyard", "recover_probe"):
-            # Timer-based pickup — write interaction_time
+        if obj["type"] in ("alien_scrapyard", "recover_probe", "noxious_gas"):
+            # Timer-based interaction — write interaction_time
             t = extra.get("interaction_time", 3.0)
             prop_time = ET.SubElement(properties, "property")
             prop_time.set("name", "interaction_time")
             prop_time.set("type", "float")
             prop_time.set("value", str(t))
+
+        elif obj["type"] == "little_john":
+            # Guardian count (1 enemy required)
+            prop_enemies = ET.SubElement(properties, "property")
+            prop_enemies.set("name", "enemies_required")
+            prop_enemies.set("type", "int")
+            prop_enemies.set("value", str(obj["enemies_required"]))
+
+            # Generate one large guardian enemy near the gate
+            guardian_enemies = generate_enemies_in_zone(
+                obj["world_x"], obj["world_y"], obj["radius"] * 0.5,
+                1, width, height, tile_width, tile_height,
+            )
+            all_outpost_enemies.extend(guardian_enemies)
 
         elif obj["type"] == "save_the_frogs":
             # enemies_required holds frog count; deposit point is the pond
@@ -531,6 +561,18 @@ def main():
         help="Number of frogs to collect per SaveTheFrogs objective (default: 3)",
     )
     parser.add_argument(
+        "--noxious",
+        type=int,
+        default=0,
+        help="Number of NoxiousGas objectives (default: 0)",
+    )
+    parser.add_argument(
+        "--littlejohn",
+        type=int,
+        default=0,
+        help="Number of LittleJohn objectives (default: 0)",
+    )
+    parser.add_argument(
         "--enemies-per-outpost",
         type=int,
         default=3,
@@ -571,6 +613,8 @@ def main():
         args.medpacks,
         args.probes,
         args.frogs,
+        args.noxious,
+        args.littlejohn,
         args.scrapyard_radius,
         args.outpost_radius,
         args.medpacks_radius,

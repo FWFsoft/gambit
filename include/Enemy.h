@@ -34,6 +34,9 @@ struct Enemy : public Animatable {
   // Target tracking
   uint32_t targetPlayerId;  // Player being chased/attacked (0 = no target)
 
+  // LittleJohn: guardian starts passive (won't chase) until player enters zone
+  bool passive = false;
+
   // Respawn tracking
   uint32_t spawnIndex;  // Which spawn point this enemy came from
   float deathTime;      // Timestamp when enemy died (milliseconds)

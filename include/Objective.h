@@ -9,7 +9,9 @@ enum class ObjectiveType : uint8_t {
   CaptureOutpost,  // Kill all enemies in zone to complete
   SalvageMedpacks,  // Kill enemies, then interact with pod for healing
   RecoverProbe,    // Dig out probe (interact timer), carry to ship deposit
-  SaveTheFrogs     // Collect 3 frogs (repeating interact+deposit cycle)
+  SaveTheFrogs,    // Collect 3 frogs (repeating interact+deposit cycle)
+  NoxiousGas,      // Kick spores in a damaging gas cloud (interact timer)
+  LittleJohn       // Gate guarded by passive enemy that activates on approach
 };
 
 // Current state of an objective
@@ -48,6 +50,12 @@ struct Objective {
   int frogsRequired = 3;   // Total frogs to deposit (default 3)
   int frogsDeposited = 0;  // How many frogs delivered so far
 
+  // For NoxiousGas: throttle damage ticks
+  float gasDamageTimer = 0.0f;  // Accumulates ms; damage fires every 2000ms
+
+  // For LittleJohn: guardian enemy tracking
+  uint32_t guardianEnemyId = 0;  // ID of the passive guardian (0 = none/dead)
+
   // Player currently interacting (0 = none)
   uint32_t interactingPlayerId = 0;
 
@@ -81,6 +89,10 @@ struct Objective {
         if (frogsRequired == 0) return 1.0f;
         return static_cast<float>(frogsDeposited) /
                static_cast<float>(frogsRequired);
+      case ObjectiveType::NoxiousGas:
+        return interactionProgress;
+      case ObjectiveType::LittleJohn:
+        return (state == ObjectiveState::Completed) ? 1.0f : 0.0f;
       default:
         return 0.0f;
     }
@@ -100,6 +112,10 @@ inline std::string objectiveTypeToString(ObjectiveType type) {
       return "RecoverProbe";
     case ObjectiveType::SaveTheFrogs:
       return "SaveTheFrogs";
+    case ObjectiveType::NoxiousGas:
+      return "NoxiousGas";
+    case ObjectiveType::LittleJohn:
+      return "LittleJohn";
     default:
       return "Unknown";
   }
@@ -137,6 +153,12 @@ inline ObjectiveType parseObjectiveType(const std::string& str) {
   }
   if (str == "save_the_frogs" || str == "SaveTheFrogs") {
     return ObjectiveType::SaveTheFrogs;
+  }
+  if (str == "noxious_gas" || str == "NoxiousGas") {
+    return ObjectiveType::NoxiousGas;
+  }
+  if (str == "little_john" || str == "LittleJohn") {
+    return ObjectiveType::LittleJohn;
   }
   // Default to AlienScrapyard if unknown
   return ObjectiveType::AlienScrapyard;

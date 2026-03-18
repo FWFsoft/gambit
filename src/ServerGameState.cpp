@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <limits>
 
 #include "CollisionSystem.h"
 #include "EnemySystem.h"
@@ -108,6 +109,31 @@ ServerGameState::ServerGameState(NetworkServer* server,
                          std::to_string(lootY) + ")");
           }
 
+          // NoxiousGas: gas disperses, spawn loot at spore location
+          if (obj->type == ObjectiveType::NoxiousGas) {
+            spawnWorldItem(1, obj->x, obj->y);
+            Logger::info("NoxiousGas cleared - loot spawned at (" +
+                         std::to_string(obj->x) + ", " +
+                         std::to_string(obj->y) + ")");
+          }
+
+          // LittleJohn: if guardian still alive, apply Berserk to it
+          if (obj->type == ObjectiveType::LittleJohn && enemySystem) {
+            if (obj->guardianEnemyId != 0) {
+              auto& enemies = enemySystem->getEnemies();
+              auto it = enemies.find(obj->guardianEnemyId);
+              if (it != enemies.end() &&
+                  it->second.state != EnemyState::Dead) {
+                effectManager->applyEffect(obj->guardianEnemyId,
+                                           EffectType::Berserk, 5, 999999.0f,
+                                           0, enemySystem->getEnemies());
+                Logger::info("LittleJohn gate opened - guardian " +
+                             std::to_string(obj->guardianEnemyId) +
+                             " enrages with Berserk x5");
+              }
+            }
+          }
+
           // SaveTheFrogs: spawn healing pickups at pond
           if (obj->type == ObjectiveType::SaveTheFrogs) {
             float lootX = obj->hasDepositPoint ? obj->depositX : obj->x;
@@ -154,6 +180,11 @@ ServerGameState::ServerGameState(NetworkServer* server,
   // Subscribe to update events
   EventBus::instance().subscribe<UpdateEvent>(
       [this](const UpdateEvent& e) { onUpdate(e); });
+
+  // Link LittleJohn guardian enemies now that both systems are initialized
+  if (objectiveSystem && enemySystem) {
+    initializeLittleJohnGuardians();
+  }
 }
 
 ServerGameState::~ServerGameState() = default;
@@ -488,6 +519,11 @@ void ServerGameState::onUpdate(const UpdateEvent& e) {
   if (effectManager && enemySystem) {
     effectManager->update(e.deltaTime, players, enemySystem->getEnemies(),
                           enemySystem.get());
+  }
+
+  // Objective side effects: gas damage, LittleJohn activation
+  if (objectiveSystem && effectManager) {
+    updateObjectiveSideEffects(e.deltaTime);
   }
 
   // Update objective system (handles interaction timers)
@@ -1256,4 +1292,81 @@ void ServerGameState::broadcastAllObjectives(uint32_t clientId) {
 
   Logger::info("Sent " + std::to_string(objectives.size()) +
                " objectives to new client");
+}
+
+void ServerGameState::updateObjectiveSideEffects(float deltaTime) {
+  auto& objectives = objectiveSystem->getObjectivesMutable();
+
+  for (auto& obj : objectives) {
+    // NoxiousGas: apply Wound to players in zone while not completed
+    if (obj.type == ObjectiveType::NoxiousGas &&
+        obj.state != ObjectiveState::Completed) {
+      obj.gasDamageTimer += deltaTime;
+      if (obj.gasDamageTimer >= 2000.0f) {  // Tick every 2 seconds
+        obj.gasDamageTimer = 0.0f;
+        for (auto& [playerId, player] : players) {
+          if (player.isAlive() && obj.isInRange(player.x, player.y)) {
+            effectManager->applyEffect(playerId, EffectType::Wound, 1,
+                                       4000.0f, 0, players);
+          }
+        }
+      }
+    }
+
+    // LittleJohn: activate guardian when a player enters the zone
+    if (obj.type == ObjectiveType::LittleJohn &&
+        obj.state == ObjectiveState::Inactive && obj.guardianEnemyId != 0) {
+      for (const auto& [playerId, player] : players) {
+        if (player.isAlive() && obj.isInRange(player.x, player.y)) {
+          // Player entered gate zone — activate guardian and start objective
+          auto& enemies = enemySystem->getEnemies();
+          auto it = enemies.find(obj.guardianEnemyId);
+          if (it != enemies.end()) {
+            it->second.passive = false;
+            Logger::info("LittleJohn guardian " +
+                         std::to_string(obj.guardianEnemyId) +
+                         " activated by player " + std::to_string(playerId));
+          }
+          obj.state = ObjectiveState::InProgress;
+          broadcastObjectiveState(obj.id);
+          break;
+        }
+      }
+    }
+  }
+}
+
+void ServerGameState::initializeLittleJohnGuardians() {
+  auto& objectives = objectiveSystem->getObjectivesMutable();
+  auto& enemies = enemySystem->getEnemies();
+
+  for (auto& obj : objectives) {
+    if (obj.type != ObjectiveType::LittleJohn) continue;
+
+    // Find nearest enemy within the objective radius and mark it as guardian
+    uint32_t nearestId = 0;
+    float nearestDistSq = std::numeric_limits<float>::max();
+
+    for (auto& [enemyId, enemy] : enemies) {
+      if (enemy.state == EnemyState::Dead) continue;
+      float dx = enemy.x - obj.x;
+      float dy = enemy.y - obj.y;
+      float distSq = dx * dx + dy * dy;
+      float searchRadius = obj.radius * 2.0f;  // Search a bit wider than zone
+      if (distSq < searchRadius * searchRadius && distSq < nearestDistSq) {
+        nearestDistSq = distSq;
+        nearestId = enemyId;
+      }
+    }
+
+    if (nearestId != 0) {
+      obj.guardianEnemyId = nearestId;
+      enemies[nearestId].passive = true;
+      Logger::info("LittleJohn '" + obj.name + "' linked to guardian enemy " +
+                   std::to_string(nearestId));
+    } else {
+      Logger::info("LittleJohn '" + obj.name +
+                   "' has no nearby enemy to use as guardian");
+    }
+  }
 }

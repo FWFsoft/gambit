@@ -1672,6 +1672,90 @@
         <property name="enemy_type" type="string" value="skeleton" />
       </properties>
     </object>
+    <object id="245" name="Outpost_Spawn_goblin_01" x="263.34665751829147" y="2241.4869197471107">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="goblin" />
+      </properties>
+    </object>
+    <object id="246" name="Outpost_Spawn_skeleton_02" x="220.01311836978184" y="2213.1500673587498">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="skeleton" />
+      </properties>
+    </object>
+    <object id="247" name="Outpost_Spawn_goblin_03" x="297.36020990625246" y="2195.5660016750985">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="goblin" />
+      </properties>
+    </object>
+    <object id="248" name="Outpost_Spawn_goblin_04" x="684.3466770088278" y="1610.387818998616">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="goblin" />
+      </properties>
+    </object>
+    <object id="249" name="Outpost_Spawn_goblin_05" x="739.3927853593141" y="1609.9099219423283">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="goblin" />
+      </properties>
+    </object>
+    <object id="250" name="Outpost_Spawn_slime_06" x="690.5229000799385" y="1648.4517384806627">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="slime" />
+      </properties>
+    </object>
+    <object id="251" name="Outpost_Spawn_goblin_07" x="1373.0219612402611" y="4275.525454391224">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="goblin" />
+      </properties>
+    </object>
+    <object id="252" name="Outpost_Spawn_skeleton_01" x="261.23657260796415" y="2287.875967124791">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="skeleton" />
+      </properties>
+    </object>
+    <object id="253" name="Outpost_Spawn_skeleton_02" x="244.11188649332814" y="2185.1679313159434">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="skeleton" />
+      </properties>
+    </object>
+    <object id="254" name="Outpost_Spawn_slime_03" x="234.86843231316197" y="2246.98235605152">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="slime" />
+      </properties>
+    </object>
+    <object id="255" name="Outpost_Spawn_skeleton_04" x="704.70646156543" y="1587.2468068777048">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="skeleton" />
+      </properties>
+    </object>
+    <object id="256" name="Outpost_Spawn_goblin_05" x="683.0742056198015" y="1619.668624290521">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="goblin" />
+      </properties>
+    </object>
+    <object id="257" name="Outpost_Spawn_slime_06" x="671.2770689268863" y="1547.5207507392222">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="slime" />
+      </properties>
+    </object>
+    <object id="258" name="Outpost_Spawn_goblin_07" x="1388.7785521209476" y="4255.593723217307">
+      <point />
+      <properties>
+        <property name="enemy_type" type="string" value="goblin" />
+      </properties>
+    </object>
   </objectgroup>
   <objectgroup id="5" name="Ship">
     <object id="239" name="The Ship" x="2400.0" y="3312.0">
@@ -1731,8 +1815,26 @@
         <property name="description" type="string" value="Rescue 3 frogs and bring them to the pond" />
         <property name="radius" type="float" value="60.0" />
         <property name="enemies_required" type="int" value="3" />
-        <property name="deposit_x" type="float" value="-449.25126916722473" />
-        <property name="deposit_y" type="float" value="5853.910213220706" />
+        <property name="deposit_x" type="float" value="-586.9147712829147" />
+        <property name="deposit_y" type="float" value="5854.991238377855" />
+      </properties>
+    </object>
+    <object id="7" name="NoxiousGas_01" x="3744.0" y="2704.0">
+      <point />
+      <properties>
+        <property name="objective_type" type="string" value="noxious_gas" />
+        <property name="description" type="string" value="Navigate the toxic gas cloud and kick the spores" />
+        <property name="radius" type="float" value="60.0" />
+        <property name="interaction_time" type="float" value="3.0" />
+      </properties>
+    </object>
+    <object id="8" name="LittleJohn_01" x="1376.0" y="4272.0">
+      <point />
+      <properties>
+        <property name="objective_type" type="string" value="little_john" />
+        <property name="description" type="string" value="Open the gate guarded by a dormant sentinel" />
+        <property name="radius" type="float" value="60.0" />
+        <property name="enemies_required" type="int" value="1" />
       </properties>
     </object>
   </objectgroup>

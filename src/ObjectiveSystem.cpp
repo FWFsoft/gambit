@@ -30,7 +30,8 @@ void ObjectiveSystem::update(float deltaTime) {
 
     if (obj->type == ObjectiveType::AlienScrapyard ||
         obj->type == ObjectiveType::RecoverProbe ||
-        obj->type == ObjectiveType::SaveTheFrogs) {
+        obj->type == ObjectiveType::SaveTheFrogs ||
+        obj->type == ObjectiveType::NoxiousGas) {
       // Progress the interaction timer (deltaTime is ms, interactionTime is
       // seconds)
       float progressIncrement =
@@ -101,6 +102,21 @@ bool ObjectiveSystem::tryInteract(uint32_t playerId, float playerX,
         obj.state == ObjectiveState::ReadyToDeposit &&
         obj.isInDepositRange(playerX, playerY)) {
       canInteract = true;  // Ready to deposit item at deposit point
+    }
+
+    // NoxiousGas: allow interact when Inactive or InProgress (re-start timer)
+    if (obj.type == ObjectiveType::NoxiousGas &&
+        (obj.state == ObjectiveState::Inactive ||
+         obj.state == ObjectiveState::InProgress) &&
+        obj.interactingPlayerId == 0 && obj.isInRange(playerX, playerY)) {
+      canInteract = true;
+    }
+
+    // LittleJohn: allow gate interact when InProgress (guardian activated)
+    if (obj.type == ObjectiveType::LittleJohn &&
+        obj.state == ObjectiveState::InProgress &&
+        obj.isInRange(playerX, playerY)) {
+      canInteract = true;
     }
 
     // SaveTheFrogs: allow re-pickup when InProgress (more frogs needed) and no
@@ -178,10 +194,19 @@ bool ObjectiveSystem::tryInteract(uint32_t playerId, float playerX,
           stateCallback(nearestObj->id, nearestObj->state);
         }
       }
+    } else if (nearestObj->type == ObjectiveType::LittleJohn &&
+               nearestObj->state == ObjectiveState::InProgress) {
+      // Interact with gate — complete immediately (no timer)
+      nearestObj->interactingPlayerId = playerId;
+      completeObjective(*nearestObj);
+    } else if (nearestObj->type == ObjectiveType::NoxiousGas &&
+               nearestObj->state == ObjectiveState::InProgress) {
+      // Resume interaction (player re-entered zone)
+      nearestObj->interactionProgress = 0.0f;
+      startObjective(*nearestObj, playerId);
     } else {
       // Start the objective (or re-start pick-up phase for SaveTheFrogs)
       if (nearestObj->type == ObjectiveType::SaveTheFrogs) {
-        // Reset pickup progress for next frog
         nearestObj->interactionProgress = 0.0f;
       }
       startObjective(*nearestObj, playerId);
@@ -204,7 +229,8 @@ void ObjectiveSystem::stopInteraction(uint32_t playerId) {
   Objective* obj = getObjective(objectiveId);
   if (obj && obj->state == ObjectiveState::InProgress) {
     if (obj->type == ObjectiveType::AlienScrapyard ||
-        obj->type == ObjectiveType::RecoverProbe) {
+        obj->type == ObjectiveType::RecoverProbe ||
+        obj->type == ObjectiveType::NoxiousGas) {
       // Reset entirely - player must start over
       obj->state = ObjectiveState::Inactive;
       obj->interactionProgress = 0.0f;

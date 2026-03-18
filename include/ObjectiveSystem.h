@@ -58,6 +58,7 @@ class ObjectiveSystem {
 
   // Get all objectives (for network sync)
   const std::vector<Objective>& getObjectives() const { return objectives; }
+  std::vector<Objective>& getObjectivesMutable() { return objectives; }
 
   // Get a specific objective by ID
   Objective* getObjective(uint32_t objectiveId);

@@ -126,6 +126,13 @@ void EnemySystem::updateEnemyAI(Enemy& enemy,
 
 void EnemySystem::updateIdleState(
     Enemy& enemy, const std::unordered_map<uint32_t, Player>& players) {
+  // Passive enemies (LittleJohn guardian) do not chase until activated
+  if (enemy.passive) {
+    enemy.vx = 0.0f;
+    enemy.vy = 0.0f;
+    return;
+  }
+
   // Look for nearest player within detection range
   const Player* nearestPlayer =
       findNearestPlayer(enemy, players, enemy.detectionRange);
