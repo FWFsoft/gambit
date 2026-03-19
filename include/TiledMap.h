@@ -36,6 +36,9 @@ class TiledMap {
     return playerSpawns;
   }
   const std::vector<Objective>& getObjectives() const { return objectives; }
+  bool hasShipPosition() const { return hasShip; }
+  float getShipX() const { return shipX; }
+  float getShipY() const { return shipY; }
 
   // Tileset information
   std::string getTilesetImagePath() const;
@@ -55,9 +58,13 @@ class TiledMap {
   std::vector<EnemySpawn> enemySpawns;
   std::vector<PlayerSpawn> playerSpawns;
   std::vector<Objective> objectives;
+  float shipX = 0.0f;
+  float shipY = 0.0f;
+  bool hasShip = false;
 
   void extractCollisionShapes();
   void extractEnemySpawns();
   void extractPlayerSpawns();
+  void extractShip();
   void extractObjectives();
 };

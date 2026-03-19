@@ -32,7 +32,8 @@ void ObjectiveSystem::update(float deltaTime) {
         obj->type == ObjectiveType::RecoverProbe ||
         obj->type == ObjectiveType::SaveTheFrogs ||
         obj->type == ObjectiveType::NoxiousGas ||
-        obj->type == ObjectiveType::DigPitTrap) {
+        obj->type == ObjectiveType::DigPitTrap ||
+        obj->type == ObjectiveType::StringTripwire) {
       // Progress the interaction timer (deltaTime is ms, interactionTime is
       // seconds)
       float progressIncrement =
@@ -232,7 +233,8 @@ void ObjectiveSystem::stopInteraction(uint32_t playerId) {
     if (obj->type == ObjectiveType::AlienScrapyard ||
         obj->type == ObjectiveType::RecoverProbe ||
         obj->type == ObjectiveType::NoxiousGas ||
-        obj->type == ObjectiveType::DigPitTrap) {
+        obj->type == ObjectiveType::DigPitTrap ||
+        obj->type == ObjectiveType::StringTripwire) {
       // Reset entirely - player must start over
       obj->state = ObjectiveState::Inactive;
       obj->interactionProgress = 0.0f;

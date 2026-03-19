@@ -43,6 +43,10 @@ class ClientPrediction {
     return objectives;
   }
 
+  bool hasShipLocation() const { return hasShip; }
+  float getShipX() const { return shipX; }
+  float getShipY() const { return shipY; }
+
   // Update an objective from network packet
   void updateObjective(const ObjectiveStatePacket& packet);
 
@@ -68,6 +72,11 @@ class ClientPrediction {
 
   // Objectives received from server
   std::unordered_map<uint32_t, ClientObjective> objectives;
+
+  // Ship (home base) position received from server
+  float shipX = 0.0f;
+  float shipY = 0.0f;
+  bool hasShip = false;
 
   // Character selection state
   bool sentCharacterSelection;

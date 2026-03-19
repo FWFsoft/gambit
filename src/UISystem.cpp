@@ -1559,6 +1559,21 @@ void UISystem::renderMinimap() {
     }
   }
 
+  // Draw ship (home base) as a blue cross
+  if (clientPrediction->hasShipLocation()) {
+    ImVec2 sp = worldToMinimap(clientPrediction->getShipX(),
+                               clientPrediction->getShipY());
+    constexpr float ARM = 6.0f;
+    constexpr float THICK = 2.0f;
+    ImU32 shipColor = IM_COL32(80, 160, 255, 240);
+    // Horizontal bar
+    draw->AddRectFilled(ImVec2(sp.x - ARM, sp.y - THICK),
+                        ImVec2(sp.x + ARM, sp.y + THICK), shipColor);
+    // Vertical bar
+    draw->AddRectFilled(ImVec2(sp.x - THICK, sp.y - ARM),
+                        ImVec2(sp.x + THICK, sp.y + ARM), shipColor);
+  }
+
   // Draw local player (bright white, slightly larger)
   {
     const Player& local = clientPrediction->getLocalPlayer();

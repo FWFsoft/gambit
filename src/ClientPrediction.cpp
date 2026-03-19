@@ -299,6 +299,17 @@ void ClientPrediction::setupObjectiveEventHandlers() {
 
         PacketType type = static_cast<PacketType>(e.data[0]);
 
+        if (type == PacketType::ShipLocation) {
+          ShipLocationPacket packet = deserializeShipLocation(e.data, e.size);
+          shipX = packet.x;
+          shipY = packet.y;
+          hasShip = true;
+          Logger::debug("Received ship location at (" +
+                        std::to_string(static_cast<int>(shipX)) + ", " +
+                        std::to_string(static_cast<int>(shipY)) + ")");
+          return;
+        }
+
         if (type == PacketType::ObjectiveState) {
           ObjectiveStatePacket packet =
               deserializeObjectiveState(e.data, e.size);
@@ -324,6 +335,18 @@ void ClientPrediction::setupObjectiveEventHandlers() {
             event.name = "Capture Outpost";
           } else if (packet.objectiveType == 2) {  // SalvageMedpacks
             event.name = "Salvage Medpacks";
+          } else if (packet.objectiveType == 3) {  // RecoverProbe
+            event.name = "Recover Probe";
+          } else if (packet.objectiveType == 4) {  // SaveTheFrogs
+            event.name = "Save the Frogs";
+          } else if (packet.objectiveType == 5) {  // NoxiousGas
+            event.name = "Noxious Gas";
+          } else if (packet.objectiveType == 6) {  // LittleJohn
+            event.name = "Little John";
+          } else if (packet.objectiveType == 7) {  // DigPitTrap
+            event.name = "Dig Pit Trap";
+          } else if (packet.objectiveType == 8) {  // StringTripwire
+            event.name = "String Tripwire";
           } else {
             event.name = "Unknown Objective";
           }

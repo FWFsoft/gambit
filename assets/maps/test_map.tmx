@@ -1888,5 +1888,14 @@
         <property name="interaction_time" type="float" value="5.0" />
       </properties>
     </object>
+    <object id="10" name="Tripwire_01" x="192.0" y="368.0">
+      <point />
+      <properties>
+        <property name="objective_type" type="string" value="string_tripwire" />
+        <property name="description" type="string" value="String a tripwire with unexploded ordnance across the choke point" />
+        <property name="radius" type="float" value="50.0" />
+        <property name="interaction_time" type="float" value="5.0" />
+      </properties>
+    </object>
   </objectgroup>
 </map>

@@ -26,7 +26,8 @@ enum class PacketType : uint8_t {
   EffectUpdate = 19,       // Server → Client (broadcast)
   CharacterSelected = 20,  // Client → Server
   ObjectiveState = 21,     // Server → Client (broadcast objective status)
-  ObjectiveInteract = 22   // Client → Server (request to interact)
+  ObjectiveInteract = 22,  // Client → Server (request to interact)
+  ShipLocation = 23        // Server → Client (ship/home base position)
 };
 
 struct ClientInputPacket {
@@ -222,6 +223,12 @@ struct ObjectiveInteractPacket {
 };
 // Size: 5 bytes (1 + 4)
 
+struct ShipLocationPacket {
+  PacketType type = PacketType::ShipLocation;
+  float x, y;  // World position of the ship (home base)
+};
+// Size: 9 bytes (1 + 4 + 4)
+
 // Serialization functions
 std::vector<uint8_t> serialize(const ClientInputPacket& packet);
 std::vector<uint8_t> serialize(const StateUpdatePacket& packet);
@@ -246,6 +253,7 @@ std::vector<uint8_t> serialize(const EffectUpdatePacket& packet);
 std::vector<uint8_t> serialize(const CharacterSelectedPacket& packet);
 std::vector<uint8_t> serialize(const ObjectiveStatePacket& packet);
 std::vector<uint8_t> serialize(const ObjectiveInteractPacket& packet);
+std::vector<uint8_t> serialize(const ShipLocationPacket& packet);
 
 // Deserialization functions
 ClientInputPacket deserializeClientInput(const uint8_t* data, size_t size);
@@ -278,6 +286,7 @@ ObjectiveStatePacket deserializeObjectiveState(const uint8_t* data,
                                                size_t size);
 ObjectiveInteractPacket deserializeObjectiveInteract(const uint8_t* data,
                                                      size_t size);
+ShipLocationPacket deserializeShipLocation(const uint8_t* data, size_t size);
 
 // Helper functions for binary I/O
 void writeUint32(std::vector<uint8_t>& buffer, uint32_t value);

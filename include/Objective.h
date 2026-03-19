@@ -12,7 +12,9 @@ enum class ObjectiveType : uint8_t {
   SaveTheFrogs,    // Collect 3 frogs (repeating interact+deposit cycle)
   NoxiousGas,      // Kick spores in a damaging gas cloud (interact timer)
   LittleJohn,      // Gate guarded by passive enemy that activates on approach
-  DigPitTrap       // Build a hidden pit trap (interact timer); arms on completion
+  DigPitTrap,      // Build a hidden pit trap (interact timer); arms on completion
+  StringTripwire   // String a tripwire with ordnance (interact timer); arms on
+                   // completion, affects friendlies
 };
 
 // Current state of an objective
@@ -58,7 +60,8 @@ struct Objective {
   uint32_t guardianEnemyId = 0;  // ID of the passive guardian (0 = none/dead)
 
   // For DigPitTrap: whether the completed trap has already been triggered
-  bool pitTrapArmed = false;  // True after trap fires (one-time use)
+  bool pitTrapArmed = false;      // True after trap fires (one-time use)
+  bool tripwireArmed = false;     // True after tripwire fires (one-time use)
 
   // Player currently interacting (0 = none)
   uint32_t interactingPlayerId = 0;
@@ -98,6 +101,7 @@ struct Objective {
       case ObjectiveType::LittleJohn:
         return (state == ObjectiveState::Completed) ? 1.0f : 0.0f;
       case ObjectiveType::DigPitTrap:
+      case ObjectiveType::StringTripwire:
         return interactionProgress;
       default:
         return 0.0f;
@@ -124,6 +128,8 @@ inline std::string objectiveTypeToString(ObjectiveType type) {
       return "LittleJohn";
     case ObjectiveType::DigPitTrap:
       return "DigPitTrap";
+    case ObjectiveType::StringTripwire:
+      return "StringTripwire";
     default:
       return "Unknown";
   }
@@ -170,6 +176,9 @@ inline ObjectiveType parseObjectiveType(const std::string& str) {
   }
   if (str == "dig_pit_trap" || str == "DigPitTrap") {
     return ObjectiveType::DigPitTrap;
+  }
+  if (str == "string_tripwire" || str == "StringTripwire") {
+    return ObjectiveType::StringTripwire;
   }
   // Default to AlienScrapyard if unknown
   return ObjectiveType::AlienScrapyard;

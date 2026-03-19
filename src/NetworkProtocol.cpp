@@ -790,3 +790,26 @@ ObjectiveInteractPacket deserializeObjectiveInteract(const uint8_t* data,
 
   return packet;
 }
+
+std::vector<uint8_t> serialize(const ShipLocationPacket& packet) {
+  std::vector<uint8_t> buffer;
+  buffer.reserve(9);
+
+  writeUint8(buffer, static_cast<uint8_t>(packet.type));
+  writeFloat(buffer, packet.x);
+  writeFloat(buffer, packet.y);
+
+  assert(buffer.size() == 9);  // 1 + 4 + 4
+  return buffer;
+}
+
+ShipLocationPacket deserializeShipLocation(const uint8_t* data, size_t size) {
+  assert(size >= 9 && "ShipLocationPacket too small");
+  assert(data[0] == static_cast<uint8_t>(PacketType::ShipLocation));
+
+  ShipLocationPacket packet;
+  packet.x = readFloat(data + 1);
+  packet.y = readFloat(data + 5);
+
+  return packet;
+}

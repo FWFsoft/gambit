@@ -140,6 +140,12 @@ ServerGameState::ServerGameState(NetworkServer* server,
                          "' armed and waiting for victims");
           }
 
+          // StringTripwire: trap is now armed — no immediate reward
+          if (obj->type == ObjectiveType::StringTripwire) {
+            Logger::info("StringTripwire '" + obj->name +
+                         "' armed and waiting for victims");
+          }
+
           // SaveTheFrogs: spawn healing pickups at pond
           if (obj->type == ObjectiveType::SaveTheFrogs) {
             float lootX = obj->hasDepositPoint ? obj->depositX : obj->x;
@@ -1358,6 +1364,52 @@ void ServerGameState::updateObjectiveSideEffects(float deltaTime) {
             effectManager->applyEffect(eid, EffectType::Wound, 1, 5000.0f, 0,
                                        enemySystem->getEnemies());
             Logger::info("  Enemy " + std::to_string(eid) + " caught in trap");
+          }
+        }
+      }
+    }
+
+    // StringTripwire: once completed, fire Wound+Snared at any entity that
+    // enters (affects friendlies too, one-time trigger like DigPitTrap)
+    if (obj.type == ObjectiveType::StringTripwire &&
+        obj.state == ObjectiveState::Completed && !obj.tripwireArmed) {
+      std::vector<uint32_t> trappedPlayers;
+      std::vector<uint32_t> trappedEnemies;
+
+      for (const auto& [playerId, player] : players) {
+        if (player.isAlive() && obj.isInRange(player.x, player.y)) {
+          trappedPlayers.push_back(playerId);
+        }
+      }
+      if (enemySystem) {
+        for (const auto& [enemyId, enemy] : enemySystem->getEnemies()) {
+          if (enemy.state != EnemyState::Dead &&
+              obj.isInRange(enemy.x, enemy.y)) {
+            trappedEnemies.push_back(enemyId);
+          }
+        }
+      }
+
+      if (!trappedPlayers.empty() || !trappedEnemies.empty()) {
+        obj.tripwireArmed = true;
+        Logger::info("StringTripwire '" + obj.name + "' triggered!");
+
+        for (uint32_t pid : trappedPlayers) {
+          effectManager->applyEffect(pid, EffectType::Wound, 1, 5000.0f, 0,
+                                     players);
+          effectManager->applyEffect(pid, EffectType::Snared, 1, 5000.0f, 0,
+                                     players);
+          Logger::info("  Player " + std::to_string(pid) +
+                       " caught in tripwire");
+        }
+        if (enemySystem) {
+          for (uint32_t eid : trappedEnemies) {
+            effectManager->applyEffect(eid, EffectType::Wound, 1, 5000.0f, 0,
+                                       enemySystem->getEnemies());
+            effectManager->applyEffect(eid, EffectType::Snared, 1, 5000.0f, 0,
+                                       enemySystem->getEnemies());
+            Logger::info("  Enemy " + std::to_string(eid) +
+                         " caught in tripwire");
           }
         }
       }
