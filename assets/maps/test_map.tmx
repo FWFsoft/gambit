@@ -1897,5 +1897,14 @@
         <property name="interaction_time" type="float" value="5.0" />
       </properties>
     </object>
+    <object id="11" name="Turret_01" x="352.0" y="368.0">
+      <point />
+      <properties>
+        <property name="objective_type" type="string" value="derelict_turret" />
+        <property name="description" type="string" value="Repair the derelict turret so it can auto-target nearby enemies" />
+        <property name="radius" type="float" value="60.0" />
+        <property name="interaction_time" type="float" value="5.0" />
+      </properties>
+    </object>
   </objectgroup>
 </map>

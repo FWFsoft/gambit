@@ -13,8 +13,10 @@ enum class ObjectiveType : uint8_t {
   NoxiousGas,      // Kick spores in a damaging gas cloud (interact timer)
   LittleJohn,      // Gate guarded by passive enemy that activates on approach
   DigPitTrap,      // Build a hidden pit trap (interact timer); arms on completion
-  StringTripwire   // String a tripwire with ordnance (interact timer); arms on
+  StringTripwire,  // String a tripwire with ordnance (interact timer); arms on
                    // completion, affects friendlies
+  DerelictTurret   // Repair turret (interact timer); auto-attacks enemies when
+                   // active
 };
 
 // Current state of an objective
@@ -63,6 +65,10 @@ struct Objective {
   bool pitTrapArmed = false;      // True after trap fires (one-time use)
   bool tripwireArmed = false;     // True after tripwire fires (one-time use)
 
+  // For DerelictTurret: auto-attack after repair
+  bool turretActive = false;        // True once repaired and calibrated
+  float turretDamageTimer = 0.0f;   // Accumulates ms; fires every 3000ms
+
   // Player currently interacting (0 = none)
   uint32_t interactingPlayerId = 0;
 
@@ -102,6 +108,7 @@ struct Objective {
         return (state == ObjectiveState::Completed) ? 1.0f : 0.0f;
       case ObjectiveType::DigPitTrap:
       case ObjectiveType::StringTripwire:
+      case ObjectiveType::DerelictTurret:
         return interactionProgress;
       default:
         return 0.0f;
@@ -130,6 +137,8 @@ inline std::string objectiveTypeToString(ObjectiveType type) {
       return "DigPitTrap";
     case ObjectiveType::StringTripwire:
       return "StringTripwire";
+    case ObjectiveType::DerelictTurret:
+      return "DerelictTurret";
     default:
       return "Unknown";
   }
@@ -179,6 +188,9 @@ inline ObjectiveType parseObjectiveType(const std::string& str) {
   }
   if (str == "string_tripwire" || str == "StringTripwire") {
     return ObjectiveType::StringTripwire;
+  }
+  if (str == "derelict_turret" || str == "DerelictTurret") {
+    return ObjectiveType::DerelictTurret;
   }
   // Default to AlienScrapyard if unknown
   return ObjectiveType::AlienScrapyard;

@@ -347,6 +347,8 @@ void ClientPrediction::setupObjectiveEventHandlers() {
             event.name = "Dig Pit Trap";
           } else if (packet.objectiveType == 8) {  // StringTripwire
             event.name = "String Tripwire";
+          } else if (packet.objectiveType == 9) {  // DerelictTurret
+            event.name = "Derelict Turret";
           } else {
             event.name = "Unknown Objective";
           }
