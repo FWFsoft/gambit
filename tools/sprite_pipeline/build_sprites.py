@@ -3,11 +3,23 @@
 
 Nothing here is drawn by hand. It converts art the team already has:
 
-  characters  assets/previews/<Name>.png (1024x1536 concept illustrations)
-              -> assets/sprites/characters/<Name>.png
-              Cropped, ground shadow removed, downscaled, palette-quantized
-              and outlined so it reads as a pixel sprite. The client animates
-              the single frame procedurally (bob / lean / lunge / flash).
+  characters  Preferred source: assets/turnarounds/<Name>.png, an 8-pose
+              turnaround drawn at the game's isometric camera angle. Eight
+              equal cells in one row, in this order:
+                  S  SE  E  NE  N  NW  W  SW
+              (S = facing the camera, E = facing screen-right), transparent
+              background, feet on the same baseline in every cell.
+              -> assets/sprites/characters/<Name>.png, an 8-frame strip. The
+              client picks the frame from the direction the character faces.
+
+              Fallback when no turnaround exists yet: assets/previews/<Name>.png
+              (1024x1536 concept illustration) is cropped, de-shadowed and
+              downscaled into a single placeholder frame that the client
+              mirrors for left/right. It is splash art, not a game sprite, so
+              it never shows the character's back or true facing.
+
+              Either way the client animates frames procedurally
+              (bob / lean / lunge / flash) until real animation frames exist.
 
   enemies     <alien-arena>/Assets/Creatures/impl/NonPlayable/<Genus>/<Name>/
               {Idle,Run,Die}/Art/*.png (Unity sheets, sliced via .meta)
@@ -20,7 +32,7 @@ Nothing here is drawn by hand. It converts art the team already has:
 Also writes assets/sprites/manifest.txt, a whitespace-separated table the
 client parses (no JSON dependency in the engine):
 
-  character <Name> <file> <width> <height>
+  character <Name> <file> <cellW> <cellH> <directions>   (directions: 8 or 1)
   enemy <Name> <Genus> <tier> <file> <cellW> <cellH> <idleN> <runN> <dieN>
   fx <name> <file> <cellW> <cellH> <frames>
 
@@ -38,7 +50,9 @@ from PIL import Image, ImageEnhance
 
 REPO = Path(__file__).resolve().parents[2]
 PREVIEWS = REPO / "assets" / "previews"
+TURNAROUNDS = REPO / "assets" / "turnarounds"
 OUT = REPO / "assets" / "sprites"
+TURNAROUND_DIRECTIONS = 8
 
 # A full-height character occupies roughly 1420px of the 1536px canvas.
 # Everything is scaled by the same factor so relative sizes survive
@@ -82,13 +96,8 @@ def add_outline(rgba: np.ndarray) -> np.ndarray:
     return out
 
 
-def build_character(name: str) -> Image.Image:
-    im = Image.open(PREVIEWS / f"{name}.png").convert("RGBA")
-    im = im.crop(im.getbbox())
-    im = remove_ground_shadow(im)
-    im = im.crop(im.getbbox())
-
-    scale = CHARACTER_TARGET_HEIGHT / CHARACTER_SOURCE_HEIGHT
+def pixelize(im: Image.Image, scale: float, colors: int) -> Image.Image:
+    """Downscale RGBA art into an outlined, palette-limited pixel sprite."""
     w = max(1, round(im.width * scale))
     h = max(1, round(im.height * scale))
 
@@ -105,14 +114,73 @@ def build_character(name: str) -> Image.Image:
     rgb_im = Image.fromarray((np.clip(rgb, 0, 1) * 255).astype(np.uint8))
     rgb_im = ImageEnhance.Color(rgb_im).enhance(1.25)
     rgb_im = ImageEnhance.Contrast(rgb_im).enhance(1.12)
-    quant = rgb_im.quantize(colors=CHARACTER_COLORS, method=Image.MEDIANCUT,
+    quant = rgb_im.quantize(colors=colors, method=Image.MEDIANCUT,
                             dither=Image.NONE).convert("RGB")
 
     rgba = np.dstack([np.array(quant), (opaque * 255).astype(np.uint8)])
     rgba[~opaque] = 0
+    return Image.fromarray(rgba.astype(np.uint8))
+
+
+def outlined(im: Image.Image) -> Image.Image:
     # 1px transparent border so the outline has room.
-    rgba = np.pad(rgba, ((1, 1), (1, 1), (0, 0)))
+    rgba = np.pad(np.array(im), ((1, 1), (1, 1), (0, 0)))
     return Image.fromarray(add_outline(rgba).astype(np.uint8))
+
+
+def build_character_from_preview(name: str) -> Image.Image:
+    """Placeholder: one frame distilled from the concept illustration."""
+    im = Image.open(PREVIEWS / f"{name}.png").convert("RGBA")
+    im = im.crop(im.getbbox())
+    im = remove_ground_shadow(im)
+    im = im.crop(im.getbbox())
+    scale = CHARACTER_TARGET_HEIGHT / CHARACTER_SOURCE_HEIGHT
+    return outlined(pixelize(im, scale, CHARACTER_COLORS))
+
+
+def feet_centre(frame: Image.Image) -> float:
+    """x of the middle of the feet: the pivot that must not move between poses."""
+    alpha = np.array(frame)[..., 3] > 40
+    rows = np.where(alpha.any(1))[0]
+    if len(rows) == 0:
+        return frame.width / 2.0
+    top, bottom = rows.min(), rows.max()
+    band = alpha[int(bottom - (bottom - top) * 0.15):bottom + 1]
+    cols = np.where(band.any(0))[0]
+    return (cols.min() + cols.max() + 1) / 2.0
+
+
+def build_character_from_turnaround(path: Path):
+    """8-direction strip from a turnaround sheet. Returns (image, cellW, cellH)."""
+    sheet = Image.open(path).convert("RGBA")
+    cell = sheet.width // TURNAROUND_DIRECTIONS
+    frames = [sheet.crop((i * cell, 0, (i + 1) * cell, sheet.height))
+              for i in range(TURNAROUND_DIRECTIONS)]
+
+    # One scale for every pose so the character does not pulse while turning.
+    tallest = max(f.getbbox()[3] - f.getbbox()[1] for f in frames)
+    scale = min(1.0, CHARACTER_TARGET_HEIGHT / tallest)
+
+    # Quantize the whole strip together so all eight poses share one palette.
+    small = pixelize(sheet, scale, CHARACTER_COLORS + 4)
+    small_cell = small.width / TURNAROUND_DIRECTIONS
+    out_frames = []
+    for i in range(TURNAROUND_DIRECTIONS):
+        frame = small.crop((round(i * small_cell), 0,
+                            round((i + 1) * small_cell), small.height))
+        box = frame.getbbox()
+        pivot = feet_centre(frame) - box[0]
+        out_frames.append((outlined(frame.crop(box)), pivot + 1))
+
+    half = max(max(p, f.width - p) for f, p in out_frames)
+    cell_w = int(np.ceil(half)) * 2
+    cell_h = max(f.height for f, _ in out_frames)
+    strip = Image.new("RGBA", (cell_w * TURNAROUND_DIRECTIONS, cell_h),
+                      (0, 0, 0, 0))
+    for i, (frame, pivot) in enumerate(out_frames):
+        x = i * cell_w + cell_w // 2 - round(pivot)
+        strip.alpha_composite(frame, (x, cell_h - frame.height))
+    return strip, cell_w, cell_h
 
 
 def unity_frame_count(png: Path) -> int:
@@ -167,13 +235,22 @@ def main() -> int:
     manifest = []
 
     (OUT / "characters").mkdir(parents=True, exist_ok=True)
-    for src in sorted(PREVIEWS.glob("*.png")):
-        name = src.stem
-        sprite = build_character(name)
+    names = sorted({p.stem for p in PREVIEWS.glob("*.png")} |
+                   {p.stem for p in TURNAROUNDS.glob("*.png")})
+    for name in names:
         rel = f"assets/sprites/characters/{name}.png"
+        turnaround = TURNAROUNDS / f"{name}.png"
+        if turnaround.exists():
+            sprite, cw, ch = build_character_from_turnaround(turnaround)
+            dirs = TURNAROUND_DIRECTIONS
+            source = "turnaround"
+        else:
+            sprite = build_character_from_preview(name)
+            cw, ch, dirs = sprite.width, sprite.height, 1
+            source = "concept art placeholder"
         sprite.save(REPO / rel)
-        manifest.append(f"character {name} {rel} {sprite.width} {sprite.height}")
-        print(f"character {name:<12} {sprite.width}x{sprite.height}")
+        manifest.append(f"character {name} {rel} {cw} {ch} {dirs}")
+        print(f"character {name:<12} {cw}x{ch} x{dirs}  ({source})")
 
     if arena.is_dir():
         (OUT / "enemies").mkdir(parents=True, exist_ok=True)

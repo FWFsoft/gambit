@@ -1,23 +1,23 @@
-character Eliana assets/sprites/characters/Eliana.png 56 73
-character Fagan assets/sprites/characters/Fagan.png 56 80
-character Gravon assets/sprites/characters/Gravon.png 43 80
-character Isaac assets/sprites/characters/Isaac.png 57 79
-character Jeff assets/sprites/characters/Jeff.png 56 82
-character Kade assets/sprites/characters/Kade.png 53 81
-character Lilith assets/sprites/characters/Lilith.png 49 80
-character MILES assets/sprites/characters/MILES.png 55 75
-character Mina assets/sprites/characters/Mina.png 57 81
-character Mordryn assets/sprites/characters/Mordryn.png 54 79
-character Namora assets/sprites/characters/Namora.png 56 38
-character Nolan assets/sprites/characters/Nolan.png 56 81
-character Nyx assets/sprites/characters/Nyx.png 37 74
-character Presidente assets/sprites/characters/Presidente.png 54 78
-character Stitches assets/sprites/characters/Stitches.png 49 74
-character Suds assets/sprites/characters/Suds.png 57 82
-character Valthor assets/sprites/characters/Valthor.png 49 79
-character Volgore assets/sprites/characters/Volgore.png 55 75
-character Wade assets/sprites/characters/Wade.png 47 77
-character Zephyr assets/sprites/characters/Zephyr.png 56 81
+character Eliana assets/sprites/characters/Eliana.png 56 73 1
+character Fagan assets/sprites/characters/Fagan.png 56 80 1
+character Gravon assets/sprites/characters/Gravon.png 43 80 1
+character Isaac assets/sprites/characters/Isaac.png 57 79 1
+character Jeff assets/sprites/characters/Jeff.png 56 82 1
+character Kade assets/sprites/characters/Kade.png 53 81 1
+character Lilith assets/sprites/characters/Lilith.png 49 80 1
+character MILES assets/sprites/characters/MILES.png 55 75 1
+character Mina assets/sprites/characters/Mina.png 57 81 1
+character Mordryn assets/sprites/characters/Mordryn.png 54 79 1
+character Namora assets/sprites/characters/Namora.png 56 38 1
+character Nolan assets/sprites/characters/Nolan.png 56 81 1
+character Nyx assets/sprites/characters/Nyx.png 37 74 1
+character Presidente assets/sprites/characters/Presidente.png 54 78 1
+character Stitches assets/sprites/characters/Stitches.png 49 74 1
+character Suds assets/sprites/characters/Suds.png 57 82 1
+character Valthor assets/sprites/characters/Valthor.png 49 79 1
+character Volgore assets/sprites/characters/Volgore.png 55 75 1
+character Wade assets/sprites/characters/Wade.png 38 78 8
+character Zephyr assets/sprites/characters/Zephyr.png 56 81 1
 enemy Toxlith Venoxarid 0 assets/sprites/enemies/Toxlith.png 35 38 5 8 7
 enemy Venomire Venoxarid 1 assets/sprites/enemies/Venomire.png 58 64 5 8 7
 enemy Serpentide Venoxarid 2 assets/sprites/enemies/Serpentide.png 116 128 5 8 7
