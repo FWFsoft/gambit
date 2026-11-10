@@ -219,6 +219,7 @@ int main(int argc, char* argv[]) {
                 TestInputReader::stringToScancode(command->stringArg);
             if (scancode != SDL_SCANCODE_UNKNOWN) {
               SDL_Event keyEvent;
+              SDL_zero(keyEvent);
               keyEvent.type = SDL_KEYDOWN;
               keyEvent.key.keysym.scancode = scancode;
               keyEvent.key.keysym.sym = SDL_GetKeyFromScancode(scancode);
@@ -232,6 +233,7 @@ int main(int argc, char* argv[]) {
                 TestInputReader::stringToScancode(command->stringArg);
             if (scancode != SDL_SCANCODE_UNKNOWN) {
               SDL_Event keyEvent;
+              SDL_zero(keyEvent);
               keyEvent.type = SDL_KEYUP;
               keyEvent.key.keysym.scancode = scancode;
               keyEvent.key.keysym.sym = SDL_GetKeyFromScancode(scancode);
@@ -250,6 +252,7 @@ int main(int argc, char* argv[]) {
           }
           case TestInputReader::CommandType::MOUSE_MOVE: {
             SDL_Event mouseEvent;
+            SDL_zero(mouseEvent);
             mouseEvent.type = SDL_MOUSEMOTION;
             mouseEvent.motion.x = command->intArg;
             mouseEvent.motion.y = command->intArg2;
@@ -270,6 +273,7 @@ int main(int argc, char* argv[]) {
 
             // Mouse down event
             SDL_Event mouseDownEvent;
+            SDL_zero(mouseDownEvent);
             mouseDownEvent.type = SDL_MOUSEBUTTONDOWN;
             mouseDownEvent.button.button = button;
             mouseDownEvent.button.clicks = 1;
@@ -282,6 +286,7 @@ int main(int argc, char* argv[]) {
 
             // Mouse up event (immediately after)
             SDL_Event mouseUpEvent;
+            SDL_zero(mouseUpEvent);
             mouseUpEvent.type = SDL_MOUSEBUTTONUP;
             mouseUpEvent.button.button = button;
             mouseUpEvent.button.clicks = 1;

@@ -1,0 +1,34 @@
+character Eliana assets/sprites/characters/Eliana.png 56 73
+character Fagan assets/sprites/characters/Fagan.png 56 80
+character Gravon assets/sprites/characters/Gravon.png 43 80
+character Isaac assets/sprites/characters/Isaac.png 57 79
+character Jeff assets/sprites/characters/Jeff.png 56 82
+character Kade assets/sprites/characters/Kade.png 53 81
+character Lilith assets/sprites/characters/Lilith.png 49 80
+character MILES assets/sprites/characters/MILES.png 55 75
+character Mina assets/sprites/characters/Mina.png 57 81
+character Mordryn assets/sprites/characters/Mordryn.png 54 79
+character Namora assets/sprites/characters/Namora.png 56 38
+character Nolan assets/sprites/characters/Nolan.png 56 81
+character Nyx assets/sprites/characters/Nyx.png 37 74
+character Presidente assets/sprites/characters/Presidente.png 54 78
+character Stitches assets/sprites/characters/Stitches.png 49 74
+character Suds assets/sprites/characters/Suds.png 57 82
+character Valthor assets/sprites/characters/Valthor.png 49 79
+character Volgore assets/sprites/characters/Volgore.png 55 75
+character Wade assets/sprites/characters/Wade.png 47 77
+character Zephyr assets/sprites/characters/Zephyr.png 56 81
+enemy Toxlith Venoxarid 0 assets/sprites/enemies/Toxlith.png 35 38 5 8 7
+enemy Venomire Venoxarid 1 assets/sprites/enemies/Venomire.png 58 64 5 8 7
+enemy Serpentide Venoxarid 2 assets/sprites/enemies/Serpentide.png 116 128 5 8 7
+enemy Psymite Cerebrian 0 assets/sprites/enemies/Psymite.png 35 38 5 8 7
+enemy Cerebrax Cerebrian 1 assets/sprites/enemies/Cerebrax.png 58 64 5 8 7
+enemy Synaptogon Cerebrian 2 assets/sprites/enemies/Synaptogon.png 116 128 5 8 7
+enemy Glacili Frigidariant 0 assets/sprites/enemies/Glacili.png 35 42 5 8 7
+enemy Cryothor Frigidariant 1 assets/sprites/enemies/Cryothor.png 53 64 5 8 7
+enemy Frosthulm Frigidariant 2 assets/sprites/enemies/Frosthulm.png 106 128 5 8 7
+enemy Emberclad Magnarok 0 assets/sprites/enemies/Emberclad.png 35 38 5 8 7
+enemy Pyroclast Magnarok 1 assets/sprites/enemies/Pyroclast.png 58 64 5 8 7
+enemy Lavaforge Magnarok 2 assets/sprites/enemies/Lavaforge.png 116 128 5 8 7
+fx brew_can assets/sprites/fx/brew_can.png 40 40 8
+fx explosion assets/sprites/fx/explosion.png 100 100 4
