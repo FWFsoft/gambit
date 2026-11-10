@@ -9,9 +9,12 @@ TEST(ClientInputSerialization) {
   original.moveRight = false;
   original.moveUp = true;
   original.moveDown = false;
+  original.buttons = InputButtons::Primary | InputButtons::Mobility;
+  original.aimX = -123.5f;
+  original.aimY = 456.25f;
 
   auto serialized = serialize(original);
-  assert(serialized.size() == 6);
+  assert(serialized.size() == 15);
 
   auto deserialized =
       deserializeClientInput(serialized.data(), serialized.size());
@@ -20,6 +23,142 @@ TEST(ClientInputSerialization) {
   assert(deserialized.moveRight == false);
   assert(deserialized.moveUp == true);
   assert(deserialized.moveDown == false);
+  assert(deserialized.buttons ==
+         (InputButtons::Primary | InputButtons::Mobility));
+  assert(deserialized.aimX == -123.5f);
+  assert(deserialized.aimY == 456.25f);
+}
+
+TEST(ArenaPlayerStateRoundTrip) {
+  StateUpdatePacket original;
+  original.serverTick = 9;
+  PlayerState p;
+  p.playerId = 3;
+  p.x = 10.0f;
+  p.y = -20.0f;
+  p.vx = p.vy = 0.0f;
+  p.health = 120.0f;
+  p.r = p.g = p.b = 255;
+  p.lastInputSequence = 77;
+  p.maxHealth = 320.0f;
+  p.shield = 45.5f;
+  p.characterId = 16;
+  p.flags = PlayerFlags::Charging | PlayerFlags::Rooted;
+  p.speedMult = 0.55f;
+  p.aimX = 400.0f;
+  p.aimY = -300.0f;
+  p.charge = 200;
+  p.chargeSlot = 1;
+  p.cooldowns[0] = 5;
+  p.cooldowns[4] = 1200;
+  p.resource = 128;
+  original.players.push_back(p);
+
+  auto serialized = serialize(original);
+  assert(serialized.size() == 7 + PLAYER_STATE_BYTES);
+  auto out = deserializeStateUpdate(serialized.data(), serialized.size());
+  assert(out.players.size() == 1);
+  const PlayerState& q = out.players[0];
+  assert(q.maxHealth == 320.0f && q.shield == 45.5f);
+  assert(q.characterId == 16);
+  assert(q.flags == (PlayerFlags::Charging | PlayerFlags::Rooted));
+  assert(q.speedMult == 0.55f);
+  assert(q.aimX == 400.0f && q.aimY == -300.0f);
+  assert(q.charge == 200 && q.chargeSlot == 1);
+  assert(q.cooldowns[0] == 5 && q.cooldowns[4] == 1200);
+  assert(q.resource == 128);
+}
+
+TEST(ArenaPacketsRoundTrip) {
+  {
+    GameEventPacket e;
+    e.kind = GameEventKind::ProjectileSpawn;
+    e.sourceId = 12;
+    e.sourceIsEnemy = true;
+    e.x = 1.5f;
+    e.y = -2.5f;
+    e.x2 = 300.0f;
+    e.y2 = -40.0f;
+    e.value = 11.0f;
+    e.value2 = 1500.0f;
+    e.param = 3;
+    e.param2 = static_cast<uint8_t>(VfxTheme::Fire);
+    e.extraId = 99;
+    auto bytes = serialize(e);
+    assert(bytes.size() == 37);
+    auto out = deserializeGameEvent(bytes.data(), bytes.size());
+    assert(out.kind == GameEventKind::ProjectileSpawn);
+    assert(out.sourceId == 12 && out.sourceIsEnemy);
+    assert(out.x == 1.5f && out.y == -2.5f && out.x2 == 300.0f);
+    assert(out.value == 11.0f && out.value2 == 1500.0f);
+    assert(out.param == 3 && out.extraId == 99);
+    assert(out.param2 == static_cast<uint8_t>(VfxTheme::Fire));
+  }
+  {
+    MatchStatePacket m;
+    m.phase = 2;
+    m.round = 3;
+    m.roundCount = 3;
+    m.timeRemaining = 12.5f;
+    m.shipHealth = 900.0f;
+    m.shipMaxHealth = 1500.0f;
+    m.shipX = 5.0f;
+    m.shipY = -6.0f;
+    m.zoneRadius = 777.0f;
+    m.scrapBanked = 4;
+    m.turretsOnline = 1;
+    m.bossId = 31;
+    MatchPlayerState a;
+    a.playerId = 1;
+    a.characterId = 20;
+    a.score = -150;
+    a.kills = 300;
+    a.deaths = 2;
+    a.ready = 1;
+    a.coreGenus = 4;
+    a.treeGenus[2] = 3;
+    a.treeLevel[2] = 2;
+    a.inventory[0] = 7;
+    a.carryingScrap = 1;
+    a.reviveProgress = 0.5f;
+    m.players.push_back(a);
+    m.players.push_back(MatchPlayerState());
+    auto bytes = serialize(m);
+    auto out = deserializeMatchState(bytes.data(), bytes.size());
+    assert(out.phase == 2 && out.round == 3 && out.roundCount == 3);
+    assert(out.timeRemaining == 12.5f && out.zoneRadius == 777.0f);
+    assert(out.shipHealth == 900.0f && out.shipMaxHealth == 1500.0f);
+    assert(out.scrapBanked == 4 && out.turretsOnline == 1 && out.bossId == 31);
+    assert(out.players.size() == 2);
+    assert(out.players[0].score == -150 && out.players[0].kills == 300);
+    assert(out.players[0].coreGenus == 4);
+    assert(out.players[0].treeGenus[2] == 3 && out.players[0].treeLevel[2] == 2);
+    assert(out.players[0].inventory[0] == 7);
+    assert(out.players[0].carryingScrap == 1);
+    assert(out.players[0].reviveProgress == 0.5f);
+  }
+  {
+    InfusionSlotPacket slot;
+    slot.genus = 2;
+    slot.slot = 4;
+    auto bytes = serialize(slot);
+    auto out = deserializeInfusionSlot(bytes.data(), bytes.size());
+    assert(out.genus == 2 && out.slot == 4);
+
+    PlayerReadyPacket ready;
+    ready.ready = 1;
+    auto readyBytes = serialize(ready);
+    assert(deserializePlayerReady(readyBytes.data(), readyBytes.size()).ready ==
+           1);
+
+    DebugCommandPacket debug;
+    debug.command = static_cast<uint8_t>(DebugCommandKind::SpawnWave);
+    debug.arg = 9;
+    auto debugBytes = serialize(debug);
+    auto debugOut =
+        deserializeDebugCommand(debugBytes.data(), debugBytes.size());
+    assert(debugOut.command == 3 && debugOut.arg == 9);
+  }
 }
 
 TEST(StateUpdateSerialization) {
@@ -54,7 +193,7 @@ TEST(StateUpdateSerialization) {
   original.players.push_back(player2);
 
   auto serialized = serialize(original);
-  assert(serialized.size() == 7 + (2 * 31));
+  assert(serialized.size() == 7 + (2 * PLAYER_STATE_BYTES));
 
   auto deserialized =
       deserializeStateUpdate(serialized.data(), serialized.size());
@@ -487,6 +626,8 @@ int main() {
   Logger::init();
 
   test_ClientInputSerialization();
+  test_ArenaPlayerStateRoundTrip();
+  test_ArenaPacketsRoundTrip();
   test_StateUpdateSerialization();
   test_PlayerJoinedSerialization();
   test_PlayerLeftSerialization();

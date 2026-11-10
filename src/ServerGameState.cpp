@@ -5,8 +5,10 @@
 #include <cmath>
 #include <limits>
 
+#include "AbilitySystem.h"
 #include "CollisionSystem.h"
 #include "EnemySystem.h"
+#include "MatchDirector.h"
 #include "ItemRegistry.h"
 #include "Logger.h"
 #include "NetworkServer.h"
@@ -31,12 +33,11 @@ ServerGameState::ServerGameState(NetworkServer* server,
                  " player spawn points");
   }
 
-  // Initialize enemy system
-  if (world.tiledMap != nullptr) {
-    enemySystem =
-        std::make_unique<EnemySystem>(world.tiledMap->getEnemySpawns());
-    enemySystem->spawnAllEnemies();
-  }
+  // Initialize enemy system (camp guards come from the map; everything else
+  // is spawned by the match director)
+  enemySystem = std::make_unique<EnemySystem>(
+      world.tiledMap != nullptr ? world.tiledMap->getEnemySpawns() : noSpawns);
+  enemySystem->spawnAllEnemies();
 
   // Initialize effect manager
   effectManager = std::make_unique<EffectManager>();
@@ -50,6 +51,40 @@ ServerGameState::ServerGameState(NetworkServer* server,
     Logger::info("Ship position loaded: (" + std::to_string(shipX) + ", " +
                  std::to_string(shipY) + ")");
   }
+
+  // Combat + match flow
+  abilitySystem = std::make_unique<AbilitySystem>(
+      players, enemySystem.get(), effectManager.get(), collisionSystem,
+      worldWidth, worldHeight, [this](const GameEventPacket& packet) {
+        this->server->broadcastPacket(serialize(packet));
+      });
+  enemySystem->setCombat(abilitySystem.get());
+
+  MatchDirector::Hooks hooks;
+  hooks.spawnPickup = [this](uint32_t itemId, float x, float y) {
+    spawnWorldItem(itemId, x, y);
+  };
+  hooks.clearPickups = [this]() { clearArenaPickups(); };
+  director = std::make_unique<MatchDirector>(
+      players, enemySystem.get(), abilitySystem.get(), shipX, shipY,
+      worldWidth, worldHeight, hooks);
+
+  // Damage-over-time ticks show numbers and count toward the source's score.
+  effectManager->setDotCallback([this](const EffectManager::DotTick& tick) {
+    GameEventPacket number;
+    number.kind = tick.isHeal ? GameEventKind::Heal : GameEventKind::Damage;
+    number.sourceId = tick.entityId;
+    number.sourceIsEnemy = tick.isEnemy;
+    number.x = tick.x;
+    number.y = tick.y;
+    number.value = tick.amount;
+    number.param = tick.isEnemy ? 4 : 6;  // 4 = DoT, 2 = on a player
+    this->server->broadcastPacket(serialize(number));
+    if (tick.isEnemy && !tick.isHeal) {
+      auto it = players.find(tick.sourceId);
+      if (it != players.end()) it->second.scoreAccum += tick.amount * 0.12f;
+    }
+  });
 
   // Initialize objective system
   if (world.tiledMap != nullptr) {
@@ -72,6 +107,13 @@ ServerGameState::ServerGameState(NetworkServer* server,
         [this](uint32_t objectiveId, uint32_t playerId) {
           const Objective* obj = objectiveSystem->getObjective(objectiveId);
           if (!obj) return;
+
+          // Score, ship repair and loot for the match
+          auto completer = players.find(playerId);
+          if (director && completer != players.end()) {
+            director->onObjectiveCompleted(
+                completer->second, obj->type == ObjectiveType::AlienScrapyard);
+          }
 
           // Remove Slow debuff from player (applied during pickup phase)
           if ((obj->type == ObjectiveType::AlienScrapyard ||
@@ -214,6 +256,7 @@ void ServerGameState::onClientConnected(const ClientConnectedEvent& e) {
   assignPlayerColor(player, players.size());
 
   players[playerId] = player;
+  director->onPlayerJoined(players[playerId]);
 
   Logger::info("Player " + std::to_string(playerId) + " joined");
 
@@ -262,6 +305,8 @@ void ServerGameState::onClientDisconnected(const ClientDisconnectedEvent& e) {
   uint32_t playerId = e.clientId;
 
   players.erase(playerId);
+  director->onPlayerLeft(playerId);
+  effectManager->clearEntity(playerId, false);
 
   Logger::info("Player " + std::to_string(playerId) + " left");
 
@@ -287,143 +332,10 @@ void ServerGameState::onNetworkPacketReceived(
       processClientInput(e.clientId, e.data, e.size);
       break;
 
-    case PacketType::AttackEnemy: {
-      if (e.size < 9) {
-        Logger::info("Invalid AttackEnemy packet size");
-        break;
-      }
-
-      AttackEnemyPacket attackPacket = deserializeAttackEnemy(e.data, e.size);
-
-      uint32_t playerId = e.clientId;
-
-      // Apply damage (server-authoritative)
-      if (enemySystem && effectManager) {
-        // Calculate modified damage based on player and enemy effects
-        float damage = attackPacket.damage;
-
-        // Apply player's damage dealt modifiers (Empowered/Weakened)
-        auto playerMods = effectManager->calculateModifiers(playerId, false);
-        damage *= playerMods.damageDealtMultiplier;
-
-        // Apply enemy's damage taken modifiers and consume Expose/Guard
-        effectManager->consumeOnDamage(attackPacket.enemyId, true, damage);
-
-        Logger::debug("Attack damage: " + std::to_string(attackPacket.damage) +
-                      " → modified: " + std::to_string(damage) +
-                      " (player mult: " +
-                      std::to_string(playerMods.damageDealtMultiplier) + ")");
-
-        // Apply final damage
-        enemySystem->damageEnemy(attackPacket.enemyId, damage, playerId);
-
-        // Apply effect based on character selection
-        if (true) {
-          auto playerIt = players.find(playerId);
-          if (playerIt != players.end()) {
-            uint32_t characterId = playerIt->second.characterId;
-            EffectType effectToApply;
-            const char* effectName;
-
-            // Map character IDs to effects (testing multiple effects)
-            // Character IDs 1-19, map to different effects
-            switch (characterId) {
-              case 1:  // Eliana
-                effectToApply = EffectType::Slow;
-                effectName = "Slow";
-                break;
-              case 2:  // Fagan
-                effectToApply = EffectType::Weakened;
-                effectName = "Weakened";
-                break;
-              case 3:  // Gravon
-                effectToApply = EffectType::Vulnerable;
-                effectName = "Vulnerable";
-                break;
-              case 4:  // Isaac
-                effectToApply = EffectType::Wound;
-                effectName = "Wound (DoT)";
-                break;
-              case 5:  // Jeff
-                effectToApply = EffectType::Haste;
-                effectName = "Haste";
-                break;
-              case 6:  // Kade
-                effectToApply = EffectType::Empowered;
-                effectName = "Empowered";
-                break;
-              case 7:  // Lilith
-                effectToApply = EffectType::Fortified;
-                effectName = "Fortified";
-                break;
-              case 8:  // MILES
-                effectToApply = EffectType::Mend;
-                effectName = "Mend (HoT)";
-                break;
-              case 9:  // Mina
-                effectToApply = EffectType::Cursed;
-                effectName = "Cursed";
-                break;
-              case 10:  // Mordryn
-                effectToApply = EffectType::Blessed;
-                effectName = "Blessed";
-                break;
-              case 11:  // Namora
-                effectToApply = EffectType::Marked;
-                effectName = "Marked";
-                break;
-              case 12:  // Nolan
-                effectToApply = EffectType::Stealth;
-                effectName = "Stealth";
-                break;
-              case 13:  // Nyx
-                effectToApply = EffectType::Expose;
-                effectName = "Expose";
-                break;
-              case 14:  // Presidente
-                effectToApply = EffectType::Guard;
-                effectName = "Guard";
-                break;
-              case 15:  // Stitches
-                effectToApply = EffectType::Stunned;
-                effectName = "Stunned";
-                break;
-              case 16:  // Suds
-                effectToApply = EffectType::Berserk;
-                effectName = "Berserk";
-                break;
-              case 17:  // Valthor
-                effectToApply = EffectType::Snared;
-                effectName = "Snared";
-                break;
-              case 18:  // Volgore
-                effectToApply = EffectType::Unbounded;
-                effectName = "Unbounded";
-                break;
-              case 19:  // Wade
-                effectToApply = EffectType::Confused;
-                effectName = "Confused";
-                break;
-              default:  // No character selected - use Slow
-                effectToApply = EffectType::Slow;
-                effectName = "Slow (default)";
-                break;
-            }
-
-            Logger::info("Player " + std::to_string(playerId) + " (Character " +
-                         std::to_string(characterId) + ") applying " +
-                         std::string(effectName) + " to enemy " +
-                         std::to_string(attackPacket.enemyId));
-
-            effectManager->applyEffect(attackPacket.enemyId, effectToApply, 1,
-                                       3000.0f, playerId,
-                                       enemySystem->getEnemies());
-          }
-        }
-      }
-
+    case PacketType::AttackEnemy:
+      // Legacy auto-attack packet. Combat now runs through AbilitySystem
+      // from the buttons carried in ClientInput.
       break;
-    }
 
     case PacketType::UseItem:
       processUseItem(e.clientId, e.data, e.size);
@@ -442,15 +354,12 @@ void ServerGameState::onNetworkPacketReceived(
       CharacterSelectedPacket charPacket =
           deserializeCharacterSelected(e.data, e.size);
 
-      uint32_t playerId = e.clientId;
-      {
-        auto playerIt = players.find(playerId);
-        if (playerIt != players.end()) {
-          playerIt->second.characterId = charPacket.characterId;
-          Logger::info("Player " + std::to_string(playerId) +
-                       " selected character ID " +
-                       std::to_string(charPacket.characterId));
-        }
+      auto playerIt = players.find(e.clientId);
+      if (playerIt != players.end()) {
+        director->onCharacterSelected(playerIt->second, charPacket.characterId);
+        Logger::info("Player " + std::to_string(e.clientId) +
+                     " selected character ID " +
+                     std::to_string(charPacket.characterId));
       }
       break;
     }
@@ -463,6 +372,40 @@ void ServerGameState::onNetworkPacketReceived(
       processObjectiveInteract(e.clientId, e.data, e.size);
       break;
 
+    case PacketType::InfusionSlot: {
+      if (e.size < 3) break;
+      InfusionSlotPacket packet = deserializeInfusionSlot(e.data, e.size);
+      auto playerIt = players.find(e.clientId);
+      if (playerIt != players.end()) {
+        director->onSlotInfusion(playerIt->second,
+                                 static_cast<Arena::Genus>(packet.genus),
+                                 packet.slot);
+      }
+      break;
+    }
+
+    case PacketType::PlayerReady: {
+      if (e.size < 2) break;
+      PlayerReadyPacket packet = deserializePlayerReady(e.data, e.size);
+      auto playerIt = players.find(e.clientId);
+      if (playerIt != players.end()) {
+        director->onReady(playerIt->second, packet.ready != 0);
+      }
+      break;
+    }
+
+    case PacketType::DebugCommand: {
+      if (e.size < 3) break;
+      DebugCommandPacket packet = deserializeDebugCommand(e.data, e.size);
+      auto playerIt = players.find(e.clientId);
+      if (playerIt != players.end()) {
+        director->onDebugCommand(
+            playerIt->second, static_cast<DebugCommandKind>(packet.command),
+            packet.arg);
+      }
+      break;
+    }
+
     default:
       Logger::info("Unknown packet type: " +
                    std::to_string(static_cast<int>(type)));
@@ -472,6 +415,10 @@ void ServerGameState::onNetworkPacketReceived(
 
 void ServerGameState::processClientInput(uint32_t clientId, const uint8_t* data,
                                          size_t size) {
+  if (size < 15) {
+    Logger::info("Invalid ClientInput packet size");
+    return;
+  }
   ClientInputPacket input = deserializeClientInput(data, size);
 
   uint32_t playerId = clientId;
@@ -480,30 +427,31 @@ void ServerGameState::processClientInput(uint32_t clientId, const uint8_t* data,
 
   Player& player = playerIt->second;
 
-  // Ignore input from dead players
-  if (player.isDead()) {
-    return;
-  }
-
   // Validate input sequence (prevent replay attacks)
-  if (input.inputSequence <= player.lastInputSequence) {
-    Logger::info("Received old input sequence from player " +
-                 std::to_string(playerId) + ", ignoring");
+  if (input.inputSequence <= player.lastInputSequence &&
+      player.lastInputSequence != 0) {
     return;
   }
   player.lastInputSequence = input.inputSequence;
+
+  // Aim and ability buttons are consumed by AbilitySystem on the next tick.
+  abilitySystem->setInput(player, input.buttons, input.aimX, input.aimY);
+
+  // No walking while dead, still choosing a character, or mid-dash.
+  if (player.isDead() || player.characterId == 0 || player.forcedMs > 0.0f) {
+    return;
+  }
 
   MovementInput movementInput(input.moveLeft, input.moveRight, input.moveUp,
                               input.moveDown, Config::Timing::TARGET_DELTA_MS,
                               worldWidth, worldHeight, collisionSystem);
 
-  // Apply effect modifiers to movement
+  // speedMult already folds in effects, kit and infusion bonuses; the same
+  // value is sent to the client so prediction matches.
   MovementModifiers modifiers;
-  if (effectManager) {
-    auto statMods = effectManager->calculateModifiers(playerId, false);
-    modifiers.speedMultiplier = statMods.movementSpeedMultiplier;
-    modifiers.canMove = statMods.canMove;
-  }
+  modifiers.speedMultiplier = player.speedMult;
+  modifiers.canMove =
+      effectManager->calculateModifiers(playerId, false).canMove;
 
   applyInput(player, movementInput, modifiers);
 }
@@ -511,33 +459,22 @@ void ServerGameState::processClientInput(uint32_t clientId, const uint8_t* data,
 void ServerGameState::onUpdate(const UpdateEvent& e) {
   serverTick++;
 
-  // Check for enemy deaths and spawn loot (BEFORE update clears the vector)
-  checkEnemyLootDrops();
+  // React to everything that died since the last tick: score, loot, kit
+  // hooks, objectives, and telling the clients.
+  handleEnemyDeaths();
 
-  // Notify objective system about enemy deaths (for CaptureOutpost)
-  if (enemySystem && objectiveSystem) {
-    // Copy deaths vector — onEnemyDeath can trigger completeObjective which
-    // calls disableSpawnsInRadius, pushing to diedThisFrame during iteration
-    const auto deaths = enemySystem->getDiedThisFrame();
-    for (const auto& death : deaths) {
-      const auto& enemies = enemySystem->getEnemies();
-      auto enemyIt = enemies.find(death.enemyId);
-      if (enemyIt != enemies.end()) {
-        objectiveSystem->onEnemyDeath(enemyIt->second.x, enemyIt->second.y);
-      }
-    }
-  }
+  // Match flow: phases, spawns, the zone, the ship, revives.
+  director->update(e.deltaTime);
 
-  // Update enemy AI
-  if (enemySystem) {
-    enemySystem->update(e.deltaTime, players, effectManager.get());
-  }
+  // Player abilities, projectiles, ground zones.
+  abilitySystem->update(e.deltaTime);
 
-  // Update effects (DoT/HoT, duration ticking)
-  if (effectManager && enemySystem) {
-    effectManager->update(e.deltaTime, players, enemySystem->getEnemies(),
-                          enemySystem.get());
-  }
+  // Enemy AI (attacks go through AbilitySystem's damage pipeline).
+  enemySystem->update(e.deltaTime, players, effectManager.get());
+
+  // Effects (DoT/HoT, duration ticking)
+  effectManager->update(e.deltaTime, players, enemySystem->getEnemies(),
+                        enemySystem.get());
 
   // Objective side effects: gas damage, LittleJohn activation
   if (objectiveSystem && effectManager) {
@@ -563,14 +500,67 @@ void ServerGameState::onUpdate(const UpdateEvent& e) {
     }
   }
 
-  // Check for player deaths
-  checkPlayerDeaths();
-
-  // Check for player respawns
-  handlePlayerRespawns();
+  processArenaPickups();
 
   // Broadcast state update every frame
   broadcastStateUpdate();
+}
+
+void ServerGameState::handleEnemyDeaths() {
+  auto deaths = enemySystem->takeDeaths();
+  for (const auto& death : deaths) {
+    const Enemy* enemy = enemySystem->find(death.enemyId);
+    if (enemy) {
+      director->onEnemyKilled(*enemy, death.killerId);
+      abilitySystem->onEnemyDied(*enemy, death.killerId);
+      if (objectiveSystem) objectiveSystem->onEnemyDeath(enemy->x, enemy->y);
+    }
+
+    EnemyDiedPacket deathPacket;
+    deathPacket.enemyId = death.enemyId;
+    deathPacket.killerId = death.killerId;
+    server->broadcastPacket(serialize(deathPacket));
+  }
+}
+
+void ServerGameState::processArenaPickups() {
+  if (worldItems.empty()) return;
+  const float radius = Arena::Tuning::PICKUP_RADIUS;
+
+  std::vector<std::pair<uint32_t, uint32_t>> taken;  // worldItemId, playerId
+  for (const auto& [worldItemId, item] : worldItems) {
+    if (item.itemId < Arena::PickupId::InfusionBase) continue;
+    for (auto& [playerId, player] : players) {
+      float dx = player.x - item.x;
+      float dy = player.y - item.y;
+      if (dx * dx + dy * dy > radius * radius) continue;
+      if (director->onPickup(player, item.itemId)) {
+        taken.emplace_back(worldItemId, playerId);
+        break;
+      }
+    }
+  }
+  for (const auto& [worldItemId, playerId] : taken) {
+    worldItems.erase(worldItemId);
+    ItemPickedUpPacket packet;
+    packet.worldItemId = worldItemId;
+    packet.playerId = playerId;
+    server->broadcastPacket(serialize(packet));
+  }
+}
+
+void ServerGameState::clearArenaPickups() {
+  std::vector<uint32_t> ids;
+  for (const auto& [worldItemId, item] : worldItems) {
+    if (item.itemId >= Arena::PickupId::InfusionBase) ids.push_back(worldItemId);
+  }
+  for (uint32_t worldItemId : ids) {
+    worldItems.erase(worldItemId);
+    ItemPickedUpPacket packet;
+    packet.worldItemId = worldItemId;
+    packet.playerId = 0;  // nobody: it just disappears
+    server->broadcastPacket(serialize(packet));
+  }
 }
 
 void ServerGameState::broadcastStateUpdate() {
@@ -589,17 +579,41 @@ void ServerGameState::broadcastStateUpdate() {
     ps.g = player.g;
     ps.b = player.b;
     ps.lastInputSequence = player.lastInputSequence;
+    ps.maxHealth = player.maxHealth;
+    ps.shield = player.shield;
+    ps.characterId = static_cast<uint8_t>(player.characterId);
+    ps.flags = player.stateFlags;
+    ps.speedMult = player.speedMult;
+    ps.aimX = player.aimX;
+    ps.aimY = player.aimY;
+    ps.chargeSlot =
+        player.chargeSlot >= 0 ? static_cast<uint8_t>(player.chargeSlot) : 255;
+    ps.charge = 0;
+    if (player.chargeSlot >= 0) {
+      const Arena::KitInfo* kit = Arena::kitInfo(player.characterId);
+      if (kit && player.chargeSlot < Arena::KIT_SLOT_COUNT) {
+        const Arena::AbilityInfo& ability = kit->abilities[player.chargeSlot];
+        float charge = ability.mode == Arena::AbilityMode::Charge
+                           ? player.chargeMs / ability.maxChargeMs
+                           : 1.0f;
+        ps.charge = static_cast<uint8_t>(
+            std::min(255.0f, std::max(0.0f, charge) * 255.0f));
+      }
+    }
+    for (int slot = 0; slot < Arena::SLOT_COUNT; slot++) {
+      ps.cooldowns[slot] = static_cast<uint16_t>(
+          std::min(65535.0f, player.cooldownMs[slot] / 10.0f));
+    }
+    ps.resource = player.resource;
     packet.players.push_back(ps);
   }
 
   server->broadcastPacket(serialize(packet));
 
-  // Broadcast enemy state
-  if (enemySystem) {
-    const auto& enemies = enemySystem->getEnemies();
-
+  // Enemy state
+  {
     EnemyStateUpdatePacket enemyPacket;
-    for (const auto& [id, enemy] : enemies) {
+    for (const auto& [id, enemy] : enemySystem->getEnemies()) {
       NetworkEnemyState state;
       state.id = enemy.id;
       state.type = static_cast<uint8_t>(enemy.type);
@@ -610,70 +624,63 @@ void ServerGameState::broadcastStateUpdate() {
       state.vy = enemy.vy;
       state.health = enemy.health;
       state.maxHealth = enemy.maxHealth;
-
+      state.flags = enemy.netFlags;
+      state.windup = 0;
+      if (enemy.state == EnemyState::Attack && enemy.windupTotalMs > 0.0f) {
+        float progress = 1.0f - enemy.windupMs / enemy.windupTotalMs;
+        state.windup = static_cast<uint8_t>(
+            std::min(255.0f, std::max(0.0f, progress) * 255.0f));
+      }
       enemyPacket.enemies.push_back(state);
     }
-
     server->broadcastPacket(serialize(enemyPacket));
-
-    // Broadcast enemy deaths
-    const auto& deaths = enemySystem->getDiedThisFrame();
-    for (const auto& death : deaths) {
-      EnemyDiedPacket deathPacket;
-      deathPacket.enemyId = death.enemyId;
-      deathPacket.killerId = death.killerId;
-
-      server->broadcastPacket(serialize(deathPacket));
-
-      Logger::debug(
-          "Broadcast EnemyDied: enemy=" + std::to_string(death.enemyId) +
-          " killer=" + std::to_string(death.killerId));
-    }
   }
 
-  // Broadcast effect updates for all entities with active effects
-  if (effectManager && enemySystem) {
-    // Player effects
-    for (const auto& [id, player] : players) {
-      const ActiveEffects& effects = effectManager->getPlayerEffects(id);
-      if (!effects.effects.empty()) {
-        EffectUpdatePacket packet;
-        packet.targetId = id;
-        packet.isEnemy = false;
-
-        for (const auto& effect : effects.effects) {
-          NetworkEffect ne;
-          ne.effectType = static_cast<uint8_t>(effect.type);
-          ne.stacks = effect.stacks;
-          ne.remainingDuration = effect.remainingDuration;
-          packet.effects.push_back(ne);
-        }
-
-        server->broadcastPacket(serialize(packet));
-      }
-    }
-
-    // Enemy effects
-    const auto& enemies = enemySystem->getEnemies();
-    for (const auto& [id, enemy] : enemies) {
-      const ActiveEffects& effects = effectManager->getEnemyEffects(id);
-      if (!effects.effects.empty()) {
-        EffectUpdatePacket packet;
-        packet.targetId = id;
-        packet.isEnemy = true;
-
-        for (const auto& effect : effects.effects) {
-          NetworkEffect ne;
-          ne.effectType = static_cast<uint8_t>(effect.type);
-          ne.stacks = effect.stacks;
-          ne.remainingDuration = effect.remainingDuration;
-          packet.effects.push_back(ne);
-        }
-
-        server->broadcastPacket(serialize(packet));
-      }
-    }
+  // Match state and effects change slowly: ten times a second is plenty.
+  if (serverTick % 6 == 0) {
+    server->broadcastPacket(serialize(director->buildState()));
+    broadcastEffects();
   }
+}
+
+void ServerGameState::broadcastEffects() {
+  auto sendFor = [this](uint32_t id, bool isEnemy, const ActiveEffects& effects) {
+    EffectUpdatePacket packet;
+    packet.targetId = id;
+    packet.isEnemy = isEnemy;
+    for (const auto& effect : effects.effects) {
+      NetworkEffect ne;
+      ne.effectType = static_cast<uint8_t>(effect.type);
+      ne.stacks = effect.stacks;
+      ne.remainingDuration = effect.remainingDuration;
+      packet.effects.push_back(ne);
+    }
+    server->broadcastPacket(serialize(packet));
+  };
+
+  // Anything that had effects last time gets one more (possibly empty)
+  // update so clients drop effects that have expired.
+  std::vector<uint32_t> nowPlayers;
+  for (const auto& [id, player] : players) {
+    const ActiveEffects& effects = effectManager->getPlayerEffects(id);
+    bool had = std::find(playersWithEffects.begin(), playersWithEffects.end(),
+                         id) != playersWithEffects.end();
+    if (effects.effects.empty() && !had) continue;
+    sendFor(id, false, effects);
+    if (!effects.effects.empty()) nowPlayers.push_back(id);
+  }
+  playersWithEffects.swap(nowPlayers);
+
+  std::vector<uint32_t> nowEnemies;
+  for (const auto& [id, enemy] : enemySystem->getEnemies()) {
+    const ActiveEffects& effects = effectManager->getEnemyEffects(id);
+    bool had = std::find(enemiesWithEffects.begin(), enemiesWithEffects.end(),
+                         id) != enemiesWithEffects.end();
+    if (effects.effects.empty() && !had) continue;
+    sendFor(id, true, effects);
+    if (!effects.effects.empty()) nowEnemies.push_back(id);
+  }
+  enemiesWithEffects.swap(nowEnemies);
 }
 
 Player ServerGameState::createPlayer(uint32_t playerId) {
@@ -752,91 +759,6 @@ void ServerGameState::assignPlayerColor(Player& player, size_t playerCount) {
   player.r = Config::Player::COLORS[colorIndex].r;
   player.g = Config::Player::COLORS[colorIndex].g;
   player.b = Config::Player::COLORS[colorIndex].b;
-}
-
-void ServerGameState::checkPlayerDeaths() {
-  for (auto& [id, player] : players) {
-    // Skip already dead players
-    if (player.deathTime > 0.0f) {
-      continue;
-    }
-
-    // Check if player just died
-    if (player.health <= 0.0f) {
-      player.health = 0.0f;
-      player.deathTime = static_cast<float>(serverTick);
-      player.vx = 0.0f;
-      player.vy = 0.0f;
-
-      Logger::info("Player " + std::to_string(player.id) + " died at tick " +
-                   std::to_string(serverTick));
-
-      // Broadcast death event
-      PlayerDiedPacket packet;
-      packet.playerId = player.id;
-      server->broadcastPacket(serialize(packet));
-    }
-  }
-}
-
-void ServerGameState::handlePlayerRespawns() {
-  float respawnDelayTicks =
-      Config::Gameplay::PLAYER_RESPAWN_DELAY / Config::Timing::TARGET_DELTA_MS;
-
-  for (auto& [id, player] : players) {
-    // Skip alive players
-    if (player.deathTime == 0.0f) {
-      continue;
-    }
-
-    // Check if respawn delay has elapsed
-    float ticksSinceDeath = serverTick - player.deathTime;
-    if (ticksSinceDeath >= respawnDelayTicks) {
-      respawnPlayer(player);
-    }
-  }
-}
-
-void ServerGameState::respawnPlayer(Player& player) {
-  // Reset health
-  player.health = Config::Player::MAX_HEALTH;
-  player.deathTime = 0.0f;
-  player.vx = 0.0f;
-  player.vy = 0.0f;
-
-  // Select spawn point (round-robin)
-  if (playerSpawns && !playerSpawns->empty()) {
-    size_t spawnIndex = player.id % playerSpawns->size();
-    const PlayerSpawn& spawn = (*playerSpawns)[spawnIndex];
-    player.x = spawn.x;
-    player.y = spawn.y;
-
-    // Validate spawn position and search for valid position if blocked
-    if (!findValidSpawnPosition(player.x, player.y)) {
-      Logger::error("Failed to find valid respawn position near " + spawn.name);
-    }
-
-    Logger::info("Player " + std::to_string(player.id) + " respawned at " +
-                 spawn.name + " (" + std::to_string(player.x) + ", " +
-                 std::to_string(player.y) + ")");
-  } else {
-    // Fallback: world center (map is centered at origin)
-    player.x = 0.0f;
-    player.y = 0.0f;
-    if (!findValidSpawnPosition(player.x, player.y)) {
-      Logger::error("Failed to find valid respawn position");
-    }
-
-    Logger::info("Player " + std::to_string(player.id) +
-                 " respawned at world center (no spawn points)");
-  }
-
-  // Broadcast respawn event
-  PlayerRespawnedPacket packet;
-  packet.playerId = player.id;
-  packet.x = player.x;
-  packet.y = player.y;
-  server->broadcastPacket(serialize(packet));
 }
 
 void ServerGameState::processUseItem(uint32_t clientId, const uint8_t* data,
@@ -1043,28 +965,6 @@ void ServerGameState::broadcastInventoryUpdate(uint32_t playerId) {
 }
 
 // World item management
-
-void ServerGameState::checkEnemyLootDrops() {
-  if (!enemySystem) {
-    return;
-  }
-
-  const auto& deaths = enemySystem->getDiedThisFrame();
-  for (const auto& death : deaths) {
-    // Simple loot table: All enemies drop Health Potion (itemId=1)
-    uint32_t lootItemId = 1;
-
-    const auto& enemies = enemySystem->getEnemies();
-    auto enemyIt = enemies.find(death.enemyId);
-    if (enemyIt != enemies.end()) {
-      const Enemy& enemy = enemyIt->second;
-      spawnWorldItem(lootItemId, enemy.x, enemy.y);
-
-      Logger::info("Enemy " + std::to_string(death.enemyId) + " dropped item " +
-                   std::to_string(lootItemId));
-    }
-  }
-}
 
 void ServerGameState::spawnWorldItem(uint32_t itemId, float x, float y) {
   uint32_t worldItemId = nextWorldItemId++;

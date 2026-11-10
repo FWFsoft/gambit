@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <unordered_map>
 
 #include "Effect.h"
@@ -63,9 +64,37 @@ class EffectManager {
   StatModifiers calculateModifiers(uint32_t playerId) const;
   StatModifiers calculateModifiers(uint32_t enemyId, bool isEnemy) const;
 
+  struct ConsumeResult {
+    float guardPrevented = 0.0f;  // damage a Guard stack soaked
+    float exposeAdded = 0.0f;     // damage an Expose stack added
+  };
+
   // Consume Expose/Guard stacks when damage is taken
   // Modifies incomingDamage based on active effects
-  void consumeOnDamage(uint32_t targetId, bool isEnemy, float& incomingDamage);
+  ConsumeResult consumeOnDamage(uint32_t targetId, bool isEnemy,
+                                float& incomingDamage);
+
+  // Remove an effect outright (no category check).
+  void removeEffect(uint32_t entityId, bool isEnemy, EffectType type);
+  // Direct access for abilities that manipulate stacks (double, corrupt...).
+  ActiveEffects& mutableEffects(uint32_t entityId, bool isEnemy);
+  // Forget an entity entirely (death, round reset).
+  void clearEntity(uint32_t entityId, bool isEnemy);
+  void clearAllEnemies() { enemyEffects.clear(); }
+
+  // Called for every Wound/Mend tick so the server can show numbers and
+  // credit the source.
+  struct DotTick {
+    uint32_t entityId;
+    bool isEnemy;
+    bool isHeal;
+    float amount;
+    float x, y;
+    uint32_t sourceId;
+  };
+  void setDotCallback(std::function<void(const DotTick&)> callback) {
+    dotCallback = std::move(callback);
+  }
 
  private:
   // Active effects per entity
@@ -80,9 +109,11 @@ class EffectManager {
                            uint8_t stacks, float durationMs, uint32_t sourceId,
                            bool isPlayer);
 
-  void updateEntityEffects(uint32_t entityId, ActiveEffects& activeEffects,
-                           float& health, float maxHealth, float deltaTime,
-                           float entityX, float entityY);
+  void updateEntityEffects(uint32_t entityId, bool isEnemy,
+                           ActiveEffects& activeEffects, float& health,
+                           float maxHealth, float deltaTime, float entityX,
+                           float entityY);
+  std::function<void(const DotTick&)> dotCallback;
 
   bool canApplyEffect(const ActiveEffects& activeEffects,
                       EffectType type) const;
@@ -94,6 +125,7 @@ class EffectManager {
                              bool isPlayer);
 
   // DoT/HoT tick logic (for Wound and Mend)
-  void tickWoundMend(EffectInstance& instance, float deltaTime, float& health,
-                     float maxHealth, float entityX, float entityY);
+  // Returns the amount applied this call (0 when no tick fired).
+  float tickWoundMend(EffectInstance& instance, float deltaTime, float& health,
+                      float maxHealth, float entityX, float entityY);
 };

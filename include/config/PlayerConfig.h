@@ -9,15 +9,14 @@ namespace Config {
 namespace Player {
 
 // Movement
-constexpr float SPEED =
-    600.0f;  // Pixels per second (3x boost for faster gameplay)
+constexpr float SPEED = 255.0f;  // Pixels per second (kits override this)
 
 // Dimensions
 constexpr int SIZE = 32;  // Player sprite size (pixels)
 constexpr float RADIUS = static_cast<float>(SIZE) / 2.0f;  // Collision radius
 
 // Stats
-constexpr float MAX_HEALTH = 1000.0f;  // Increased for testing objectives
+constexpr float MAX_HEALTH = 240.0f;  // Default; kits set their own
 
 // Spawn location (center of screen by default)
 constexpr float DEFAULT_SPAWN_X = 400.0f;

@@ -230,11 +230,11 @@ void TiledMap::extractEnemySpawns() {
         // Parse enemy type
         EnemyType type;
         if (enemyTypeStr == "slime") {
-          type = EnemyType::Slime;
+          type = EnemyType::Toxlith;
         } else if (enemyTypeStr == "goblin") {
-          type = EnemyType::Goblin;
+          type = EnemyType::Venomire;
         } else if (enemyTypeStr == "skeleton") {
-          type = EnemyType::Skeleton;
+          type = EnemyType::Serpentide;
         } else {
           Logger::info("Unknown enemy_type: " + enemyTypeStr + ", skipping");
           continue;

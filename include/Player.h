@@ -6,6 +6,7 @@
 #include <memory>
 
 #include "Animatable.h"
+#include "ArenaData.h"
 #include "AnimationController.h"
 #include "CollisionSystem.h"
 #include "Item.h"
@@ -39,6 +40,61 @@ struct Player : public Animatable {
 
   // Client-only fields
   uint32_t lastServerTick;
+
+  // --- Arena combat state -------------------------------------------------
+  // Server authoritative; the subset in PlayerState is mirrored to clients.
+  float maxHealth = Config::Player::MAX_HEALTH;
+  float moveSpeed = Config::Player::SPEED;
+  float shield = 0.0f;
+  float shieldMs = 0.0f;  // remaining shield duration
+  float aimX = 0.0f, aimY = 0.0f;
+  uint8_t buttons = 0, prevButtons = 0;
+  float cooldownMs[Arena::SLOT_COUNT] = {0, 0, 0, 0, 0};
+  int chargeSlot = -1;        // slot being charged / channelled
+  float chargeMs = 0.0f;      // time held so far
+  float channelTimerMs = 0.0f;
+  float actionLockMs = 0.0f;  // brief lock after a cast
+  // Forced motion (dash / roll / pull). Input is ignored while it runs.
+  float forcedVx = 0.0f, forcedVy = 0.0f, forcedMs = 0.0f;
+  bool forcedGhost = false;    // passes through enemies while dashing
+  float intangibleMs = 0.0f;   // cannot be hit
+  float hiddenMs = 0.0f;       // enemies cannot target
+  float speedMult = 1.0f;      // mirrored so prediction matches the server
+  uint8_t stateFlags = 0;      // PlayerFlags, mirrored
+  uint8_t resource = 0;        // kit meter (0-255)
+  // Scratch state for the active kit (meaning is per character).
+  float kitTimer[4] = {0, 0, 0, 0};
+  int kitCounter[4] = {0, 0, 0, 0};
+  uint32_t kitTarget = 0;
+  bool godMode = false;
+
+  // Downed / revive
+  float reviveProgress = 0.0f;
+
+  // Infusions (suit loadout)
+  Arena::Genus coreGenus = Arena::Genus::None;
+  Arena::Genus treeGenus[Arena::TREE_COUNT] = {
+      Arena::Genus::None, Arena::Genus::None, Arena::Genus::None,
+      Arena::Genus::None};
+  uint8_t treeLevel[Arena::TREE_COUNT] = {0, 0, 0, 0};
+  uint8_t infusionInventory[Arena::GENUS_COUNT] = {0, 0, 0, 0};
+  float infusionTimer[4] = {0, 0, 0, 0};  // per-tree cooldown / accumulators
+  int infusionCounter[4] = {0, 0, 0, 0};
+  float coreTimerMs = 0.0f;  // core ability active window
+
+  // Match stats
+  float scoreAccum = 0.0f;  // fractional points
+  int32_t score = 0;
+  uint16_t kills = 0;
+  uint8_t deaths = 0;
+  bool ready = false;
+  bool carryingScrap = false;
+
+  // Level of `genus` infusion slotted in `tree` (0 = none).
+  int infusionLevel(Arena::Genus genus, Arena::InfusionTree tree) const {
+    int t = static_cast<int>(tree);
+    return treeGenus[t] == genus ? treeLevel[t] : 0;
+  }
 
   Player()
       : id(0),
@@ -105,6 +161,8 @@ struct MovementModifiers {
   bool canMove;           // From effects (Stunned/Snared)
 
   MovementModifiers() : speedMultiplier(1.0f), canMove(true) {}
+  MovementModifiers(float speed, bool move)
+      : speedMultiplier(speed), canMove(move) {}
 };
 
 inline void applyInput(
@@ -141,7 +199,7 @@ inline void applyInput(
     dy /= len;
   }
 
-  float effectiveSpeed = Config::Player::SPEED * modifiers.speedMultiplier;
+  float effectiveSpeed = player.moveSpeed * modifiers.speedMultiplier;
   player.vx = dx * effectiveSpeed;
   player.vy = dy * effectiveSpeed;
 
