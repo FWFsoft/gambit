@@ -107,9 +107,10 @@ void ArenaView::handleHotkeys() {
   ImGuiIO& io = ImGui::GetIO();
   if (io.WantTextInput) return;
 
-  auto debug = [&](DebugCommandKind kind) {
+  auto debug = [&](DebugCommandKind kind, uint8_t arg = 0) {
     DebugCommandPacket packet;
     packet.command = static_cast<uint8_t>(kind);
+    packet.arg = arg;
     prediction->sendToServer(serialize(packet));
   };
 
@@ -130,6 +131,10 @@ void ArenaView::handleHotkeys() {
   if (ImGui::IsKeyPressed(ImGuiKey_F8, false)) debug(DebugCommandKind::ToggleGodMode);
   if (ImGui::IsKeyPressed(ImGuiKey_F9, false)) debug(DebugCommandKind::KillAll);
   if (ImGui::IsKeyPressed(ImGuiKey_F10, false)) debug(DebugCommandKind::SpawnBoss);
+  if (ImGui::IsKeyPressed(ImGuiKey_F11, false)) {
+    debug(DebugCommandKind::SpawnWave,
+          static_cast<uint8_t>(Arena::Genus::Venoxarid));
+  }
 }
 
 // ---------------------------------------------------------------------------

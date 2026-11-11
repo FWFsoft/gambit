@@ -497,8 +497,11 @@ void MatchDirector::updateSpawning(float dtMs, bool bossPhase) {
   }
 }
 
-void MatchDirector::spawnPack(float x, float y, int size, bool targetShip) {
-  Genus genus = Arena::genusForDirection(x - shipX, y - shipY);
+void MatchDirector::spawnPack(float x, float y, int size, bool targetShip,
+                              Genus genusOverride, bool swarmersOnly) {
+  Genus genus = genusOverride != Genus::None
+                    ? genusOverride
+                    : Arena::genusForDirection(x - shipX, y - shipY);
   int round = std::min(currentRound, Tuning::ROUND_COUNT);
 
   // Later rounds mix in more casters and brutes.
@@ -521,6 +524,7 @@ void MatchDirector::spawnPack(float x, float y, int size, bool targetShip) {
       tier = EnemyTier::Caster;
     }
     if (targetShip && tier == EnemyTier::Brute) tier = EnemyTier::Swarmer;
+    if (swarmersOnly) tier = EnemyTier::Swarmer;
 
     EnemySystem::SpawnOptions options;
     options.targetShip = targetShip;
@@ -833,7 +837,6 @@ void MatchDirector::damageShip(float amount) {
 
 void MatchDirector::onDebugCommand(Player& player, DebugCommandKind command,
                                    uint8_t arg) {
-  (void)arg;
   switch (command) {
     case DebugCommandKind::SkipPhase:
       if (currentPhase == MatchPhase::Lobby) {
@@ -853,9 +856,14 @@ void MatchDirector::onDebugCommand(Player& player, DebugCommandKind command,
       for (uint8_t& count : player.infusionInventory) count += 2;
       break;
     case DebugCommandKind::SpawnWave: {
+      // arg 1-4: a swarm of that genus's smallest alien (sprite testing).
       float angle = randomRange(0.0f, 2.0f * PI);
+      Genus genus = arg >= 1 && arg <= Arena::GENUS_COUNT
+                        ? static_cast<Genus>(arg)
+                        : Genus::None;
       spawnPack(player.x + std::cos(angle) * 300.0f,
-                player.y + std::sin(angle) * 300.0f, 6, false);
+                player.y + std::sin(angle) * 300.0f, 6, false, genus,
+                genus != Genus::None);
       break;
     }
     case DebugCommandKind::ToggleGodMode:

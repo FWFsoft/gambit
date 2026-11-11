@@ -183,6 +183,7 @@ void ArenaClient::onGameEvent(const GameEventPacket& p) {
       PlayerView& view = it->second;
       view.castMs = view.castTotalMs = std::max(80.0f, p.value);
       view.castSlot = p.param;
+      view.castCount++;
       float dx = p.x2 - p.x;
       float dy = p.y2 - p.y;
       float d = std::sqrt(dx * dx + dy * dy);
@@ -269,10 +270,16 @@ void ArenaClient::onGameEvent(const GameEventPacket& p) {
       bool dot = (p.param & 4) != 0;
       if (p.sourceIsEnemy) {
         auto it = enemyViews.find(p.sourceId);
-        if (it != enemyViews.end()) it->second.hitFlashMs = 120.0f;
+        if (it != enemyViews.end()) {
+          it->second.hitFlashMs = 120.0f;
+          it->second.hitMs = 0.0f;
+        }
       } else {
         auto it = playerViews.find(p.sourceId);
-        if (it != playerViews.end()) it->second.hitFlashMs = 160.0f;
+        if (it != playerViews.end()) {
+          it->second.hitFlashMs = 160.0f;
+          if (!dot) it->second.hitMs = 0.0f;
+        }
       }
       if (p.value < 0.5f) break;
       if (!dot) {
@@ -441,6 +448,12 @@ void ArenaClient::onUpdate(const UpdateEvent& e) {
     view.x += (view.state.x - view.x) * blend;
     view.y += (view.state.y - view.y) * blend;
     view.castMs = std::max(0.0f, view.castMs - dtMs);
+    view.hitMs += dtMs;
+    if (view.state.health <= 0.0f) {
+      view.deadMs += dtMs;
+    } else {
+      view.deadMs = 0.0f;
+    }
     view.hitFlashMs = std::max(0.0f, view.hitFlashMs - dtMs);
     view.shieldBubbleMs = std::max(0.0f, view.shieldBubbleMs - dtMs);
     if (view.state.shield <= 0.0f && view.shieldTheme == 0) {
@@ -479,6 +492,7 @@ void ArenaClient::onUpdate(const UpdateEvent& e) {
     }
     view.strikeMs = std::max(0.0f, view.strikeMs - dtMs);
     view.hitFlashMs = std::max(0.0f, view.hitFlashMs - dtMs);
+    view.hitMs += dtMs;
     view.animTime += dt;
     ++it;
   }

@@ -53,7 +53,8 @@ the ship slowly heals you.
 
 **Playtest cheats** (for poking at things, not for real tests):
 F5 skip phase, F6 +2 of every infusion, F7 spawn a pack near you,
-F8 god mode, F9 kill everything, F10 spawn the boss.
+F8 god mode, F9 kill everything, F10 spawn the boss, F11 spawn a swarm
+of Toxliths.
 
 ## Playable characters
 

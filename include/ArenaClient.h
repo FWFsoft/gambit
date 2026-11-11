@@ -29,6 +29,9 @@ class ArenaClient {
     float castTotalMs = 0;
     float castDirX = 1, castDirY = 0;
     int castSlot = 0;
+    uint32_t castCount = 0;  // increments on every cast (alternating anims)
+    float deadMs = 0;        // time spent down (death animation)
+    float hitMs = 1e9f;      // time since the last hit taken (hit animation)
     float hitFlashMs = 0;
     float animTime = 0;     // seconds, drives bob / walk cycle
     float shieldBubbleMs = 0;
@@ -46,6 +49,7 @@ class ArenaClient {
     float strikeMs = 0;  // short lunge after the windup ends
     float aimX = 0, aimY = 0;
     float hitFlashMs = 0;
+    float hitMs = 1e9f;  // time since the last hit taken
     bool dying = false;
     float deathMs = 0;   // time since death started
     float animTime = 0;

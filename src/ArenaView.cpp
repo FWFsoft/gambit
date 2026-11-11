@@ -165,11 +165,46 @@ void ArenaView::loadManifest() {
       if (sprite.texture) fxSprites[name] = sprite;
     }
   }
+  // Fully animated actors baked by tools/sprite_forge.
+  std::ifstream actors("assets/sprites/actors/manifest.txt");
+  while (actors.is_open() && std::getline(actors, line)) {
+    std::istringstream in(line);
+    std::string kind, name;
+    in >> kind >> name;
+    if (kind == "actor") {
+      ActorSheet sheet;
+      std::string path;
+      in >> path >> sheet.cellW >> sheet.cellH >> sheet.pivotX >> sheet.pivotY >>
+          sheet.columns;
+      sheet.texture = TextureManager::instance().get(path);
+      if (sheet.texture) {
+        auto anims = std::move(actorSheets[name].anims);
+        actorSheets[name] = sheet;
+        actorSheets[name].anims = std::move(anims);
+      }
+    } else if (kind == "anim") {
+      std::string clip;
+      ActorAnim anim;
+      int loop = 1;
+      in >> clip >> anim.start >> anim.frames >> anim.fps >> loop;
+      anim.loop = loop != 0;
+      actorSheets[name].anims[clip] = anim;
+    }
+  }
+  for (auto it = actorSheets.begin(); it != actorSheets.end();) {
+    if (!it->second.texture) {
+      it = actorSheets.erase(it);
+    } else {
+      ++it;
+    }
+  }
+
   shipTexture = TextureManager::instance().get("assets/ship.png");
   Logger::info("ArenaView: loaded " + std::to_string(characterSprites.size()) +
                " character, " + std::to_string(enemySprites.size()) +
                " enemy and " + std::to_string(fxSprites.size()) +
-               " fx sprites");
+               " fx sprites, " + std::to_string(actorSheets.size()) +
+               " animated actors");
 }
 
 const ArenaView::CharacterSprite* ArenaView::characterSprite(
@@ -181,6 +216,61 @@ const ArenaView::CharacterSprite* ArenaView::characterSprite(
   auto it = characterSprites.find(definition->name);
   return it == characterSprites.end() ? nullptr : &it->second;
 }
+
+const ArenaView::ActorSheet* ArenaView::actorFor(const std::string& name) const {
+  auto it = actorSheets.find(name);
+  return it == actorSheets.end() ? nullptr : &it->second;
+}
+
+void ArenaView::drawActorFrame(ImDrawList* dl, const ActorSheet& sheet,
+                               const ActorAnim& anim, int direction,
+                               float elapsed, ImVec2 feet, float scale,
+                               ImU32 tint, bool hold, int forcedFrame) {
+  int frame = forcedFrame >= 0 ? forcedFrame
+                               : static_cast<int>(elapsed * anim.fps);
+  if (anim.loop && !hold) {
+    frame %= anim.frames;
+  } else if (anim.loop) {
+    frame = ((frame % anim.frames) + anim.frames) % anim.frames;
+  } else {
+    frame = std::max(0, std::min(anim.frames - 1, frame));
+  }
+  int cell = anim.start + direction * anim.frames + frame;
+  int col = cell % sheet.columns;
+  int row = cell / sheet.columns;
+  // drawSprite stands the quad on `feet`; the cell's feet line is
+  // (cellH - pivotY) pixels above its bottom edge.
+  ImVec2 base(feet.x, feet.y + (sheet.cellH - sheet.pivotY) * scale);
+  drawSprite(dl, sheet.texture, col * sheet.cellW, row * sheet.cellH,
+             sheet.cellW, sheet.cellH, base, scale, scale, 0.0f, false, tint);
+}
+
+namespace {
+
+// Which clip an ability plays. Characters alternate hands on repeat casts.
+std::string actionClip(const std::string& character, int slot,
+                       uint32_t castCount) {
+  bool odd = (castCount % 2) == 1;
+  if (character == "Wade") {
+    switch (slot) {
+      case 0:
+        return odd ? "jab" : "cross";
+      case 1:
+        return odd ? "uppercut_R" : "uppercut_L";
+      case 2:
+        return "slip";
+      case 3:
+        return "roll";
+      default:
+        return "cross";
+    }
+  }
+  static const char* GENERIC[5] = {"attack", "secondary", "special",
+                                   "mobility", "special"};
+  return GENERIC[std::max(0, std::min(4, slot))];
+}
+
+}  // namespace
 
 const ArenaView::EnemySprite* ArenaView::enemySprite(Arena::EnemyKind kind) {
   loadManifest();
@@ -567,7 +657,50 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
   }
 
   ImVec2 at(feet.x + offsetX, feet.y + offsetY);
-  if (sprite && sprite->texture) {
+  const CharacterDefinition* definition =
+      CharacterRegistry::instance().getCharacter(state.characterId);
+  const ActorSheet* actor = definition ? actorFor(definition->name) : nullptr;
+  if (actor) {
+    // Real animation: choose a clip from what the character is doing.
+    AnimState& anim = playerAnim[state.playerId];
+    if (moving || view.castMs > 0.0f || aimX != worldX || aimY != worldY) {
+      anim.direction = directionFrame(faceX, faceY);
+    }
+    if (view.castCount != anim.castCount) {
+      anim.castCount = view.castCount;
+      anim.clip = actionClip(definition->name, view.castSlot, view.castCount);
+      anim.startSeconds = timeSeconds;
+    }
+    const ActorAnim* clip = nullptr;
+    float elapsed = 0.0f;
+    if (dead) {
+      clip = actor->find("death");
+      elapsed = view.deadMs / 1000.0f;
+    }
+    if (!clip && !anim.clip.empty()) {
+      const ActorAnim* action = actor->find(anim.clip);
+      float t = timeSeconds - anim.startSeconds;
+      if (action && t < static_cast<float>(action->frames) / action->fps) {
+        clip = action;
+        elapsed = t;
+      } else {
+        anim.clip.clear();
+      }
+    }
+    if (!clip && view.hitMs < 220.0f) {
+      clip = actor->find("hit");
+      elapsed = view.hitMs / 1000.0f;
+    }
+    if (!clip) {
+      clip = actor->find(moving ? "run" : "idle");
+      elapsed = view.animTime;
+    }
+    if (clip) {
+      drawActorFrame(dl, *actor, *clip, anim.direction, elapsed,
+                     ImVec2(feet.x, feet.y + (dead ? 0.0f : 0.0f)), 1.0f,
+                     tint);
+    }
+  } else if (sprite && sprite->texture) {
     int frame = 0;
     bool flip = false;
     if (sprite->directions == 8) {
@@ -667,7 +800,51 @@ void ArenaView::drawEnemy(ImDrawList* dl, const ArenaClient::EnemyView& view) {
   }
 
   ImVec2 at(feet.x + offsetX, feet.y + offsetY);
-  if (sprite && sprite->texture) {
+  const ActorSheet* actor = boss ? nullptr : actorFor(def.name);
+  if (actor) {
+    AnimState& anim = enemyAnim[view.state.id];
+    float faceX = 0.0f, faceY = 0.0f;
+    if (view.attackMs > 0.0f || view.strikeMs > 0.0f) {
+      faceX = view.aimX - view.x;
+      faceY = view.aimY - view.y;
+    } else if (speed > 8.0f) {
+      faceX = view.state.vx;
+      faceY = view.state.vy;
+    }
+    if (std::abs(faceX) + std::abs(faceY) > 0.5f) {
+      anim.direction = directionFrame(faceX, faceY);
+    }
+    const ActorAnim* clip = nullptr;
+    float elapsed = view.animTime;
+    int forced = -1;
+    if (view.dying) {
+      clip = actor->find("death");
+      elapsed = view.deathMs / 1000.0f;
+    } else if (view.attackMs > 0.0f || view.strikeMs > 0.0f) {
+      // Hold the coil for the whole telegraph, then strike when it lands.
+      clip = actor->find("attack");
+      if (clip) {
+        float windup = static_cast<float>(clip->frames) * 0.45f;
+        if (view.attackMs > 0.0f && view.attackTotalMs > 0.0f) {
+          float p = 1.0f - view.attackMs / view.attackTotalMs;
+          forced = static_cast<int>(p * windup);
+        } else {
+          float p = 1.0f - view.strikeMs / 160.0f;
+          forced = static_cast<int>(windup + p * (clip->frames - windup));
+        }
+      }
+    } else if (view.hitMs < 180.0f) {
+      clip = actor->find("hit");
+      elapsed = view.hitMs / 1000.0f;
+    }
+    if (!clip) clip = actor->find(speed > 8.0f && !stunned ? "run" : "idle");
+    if (clip) {
+      ImU32 actorTint = tint;
+      if (view.hitFlashMs > 0.0f) actorTint = IM_COL32(255, 150, 150, 255);
+      drawActorFrame(dl, *actor, *clip, anim.direction, elapsed, feet,
+                     scale * (elite ? 1.0f : 1.0f), actorTint, true, forced);
+    }
+  } else if (sprite && sprite->texture) {
     drawSprite(dl, sprite->texture, frame * sprite->cellW, row * sprite->cellH,
                sprite->cellW, sprite->cellH, at, scaleX, scaleY, rotation,
                view.faceLeft, tint);
@@ -1054,8 +1231,12 @@ void ArenaView::drawOverhead(ImDrawList* dl) {
       continue;
     }
     bool elite = (view.state.flags & EnemyFlags::Elite) != 0;
-    float height = (sprite ? sprite->cellH : 40) * def.drawScale *
-                   (elite ? 1.22f : 1.0f) * camera->zoom;
+    const ActorSheet* enemyActor =
+        kind == Arena::EnemyKind::Boss ? nullptr : actorFor(def.name);
+    float spriteHeight = enemyActor ? enemyActor->pivotY * 0.72f
+                                    : (sprite ? sprite->cellH : 40);
+    float height = spriteHeight * def.drawScale * (elite ? 1.22f : 1.0f) *
+                   camera->zoom;
     float top = feet.y - height - 8.0f;
     bool hurt = view.state.health < view.state.maxHealth - 0.5f;
     if (hurt || elite) {
@@ -1099,7 +1280,13 @@ void ArenaView::drawOverhead(ImDrawList* dl) {
     }
     ImVec2 feet = toZoomedScreen(x, y);
     const CharacterSprite* sprite = characterSprite(view.state.characterId);
-    float height = (sprite ? sprite->cellH : 60.0f) * camera->zoom;
+    const CharacterDefinition* heightDef =
+        CharacterRegistry::instance().getCharacter(view.state.characterId);
+    const ActorSheet* heightActor =
+        heightDef ? actorFor(heightDef->name) : nullptr;
+    float height = (heightActor ? heightActor->pivotY * 0.82f
+                                : (sprite ? sprite->cellH : 60.0f)) *
+                   camera->zoom;
     bool dead = view.state.health <= 0.0f;
     float top = feet.y - height - 12.0f;
 

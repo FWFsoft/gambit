@@ -54,6 +54,38 @@ class ArenaView {
     int frames = 1;
   };
 
+  // Baked, fully animated sheets from tools/sprite_forge. When a character
+  // or enemy has one it replaces the placeholder sprite.
+  struct ActorAnim {
+    int start = 0, frames = 1, fps = 10;
+    bool loop = true;
+  };
+  struct ActorSheet {
+    Texture* texture = nullptr;
+    int cellW = 0, cellH = 0, pivotX = 0, pivotY = 0, columns = 1;
+    std::unordered_map<std::string, ActorAnim> anims;
+    const ActorAnim* find(const std::string& name) const {
+      auto it = anims.find(name);
+      return it == anims.end() ? nullptr : &it->second;
+    }
+  };
+  std::unordered_map<std::string, ActorSheet> actorSheets;
+  const ActorSheet* actorFor(const std::string& name) const;
+  // Remembered per entity so a clip plays from its start and stopped
+  // characters keep facing where they last looked.
+  struct AnimState {
+    std::string clip;
+    float startSeconds = 0.0f;
+    uint32_t castCount = 0;
+    int direction = 0;
+  };
+  std::unordered_map<uint32_t, AnimState> playerAnim;
+  std::unordered_map<uint32_t, AnimState> enemyAnim;
+  void drawActorFrame(ImDrawList* dl, const ActorSheet& sheet,
+                      const ActorAnim& anim, int direction, float elapsed,
+                      ImVec2 feet, float scale, unsigned int tint, bool hold = true,
+                      int forcedFrame = -1);
+
   bool manifestLoaded = false;
   std::unordered_map<std::string, CharacterSprite> characterSprites;
   std::unordered_map<std::string, EnemySprite> enemySprites;

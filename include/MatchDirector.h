@@ -113,7 +113,10 @@ class MatchDirector {
   void updateTurrets(float dtMs);
   void updateDeathsAndRevives(float dtMs);
   void updateScrapDelivery();
-  void spawnPack(float x, float y, int size, bool targetShip);
+  // genusOverride / swarmersOnly are for playtest cheats.
+  void spawnPack(float x, float y, int size, bool targetShip,
+                 Arena::Genus genusOverride = Arena::Genus::None,
+                 bool swarmersOnly = false);
   void spawnRaid();
   void spawnBoss();
   void dropLoot(const Enemy& enemy);
