@@ -26,7 +26,7 @@ constexpr uint32_t COLOR_DEBUFF = 0xFFFF90D0;
 float lifetimeFor(const GameEventPacket& p) {
   switch (p.kind) {
     case GameEventKind::Slash:
-      return 200.0f;
+      return 260.0f;
     case GameEventKind::Cone:
       return 280.0f;
     case GameEventKind::Burst:
@@ -275,6 +275,22 @@ void ArenaClient::onGameEvent(const GameEventPacket& p) {
         if (it != playerViews.end()) it->second.hitFlashMs = 160.0f;
       }
       if (p.value < 0.5f) break;
+      if (!dot) {
+        // Impact flash on whatever got hit: every hit should feel like one.
+        Fx spark;
+        spark.kind = GameEventKind::HitSpark;
+        spark.x = p.x;
+        spark.y = p.y;
+        spark.x2 = static_cast<float>((eventCount * 53) % 628) / 100.0f;
+        spark.y2 = 0;
+        spark.value = crit ? 30.0f : (p.value >= 30.0f ? 24.0f : 17.0f);
+        spark.value2 = 0;
+        spark.param = onPlayer ? 1 : 0;
+        spark.theme = onPlayer ? VfxTheme::Blood
+                               : (crit ? VfxTheme::Holy : VfxTheme::Neutral);
+        spark.lifeMs = 170.0f;
+        fx.push_back(spark);
+      }
       FloatText text;
       // Scatter numbers a little so stacked hits stay readable.
       float jitter = static_cast<float>((eventCount * 37) % 41) - 20.0f;

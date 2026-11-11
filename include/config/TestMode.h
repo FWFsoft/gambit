@@ -18,6 +18,11 @@ struct TestConfig {
   int screenshotInterval =
       60;  // Capture every N frames (60 = every 1.0s at 60fps)
 
+  // --record N: also save every Nth frame as test_output/rec_00001.png, ...
+  // (0 = off). Stitch them with ffmpeg to make clips.
+  int recordInterval = 0;
+  int recordedFrames = 0;
+
   // Current frame counter
   int frameCount = 0;
 };

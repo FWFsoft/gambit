@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <fstream>
 #include <sstream>
+#include <string>
 #include <vector>
 
 #include "ArenaDraw.h"
@@ -68,6 +69,48 @@ void drawShadow(ImDrawList* dl, ImVec2 feet, float radius, float alpha = 0.35f) 
   dl->AddEllipseFilled(feet, ImVec2(radius, radius * 0.38f),
                        IM_COL32(0, 0, 0, static_cast<int>(255 * alpha)), 0.0f,
                        20);
+}
+
+// Short tag for an effect, used above enemies where space is tight.
+const char* effectTag(EffectType type) {
+  switch (type) {
+    case EffectType::Slow:
+      return "SLOW";
+    case EffectType::Haste:
+      return "HASTE";
+    case EffectType::Weakened:
+      return "WEAK";
+    case EffectType::Empowered:
+      return "EMP";
+    case EffectType::Vulnerable:
+      return "VULN";
+    case EffectType::Fortified:
+      return "FORT";
+    case EffectType::Wound:
+      return "WND";
+    case EffectType::Mend:
+      return "MEND";
+    case EffectType::Expose:
+      return "EXPO";
+    case EffectType::Guard:
+      return "GRD";
+    case EffectType::Stunned:
+      return "STUN";
+    case EffectType::Berserk:
+      return "BSRK";
+    case EffectType::Snared:
+      return "SNARE";
+    case EffectType::Confused:
+      return "CONF";
+    case EffectType::Doomed:
+      return "DOOM";
+    case EffectType::Silenced:
+      return "SIL";
+    case EffectType::Marked:
+      return "MARK";
+    default:
+      return EffectRegistry::getName(type);
+  }
 }
 
 // Frame index for an 8-direction strip laid out S, SE, E, NE, N, NW, W, SW.
@@ -714,15 +757,16 @@ void ArenaView::drawAir(ImDrawList* dl) {
           float r = radius * (1.0f - 0.09f * i);
           float tail = std::max(start, head - half * (0.5f + 0.35f * i));
           dl->PathArcTo(origin, r, tail, head, segments);
-          dl->PathStroke(themeColor(f.theme, (0.42f - 0.1f * i) * fade), 0,
+          dl->PathStroke(themeColor(f.theme, (0.55f - 0.13f * i) * fade), 0,
                          radius * 0.11f * (1.0f + 0.5f * i));
         }
         float tail = std::max(start, head - half * 0.9f);
         dl->PathArcTo(origin, radius, tail, head, segments);
-        dl->PathStroke(themeColor(f.theme, 0.9f * fade), 0, radius * 0.10f);
+        dl->PathStroke(themeHot(f.theme, 0.85f * fade), 0, radius * 0.13f);
         dl->PathArcTo(origin, radius, std::max(start, head - half * 0.45f), head,
                       segments);
-        dl->PathStroke(themeHot(f.theme, fade), 0, radius * 0.045f);
+        dl->PathStroke(IM_COL32(255, 255, 255, static_cast<int>(255 * fade)), 0,
+                       radius * 0.05f);
         // Spark at the tip of the swing.
         ImVec2 tip(origin.x + std::cos(head) * radius,
                    origin.y + std::sin(head) * radius);
@@ -853,6 +897,21 @@ void ArenaView::drawAir(ImDrawList* dl) {
         dl->PathStroke(themeHot(f.theme, 0.9f * alpha), 0, 3.5f);
         dl->AddLine(a, b, themeColor(f.theme, 0.3f * alpha), 8.0f);
         dl->AddCircleFilled(b, 9.0f, themeColor(f.theme, 0.5f * alpha));
+        break;
+      }
+      case GameEventKind::HitSpark: {
+        // Four-point star that snaps open and vanishes.
+        ImVec2 centre = toScreen(f.x, f.y - 26.0f);
+        float size = f.value * (0.5f + 0.5f * ease(t * 2.0f));
+        float spin = f.x2;
+        for (int i = 0; i < 4; i++) {
+          float a = spin + i * PI * 0.5f;
+          float len = size * (i % 2 == 0 ? 1.0f : 0.6f);
+          ImVec2 tip(centre.x + std::cos(a) * len, centre.y + std::sin(a) * len);
+          ImVec2 back(centre.x - std::cos(a) * len, centre.y - std::sin(a) * len);
+          dl->AddLine(back, tip, themeHot(f.theme, fade), 3.0f * fade + 1.0f);
+        }
+        dl->AddCircleFilled(centre, size * 0.32f, themeHot(f.theme, 0.9f * fade));
         break;
       }
       case GameEventKind::SpawnPuff: {
@@ -1005,7 +1064,29 @@ void ArenaView::drawOverhead(ImDrawList* dl) {
           view.state.health / std::max(1.0f, view.state.maxHealth),
           elite ? IM_COL32(255, 200, 70, 255) : IM_COL32(230, 60, 60, 255));
     }
-    drawEffects(id, true, ImVec2(feet.x, top - 13.0f), 2);
+    // One compact line of status tags; full names would bury a pack.
+    if (effects) {
+      const auto& list = effects->getEffects(id, true);
+      if (!list.empty()) {
+        std::string line;
+        bool control = false;
+        int shown = 0;
+        for (const EffectInstance& effect : list) {
+          if (shown >= 3) break;
+          if (!line.empty()) line += ' ';
+          line += effectTag(effect.type);
+          if (effect.stacks > 1) line += std::to_string(effect.stacks);
+          control = control || effect.type == EffectType::Stunned ||
+                    effect.type == EffectType::Snared ||
+                    effect.type == EffectType::Confused;
+          shown++;
+        }
+        text(dl, ImVec2(feet.x, top - 12.0f),
+             control ? IM_COL32(255, 240, 120, 255)
+                     : IM_COL32(215, 190, 255, 255),
+             10.0f, line.c_str());
+      }
+    }
   }
 
   // Players: name, health, shield, effects

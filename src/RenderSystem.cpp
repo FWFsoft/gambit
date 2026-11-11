@@ -541,7 +541,7 @@ void RenderSystem::captureScreenshot(const std::string& path) {
     if (ec) {
       Logger::error("Failed to rename screenshot temp file: " + ec.message());
     } else {
-      Logger::info("Screenshot saved to " + path);
+      Logger::debug("Screenshot saved to " + path);
     }
   }
 

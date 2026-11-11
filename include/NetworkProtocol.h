@@ -336,7 +336,9 @@ enum class GameEventKind : uint8_t {
   // Enemy spawn puff at x,y.
   SpawnPuff = 21,
   // Shield bubble on player sourceId for value2 ms.
-  ShieldBubble = 22
+  ShieldBubble = 22,
+  // Client-only (never sent): impact flash where a hit landed.
+  HitSpark = 200
 };
 
 // Colour themes for VFX (GameEventPacket::param2).

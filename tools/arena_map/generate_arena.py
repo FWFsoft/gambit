@@ -216,6 +216,15 @@ def main() -> None:
             ]))
         next_id += 1
 
+    # The wreck is solid: one collision rectangle under the hull.
+    hull_w, hull_h = 132.0, 46.0
+    objects["Collision"] = [
+        f'    <object id="{next_id}" name="ShipHull" type="wall" '
+        f'x="{-hull_w / 2:.1f}" y="{-hull_h / 2 - 4 + centre_y:.1f}" '
+        f'width="{hull_w:.1f}" height="{hull_h:.1f}" />'
+    ]
+    next_id += 1
+
     groups = []
     for layer_id, (name, items) in enumerate(objects.items(), start=2):
         groups.append(f'  <objectgroup id="{layer_id}" name="{name}">\n' +

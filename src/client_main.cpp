@@ -1,3 +1,5 @@
+#include <cstdio>
+#include <cstdlib>
 #include <memory>
 
 #include "AnimationAssetLoader.h"
@@ -51,6 +53,7 @@ int main(int argc, char* argv[]) {
   //   --connect <host>    server address (default 127.0.0.1)
   //   --map <path.tmx>    map to load (must match the server's map)
   //   --test-mode         scripted input + screenshots (see visual-test skill)
+  //   --record <n>        with --test-mode: save every nth frame for clips
   bool embeddedMode = false;
   std::string serverAddress = Config::Network::SERVER_ADDRESS;
   for (int i = 1; i < argc; i++) {
@@ -61,6 +64,8 @@ int main(int argc, char* argv[]) {
     } else if (arg == "--embedded") {
       embeddedMode = true;
       Logger::info("Embedded server mode enabled");
+    } else if (arg == "--record" && i + 1 < argc) {
+      Config::TestMode::testConfig.recordInterval = std::atoi(argv[++i]);
     } else if (arg == "--connect" && i + 1 < argc) {
       serverAddress = argv[++i];
     } else if (arg == "--map" && i + 1 < argc) {
@@ -182,6 +187,10 @@ int main(int argc, char* argv[]) {
         Config::TestMode::testConfig.inputCommandPath);
   }
 
+  // ImGui's SDL backend ignores events that do not belong to a window, so
+  // scripted events must carry ours.
+  const Uint32 testWindowId = SDL_GetWindowID(window.getWindow());
+
   // Where scripted test input last put the mouse.
   int testMouseX = Config::Screen::WIDTH / 2;
   int testMouseY = Config::Screen::HEIGHT / 2;
@@ -202,6 +211,7 @@ int main(int argc, char* argv[]) {
             if (scancode != SDL_SCANCODE_UNKNOWN) {
               SDL_Event keyEvent;
               SDL_zero(keyEvent);
+              keyEvent.key.windowID = testWindowId;
               keyEvent.type = SDL_KEYDOWN;
               keyEvent.key.keysym.scancode = scancode;
               keyEvent.key.keysym.sym = SDL_GetKeyFromScancode(scancode);
@@ -216,6 +226,7 @@ int main(int argc, char* argv[]) {
             if (scancode != SDL_SCANCODE_UNKNOWN) {
               SDL_Event keyEvent;
               SDL_zero(keyEvent);
+              keyEvent.key.windowID = testWindowId;
               keyEvent.type = SDL_KEYUP;
               keyEvent.key.keysym.scancode = scancode;
               keyEvent.key.keysym.sym = SDL_GetKeyFromScancode(scancode);
@@ -237,6 +248,7 @@ int main(int argc, char* argv[]) {
             testMouseY = command->intArg2;
             SDL_Event mouseEvent;
             SDL_zero(mouseEvent);
+            mouseEvent.motion.windowID = testWindowId;
             mouseEvent.type = SDL_MOUSEMOTION;
             mouseEvent.motion.x = command->intArg;
             mouseEvent.motion.y = command->intArg2;
@@ -258,6 +270,7 @@ int main(int argc, char* argv[]) {
             // Mouse down event
             SDL_Event mouseDownEvent;
             SDL_zero(mouseDownEvent);
+            mouseDownEvent.button.windowID = testWindowId;
             mouseDownEvent.type = SDL_MOUSEBUTTONDOWN;
             mouseDownEvent.button.button = button;
             mouseDownEvent.button.clicks = 1;
@@ -271,6 +284,7 @@ int main(int argc, char* argv[]) {
             // Mouse up event (immediately after)
             SDL_Event mouseUpEvent;
             SDL_zero(mouseUpEvent);
+            mouseUpEvent.button.windowID = testWindowId;
             mouseUpEvent.type = SDL_MOUSEBUTTONUP;
             mouseUpEvent.button.button = button;
             mouseUpEvent.button.clicks = 1;
@@ -285,6 +299,7 @@ int main(int argc, char* argv[]) {
                 command->type == TestInputReader::CommandType::MOUSE_DOWN;
             SDL_Event buttonEvent;
             SDL_zero(buttonEvent);
+            buttonEvent.button.windowID = testWindowId;
             buttonEvent.type = down ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
             buttonEvent.button.button =
                 command->stringArg == "right" ? SDL_BUTTON_RIGHT
@@ -302,6 +317,16 @@ int main(int argc, char* argv[]) {
 
       // Periodic screenshot capture
       Config::TestMode::testConfig.frameCount++;
+      auto& testConfig = Config::TestMode::testConfig;
+      if (testConfig.recordInterval > 0 &&
+          testConfig.frameCount % testConfig.recordInterval == 0 &&
+          GameStateManager::instance().getCurrentState() ==
+              GameState::Playing) {
+        char name[64];
+        std::snprintf(name, sizeof(name), "test_output/rec_%05d.png",
+                      ++testConfig.recordedFrames);
+        renderSystem.captureScreenshot(name);
+      }
       if (Config::TestMode::testConfig.frameCount %
               Config::TestMode::testConfig.screenshotInterval ==
           0) {
