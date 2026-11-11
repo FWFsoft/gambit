@@ -246,6 +246,10 @@ int main(int argc, char* argv[]) {
           case TestInputReader::CommandType::MOUSE_MOVE: {
             testMouseX = command->intArg;
             testMouseY = command->intArg2;
+            // Move the real pointer too: ImGui polls the global mouse
+            // position every frame and would otherwise override the
+            // scripted one, so UI hover and clicks would miss.
+            SDL_WarpMouseInWindow(window.getWindow(), testMouseX, testMouseY);
             SDL_Event mouseEvent;
             SDL_zero(mouseEvent);
             mouseEvent.motion.windowID = testWindowId;

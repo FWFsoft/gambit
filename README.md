@@ -1,5 +1,7 @@
 # Gambit Game Engine
 
+> **Alien Arena prototype:** see [PLAYTEST.md](PLAYTEST.md) for how to play, run a 2 to 4 player match, and tune it.
+
 A C++ game engine for building 2D isometric ARPG games with a focus on debuggability, stability, and performance.
 
 ## Quick Start
