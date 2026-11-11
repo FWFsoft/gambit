@@ -184,6 +184,7 @@ void ArenaClient::onGameEvent(const GameEventPacket& p) {
       view.castMs = view.castTotalMs = std::max(80.0f, p.value);
       view.castSlot = p.param;
       view.castCount++;
+      view.castAlt = view.state.resource >= 200;
       float dx = p.x2 - p.x;
       float dy = p.y2 - p.y;
       float d = std::sqrt(dx * dx + dy * dy);

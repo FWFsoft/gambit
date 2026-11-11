@@ -84,7 +84,7 @@ class ArenaView {
   void drawActorFrame(ImDrawList* dl, const ActorSheet& sheet,
                       const ActorAnim& anim, int direction, float elapsed,
                       ImVec2 feet, float scale, unsigned int tint, bool hold = true,
-                      int forcedFrame = -1);
+                      int forcedFrame = -1, float rotation = 0.0f);
 
   bool manifestLoaded = false;
   std::unordered_map<std::string, CharacterSprite> characterSprites;

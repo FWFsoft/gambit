@@ -492,7 +492,8 @@ class ActorSpec:
     pivot_y: int = 98     # feet line in the cell
 
 
-SHEET_COLUMNS = 16   # cells per sheet row; keeps sheets under 4096px tall
+SHEET_COLUMNS = 16   # minimum cells per sheet row
+MAX_SHEET = 8192     # px; safe texture size on desktop GPUs and WebGL2
 
 
 def render_actor(spec: ActorSpec, out_png: str, rel_png: str, log=print):
@@ -507,8 +508,12 @@ def render_actor(spec: ActorSpec, out_png: str, rel_png: str, log=print):
     model, base = spec.build()
     renderer = Renderer(spec.cell_w, spec.cell_h, spec.pivot_y)
     total = sum(c.frames for c in spec.clips) * len(DIRECTIONS)
-    cols = SHEET_COLUMNS
+    # Roughly square sheets stay inside GPU texture limits for big casts.
+    cols = max(SHEET_COLUMNS,
+               math.ceil(math.sqrt(total * spec.cell_h / spec.cell_w)))
     rows = (total + cols - 1) // cols
+    assert cols * spec.cell_w <= MAX_SHEET and rows * spec.cell_h <= MAX_SHEET, \
+        f"{spec.name}: sheet would be {cols * spec.cell_w}x{rows * spec.cell_h}"
     sheet = Image.new("RGBA", (cols * spec.cell_w, rows * spec.cell_h),
                       (0, 0, 0, 0))
     lines = [f"actor {spec.name} {rel_png} {spec.cell_w} {spec.cell_h} "

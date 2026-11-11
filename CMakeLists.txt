@@ -568,7 +568,7 @@ add_test(NAME GameLoop COMMAND test_gameloop)
 # God mode makes the outcome deterministic: it must reach Victory.
 add_test(NAME ArenaMatchFlow
          COMMAND ArenaSim --god --quiet --expect victory
-                 --bots Suds,Gravon,Isaac,Zephyr,Mina,Volgore,Wade)
+                 --bots Suds,Gravon,Isaac,Zephyr,Mina,Volgore,Wade,Presidente)
 set_tests_properties(ArenaMatchFlow PROPERTIES
     WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 # Same match without god mode: either result is fine, it just has to finish.

@@ -225,7 +225,8 @@ const ArenaView::ActorSheet* ArenaView::actorFor(const std::string& name) const 
 void ArenaView::drawActorFrame(ImDrawList* dl, const ActorSheet& sheet,
                                const ActorAnim& anim, int direction,
                                float elapsed, ImVec2 feet, float scale,
-                               ImU32 tint, bool hold, int forcedFrame) {
+                               ImU32 tint, bool hold, int forcedFrame,
+                               float rotation) {
   int frame = forcedFrame >= 0 ? forcedFrame
                                : static_cast<int>(elapsed * anim.fps);
   if (anim.loop && !hold) {
@@ -242,15 +243,31 @@ void ArenaView::drawActorFrame(ImDrawList* dl, const ActorSheet& sheet,
   // (cellH - pivotY) pixels above its bottom edge.
   ImVec2 base(feet.x, feet.y + (sheet.cellH - sheet.pivotY) * scale);
   drawSprite(dl, sheet.texture, col * sheet.cellW, row * sheet.cellH,
-             sheet.cellW, sheet.cellH, base, scale, scale, 0.0f, false, tint);
+             sheet.cellW, sheet.cellH, base, scale, scale, rotation, false,
+             tint);
 }
 
 namespace {
 
 // Which clip an ability plays. Characters alternate hands on repeat casts.
 std::string actionClip(const std::string& character, int slot,
-                       uint32_t castCount) {
+                       uint32_t castCount, bool alt) {
   bool odd = (castCount % 2) == 1;
+  if (character == "Presidente") {
+    // alt = cast while holding a foe: the Resonance forms.
+    switch (slot) {
+      case 0:
+        return alt ? "latigo" : "grab";
+      case 1:
+        return alt ? "bomba" : "pesado";
+      case 2:
+        return alt ? "abrazo" : "cajones";
+      case 3:
+        return alt ? "rana_bomba" : "splash";
+      default:
+        return alt ? "latigo" : "cajones";
+    }
+  }
   if (character == "Wade") {
     switch (slot) {
       case 0:
@@ -668,7 +685,8 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
     }
     if (view.castCount != anim.castCount) {
       anim.castCount = view.castCount;
-      anim.clip = actionClip(definition->name, view.castSlot, view.castCount);
+      anim.clip = actionClip(definition->name, view.castSlot, view.castCount,
+                             view.castAlt);
       anim.startSeconds = timeSeconds;
     }
     const ActorAnim* clip = nullptr;
@@ -692,7 +710,10 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
       elapsed = view.hitMs / 1000.0f;
     }
     if (!clip) {
-      clip = actor->find(moving ? "run" : "idle");
+      // Characters that carry things (Presidente) have holding variants.
+      bool holding = state.resource >= 200 && actor->find("hold_idle");
+      clip = actor->find(holding ? (moving ? "hold_run" : "hold_idle")
+                                 : (moving ? "run" : "idle"));
       elapsed = view.animTime;
     }
     if (clip) {
@@ -801,6 +822,20 @@ void ArenaView::drawEnemy(ImDrawList* dl, const ArenaClient::EnemyView& view) {
 
   ImVec2 at(feet.x + offsetX, feet.y + offsetY);
   const ActorSheet* actor = boss ? nullptr : actorFor(def.name);
+  // Grappled: held overhead by El Presidente, lying across his hands.
+  bool lifted = (view.state.flags & EnemyFlags::Grappled) != 0;
+  float liftRotation = 0.0f;
+  if (lifted && (view.state.flags & EnemyFlags::HeldLow) != 0) {
+    // Crushed against his chest in the bear hug.
+    at.y -= 34.0f;
+    feet.y -= 34.0f;
+  } else if (lifted) {
+    at.y -= 100.0f;
+    feet.y -= 100.0f;
+    liftRotation = view.faceLeft ? -1.45f : 1.45f;
+    at.x += view.faceLeft ? 18.0f : -18.0f;
+    feet.x += view.faceLeft ? 18.0f : -18.0f;
+  }
   if (actor) {
     AnimState& anim = enemyAnim[view.state.id];
     float faceX = 0.0f, faceY = 0.0f;
@@ -841,13 +876,19 @@ void ArenaView::drawEnemy(ImDrawList* dl, const ArenaClient::EnemyView& view) {
     if (clip) {
       ImU32 actorTint = tint;
       if (view.hitFlashMs > 0.0f) actorTint = IM_COL32(255, 150, 150, 255);
-      drawActorFrame(dl, *actor, *clip, anim.direction, elapsed, feet,
-                     scale * (elite ? 1.0f : 1.0f), actorTint, true, forced);
+      if (lifted) {
+        clip = actor->find("hit");
+        forced = 1;
+      }
+      if (clip) {
+        drawActorFrame(dl, *actor, *clip, anim.direction, elapsed, feet, scale,
+                       actorTint, true, forced, liftRotation);
+      }
     }
   } else if (sprite && sprite->texture) {
     drawSprite(dl, sprite->texture, frame * sprite->cellW, row * sprite->cellH,
-               sprite->cellW, sprite->cellH, at, scaleX, scaleY, rotation,
-               view.faceLeft, tint);
+               sprite->cellW, sprite->cellH, at, scaleX, scaleY,
+               rotation + liftRotation, view.faceLeft, tint);
   } else {
     dl->AddCircleFilled(ImVec2(at.x, at.y - def.radius), def.radius,
                         themeColor(genusTheme(def.genus), 1.0f));
@@ -877,7 +918,10 @@ void ArenaView::drawEntities(ImDrawList* dl) {
     items.push_back({y, 0, &view, id, x, y});
   }
   for (const auto& [id, view] : arena->enemies()) {
-    items.push_back({view.y, 1, &view, id, view.x, view.y});
+    // Grappled foes are up in their captor's arms: draw them over him.
+    float depth = (view.state.flags & EnemyFlags::Grappled) ? view.y + 80.0f
+                                                             : view.y;
+    items.push_back({depth, 1, &view, id, view.x, view.y});
   }
   for (const auto& [id, item] : prediction->getWorldItems()) {
     items.push_back({item.y - 1.0f, 2, nullptr, item.itemId, item.x, item.y});

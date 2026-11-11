@@ -66,6 +66,8 @@ void AbilitySystem::update(float dtMs) {
 
 void AbilitySystem::setInput(Player& player, uint8_t buttons, float aimX,
                              float aimY) {
+  player.pressedLatch |= buttons & ~player.lastPacketButtons;
+  player.lastPacketButtons = buttons;
   player.buttons = buttons;
   player.aimX = aimX;
   player.aimY = aimY;
@@ -210,6 +212,8 @@ void AbilitySystem::updatePlayer(Player& player, float dtMs) {
     player.chargeSlot = -1;
     player.chargeMs = 0.0f;
   }
+  // Presses made while stunned or mid-dash are dropped, not queued.
+  player.pressedLatch = 0;
   player.prevButtons = player.buttons;
 
   uint8_t flags = 0;
@@ -240,8 +244,11 @@ void AbilitySystem::updateAbilityInput(Player& player, float dtMs) {
 
   bool silenced =
       !effectManager->calculateModifiers(player.id, false).canUseAbilities;
-  uint8_t held = player.buttons;
-  uint8_t pressed = held & ~player.prevButtons;
+  // A latched press counts as held for this tick even if it was already
+  // released (tap shorter than a tick).
+  uint8_t pressed = (player.buttons & ~player.prevButtons) | player.pressedLatch;
+  uint8_t held = player.buttons | player.pressedLatch;
+  player.pressedLatch = 0;
 
   for (int slot = 0; slot < Arena::SLOT_COUNT; slot++) {
     uint8_t bit = static_cast<uint8_t>(1u << slot);

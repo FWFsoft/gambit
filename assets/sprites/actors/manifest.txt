@@ -1,3 +1,18 @@
+actor Presidente assets/sprites/actors/Presidente.png 144 168 72 146 32
+anim Presidente idle 0 8 8 1
+anim Presidente run 64 8 12 1
+anim Presidente hold_idle 128 6 8 1
+anim Presidente hold_run 176 8 12 1
+anim Presidente grab 240 5 18 0
+anim Presidente latigo 280 8 20 0
+anim Presidente pesado 344 6 18 0
+anim Presidente bomba 392 9 18 0
+anim Presidente cajones 464 8 14 0
+anim Presidente abrazo 528 10 13 0
+anim Presidente splash 608 10 18 0
+anim Presidente rana_bomba 688 10 18 0
+anim Presidente hit 768 4 16 0
+anim Presidente death 800 9 12 0
 actor Toxlith assets/sprites/actors/Toxlith.png 96 80 48 66 16
 anim Toxlith idle 0 6 8 1
 anim Toxlith run 48 6 14 1

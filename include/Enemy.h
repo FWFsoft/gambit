@@ -52,6 +52,7 @@ struct Enemy : public Animatable {
   int bossMove = 0;            // boss attack rotation
   float bossTimerMs = 0.0f;
   uint8_t netFlags = 0;        // EnemyFlags, mirrored to clients
+  bool heldLow = false;        // grappled at chest height (set by a kit)
 
   // Respawn tracking
   uint32_t spawnIndex;  // Which spawn point this enemy came from

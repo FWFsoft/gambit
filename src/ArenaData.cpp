@@ -211,6 +211,38 @@ static const KitInfo KITS[] = {
          {"Handball!", "Pick up the ball and run. Gain +2 Haste.", 10000.0f,
           AbilityMode::Tap, 0.0f},
      }},
+    {CharacterId::Presidente,
+     "El Presidente",
+     "the Presidente",
+     Archetype::Playmaker,
+     330.0f,
+     238.0f,
+     "The Presidente",
+     "Grappling a foe grants Resonance. With Resonance every move becomes "
+     "its alternate form. Resonance ends when the foe is thrown, slammed or "
+     "slips free.",
+     {
+         {"Lucha Libre",
+          "Grab the foe in front of you and lift it overhead. Holding a foe: "
+          "Latigo - whirl, knocking enemies back, then throw your foe at the "
+          "cursor.",
+          600.0f, AbilityMode::Tap, 0.0f},
+         {"Pesado",
+          "Hold: charge forward shoulder-first, scattering enemies and grabbing "
+          "the first one. Holding a foe: Bomba - leap and slam them into the "
+          "ground. Charge for distance and size.",
+          6500.0f, AbilityMode::Charge, 1000.0f},
+         {"Grande Cajones",
+          "Flex. Enemies in front lose their buffs and become Vulnerable; you "
+          "gain Fortified. Holding a foe: Abrazo de Oso - crushing bear hug "
+          "that Stuns (separate cooldown).",
+          9000.0f, AbilityMode::Tap, 0.0f},
+         {"El Splash de Rana",
+          "Leap to the cursor and body-splash, knocking up foes where you "
+          "land. Holding a foe: Grande Rana Bomba - land on them for a much "
+          "bigger slam.",
+          9000.0f, AbilityMode::Tap, 0.0f},
+     }},
     {CharacterId::Volgore,
      "Volgore",
      "the Berserker",

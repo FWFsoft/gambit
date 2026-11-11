@@ -49,6 +49,9 @@ struct Player : public Animatable {
   float shieldMs = 0.0f;  // remaining shield duration
   float aimX = 0.0f, aimY = 0.0f;
   uint8_t buttons = 0, prevButtons = 0;
+  // Presses seen in any input packet since the last ability tick. Several
+  // packets can land in one server tick; a quick tap must not be lost.
+  uint8_t pressedLatch = 0, lastPacketButtons = 0;
   float cooldownMs[Arena::SLOT_COUNT] = {0, 0, 0, 0, 0};
   int chargeSlot = -1;        // slot being charged / channelled
   float chargeMs = 0.0f;      // time held so far

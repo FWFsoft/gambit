@@ -8,17 +8,20 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <memory>
 
 #include "AbilitySystem.h"
 #include "EffectManager.h"
 #include "EnemySystem.h"
+#include "Logger.h"
 
 namespace {
 
 using Arena::CharacterId::Gravon;
 using Arena::CharacterId::Isaac;
 using Arena::CharacterId::Mina;
+using Arena::CharacterId::Presidente;
 using Arena::CharacterId::Suds;
 using Arena::CharacterId::Volgore;
 using Arena::CharacterId::Wade;
@@ -820,6 +823,326 @@ class WadeKit : public Kit {
   }
 };
 
+// ===========================================================================
+// El Presidente (Playmaker)
+//   kitTarget     the foe he is holding (0 = hands free)
+//   kitTimer[0]   how much longer he can hold them
+//   kitTimer[1]   Abrazo de Oso cooldown (separate from Grande Cajones)
+// While holding a foe he has Resonance and every move uses its alternate
+// form. The held foe is Grappled: carried overhead, helpless.
+// ===========================================================================
+class PresidenteKit : public Kit {
+ public:
+  static constexpr float HOLD_MS = 3800.0f;
+  static constexpr float LEAP_MS = 520.0f;
+  static constexpr float BOMBA_MS = 480.0f;
+
+  static Enemy* held(AbilitySystem& sys, Player& self) {
+    if (self.kitTarget == 0) return nullptr;
+    Enemy* e = sys.findEnemy(self.kitTarget);
+    if (!e || e->state == EnemyState::Dead) return nullptr;
+    // Freed some other way (he went down, the grapple wore off).
+    if (!sys.effects().getEnemyEffects(e->id).hasEffect(EffectType::Grappled)) {
+      return nullptr;
+    }
+    return e;
+  }
+
+  static bool grab(AbilitySystem& sys, Player& self, Enemy& enemy) {
+    sys.applyToEnemy(enemy, EffectType::Grappled, 1, self.id, HOLD_MS + 500.0f);
+    if (!sys.effects().getEnemyEffects(enemy.id).hasEffect(
+            EffectType::Grappled)) {
+      return false;  // too big to lift (the boss)
+    }
+    self.kitTarget = enemy.id;
+    self.kitTimer[0] = HOLD_MS;
+    enemy.knockMs = 0.0f;
+    sys.applyToPlayer(self, EffectType::Resonance, 1, self.id, HOLD_MS + 500.0f);
+    return true;
+  }
+
+  static void release(AbilitySystem& sys, Player& self) {
+    if (Enemy* e = sys.findEnemy(self.kitTarget)) {
+      sys.effects().removeEffect(e->id, true, EffectType::Grappled);
+      e->heldLow = false;
+    }
+    sys.effects().removeEffect(self.id, false, EffectType::Resonance);
+    self.kitTarget = 0;
+    self.kitTimer[0] = 0.0f;
+  }
+
+  // Leap toward (x, y); `land` runs where he comes down.
+  static void leap(AbilitySystem& sys, Player& self, float x, float y,
+                   float durationMs, std::function<void(Player&)> land) {
+    float dx = x - self.x, dy = y - self.y;
+    float d = std::sqrt(dx * dx + dy * dy);
+    if (d > 1.0f) {
+      sys.dashPlayer(self, dx / d, dy / d, d, durationMs, true);
+    } else {
+      self.forcedVx = self.forcedVy = 0.0f;
+      self.forcedMs = durationMs;
+    }
+    uint32_t id = self.id;
+    AbilitySystem* s = &sys;
+    s->schedule(durationMs, [s, id, land]() {
+      if (Player* p = s->findPlayer(id)) {
+        if (p->isAlive()) land(*p);
+      }
+    });
+  }
+
+  static void slam(AbilitySystem& sys, Player& self, float radius,
+                   float damage, float stunMs, VfxTheme theme) {
+    uint32_t id = self.id;
+    uint32_t heldId = self.kitTarget;
+    float cx = self.x, cy = self.y;
+    sys.fxBurst(cx, cy, radius, theme);
+    sys.fxRing(cx, cy, radius + 24.0f, theme);
+    sys.enemiesInCircle(cx, cy, radius, [&](Enemy& enemy) {
+      if (enemy.id == heldId) return;
+      sys.damageEnemy(id, enemy, damage, DamageFlag::Explosion);
+      if (Enemy* still = sys.findEnemy(enemy.id)) {
+        sys.applyToEnemy(*still, EffectType::Stunned, 1, id, stunMs);
+        sys.knockbackEnemy(*still, cx, cy, 40.0f);
+      }
+    });
+  }
+
+  void cast(AbilityContext& ctx, int slot) override {
+    AbilitySystem& sys = ctx.sys;
+    Player& self = ctx.self;
+    uint32_t selfId = self.id;
+    Enemy* foe = held(sys, self);
+
+    if (slot == 0) {
+      if (foe) {
+        // Látigo: whirl, scattering everyone, then hurl the foe.
+        const float radius = 120.0f;
+        uint32_t foeId = foe->id;
+        sys.fxRing(self.x, self.y, radius, VfxTheme::Holy);
+        sys.fxSlash(self.x, self.y, ctx.dirX, ctx.dirY, radius, 340.0f,
+                    VfxTheme::Holy);
+        sys.enemiesInCircle(self.x, self.y, radius, [&](Enemy& enemy) {
+          if (enemy.id == foeId) return;
+          sys.knockbackEnemy(enemy, self.x, self.y, 120.0f);
+          sys.damageEnemy(selfId, enemy, 18.0f);
+        });
+        release(sys, self);
+        if (Enemy* thrown = sys.findEnemy(foeId)) {
+          thrown->x = self.x + ctx.dirX * 30.0f;
+          thrown->y = self.y + ctx.dirY * 30.0f;
+          sys.enemySystem().pushEnemy(*thrown, ctx.dirX, ctx.dirY, 300.0f,
+                                      280.0f);
+          sys.fxDashTrail(thrown->x, thrown->y, thrown->x + ctx.dirX * 300.0f,
+                          thrown->y + ctx.dirY * 300.0f, VfxTheme::Holy);
+        }
+        AbilitySystem* s = &sys;
+        sys.schedule(280.0f, [s, selfId, foeId]() {
+          Enemy* landed = s->findEnemy(foeId);
+          if (!landed || landed->state == EnemyState::Dead) return;
+          float lx = landed->x, ly = landed->y;
+          s->fxBurst(lx, ly, 80.0f, VfxTheme::Holy);
+          s->enemiesInCircle(lx, ly, 80.0f, [&](Enemy& other) {
+            float dmg = other.id == foeId ? 35.0f : 28.0f;
+            s->damageEnemy(selfId, other, dmg, DamageFlag::Explosion);
+            if (Enemy* still = s->findEnemy(other.id)) {
+              s->applyToEnemy(*still, EffectType::Stunned, 1, selfId, 900.0f);
+            }
+          });
+        });
+        return;
+      }
+      // Lucha Libre: grab the closest foe in front.
+      Enemy* best = nullptr;
+      float bestDist = 1e9f;
+      sys.enemiesInCone(self.x, self.y, ctx.dirX, ctx.dirY, 100.0f, 55.0f,
+                        [&](Enemy& enemy) {
+                          float d = dist(self.x, self.y, enemy.x, enemy.y);
+                          if (d < bestDist) {
+                            bestDist = d;
+                            best = &enemy;
+                          }
+                        });
+      sys.fxSlash(self.x, self.y, ctx.dirX, ctx.dirY, 100.0f, 90.0f,
+                  VfxTheme::Holy);
+      if (best) {
+        uint32_t id = best->id;
+        sys.damageEnemy(selfId, *best, 10.0f, DamageFlag::Basic |
+                                                  DamageFlag::Melee);
+        if (Enemy* still = sys.findEnemy(id)) grab(sys, self, *still);
+      }
+    } else if (slot == 1) {
+      if (foe) {
+        // Bomba: leap and pile-drive the foe into the ground.
+        float range = 120.0f + 200.0f * ctx.charge;
+        float x = self.x + ctx.dirX * range, y = self.y + ctx.dirY * range;
+        sys.clampToWorld(x, y);
+        float radius = 90.0f + 70.0f * ctx.charge;
+        float damage = 40.0f + 40.0f * ctx.charge;
+        sys.fxTelegraphCircle(x, y, radius, BOMBA_MS, VfxTheme::Holy);
+        leap(sys, self, x, y, BOMBA_MS, [&sys, radius, damage](Player& p) {
+          AbilitySystem& s2 = sys;
+          slam(s2, p, radius, damage, 1000.0f, VfxTheme::Holy);
+          if (Enemy* victim = held(s2, p)) {
+            uint32_t vid = victim->id;
+            victim->x = p.x + 6.0f;
+            victim->y = p.y + 4.0f;
+            release(s2, p);
+            if (Enemy* v = s2.findEnemy(vid)) {
+              s2.damageEnemy(p.id, *v, damage * 1.5f, DamageFlag::Explosion);
+              if (Enemy* still = s2.findEnemy(vid)) {
+                s2.applyToEnemy(*still, EffectType::Stunned, 1, p.id, 1500.0f);
+              }
+            }
+          }
+        });
+        return;
+      }
+      // Pesado: shoulder charge. First foe in the way is scooped up.
+      float distance = 160.0f + 260.0f * ctx.charge;
+      float endX = self.x + ctx.dirX * distance;
+      float endY = self.y + ctx.dirY * distance;
+      sys.clampToWorld(endX, endY);
+      sys.fxDashTrail(self.x, self.y, endX, endY, VfxTheme::Blood);
+      Enemy* first = nullptr;
+      float firstDist = 1e9f;
+      sys.enemiesInLine(self.x, self.y, endX, endY, 40.0f, [&](Enemy& enemy) {
+        float d = dist(self.x, self.y, enemy.x, enemy.y);
+        if (d < firstDist) {
+          firstDist = d;
+          first = &enemy;
+        }
+      });
+      uint32_t firstId = first ? first->id : 0;
+      float sx = self.x, sy = self.y;
+      sys.enemiesInLine(self.x, self.y, endX, endY, 40.0f, [&](Enemy& enemy) {
+        if (enemy.id == firstId) return;
+        // Knock everyone else aside.
+        float side = ((enemy.x - sx) * -ctx.dirY + (enemy.y - sy) * ctx.dirX) >= 0
+                         ? 1.0f : -1.0f;
+        sys.enemySystem().pushEnemy(enemy, -ctx.dirY * side, ctx.dirX * side,
+                                    90.0f, 200.0f);
+        sys.damageEnemy(selfId, enemy, 20.0f, DamageFlag::Melee);
+        if (Enemy* still = sys.findEnemy(enemy.id)) {
+          sys.applyToEnemy(*still, EffectType::Stunned, 1, selfId, 500.0f);
+        }
+      });
+      if (first) {
+        sys.damageEnemy(selfId, *first, 15.0f, DamageFlag::Melee);
+        if (Enemy* still = sys.findEnemy(firstId)) grab(sys, self, *still);
+      }
+      sys.dashPlayer(self, ctx.dirX, ctx.dirY, distance, 330.0f, true);
+    } else if (slot == 2) {
+      if (foe) {
+        // Abrazo de Oso: three crushing squeezes, then drop them stunned.
+        if (self.kitTimer[1] > 0.0f) return;
+        self.kitTimer[1] = 7000.0f;
+        self.cooldownMs[2] = std::max(0.0f, self.cooldownMs[2] - 9000.0f);
+        self.kitTimer[0] = std::max(self.kitTimer[0], 1200.0f);
+        foe->heldLow = true;  // brought down to chest height for the hug
+        AbilitySystem* s = &sys;
+        for (int i = 0; i < 3; i++) {
+          sys.schedule(180.0f + i * 230.0f, [s, selfId, i]() {
+            Player* p = s->findPlayer(selfId);
+            if (!p) return;
+            Enemy* victim = held(*s, *p);
+            if (!victim) return;
+            uint32_t vid = victim->id;
+            s->fxBurst(victim->x, victim->y, 34.0f, VfxTheme::Blood);
+            s->damageEnemy(selfId, *victim, 24.0f, DamageFlag::Melee);
+            if (i == 2) {
+              if (Enemy* still = s->findEnemy(vid)) {
+                release(*s, *p);
+                s->applyToEnemy(*still, EffectType::Stunned, 1, selfId, 2000.0f);
+              }
+            }
+          });
+        }
+        return;
+      }
+      // Grande Cajones: a flex that strips their nerve.
+      const float range = 230.0f;
+      sys.fxCone(self.x, self.y, ctx.dirX, ctx.dirY, range, 120.0f,
+                 VfxTheme::Holy);
+      sys.enemiesInCone(self.x, self.y, ctx.dirX, ctx.dirY, range, 60.0f,
+                        [&](Enemy& enemy) {
+                          sys.effects().mutableEffects(enemy.id, true)
+                              .removeAllBuffs();
+                          sys.applyToEnemy(enemy, EffectType::Vulnerable, 2,
+                                           selfId);
+                          sys.applyToEnemy(enemy, EffectType::Weakened, 1,
+                                           selfId);
+                        });
+      sys.applyToPlayer(self, EffectType::Fortified, 2, selfId, 4000.0f);
+    } else if (slot == 3) {
+      // El Splash de Rana / Grande Rana Bomba: leap to the cursor.
+      float x, y;
+      aimPoint(ctx, 360.0f, x, y);
+      bool carrying = foe != nullptr;
+      float radius = carrying ? 150.0f : 110.0f;
+      sys.fxTelegraphCircle(x, y, radius, LEAP_MS, VfxTheme::Holy);
+      if (carrying) self.kitTimer[0] = std::max(self.kitTimer[0], LEAP_MS + 200);
+      leap(sys, self, x, y, LEAP_MS, [&sys, carrying, radius](Player& p) {
+        slam(sys, p, radius, carrying ? 45.0f : 30.0f, carrying ? 900.0f : 600.0f,
+             carrying ? VfxTheme::Fire : VfxTheme::Holy);
+        if (!carrying) return;
+        if (Enemy* victim = held(sys, p)) {
+          uint32_t vid = victim->id;
+          release(sys, p);
+          if (Enemy* v = sys.findEnemy(vid)) {
+            sys.damageEnemy(p.id, *v, 80.0f, DamageFlag::Explosion);
+            if (Enemy* still = sys.findEnemy(vid)) {
+              sys.applyToEnemy(*still, EffectType::Stunned, 1, p.id, 1500.0f);
+            }
+          }
+        }
+      });
+    }
+  }
+
+  bool canRecast(const Player& self, int slot) const override {
+    // Abrazo de Oso has its own cooldown, separate from Grande Cajones.
+    return slot == 2 && self.kitTarget != 0 && self.kitTimer[1] <= 0.0f;
+  }
+
+  void tick(AbilitySystem& sys, Player& self, float dtMs) override {
+    self.kitTimer[1] = std::max(0.0f, self.kitTimer[1] - dtMs);
+    Enemy* foe = held(sys, self);
+    if (!foe) {
+      if (self.kitTarget != 0) release(sys, self);
+      self.resource = 0;
+      return;
+    }
+    self.kitTimer[0] -= dtMs;
+    if (self.kitTimer[0] <= 0.0f) {
+      // They wriggle free.
+      release(sys, self);
+      self.resource = 0;
+      return;
+    }
+    self.resource = 255;
+    // Carry the foe overhead, a little in front, facing the cursor.
+    float dx = self.aimX - self.x, dy = self.aimY - self.y;
+    float d = std::sqrt(dx * dx + dy * dy);
+    float fx = d > 1.0f ? dx / d : 0.0f;
+    float fy = d > 1.0f ? dy / d : 1.0f;
+    float reach = foe->heldLow ? 26.0f : 14.0f;
+    foe->x = self.x + fx * reach;
+    foe->y = self.y + fy * reach + 2.0f;
+    foe->vx = foe->vy = 0.0f;
+    foe->knockMs = 0.0f;
+  }
+
+  float speedMultiplier(const Player& self) const override {
+    return self.kitTarget != 0 ? 0.85f : 1.0f;
+  }
+
+  void onRoundStart(Player& self) override {
+    self.kitTarget = 0;
+    self.kitTimer[0] = self.kitTimer[1] = 0.0f;
+  }
+};
+
 }  // namespace
 
 std::unique_ptr<Kit> makeKit(uint32_t characterId) {
@@ -838,6 +1161,8 @@ std::unique_ptr<Kit> makeKit(uint32_t characterId) {
       return std::make_unique<VolgoreKit>();
     case Wade:
       return std::make_unique<WadeKit>();
+    case Presidente:
+      return std::make_unique<PresidenteKit>();
     default:
       return nullptr;
   }

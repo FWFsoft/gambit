@@ -60,6 +60,8 @@ constexpr uint8_t Stunned = 0x01;
 constexpr uint8_t Confused = 0x02;
 constexpr uint8_t Elite = 0x04;
 constexpr uint8_t AttackingShip = 0x08;
+constexpr uint8_t Grappled = 0x10;  // held by a player: drawn lifted
+constexpr uint8_t HeldLow = 0x20;   // held at chest height (bear hug)
 }  // namespace EnemyFlags
 
 struct ClientInputPacket {

@@ -123,6 +123,7 @@ namespace CharacterId {
 constexpr uint32_t Gravon = 3;
 constexpr uint32_t Isaac = 4;
 constexpr uint32_t Mina = 9;
+constexpr uint32_t Presidente = 14;
 constexpr uint32_t Suds = 16;
 constexpr uint32_t Volgore = 18;
 constexpr uint32_t Wade = 19;

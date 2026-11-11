@@ -238,6 +238,12 @@ void EnemySystem::updateEnemy(Enemy& enemy,
   if (confused) enemy.netFlags |= EnemyFlags::Confused;
   if (enemy.elite) enemy.netFlags |= EnemyFlags::Elite;
   if (enemy.targetShip) enemy.netFlags |= EnemyFlags::AttackingShip;
+  if (effectManager &&
+      effectManager->getEnemyEffects(enemy.id).hasEffect(EffectType::Grappled)) {
+    enemy.netFlags |= EnemyFlags::Grappled;
+    enemy.netFlags &= ~EnemyFlags::Stunned;
+    if (enemy.heldLow) enemy.netFlags |= EnemyFlags::HeldLow;
+  }
 
   enemy.cooldownMs = std::max(0.0f, enemy.cooldownMs - deltaTime);
 

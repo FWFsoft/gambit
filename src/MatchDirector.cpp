@@ -856,8 +856,12 @@ void MatchDirector::onDebugCommand(Player& player, DebugCommandKind command,
       for (uint8_t& count : player.infusionInventory) count += 2;
       break;
     case DebugCommandKind::SpawnWave: {
-      // arg 1-4: a swarm of that genus's smallest alien (sprite testing).
+      // arg 1-4: a swarm of that genus's smallest alien, in the direction
+      // the player is aiming (for testing moves and recording clips).
       float angle = randomRange(0.0f, 2.0f * PI);
+      if (arg >= 1 && arg <= Arena::GENUS_COUNT) {
+        angle = std::atan2(player.aimY - player.y, player.aimX - player.x);
+      }
       Genus genus = arg >= 1 && arg <= Arena::GENUS_COUNT
                         ? static_cast<Genus>(arg)
                         : Genus::None;

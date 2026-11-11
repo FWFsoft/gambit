@@ -184,7 +184,9 @@ EffectManager::StatModifiers EffectManager::calculateModifiers(
                  !effects.hasEffect(EffectType::Snared) &&
                  !effects.hasEffect(EffectType::Grappled);
 
-  mods.canAct = !effects.hasEffect(EffectType::Stunned);
+  // A grappled creature is helpless in its captor's arms.
+  mods.canAct = !effects.hasEffect(EffectType::Stunned) &&
+                !effects.hasEffect(EffectType::Grappled);
 
   mods.canUseAbilities = !effects.hasEffect(EffectType::Silenced);
 
