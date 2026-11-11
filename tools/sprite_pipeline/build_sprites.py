@@ -183,6 +183,25 @@ def build_character_from_turnaround(path: Path):
     return strip, cell_w, cell_h
 
 
+def ensure_portrait(name: str) -> bool:
+    """Character select needs a portrait; cut one from the concept art if the
+    hand-made one is missing. Returns True if a portrait was written."""
+    portrait = REPO / "assets" / "portraits" / f"{name}.png"
+    preview = PREVIEWS / f"{name}.png"
+    if portrait.exists() or not preview.exists():
+        return False
+    im = Image.open(preview).convert("RGBA")
+    left, top, right, bottom = im.getbbox()
+    side = int((right - left) * 0.62)
+    cx = (left + right) // 2
+    box = (cx - side // 2, top, cx + side // 2, top + side)
+    head = im.crop(box).resize((512, 512), Image.LANCZOS)
+    backdrop = Image.new("RGBA", head.size, (26, 22, 40, 255))
+    backdrop.alpha_composite(head)
+    backdrop.save(portrait)
+    return True
+
+
 def unity_frame_count(png: Path) -> int:
     meta = Path(str(png) + ".meta").read_text()
     return max(1, len(re.findall(r"^\s+rect:\s*$", meta, flags=re.M)))
@@ -249,6 +268,8 @@ def main() -> int:
             cw, ch, dirs = sprite.width, sprite.height, 1
             source = "concept art placeholder"
         sprite.save(REPO / rel)
+        if ensure_portrait(name):
+            print(f"  wrote missing portrait for {name}")
         manifest.append(f"character {name} {rel} {cw} {ch} {dirs}")
         print(f"character {name:<12} {cw}x{ch} x{dirs}  ({source})")
 

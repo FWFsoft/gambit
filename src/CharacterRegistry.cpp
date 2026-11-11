@@ -8,7 +8,7 @@ CharacterRegistry& CharacterRegistry::instance() {
 CharacterRegistry::CharacterRegistry() { initializeCharacters(); }
 
 void CharacterRegistry::initializeCharacters() {
-  // 19 Characters with actual portrait images
+  // 20 characters with portrait images
 
   characters.push_back(CharacterDefinition(1, "Eliana", 240, 230,
                                            255));  // Light ethereal purple
@@ -47,6 +47,8 @@ void CharacterRegistry::initializeCharacters() {
   characters.push_back(CharacterDefinition(18, "Volgore", 255, 50,
                                            0));  // Bright red fire
   characters.push_back(CharacterDefinition(19, "Wade", 30, 50, 120));  // Navy
+  characters.push_back(
+      CharacterDefinition(20, "Zephyr", 120, 230, 255));  // Storm cyan
 
   // Build ID lookup
   for (size_t i = 0; i < characters.size(); i++) {

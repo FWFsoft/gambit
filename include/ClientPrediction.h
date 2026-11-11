@@ -2,6 +2,7 @@
 
 #include <deque>
 #include <unordered_map>
+#include <vector>
 
 #include "EventBus.h"
 #include "NetworkProtocol.h"
@@ -56,6 +57,17 @@ class ClientPrediction {
   // Reset character selection state (for returning to character select)
   void resetCharacterSelection() { sentCharacterSelection = false; }
 
+  uint32_t getLocalPlayerId() const { return localPlayerId; }
+  // Cursor position in world space as last sent to the server.
+  float getAimX() const { return aimX; }
+  float getAimY() const { return aimY; }
+  // Send any packet to the server (HUD actions: ready, infusions, debug).
+  void sendToServer(const std::vector<uint8_t>& data);
+
+  // Height above the feet that the cursor is assumed to point at, so that
+  // clicking on an enemy's body aims at the ground point it stands on.
+  static constexpr float AIM_HEIGHT = 26.0f;
+
  private:
   NetworkClient* client;
   uint32_t localPlayerId;
@@ -77,6 +89,9 @@ class ClientPrediction {
   float shipX = 0.0f;
   float shipY = 0.0f;
   bool hasShip = false;
+
+  float aimX = 0.0f;
+  float aimY = 0.0f;
 
   // Character selection state
   bool sentCharacterSelection;

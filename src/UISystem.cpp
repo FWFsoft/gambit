@@ -8,6 +8,8 @@
 #include <string>
 
 #include "CharacterRegistry.h"
+#include "ArenaData.h"
+#include "ArenaView.h"
 #include "CharacterSelectionState.h"
 #include "ClientPrediction.h"
 #include "DamageNumberSystem.h"
@@ -153,6 +155,10 @@ void UISystem::render() {
       }
       break;
     case GameState::Playing:
+      if (arenaView) {
+        arenaView->render();
+        break;
+      }
       renderHUD();
       // Show death screen overlay if player is dead
       if (clientPrediction && clientPrediction->getLocalPlayer().isDead()) {
@@ -160,7 +166,11 @@ void UISystem::render() {
       }
       break;
     case GameState::Paused:
-      renderHUD();
+      if (arenaView) {
+        arenaView->render();
+      } else {
+        renderHUD();
+      }
       renderPauseMenu();
       if (showSettings) {
         renderSettingsPanel();
@@ -171,21 +181,26 @@ void UISystem::render() {
       break;
   }
 
-  // Render pickup notifications (always on top, except in main menu)
-  if (currentState != GameState::MainMenu) {
-    renderNotifications();
-    renderObjectiveActivity();
+  // The arena view has its own prompts, effect chips and damage numbers.
+  if (!arenaView) {
+    // Render pickup notifications (always on top, except in main menu)
+    if (currentState != GameState::MainMenu) {
+      renderNotifications();
+      renderObjectiveActivity();
+    }
+
+    // Render effect bars (only during gameplay)
+    if (currentState == GameState::Playing) {
+      renderEffectBars();
+    }
+
+    // Render damage numbers (only during gameplay)
+    if (currentState == GameState::Playing && damageNumberSystem) {
+      damageNumberSystem->render();
+    }
   }
 
-  // Render effect bars (only during gameplay)
-  if (currentState == GameState::Playing) {
-    renderEffectBars();
-  }
-
-  // Render damage numbers (only during gameplay)
-  if (currentState == GameState::Playing && damageNumberSystem) {
-    damageNumberSystem->render();
-  }
+  lastRenderedState = currentState;
 
   // Render ImGui
   ImGui::Render();
@@ -293,7 +308,7 @@ void UISystem::renderCharacterSelect() {
   const CharacterRegistry& registry = CharacterRegistry::instance();
   const auto& characters = registry.getAllCharacters();
 
-  // Grid layout: 5 columns x 4 rows for 19 characters
+  // Grid layout: 5 columns x 4 rows for 20 characters
   const int columns = 5;
   const int rows = 4;
   const float portraitSize = 120.0f;
@@ -360,6 +375,26 @@ void UISystem::renderCharacterSelect() {
         drawList->AddImage((ImTextureID)(intptr_t)portrait->getID(), topLeft,
                            bottomRight);
 
+        // Characters without a kit yet are concept-only: dim them.
+        bool playable = Arena::isPlayable(character.id);
+        if (!playable) {
+          drawList->AddRectFilled(topLeft, bottomRight, IM_COL32(8, 8, 14, 175));
+          drawList->AddText(ImVec2(topLeft.x + 6.0f, bottomRight.y - 18.0f),
+                            IM_COL32(200, 200, 215, 255), "concept");
+        } else {
+          drawList->AddRect(topLeft, bottomRight, IM_COL32(120, 255, 170, 200),
+                            0.0f, 0, 2.0f);
+          drawList->AddRectFilled(ImVec2(topLeft.x, bottomRight.y - 18.0f),
+                                  bottomRight, IM_COL32(0, 0, 0, 170));
+          drawList->AddText(ImVec2(topLeft.x + 6.0f, bottomRight.y - 16.0f),
+                            IM_COL32(150, 255, 190, 255),
+                            character.name.c_str());
+        }
+        if (isSelected) {
+          drawList->AddRect(topLeft, bottomRight, IM_COL32(255, 255, 255, 255),
+                            0.0f, 0, 3.0f);
+        }
+
         // Draw keyboard focus border (yellow)
         if (isFocused) {
           drawList->AddRect(topLeft, bottomRight, IM_COL32(255, 255, 0, 255),
@@ -412,105 +447,84 @@ void UISystem::renderCharacterSelect() {
   ImGui::End();
   ImGui::PopStyleVar();
 
-  // CENTER-RIGHT: Map selection (positioned to the right of character grid)
-  const float mapSelectorX = 50 + gridWidth + 80;  // Right of grid with gap
-  const float mapSelectorY = 300;                  // Middle of screen
-  ImGui::SetNextWindowPos(ImVec2(mapSelectorX, mapSelectorY), ImGuiCond_Always,
-                          ImVec2(0.0f, 0.0f));
-  ImGui::SetNextWindowSize(ImVec2(280, 150), ImGuiCond_Always);
-  ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-
-  ImGui::Begin("Map Selection", nullptr,
-               ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-                   ImGuiWindowFlags_NoCollapse |
-                   ImGuiWindowFlags_NoBringToFrontOnFocus);
-
-  ImGui::SetWindowFontScale(1.5f);
-  ImGui::Text("Select Map");
-  ImGui::SetWindowFontScale(1.0f);
-  ImGui::Separator();
-  ImGui::Spacing();
-
-  // List of available maps
-  struct MapInfo {
-    std::string name;
-    std::string path;
-  };
-  static const MapInfo maps[] = {
-      {"Test Map 1", "assets/maps/test_map.tmx"},
-      {"Test Map 2", "assets/maps/test_map2.tmx"},
-  };
-
-  std::string currentMapPath =
-      MapSelectionState::instance().getSelectedMapPath();
-
-  for (size_t i = 0; i < sizeof(maps) / sizeof(maps[0]); i++) {
-    bool isSelected = (currentMapPath == maps[i].path);
-
-    if (isSelected) {
-      ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.6f, 0.2f, 1.0f));
-    }
-
-    if (ImGui::Button(maps[i].name.c_str(), ImVec2(250, 40))) {
-      MapSelectionState::instance().setSelectedMap(maps[i].path);
-      Logger::info("Selected map: " + maps[i].name);
-    }
-
-    if (isSelected) {
-      ImGui::PopStyleColor();
-    }
-  }
-
-  ImGui::End();
-  ImGui::PopStyleVar();
-
-  // BOTTOM-RIGHT: Character preview
-  ImGui::SetNextWindowPos(ImVec2(windowSize.x - 50, windowSize.y - 130),
-                          ImGuiCond_Always, ImVec2(1.0f, 1.0f));
-  ImGui::SetNextWindowSize(ImVec2(350, 500), ImGuiCond_Always);
+  // RIGHT: character sheet (art + kit)
+  ImGui::SetNextWindowPos(ImVec2(windowSize.x - 30, 96), ImGuiCond_Always,
+                          ImVec2(1.0f, 0.0f));
+  ImGui::SetNextWindowSize(ImVec2(440, 548), ImGuiCond_Always);
   ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
 
   ImGui::Begin("Character Preview", nullptr,
                ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
                    ImGuiWindowFlags_NoBringToFrontOnFocus |
-                   ImGuiWindowFlags_NoCollapse);
+                   ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar);
 
-  if (selectedCharacterId != 0) {
-    const CharacterDefinition* character =
-        registry.getCharacter(selectedCharacterId);
+  uint32_t shownCharacterId =
+      selectedCharacterId != 0 ? selectedCharacterId : hoveredCharacterId;
+  const CharacterDefinition* shown =
+      shownCharacterId != 0 ? registry.getCharacter(shownCharacterId) : nullptr;
+  if (shown) {
+    const Arena::KitInfo* kit = Arena::kitInfo(shown->id);
 
-    if (character) {
-      // Display character name
-      ImGui::SetWindowFontScale(1.5f);
-      ImGui::Text("%s", character->name.c_str());
-      ImGui::SetWindowFontScale(1.0f);
-
-      ImGui::Separator();
+    // Art on the left, identity on the right
+    Texture* art = TextureManager::instance().get(shown->getCharacterPreviewPath());
+    const float artW = 150.0f, artH = artW * 1.5f;
+    ImVec2 artPos = ImGui::GetCursorPos();
+    if (art && art->isLoaded()) {
+      ImGui::Image((ImTextureID)(intptr_t)art->getID(), ImVec2(artW, artH));
+    } else {
+      ImGui::Dummy(ImVec2(artW, artH));
+    }
+    ImGui::SetCursorPos(ImVec2(artPos.x + artW + 14.0f, artPos.y));
+    ImGui::BeginGroup();
+    ImGui::SetWindowFontScale(1.6f);
+    ImGui::Text("%s", shown->name.c_str());
+    ImGui::SetWindowFontScale(1.0f);
+    if (kit) {
+      ImGui::TextColored(ImVec4(0.8f, 0.85f, 1.0f, 1.0f), "%s", kit->title);
+      ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "%s",
+                         Arena::archetypeName(kit->archetype));
+      ImGui::Text("Health %.0f   Speed %.0f", kit->maxHealth, kit->moveSpeed);
       ImGui::Spacing();
+      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 250.0f);
+      ImGui::TextColored(ImVec4(1.0f, 0.86f, 0.5f, 1.0f), "Passive: %s",
+                         kit->passiveName);
+      ImGui::TextUnformatted(kit->passiveDescription);
+      ImGui::PopTextWrapPos();
+    } else {
+      ImGui::TextDisabled("Concept only");
+      ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 250.0f);
+      ImGui::TextWrapped(
+          "This character is designed but does not have a playable kit in "
+          "the prototype yet.");
+      ImGui::PopTextWrapPos();
+    }
+    ImGui::EndGroup();
 
-      // Display character using relevant character image asset
-      Texture* playerTexture =
-          TextureManager::instance().get(character->getCharacterPreviewPath());
-      if (playerTexture && playerTexture->isLoaded()) {
-        // Calculate preview size (3x game size = 96x96)
-        float previewSize = 250.0f;
-        float previewSizeY = previewSize * 1.44;
-
-        // Center the preview in the window
-        ImVec2 cursorPos = ImGui::GetCursorPos();
-        float centerX = (350 - previewSize) / 2.0f;
-        ImGui::SetCursorPos(ImVec2(centerX, cursorPos.y));
-
-        ImGui::Image((ImTextureID)(intptr_t)playerTexture->getID(),
-                     ImVec2(previewSize, previewSizeY));
+    ImGui::SetCursorPos(ImVec2(artPos.x, artPos.y + artH + 10.0f));
+    ImGui::Separator();
+    if (kit) {
+      static const char* keys[4] = {"LMB", "RMB (hold)", "Q", "SHIFT"};
+      for (int slot = 0; slot < Arena::KIT_SLOT_COUNT; slot++) {
+        const Arena::AbilityInfo& ability = kit->abilities[slot];
+        ImGui::TextColored(ImVec4(1.0f, 0.86f, 0.5f, 1.0f), "%s", keys[slot]);
+        ImGui::SameLine(96.0f);
+        ImGui::Text("%s", ability.name);
+        if (ability.cooldownMs >= 1000.0f) {
+          ImGui::SameLine();
+          ImGui::TextDisabled("(%.0fs)", ability.cooldownMs / 1000.0f);
+        }
+        ImGui::PushTextWrapPos(425.0f);
+        ImGui::TextColored(ImVec4(0.78f, 0.8f, 0.86f, 1.0f), "%s",
+                           ability.description);
+        ImGui::PopTextWrapPos();
+        ImGui::Spacing();
       }
-
-      // Future: Show character stats here
+      ImGui::TextDisabled("E: core ability from your first alien infusion");
     }
   } else {
-    // No character selected
     ImGui::SetWindowFontScale(1.2f);
-    ImGui::TextWrapped("Select a character from the grid");
+    ImGui::TextWrapped("Pick a character. Green frames are playable in this "
+                       "prototype.");
     ImGui::SetWindowFontScale(1.0f);
   }
 
@@ -527,7 +541,12 @@ void UISystem::renderCharacterSelect() {
                ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                    ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize);
 
-  if (selectedCharacterId != 0) {
+  if (selectedCharacterId != 0 && !Arena::isPlayable(selectedCharacterId)) {
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.6f, 0.6f, 1.0f));
+    ImGui::Button("Not playable yet", ImVec2(300, 50));
+    ImGui::PopStyleColor(2);
+  } else if (selectedCharacterId != 0) {
     if (ImGui::Button("Confirm Selection", ImVec2(300, 50))) {
       // Save selection to state
       CharacterSelectionState::instance().setSelectedCharacter(
@@ -1367,6 +1386,9 @@ void UISystem::onKeyDown(const KeyDownEvent& e) {
   if (currentState != GameState::CharacterSelect) {
     return;
   }
+  if (lastRenderedState != GameState::CharacterSelect) {
+    return;  // this key press is what brought us here
+  }
 
   const CharacterRegistry& registry = CharacterRegistry::instance();
   const auto& characters = registry.getAllCharacters();
@@ -1378,9 +1400,15 @@ void UISystem::onKeyDown(const KeyDownEvent& e) {
 
   const int columns = 5;
 
-  // Initialize focus to first character if not set
+  // Initialize focus to the first playable character if not set
   if (keyboardFocusedIndex == -1) {
     keyboardFocusedIndex = 0;
+    for (int i = 0; i < totalCharacters; i++) {
+      if (Arena::isPlayable(characters[i].id)) {
+        keyboardFocusedIndex = i;
+        break;
+      }
+    }
   }
 
   // Handle arrow key navigation
@@ -1427,6 +1455,11 @@ void UISystem::onKeyDown(const KeyDownEvent& e) {
               characters[keyboardFocusedIndex];
           selectedCharacterId = character.id;
           Logger::info("Selected character via keyboard: " + character.name);
+        }
+
+        if (!Arena::isPlayable(selectedCharacterId)) {
+          Logger::info("Character has no playable kit yet");
+          break;
         }
 
         // Now confirm the selection and enter game

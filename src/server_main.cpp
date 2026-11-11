@@ -1,6 +1,7 @@
 #include <cassert>
 #include <csignal>
 #include <memory>
+#include <string>
 
 #include "CollisionSystem.h"
 #include "EventBus.h"
@@ -18,8 +19,15 @@ volatile bool serverRunning = true;
 
 void signalHandler(int signum) { serverRunning = false; }
 
-int main() {
+int main(int argc, char* argv[]) {
   Logger::init();
+
+  //   --map <path.tmx>    map to host (clients must load the same one)
+  std::string mapPath = "assets/maps/arena.tmx";
+  for (int i = 1; i < argc; i++) {
+    std::string arg = argv[i];
+    if (arg == "--map" && i + 1 < argc) mapPath = argv[++i];
+  }
   signal(SIGINT, signalHandler);
 
   // Load item definitions
@@ -35,8 +43,11 @@ int main() {
   }
 
   TiledMap map;
-  // Server uses default map (could be made configurable via command line)
-  assert(map.load("assets/maps/test_map.tmx") && "Failed to load required map");
+  if (!map.load(mapPath)) {
+    Logger::error("Failed to load map: " + mapPath);
+    return EXIT_FAILURE;
+  }
+  Logger::info("Hosting map " + mapPath);
 
   CollisionSystem collisionSystem(map.getCollisionShapes());
   Logger::info("Collision system initialized with " +

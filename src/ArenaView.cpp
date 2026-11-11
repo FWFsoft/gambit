@@ -1,0 +1,1073 @@
+// World rendering for the arena: ground markers, characters, enemies, attack
+// effects and floating text. The HUD lives in ArenaHud.cpp.
+
+#include "ArenaView.h"
+
+#include <imgui.h>
+
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
+#include <fstream>
+#include <sstream>
+#include <vector>
+
+#include "ArenaDraw.h"
+#include "CharacterRegistry.h"
+#include "ClientPrediction.h"
+#include "Effect.h"
+#include "EffectTracker.h"
+#include "Logger.h"
+#include "Texture.h"
+#include "TextureManager.h"
+#include "config/ScreenConfig.h"
+
+using namespace ArenaDraw;
+
+namespace {
+
+constexpr float PROJECTILE_HEIGHT = 24.0f;  // drawn this far above the ground
+constexpr float SHIP_DRAW_SIZE = 192.0f;
+
+ImTextureID textureId(const Texture* texture) {
+  return (ImTextureID)(intptr_t)texture->getID();
+}
+
+// Draw a sprite cell standing on `feet`. The quad is scaled and rotated
+// around the feet so characters can lean, squash and fall over.
+void drawSprite(ImDrawList* dl, const Texture* texture, int srcX, int srcY,
+                int srcW, int srcH, ImVec2 feet, float scaleX, float scaleY,
+                float rotation, bool flipX, ImU32 color) {
+  float w = srcW * scaleX;
+  float h = srcH * scaleY;
+  float cosR = std::cos(rotation);
+  float sinR = std::sin(rotation);
+  auto corner = [&](float lx, float ly) {
+    return ImVec2(feet.x + lx * cosR - ly * sinR,
+                  feet.y + lx * sinR + ly * cosR);
+  };
+  ImVec2 topLeft = corner(-w * 0.5f, -h);
+  ImVec2 topRight = corner(w * 0.5f, -h);
+  ImVec2 bottomRight = corner(w * 0.5f, 0.0f);
+  ImVec2 bottomLeft = corner(-w * 0.5f, 0.0f);
+
+  float texW = static_cast<float>(texture->getWidth());
+  float texH = static_cast<float>(texture->getHeight());
+  float u0 = srcX / texW;
+  float u1 = (srcX + srcW) / texW;
+  float v0 = srcY / texH;
+  float v1 = (srcY + srcH) / texH;
+  if (flipX) std::swap(u0, u1);
+
+  dl->AddImageQuad(textureId(texture), topLeft, topRight, bottomRight,
+                   bottomLeft, ImVec2(u0, v0), ImVec2(u1, v0), ImVec2(u1, v1),
+                   ImVec2(u0, v1), color);
+}
+
+void drawShadow(ImDrawList* dl, ImVec2 feet, float radius, float alpha = 0.35f) {
+  dl->AddEllipseFilled(feet, ImVec2(radius, radius * 0.38f),
+                       IM_COL32(0, 0, 0, static_cast<int>(255 * alpha)), 0.0f,
+                       20);
+}
+
+// Frame index for an 8-direction strip laid out S, SE, E, NE, N, NW, W, SW.
+int directionFrame(float dirX, float dirY) {
+  float degrees = std::atan2(dirY, dirX) * 180.0f / PI;  // E = 0, S = 90
+  int index = static_cast<int>(std::lround((90.0f - degrees) / 45.0f));
+  return ((index % 8) + 8) % 8;
+}
+
+}  // namespace
+
+ArenaView::ArenaView(ArenaClient* arena, ClientPrediction* prediction,
+                     EffectTracker* effects, Camera* camera)
+    : arena(arena), prediction(prediction), effects(effects), camera(camera) {}
+
+// ---------------------------------------------------------------------------
+// Sprites
+// ---------------------------------------------------------------------------
+
+void ArenaView::loadManifest() {
+  if (manifestLoaded) return;
+  manifestLoaded = true;
+
+  std::ifstream file("assets/sprites/manifest.txt");
+  if (!file.is_open()) {
+    Logger::error("ArenaView: assets/sprites/manifest.txt not found. Run "
+                  "tools/sprite_pipeline/build_sprites.py");
+    return;
+  }
+  std::string line;
+  while (std::getline(file, line)) {
+    std::istringstream in(line);
+    std::string kind, name, path;
+    in >> kind;
+    if (kind == "character") {
+      CharacterSprite sprite;
+      in >> name >> path >> sprite.cellW >> sprite.cellH >> sprite.directions;
+      sprite.texture = TextureManager::instance().get(path);
+      if (sprite.texture) characterSprites[name] = sprite;
+    } else if (kind == "enemy") {
+      EnemySprite sprite;
+      std::string genus;
+      int tier;
+      in >> name >> genus >> tier >> path >> sprite.cellW >> sprite.cellH >>
+          sprite.idleFrames >> sprite.runFrames >> sprite.dieFrames;
+      sprite.texture = TextureManager::instance().get(path);
+      if (sprite.texture) enemySprites[name] = sprite;
+    } else if (kind == "fx") {
+      FxSprite sprite;
+      in >> name >> path >> sprite.cellW >> sprite.cellH >> sprite.frames;
+      sprite.texture = TextureManager::instance().get(path);
+      if (sprite.texture) fxSprites[name] = sprite;
+    }
+  }
+  shipTexture = TextureManager::instance().get("assets/ship.png");
+  Logger::info("ArenaView: loaded " + std::to_string(characterSprites.size()) +
+               " character, " + std::to_string(enemySprites.size()) +
+               " enemy and " + std::to_string(fxSprites.size()) +
+               " fx sprites");
+}
+
+const ArenaView::CharacterSprite* ArenaView::characterSprite(
+    uint32_t characterId) {
+  loadManifest();
+  const CharacterDefinition* definition =
+      CharacterRegistry::instance().getCharacter(characterId);
+  if (!definition) return nullptr;
+  auto it = characterSprites.find(definition->name);
+  return it == characterSprites.end() ? nullptr : &it->second;
+}
+
+const ArenaView::EnemySprite* ArenaView::enemySprite(Arena::EnemyKind kind) {
+  loadManifest();
+  // The boss borrows the largest Cerebrian body until it has its own art.
+  const char* name = kind == Arena::EnemyKind::Boss
+                         ? "Synaptogon"
+                         : Arena::enemyDef(kind).name;
+  auto it = enemySprites.find(name);
+  return it == enemySprites.end() ? nullptr : &it->second;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+ImVec2 ArenaView::toScreen(float worldX, float worldY) const {
+  return ImVec2(worldX - camera->x + Config::Screen::WIDTH / 2.0f,
+                worldY - camera->y + Config::Screen::HEIGHT / 2.0f);
+}
+
+ImVec2 ArenaView::toZoomedScreen(float worldX, float worldY) const {
+  return ImVec2(
+      (worldX - camera->x) * camera->zoom + Config::Screen::WIDTH / 2.0f,
+      (worldY - camera->y) * camera->zoom + Config::Screen::HEIGHT / 2.0f);
+}
+
+uint32_t ArenaView::localId() const { return prediction->getLocalPlayerId(); }
+
+bool ArenaView::localPosition(float& x, float& y) const {
+  const Player& local = prediction->getLocalPlayer();
+  x = local.x;
+  y = local.y;
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// Frame
+// ---------------------------------------------------------------------------
+
+void ArenaView::render() {
+  loadManifest();
+  timeSeconds = arena->nowMs() / 1000.0f;
+
+  // The background draw list sits under every ImGui window: the world.
+  renderWorld(ImGui::GetBackgroundDrawList());
+  renderHud();
+}
+
+void ArenaView::renderWorld(ImDrawList* dl) {
+  // Lay the world out at 1x, then magnify every vertex around the screen
+  // centre. One place applies the zoom, and no drawing code has to care.
+  int firstVertex = dl->VtxBuffer.Size;
+  drawGround(dl);
+  drawEntities(dl);
+  drawAir(dl);
+  const float zoom = camera->zoom;
+  if (zoom != 1.0f) {
+    const float cx = Config::Screen::WIDTH / 2.0f;
+    const float cy = Config::Screen::HEIGHT / 2.0f;
+    for (int i = firstVertex; i < dl->VtxBuffer.Size; i++) {
+      ImDrawVert& v = dl->VtxBuffer[i];
+      v.pos.x = cx + (v.pos.x - cx) * zoom;
+      v.pos.y = cy + (v.pos.y - cy) * zoom;
+    }
+  }
+  drawOverhead(dl);
+}
+
+// ---------------------------------------------------------------------------
+// Ground layer: zone, hazards, telegraphs, objectives
+// ---------------------------------------------------------------------------
+
+void ArenaView::drawGround(ImDrawList* dl) {
+  const MatchStatePacket& match = arena->match();
+  Arena::MatchPhase phase = arena->phase();
+  bool fighting = phase == Arena::MatchPhase::Round ||
+                  phase == Arena::MatchPhase::BossFight;
+
+  if (arena->hasMatch()) {
+    ImVec2 ship = toScreen(match.shipX, match.shipY);
+
+    // Around the ship: where you need to be when the round ends.
+    if (phase == Arena::MatchPhase::Round) {
+      float pulse = 0.5f + 0.5f * std::sin(timeSeconds * 2.0f);
+      dl->AddCircle(ship, Arena::Tuning::SHIP_SAFE_RADIUS,
+                    IM_COL32(120, 255, 170, static_cast<int>(40 + 30 * pulse)),
+                    72, 2.0f);
+    }
+
+    // The Blue Zone: everything outside is tinted and deadly.
+    if (fighting) {
+      float radius = match.zoneRadius;
+      const float band = 2400.0f;
+      dl->AddCircle(ship, radius + band * 0.5f, IM_COL32(20, 40, 120, 95), 96,
+                    band);
+      float pulse = 0.5f + 0.5f * std::sin(timeSeconds * 3.0f);
+      dl->AddCircle(ship, radius, IM_COL32(90, 170, 255, 200), 128, 5.0f);
+      dl->AddCircle(ship, radius - 7.0f,
+                    IM_COL32(160, 220, 255, static_cast<int>(60 + 60 * pulse)),
+                    128, 2.0f);
+    }
+  }
+
+  // Objectives
+  for (const auto& [id, objective] : prediction->getObjectives()) {
+    ImVec2 centre = toScreen(objective.x, objective.y);
+    if (centre.x < -200 || centre.x > Config::Screen::WIDTH + 200 ||
+        centre.y < -200 || centre.y > Config::Screen::HEIGHT + 200) {
+      continue;
+    }
+    ImU32 colour = IM_COL32(255, 220, 90, 150);
+    const char* label = "Objective";
+    if (objective.state == ObjectiveState::InProgress) {
+      colour = IM_COL32(90, 190, 255, 190);
+    } else if (objective.state == ObjectiveState::ReadyToDeposit) {
+      colour = IM_COL32(255, 160, 60, 190);
+    } else if (objective.state == ObjectiveState::Completed) {
+      colour = IM_COL32(110, 230, 130, 90);
+    }
+    switch (objective.type) {
+      case ObjectiveType::AlienScrapyard:
+        label = "Scrapyard";
+        break;
+      case ObjectiveType::DerelictTurret:
+        label = "Derelict Turret";
+        break;
+      case ObjectiveType::CaptureOutpost:
+        label = "Outpost";
+        break;
+      case ObjectiveType::SalvageMedpacks:
+        label = "Medpacks";
+        break;
+      default:
+        break;
+    }
+    float spin = timeSeconds * 0.6f;
+    dl->AddCircle(centre, objective.radius, colour, 48, 2.0f);
+    // Four rotating ticks make it read as "interactive" rather than a hazard.
+    for (int i = 0; i < 4; i++) {
+      float a = spin + i * PI * 0.5f;
+      dl->AddLine(ImVec2(centre.x + std::cos(a) * (objective.radius - 8),
+                         centre.y + std::sin(a) * (objective.radius - 8)),
+                  ImVec2(centre.x + std::cos(a) * (objective.radius + 8),
+                         centre.y + std::sin(a) * (objective.radius + 8)),
+                  colour, 3.0f);
+    }
+    dl->AddRectFilled(ImVec2(centre.x - 9, centre.y - 9),
+                      ImVec2(centre.x + 9, centre.y + 9), colour, 2.0f);
+    (void)label;  // names and progress are drawn crisp in drawOverhead
+  }
+
+  // Ground zones: clouds, pools, vortex
+  for (const ArenaClient::Zone& zone : arena->zones()) {
+    ImVec2 centre = toScreen(zone.x, zone.y);
+    float fadeIn = std::min(1.0f, zone.ageMs / 200.0f);
+    float fadeOut = std::min(1.0f, (zone.lifeMs - zone.ageMs) / 400.0f);
+    float alpha = std::max(0.0f, std::min(fadeIn, fadeOut));
+    // Enemy hazards are outlined in red so "don't stand here" is unmistakable.
+    ImU32 edge = zone.fromEnemy ? themeColor(VfxTheme::Danger, 0.8f * alpha)
+                                : themeColor(zone.theme, 0.7f * alpha);
+
+    if (zone.variant == 0) {
+      // Cloud: drifting blobs
+      for (int i = 0; i < 7; i++) {
+        float a = i * 0.9f + timeSeconds * (0.3f + 0.05f * i);
+        float r = zone.radius * (0.25f + 0.1f * (i % 3));
+        float orbit = zone.radius * (i == 0 ? 0.0f : 0.5f);
+        ImVec2 p(centre.x + std::cos(a) * orbit, centre.y + std::sin(a) * orbit);
+        dl->AddCircleFilled(p, r + zone.radius * 0.25f,
+                            themeColor(zone.theme, 0.10f * alpha), 24);
+      }
+      dl->AddCircle(centre, zone.radius, edge, 48, 2.0f);
+    } else if (zone.variant == 1) {
+      // Pool
+      dl->AddCircleFilled(centre, zone.radius,
+                          themeColor(zone.theme, 0.22f * alpha), 32);
+      float ripple = std::fmod(timeSeconds * 0.8f + zone.id * 0.37f, 1.0f);
+      dl->AddCircle(centre, zone.radius * ripple,
+                    themeHot(zone.theme, 0.35f * alpha * (1.0f - ripple)), 32,
+                    2.0f);
+      dl->AddCircle(centre, zone.radius, edge, 32, 2.0f);
+    } else {
+      // Vortex: rotating arcs pulling inward
+      float shrink = 1.0f - 0.5f * ease(zone.ageMs / zone.lifeMs);
+      for (int i = 0; i < 3; i++) {
+        float a = timeSeconds * 9.0f + i * (2.0f * PI / 3.0f);
+        float r = zone.radius * shrink * (0.45f + 0.27f * i);
+        dl->PathArcTo(centre, r, a, a + 1.9f, 20);
+        dl->PathStroke(themeColor(zone.theme, 0.75f * alpha), 0, 4.0f);
+      }
+      dl->AddCircleFilled(centre, zone.radius * shrink,
+                          themeColor(zone.theme, 0.10f * alpha), 40);
+    }
+  }
+
+  // Telegraphs: where an attack is about to land
+  for (const ArenaClient::Fx& f : arena->effects()) {
+    float t = f.ageMs / f.lifeMs;
+    if (f.kind == GameEventKind::TelegraphCircle) {
+      ImVec2 centre = toScreen(f.x, f.y);
+      dl->AddCircleFilled(centre, f.value, themeColor(f.theme, 0.10f), 40);
+      dl->AddCircleFilled(centre, f.value * t, themeColor(f.theme, 0.26f), 40);
+      dl->AddCircle(centre, f.value, themeColor(f.theme, 0.95f), 40, 2.5f);
+    } else if (f.kind == GameEventKind::TelegraphCone) {
+      ImVec2 origin = toScreen(f.x, f.y);
+      float angle = std::atan2(f.y2, f.x2);
+      float half = f.param * PI / 180.0f;
+      sector(dl, origin, f.value, angle, half, themeColor(f.theme, 0.10f),
+             themeColor(f.theme, 0.9f), 2.0f);
+      sector(dl, origin, f.value * t, angle, half, themeColor(f.theme, 0.28f),
+             0);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Entities, depth sorted
+// ---------------------------------------------------------------------------
+
+void ArenaView::drawShip(ImDrawList* dl) {
+  if (!arena->hasMatch()) return;
+  const MatchStatePacket& match = arena->match();
+  ImVec2 base = toScreen(match.shipX, match.shipY + 34.0f);
+  drawShadow(dl, ImVec2(base.x, base.y - 16.0f), 62.0f, 0.35f);
+  if (shipTexture) {
+    float scale = SHIP_DRAW_SIZE / shipTexture->getWidth();
+    // Wrecked and listing; shudders when it is being hit.
+    float damage = 1.0f - match.shipHealth / std::max(1.0f, match.shipMaxHealth);
+    ImU32 tint = IM_COL32(255, static_cast<int>(255 - 90 * damage),
+                          static_cast<int>(255 - 110 * damage), 255);
+    drawSprite(dl, shipTexture, 0, 0, shipTexture->getWidth(),
+               shipTexture->getHeight(), base, scale, scale, -0.05f, false,
+               tint);
+  }
+  if (match.turretsOnline) {
+    ImVec2 top = toScreen(match.shipX, match.shipY - 30.0f);
+    float pulse = 0.5f + 0.5f * std::sin(timeSeconds * 6.0f);
+    dl->AddCircleFilled(top, 5.0f + 2.0f * pulse, IM_COL32(150, 255, 190, 230));
+  }
+}
+
+void ArenaView::drawPickup(ImDrawList* dl, uint32_t itemId, float worldX,
+                           float worldY) {
+  float bob = std::sin(timeSeconds * 4.0f + worldX * 0.05f) * 3.0f;
+  ImVec2 feet = toScreen(worldX, worldY);
+  ImVec2 centre(feet.x, feet.y - 14.0f + bob);
+  drawShadow(dl, feet, 9.0f, 0.3f);
+
+  if (Arena::PickupId::isInfusion(itemId)) {
+    VfxTheme theme = genusTheme(Arena::PickupId::infusionGenus(itemId));
+    float pulse = 0.5f + 0.5f * std::sin(timeSeconds * 5.0f + worldY * 0.03f);
+    dl->AddCircleFilled(centre, 14.0f + 3.0f * pulse, themeColor(theme, 0.22f));
+    // Diamond gem
+    ImVec2 gem[4] = {ImVec2(centre.x, centre.y - 10), ImVec2(centre.x + 8, centre.y),
+                     ImVec2(centre.x, centre.y + 10), ImVec2(centre.x - 8, centre.y)};
+    dl->AddConvexPolyFilled(gem, 4, themeColor(theme, 1.0f));
+    dl->AddPolyline(gem, 4, IM_COL32(20, 14, 24, 255), ImDrawFlags_Closed, 2.0f);
+    dl->AddLine(ImVec2(centre.x - 3, centre.y - 3), ImVec2(centre.x, centre.y - 7),
+                themeHot(theme, 1.0f), 2.0f);
+  } else if (itemId == Arena::PickupId::Scrap) {
+    dl->AddRectFilled(ImVec2(centre.x - 9, centre.y - 7),
+                      ImVec2(centre.x + 9, centre.y + 7),
+                      IM_COL32(150, 150, 165, 255), 2.0f);
+    dl->AddRect(ImVec2(centre.x - 9, centre.y - 7),
+                ImVec2(centre.x + 9, centre.y + 7), IM_COL32(20, 14, 24, 255),
+                2.0f, 0, 2.0f);
+    dl->AddLine(ImVec2(centre.x - 5, centre.y - 3), ImVec2(centre.x + 5, centre.y + 3),
+                IM_COL32(90, 90, 105, 255), 2.0f);
+    text(dl, ImVec2(centre.x, centre.y - 24), IM_COL32(220, 220, 235, 255),
+         11.0f, "SCRAP");
+  } else if (itemId == Arena::PickupId::Medkit) {
+    dl->AddRectFilled(ImVec2(centre.x - 8, centre.y - 8),
+                      ImVec2(centre.x + 8, centre.y + 8),
+                      IM_COL32(240, 240, 240, 255), 2.0f);
+    dl->AddRectFilled(ImVec2(centre.x - 2, centre.y - 6),
+                      ImVec2(centre.x + 2, centre.y + 6),
+                      IM_COL32(220, 40, 50, 255));
+    dl->AddRectFilled(ImVec2(centre.x - 6, centre.y - 2),
+                      ImVec2(centre.x + 6, centre.y + 2),
+                      IM_COL32(220, 40, 50, 255));
+  } else {
+    dl->AddRectFilled(ImVec2(centre.x - 6, centre.y - 6),
+                      ImVec2(centre.x + 6, centre.y + 6),
+                      IM_COL32(255, 215, 0, 255));
+  }
+}
+
+void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
+                           float worldX, float worldY, bool isLocal) {
+  const PlayerState& state = view.state;
+  if (state.characterId == 0) return;  // still choosing a character
+  const CharacterSprite* sprite = characterSprite(state.characterId);
+  ImVec2 feet = toScreen(worldX, worldY);
+
+  bool dead = (state.flags & PlayerFlags::Dead) != 0 || state.health <= 0.0f;
+  bool hidden = (state.flags & PlayerFlags::Hidden) != 0;
+  bool charging = (state.flags & PlayerFlags::Charging) != 0;
+  bool stunned = (state.flags & PlayerFlags::Stunned) != 0;
+
+  float vx = state.vx, vy = state.vy;
+  float aimX = state.aimX, aimY = state.aimY;
+  if (isLocal) {
+    const Player& local = prediction->getLocalPlayer();
+    vx = local.vx;
+    vy = local.vy;
+    aimX = prediction->getAimX();
+    aimY = prediction->getAimY();
+  }
+  float speed = std::sqrt(vx * vx + vy * vy);
+  bool moving = speed > 12.0f && !dead;
+
+  // Face the cursor; while just walking with no aim info, face the heading.
+  float faceX = aimX - worldX;
+  float faceY = aimY - worldY;
+  if (std::abs(faceX) + std::abs(faceY) < 1.0f) {
+    faceX = moving ? vx : 0.0f;
+    faceY = moving ? vy : 1.0f;
+  }
+
+  // --- procedural animation -------------------------------------------------
+  float scaleX = 1.0f, scaleY = 1.0f, rotation = 0.0f;
+  float offsetX = 0.0f, offsetY = 0.0f;
+
+  if (dead) {
+    rotation = PI * 0.5f;  // lying down
+    offsetY = -10.0f;
+  } else {
+    if (moving) {
+      // Walk: a little hop and a lean into the direction of travel.
+      float cycle = view.animTime * (7.0f + speed * 0.012f);
+      offsetY -= std::abs(std::sin(cycle)) * 3.5f;
+      rotation += (vx / std::max(speed, 1.0f)) * 0.07f +
+                  std::sin(cycle) * 0.035f;
+    } else {
+      // Idle: breathe.
+      float breathe = std::sin(view.animTime * 2.4f);
+      scaleY += breathe * 0.018f;
+      scaleX -= breathe * 0.010f;
+    }
+    if (charging) {
+      // Winding up: crouch and tremble.
+      float progress = state.charge / 255.0f;
+      scaleY *= 1.0f - 0.07f * progress;
+      scaleX *= 1.0f + 0.05f * progress;
+      offsetX += std::sin(view.animTime * 55.0f) * 1.2f * progress;
+    }
+    if (view.castMs > 0.0f && view.castTotalMs > 0.0f) {
+      // Attack: lunge toward the target and snap back.
+      float t = 1.0f - view.castMs / view.castTotalMs;
+      float punch = std::sin(std::min(1.0f, t * 1.6f) * PI);
+      float reach = view.castSlot == 0 ? 9.0f : 13.0f;
+      offsetX += view.castDirX * reach * punch;
+      offsetY += view.castDirY * reach * punch * 0.6f;
+      scaleX *= 1.0f + 0.10f * punch;
+      scaleY *= 1.0f - 0.07f * punch;
+      rotation += view.castDirX * 0.12f * punch;
+    }
+    if (stunned) {
+      rotation += std::sin(view.animTime * 9.0f) * 0.08f;
+    }
+  }
+
+  ImU32 tint = IM_COL32(255, 255, 255, 255);
+  if (view.hitFlashMs > 0.0f) tint = IM_COL32(255, 120, 120, 255);
+  if (dead) tint = IM_COL32(150, 150, 170, 200);
+  if (hidden && !dead) tint = withAlpha(tint, 0.4f);
+
+  if (!dead) drawShadow(dl, feet, 15.0f);
+
+  // Ring under the local player so you never lose yourself in a brawl.
+  if (isLocal && !dead) {
+    dl->AddEllipse(feet, ImVec2(20.0f, 8.5f), IM_COL32(255, 255, 255, 110), 0.0f,
+                   24, 1.5f);
+  }
+
+  // Charge ring
+  if (charging && !dead) {
+    float progress = state.charge / 255.0f;
+    dl->PathArcTo(ImVec2(feet.x, feet.y), 26.0f, -PI * 0.5f,
+                  -PI * 0.5f + 2.0f * PI * progress, 32);
+    dl->PathStroke(progress >= 0.98f ? IM_COL32(255, 255, 255, 255)
+                                     : IM_COL32(255, 210, 90, 230),
+                   0, 4.0f);
+  }
+
+  ImVec2 at(feet.x + offsetX, feet.y + offsetY);
+  if (sprite && sprite->texture) {
+    int frame = 0;
+    bool flip = false;
+    if (sprite->directions == 8) {
+      frame = directionFrame(faceX, faceY);
+    } else {
+      // Placeholder art has a single pose: mirror it for left / right.
+      flip = faceX < 0.0f;
+    }
+    drawSprite(dl, sprite->texture, frame * sprite->cellW, 0, sprite->cellW,
+               sprite->cellH, at, scaleX, scaleY, rotation, flip, tint);
+  } else {
+    // No sprite at all: a labelled capsule so the game stays playable.
+    dl->AddRectFilled(ImVec2(at.x - 12, at.y - 56), ImVec2(at.x + 12, at.y),
+                      IM_COL32(state.r, state.g, state.b, 255), 10.0f);
+  }
+
+  // Shield bubble
+  if (view.shieldBubbleMs > 0.0f && !dead) {
+    VfxTheme theme = view.shieldTheme ? static_cast<VfxTheme>(view.shieldTheme)
+                                      : VfxTheme::Wind;
+    float pulse = 0.5f + 0.5f * std::sin(view.animTime * 6.0f);
+    ImVec2 centre(feet.x, feet.y - 36.0f);
+    dl->AddCircleFilled(centre, 44.0f, themeColor(theme, 0.10f + 0.05f * pulse));
+    dl->AddCircle(centre, 44.0f, themeHot(theme, 0.75f), 40, 2.5f);
+  }
+}
+
+void ArenaView::drawEnemy(ImDrawList* dl, const ArenaClient::EnemyView& view) {
+  Arena::EnemyKind kind = static_cast<Arena::EnemyKind>(view.state.type);
+  if (static_cast<int>(kind) >= static_cast<int>(Arena::EnemyKind::Count)) {
+    return;
+  }
+  const Arena::EnemyKindDef& def = Arena::enemyDef(kind);
+  const EnemySprite* sprite = enemySprite(kind);
+  ImVec2 feet = toScreen(view.x, view.y);
+  if (feet.x < -260 || feet.x > Config::Screen::WIDTH + 260 || feet.y < -120 ||
+      feet.y > Config::Screen::HEIGHT + 360) {
+    return;
+  }
+
+  bool elite = (view.state.flags & EnemyFlags::Elite) != 0;
+  bool stunned = (view.state.flags & EnemyFlags::Stunned) != 0;
+  bool confused = (view.state.flags & EnemyFlags::Confused) != 0;
+  bool boss = kind == Arena::EnemyKind::Boss;
+  float scale = def.drawScale * (elite ? 1.22f : 1.0f);
+  float speed = std::sqrt(view.state.vx * view.state.vx +
+                          view.state.vy * view.state.vy);
+
+  float scaleX = scale, scaleY = scale, rotation = 0.0f;
+  float offsetX = 0.0f, offsetY = 0.0f;
+  ImU32 tint = boss ? IM_COL32(200, 130, 255, 255) : IM_COL32(255, 255, 255, 255);
+  int row = 0, frame = 0;
+
+  if (sprite) {
+    if (view.dying) {
+      row = 2;
+      float t = std::min(0.999f, view.deathMs / 600.0f);
+      frame = static_cast<int>(t * sprite->dieFrames);
+      tint = withAlpha(tint, 1.0f - std::max(0.0f, (view.deathMs - 450.0f) / 250.0f));
+    } else if (speed > 8.0f && !stunned) {
+      row = 1;
+      frame = static_cast<int>(view.animTime * 11.0f) % sprite->runFrames;
+    } else {
+      row = 0;
+      frame = static_cast<int>(view.animTime * 6.0f) % sprite->idleFrames;
+    }
+  }
+
+  if (!view.dying) {
+    if (view.attackMs > 0.0f && view.attackTotalMs > 0.0f) {
+      // Windup: rear back, swell and glow toward the hit.
+      float t = 1.0f - view.attackMs / view.attackTotalMs;
+      float dir = view.faceLeft ? 1.0f : -1.0f;
+      offsetX += dir * 5.0f * t;
+      scaleX *= 1.0f + 0.10f * t;
+      scaleY *= 1.0f + 0.12f * t;
+      int glow = static_cast<int>(120 * t);
+      tint = IM_COL32(255, 255 - glow, 255 - glow, 255);
+    } else if (view.strikeMs > 0.0f) {
+      // The hit: snap forward.
+      float t = view.strikeMs / 160.0f;
+      float dir = view.faceLeft ? -1.0f : 1.0f;
+      offsetX += dir * 12.0f * t;
+      scaleX *= 1.0f + 0.08f * t;
+    }
+    if (stunned) rotation = std::sin(view.animTime * 10.0f) * 0.10f;
+    if (confused) offsetX += std::sin(view.animTime * 14.0f) * 2.0f;
+    if (view.hitFlashMs > 0.0f) {
+      tint = IM_COL32(255, 110, 110, 255);
+      scaleX *= 1.06f;
+    }
+  }
+
+  if (!view.dying) drawShadow(dl, feet, def.radius * scale / def.drawScale * 1.05f);
+  if (elite && !view.dying) {
+    dl->AddCircle(feet, def.radius * 1.5f, IM_COL32(255, 210, 80, 200), 28, 2.5f);
+  }
+
+  ImVec2 at(feet.x + offsetX, feet.y + offsetY);
+  if (sprite && sprite->texture) {
+    drawSprite(dl, sprite->texture, frame * sprite->cellW, row * sprite->cellH,
+               sprite->cellW, sprite->cellH, at, scaleX, scaleY, rotation,
+               view.faceLeft, tint);
+  } else {
+    dl->AddCircleFilled(ImVec2(at.x, at.y - def.radius), def.radius,
+                        themeColor(genusTheme(def.genus), 1.0f));
+  }
+}
+
+void ArenaView::drawEntities(ImDrawList* dl) {
+  struct Item {
+    float depth;
+    int kind;  // 0 player, 1 enemy, 2 pickup, 3 ship
+    const void* ptr;
+    uint32_t id;
+    float x, y;
+  };
+  std::vector<Item> items;
+  items.reserve(128);
+
+  uint32_t me = localId();
+  const Player& local = prediction->getLocalPlayer();
+  for (const auto& [id, view] : arena->players()) {
+    float x = view.x, y = view.y;
+    if (id == me) {
+      // Draw the local player where prediction puts them: no input lag.
+      x = local.x;
+      y = local.y;
+    }
+    items.push_back({y, 0, &view, id, x, y});
+  }
+  for (const auto& [id, view] : arena->enemies()) {
+    items.push_back({view.y, 1, &view, id, view.x, view.y});
+  }
+  for (const auto& [id, item] : prediction->getWorldItems()) {
+    items.push_back({item.y - 1.0f, 2, nullptr, item.itemId, item.x, item.y});
+  }
+  if (arena->hasMatch()) {
+    items.push_back({arena->match().shipY + 30.0f, 3, nullptr, 0, 0, 0});
+  }
+
+  std::sort(items.begin(), items.end(),
+            [](const Item& a, const Item& b) { return a.depth < b.depth; });
+
+  for (const Item& item : items) {
+    switch (item.kind) {
+      case 0:
+        drawPlayer(dl, *static_cast<const ArenaClient::PlayerView*>(item.ptr),
+                   item.x, item.y, item.id == me);
+        break;
+      case 1:
+        drawEnemy(dl, *static_cast<const ArenaClient::EnemyView*>(item.ptr));
+        break;
+      case 2:
+        drawPickup(dl, item.id, item.x, item.y);
+        break;
+      case 3:
+        drawShip(dl);
+        break;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Air layer: attacks
+// ---------------------------------------------------------------------------
+
+void ArenaView::drawAir(ImDrawList* dl) {
+  for (const ArenaClient::Fx& f : arena->effects()) {
+    float t = std::min(1.0f, f.ageMs / f.lifeMs);
+    float fade = 1.0f - t;
+
+    switch (f.kind) {
+      case GameEventKind::Slash: {
+        // A blade trail: a bright leading edge sweeping across the arc with
+        // softer echoes trailing behind it.
+        ImVec2 origin = toScreen(f.x, f.y - PROJECTILE_HEIGHT);
+        float angle = std::atan2(f.y2, f.x2);
+        float half = f.value2 * 0.5f * PI / 180.0f;
+        float sweep = ease(t * 1.7f);
+        float head = angle - half + 2.0f * half * sweep;
+        float start = angle - half;
+        float radius = f.value * (0.86f + 0.14f * sweep);
+        int segments = std::max(8, static_cast<int>(half * radius / 8.0f));
+        // Echoes: wider, fainter, slightly smaller.
+        for (int i = 3; i >= 1; i--) {
+          float r = radius * (1.0f - 0.09f * i);
+          float tail = std::max(start, head - half * (0.5f + 0.35f * i));
+          dl->PathArcTo(origin, r, tail, head, segments);
+          dl->PathStroke(themeColor(f.theme, (0.42f - 0.1f * i) * fade), 0,
+                         radius * 0.11f * (1.0f + 0.5f * i));
+        }
+        float tail = std::max(start, head - half * 0.9f);
+        dl->PathArcTo(origin, radius, tail, head, segments);
+        dl->PathStroke(themeColor(f.theme, 0.9f * fade), 0, radius * 0.10f);
+        dl->PathArcTo(origin, radius, std::max(start, head - half * 0.45f), head,
+                      segments);
+        dl->PathStroke(themeHot(f.theme, fade), 0, radius * 0.045f);
+        // Spark at the tip of the swing.
+        ImVec2 tip(origin.x + std::cos(head) * radius,
+                   origin.y + std::sin(head) * radius);
+        dl->AddCircleFilled(tip, radius * 0.07f * fade + 1.0f,
+                            themeHot(f.theme, fade));
+        break;
+      }
+      case GameEventKind::Cone: {
+        ImVec2 origin = toScreen(f.x, f.y - PROJECTILE_HEIGHT * 0.6f);
+        float angle = std::atan2(f.y2, f.x2);
+        float half = f.value2 * 0.5f * PI / 180.0f;
+        float reach = f.value * (0.35f + 0.65f * ease(t * 2.2f));
+        sector(dl, origin, reach, angle, half, themeColor(f.theme, 0.38f * fade),
+               themeHot(f.theme, 0.85f * fade), 2.5f);
+        // Streaks radiating outward sell the direction.
+        for (int i = -2; i <= 2; i++) {
+          float a = angle + half * 0.38f * i;
+          dl->AddLine(ImVec2(origin.x + std::cos(a) * reach * 0.35f,
+                             origin.y + std::sin(a) * reach * 0.35f),
+                      ImVec2(origin.x + std::cos(a) * reach * 0.95f,
+                             origin.y + std::sin(a) * reach * 0.95f),
+                      themeHot(f.theme, 0.5f * fade), 2.0f);
+        }
+        break;
+      }
+      case GameEventKind::Burst: {
+        float lift = f.param == 1 ? PROJECTILE_HEIGHT : 0.0f;
+        ImVec2 centre = toScreen(f.x, f.y - lift);
+        float radius = f.value * (0.55f + 0.45f * ease(t * 1.6f));
+        // Fire bursts use the explosion sheet from the Unity project.
+        auto sheet = fxSprites.find("explosion");
+        if (f.theme == VfxTheme::Fire && sheet != fxSprites.end() &&
+            f.value >= 40.0f) {
+          const FxSprite& sprite = sheet->second;
+          int frame = std::min(sprite.frames - 1,
+                               static_cast<int>(t * sprite.frames));
+          float size = f.value * 2.5f;
+          float texW = static_cast<float>(sprite.texture->getWidth());
+          dl->AddImage(textureId(sprite.texture),
+                       ImVec2(centre.x - size * 0.5f, centre.y - size * 0.62f),
+                       ImVec2(centre.x + size * 0.5f, centre.y + size * 0.38f),
+                       ImVec2(frame * sprite.cellW / texW, 0.0f),
+                       ImVec2((frame + 1) * sprite.cellW / texW, 1.0f),
+                       IM_COL32(255, 255, 255, static_cast<int>(255 * (1.0f - t * t))));
+        }
+        dl->AddCircleFilled(centre, radius, themeColor(f.theme, 0.34f * fade), 36);
+        dl->AddCircleFilled(centre, radius * 0.55f,
+                            themeHot(f.theme, 0.40f * fade * fade), 28);
+        dl->AddCircle(centre, radius, themeHot(f.theme, 0.9f * fade), 36, 3.0f);
+        break;
+      }
+      case GameEventKind::Ring: {
+        ImVec2 centre = toScreen(f.x, f.y);
+        float radius = f.value * (0.25f + 0.75f * ease(t));
+        dl->AddCircle(centre, radius, themeColor(f.theme, 0.9f * fade), 48,
+                      2.0f + 5.0f * fade);
+        dl->AddCircle(centre, radius * 0.8f, themeHot(f.theme, 0.4f * fade), 40,
+                      2.0f);
+        break;
+      }
+      case GameEventKind::Beam: {
+        ImVec2 a = toScreen(f.x, f.y - PROJECTILE_HEIGHT);
+        ImVec2 b = toScreen(f.x2, f.y2 - PROJECTILE_HEIGHT);
+        dl->AddLine(a, b, themeColor(f.theme, 0.5f * fade), f.value * 1.8f);
+        dl->AddLine(a, b, themeHot(f.theme, 0.95f * fade),
+                    std::max(1.5f, f.value * 0.6f));
+        break;
+      }
+      case GameEventKind::Lob: {
+        // Thrown object on an arc, with its shadow sliding along the ground.
+        float gx = f.x + (f.x2 - f.x) * t;
+        float gy = f.y + (f.y2 - f.y) * t;
+        float dx = f.x2 - f.x, dy = f.y2 - f.y;
+        float height = (70.0f + std::sqrt(dx * dx + dy * dy) * 0.18f) * 4.0f *
+                       t * (1.0f - t);
+        ImVec2 ground = toScreen(gx, gy);
+        ImVec2 pos(ground.x, ground.y - PROJECTILE_HEIGHT - height);
+        drawShadow(dl, ground, 7.0f, 0.3f);
+        auto can = fxSprites.find("brew_can");
+        if (f.param == 2 && can != fxSprites.end()) {
+          const FxSprite& sprite = can->second;
+          int frame = static_cast<int>(f.ageMs / 45.0f) % sprite.frames;
+          float texW = static_cast<float>(sprite.texture->getWidth());
+          dl->AddImage(textureId(sprite.texture),
+                       ImVec2(pos.x - 20, pos.y - 20), ImVec2(pos.x + 20, pos.y + 20),
+                       ImVec2(frame * sprite.cellW / texW, 0.0f),
+                       ImVec2((frame + 1) * sprite.cellW / texW, 1.0f));
+        } else {
+          float r = f.param == 3 ? 9.0f : 7.0f;
+          dl->AddCircleFilled(pos, r + 4.0f, themeColor(f.theme, 0.35f));
+          dl->AddCircleFilled(pos, r, IM_COL32(40, 36, 46, 255));
+          dl->AddCircle(pos, r, themeHot(f.theme, 1.0f), 16, 2.0f);
+        }
+        break;
+      }
+      case GameEventKind::DashTrail: {
+        ImVec2 a = toScreen(f.x, f.y - PROJECTILE_HEIGHT);
+        ImVec2 b = toScreen(f.x2, f.y2 - PROJECTILE_HEIGHT);
+        // Three stacked streaks that thin out as they fade.
+        for (int i = -1; i <= 1; i++) {
+          ImVec2 off(0.0f, i * 12.0f);
+          dl->AddLine(ImVec2(a.x, a.y + off.y), ImVec2(b.x, b.y + off.y),
+                      themeColor(f.theme, (i == 0 ? 0.75f : 0.4f) * fade),
+                      (i == 0 ? 10.0f : 5.0f) * fade + 1.0f);
+        }
+        dl->AddCircleFilled(a, 16.0f * fade, themeColor(f.theme, 0.3f * fade));
+        break;
+      }
+      case GameEventKind::Tether: {
+        ImVec2 a = toScreen(f.x, f.y - PROJECTILE_HEIGHT);
+        ImVec2 b = toScreen(f.x2, f.y2 - PROJECTILE_HEIGHT);
+        float alpha = std::min(1.0f, fade * 2.5f);
+        // A gently waving strand of light.
+        const int steps = 14;
+        float nx = -(b.y - a.y), ny = b.x - a.x;
+        float len = std::sqrt(nx * nx + ny * ny);
+        if (len > 0.001f) {
+          nx /= len;
+          ny /= len;
+        }
+        for (int i = 0; i <= steps; i++) {
+          float u = static_cast<float>(i) / steps;
+          float wave = std::sin(u * PI * 3.0f + timeSeconds * 12.0f) * 6.0f *
+                       std::sin(u * PI);
+          dl->PathLineTo(ImVec2(a.x + (b.x - a.x) * u + nx * wave,
+                                a.y + (b.y - a.y) * u + ny * wave));
+        }
+        dl->PathStroke(themeHot(f.theme, 0.9f * alpha), 0, 3.5f);
+        dl->AddLine(a, b, themeColor(f.theme, 0.3f * alpha), 8.0f);
+        dl->AddCircleFilled(b, 9.0f, themeColor(f.theme, 0.5f * alpha));
+        break;
+      }
+      case GameEventKind::SpawnPuff: {
+        ImVec2 centre = toScreen(f.x, f.y);
+        float radius = 10.0f + 26.0f * ease(t);
+        dl->AddCircle(centre, radius, themeColor(f.theme, 0.8f * fade), 20, 3.0f);
+        for (int i = 0; i < 5; i++) {
+          float a = i * 1.26f + f.x * 0.01f;
+          dl->AddCircleFilled(
+              ImVec2(centre.x + std::cos(a) * radius,
+                     centre.y + std::sin(a) * radius * 0.6f - 20.0f * t),
+              4.0f * fade + 1.0f, themeColor(f.theme, 0.7f * fade));
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  // Projectiles
+  for (const ArenaClient::Projectile& shot : arena->projectiles()) {
+    if (shot.ageMs > shot.lifeMs) continue;
+    ImVec2 ground = toScreen(shot.x, shot.y);
+    ImVec2 pos(ground.x, ground.y - PROJECTILE_HEIGHT);
+    float angle = std::atan2(shot.vy, shot.vx);
+    drawShadow(dl, ground, shot.radius * 0.7f, 0.25f);
+
+    // Enemy shots get a red rim: threat colour beats genus colour.
+    ImU32 rim = shot.fromEnemy ? themeColor(VfxTheme::Danger, 1.0f)
+                               : themeHot(shot.theme, 1.0f);
+    if (shot.sprite == 1) {
+      // Crescent of wind, bowed toward its heading.
+      float r = shot.radius * 1.6f;
+      ImVec2 centre(pos.x - std::cos(angle) * r * 0.6f,
+                    pos.y - std::sin(angle) * r * 0.6f);
+      dl->PathArcTo(centre, r, angle - 1.0f, angle + 1.0f, 14);
+      dl->PathStroke(themeColor(shot.theme, 0.45f), 0, 11.0f);
+      dl->PathArcTo(centre, r, angle - 0.9f, angle + 0.9f, 14);
+      dl->PathStroke(themeHot(shot.theme, 0.95f), 0, 4.0f);
+    } else if (shot.sprite == 3) {
+      // Bomb ball with a lit fuse.
+      dl->AddCircleFilled(pos, shot.radius + 5.0f, themeColor(shot.theme, 0.3f));
+      dl->AddCircleFilled(pos, shot.radius, IM_COL32(44, 40, 52, 255));
+      dl->AddCircle(pos, shot.radius, IM_COL32(230, 230, 240, 255), 16, 2.0f);
+      float flicker = 0.5f + 0.5f * std::sin(timeSeconds * 40.0f);
+      dl->AddCircleFilled(ImVec2(pos.x + 4, pos.y - shot.radius),
+                          2.5f + 2.0f * flicker, themeHot(shot.theme, 1.0f));
+    } else {
+      // Orb with a short tail.
+      ImVec2 tail(pos.x - std::cos(angle) * shot.radius * 2.6f,
+                  pos.y - std::sin(angle) * shot.radius * 2.6f);
+      dl->AddLine(tail, pos, themeColor(shot.theme, 0.5f), shot.radius * 1.2f);
+      dl->AddCircleFilled(pos, shot.radius + 5.0f, themeColor(shot.theme, 0.28f));
+      dl->AddCircleFilled(pos, shot.radius, themeColor(shot.theme, 1.0f));
+      dl->AddCircleFilled(pos, shot.radius * 0.5f, themeHot(shot.theme, 1.0f));
+      dl->AddCircle(pos, shot.radius, rim, 16, 2.0f);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Overhead: health, status, numbers
+// ---------------------------------------------------------------------------
+
+void ArenaView::drawOverhead(ImDrawList* dl) {
+  uint32_t me = localId();
+  const Player& local = prediction->getLocalPlayer();
+
+  auto drawEffects = [&](uint32_t id, bool isEnemy, ImVec2 at, int limit) {
+    if (!effects) return;
+    const auto& list = effects->getEffects(id, isEnemy);
+    int shown = 0;
+    char buffer[40];
+    for (const EffectInstance& effect : list) {
+      if (shown >= limit) break;
+      bool buff =
+          EffectRegistry::getCategory(effect.type) == EffectCategory::Buff;
+      if (effect.stacks > 1) {
+        std::snprintf(buffer, sizeof(buffer), "%s x%d",
+                      EffectRegistry::getName(effect.type), effect.stacks);
+      } else {
+        std::snprintf(buffer, sizeof(buffer), "%s",
+                      EffectRegistry::getName(effect.type));
+      }
+      text(dl, ImVec2(at.x, at.y - shown * 12.0f),
+           buff ? IM_COL32(255, 224, 128, 255) : IM_COL32(255, 144, 208, 255),
+           11.0f, buffer);
+      shown++;
+    }
+  };
+
+  // Objectives: name and progress
+  for (const auto& [id, objective] : prediction->getObjectives()) {
+    ImVec2 centre = toZoomedScreen(objective.x, objective.y);
+    if (centre.x < -100 || centre.x > Config::Screen::WIDTH + 100 ||
+        centre.y < -100 || centre.y > Config::Screen::HEIGHT + 100) {
+      continue;
+    }
+    const char* label = "Objective";
+    switch (objective.type) {
+      case ObjectiveType::AlienScrapyard:
+        label = "Scrapyard";
+        break;
+      case ObjectiveType::DerelictTurret:
+        label = "Derelict Turret";
+        break;
+      case ObjectiveType::CaptureOutpost:
+        label = "Outpost";
+        break;
+      case ObjectiveType::SalvageMedpacks:
+        label = "Medpacks";
+        break;
+      default:
+        break;
+    }
+    bool done = objective.state == ObjectiveState::Completed;
+    text(dl, ImVec2(centre.x, centre.y + 20.0f),
+         done ? IM_COL32(130, 220, 150, 170) : IM_COL32(255, 228, 130, 255),
+         13.0f, done ? "done" : label);
+    if (objective.state == ObjectiveState::InProgress &&
+        objective.progress > 0.0f) {
+      bar(dl, ImVec2(centre.x - 34, centre.y + 38), 68, 7, objective.progress,
+          IM_COL32(90, 220, 255, 255));
+    }
+  }
+
+  // Enemies: health bar once hurt (always for elites and the boss)
+  for (const auto& [id, view] : arena->enemies()) {
+    if (view.dying) continue;
+    Arena::EnemyKind kind = static_cast<Arena::EnemyKind>(view.state.type);
+    if (static_cast<int>(kind) >= static_cast<int>(Arena::EnemyKind::Count)) {
+      continue;
+    }
+    const Arena::EnemyKindDef& def = Arena::enemyDef(kind);
+    const EnemySprite* sprite = enemySprite(kind);
+    ImVec2 feet = toZoomedScreen(view.x, view.y);
+    if (feet.x < -100 || feet.x > Config::Screen::WIDTH + 100 || feet.y < -50 ||
+        feet.y > Config::Screen::HEIGHT + 250) {
+      continue;
+    }
+    bool elite = (view.state.flags & EnemyFlags::Elite) != 0;
+    float height = (sprite ? sprite->cellH : 40) * def.drawScale *
+                   (elite ? 1.22f : 1.0f) * camera->zoom;
+    float top = feet.y - height - 8.0f;
+    bool hurt = view.state.health < view.state.maxHealth - 0.5f;
+    if (hurt || elite) {
+      float width = std::max(26.0f, def.radius * 2.2f);
+      bar(dl, ImVec2(feet.x - width * 0.5f, top), width, 4.0f,
+          view.state.health / std::max(1.0f, view.state.maxHealth),
+          elite ? IM_COL32(255, 200, 70, 255) : IM_COL32(230, 60, 60, 255));
+    }
+    drawEffects(id, true, ImVec2(feet.x, top - 13.0f), 2);
+  }
+
+  // Players: name, health, shield, effects
+  for (const auto& [id, view] : arena->players()) {
+    if (view.state.characterId == 0) continue;
+    float x = view.x, y = view.y;
+    if (id == me) {
+      x = local.x;
+      y = local.y;
+    }
+    ImVec2 feet = toZoomedScreen(x, y);
+    const CharacterSprite* sprite = characterSprite(view.state.characterId);
+    float height = (sprite ? sprite->cellH : 60.0f) * camera->zoom;
+    bool dead = view.state.health <= 0.0f;
+    float top = feet.y - height - 12.0f;
+
+    const CharacterDefinition* def =
+        CharacterRegistry::instance().getCharacter(view.state.characterId);
+    const char* name = def ? def->name.c_str() : "?";
+
+    if (dead) {
+      text(dl, ImVec2(feet.x, feet.y - 44.0f), IM_COL32(255, 110, 110, 255),
+           13.0f, "DOWN");
+      const MatchPlayerState* mp = arena->matchPlayer(id);
+      if (mp && mp->reviveProgress > 0.0f) {
+        bar(dl, ImVec2(feet.x - 24, feet.y - 28), 48, 6, mp->reviveProgress,
+            IM_COL32(120, 255, 170, 255));
+      }
+      continue;
+    }
+
+    const float width = 46.0f;
+    float fraction = view.state.health / std::max(1.0f, view.state.maxHealth);
+    ImU32 fill = id == me ? IM_COL32(90, 230, 110, 255)
+                          : IM_COL32(90, 190, 255, 255);
+    bar(dl, ImVec2(feet.x - width * 0.5f, top), width, 5.0f, fraction, fill);
+    if (view.state.shield > 0.0f) {
+      float shield =
+          std::min(1.0f, view.state.shield / std::max(1.0f, view.state.maxHealth));
+      dl->AddRectFilled(ImVec2(feet.x - width * 0.5f, top - 3.0f),
+                        ImVec2(feet.x - width * 0.5f + width * shield, top - 1.0f),
+                        IM_COL32(200, 235, 255, 255));
+    }
+    if (id != me) {
+      text(dl, ImVec2(feet.x, top - 15.0f), IM_COL32(210, 230, 255, 255), 12.0f,
+           name);
+      drawEffects(id, false, ImVec2(feet.x, top - 28.0f), 3);
+    }
+    const MatchPlayerState* mp = arena->matchPlayer(id);
+    if (mp && mp->carryingScrap) {
+      text(dl, ImVec2(feet.x, top - (id == me ? 15.0f : 41.0f)),
+           IM_COL32(255, 200, 110, 255), 11.0f, "carrying scrap");
+    }
+  }
+
+  // Floating numbers and status words
+  for (const ArenaClient::FloatText& t : arena->floatTexts()) {
+    float u = t.ageMs / t.lifeMs;
+    ImVec2 pos = toZoomedScreen(t.x + t.driftX * u, t.y - 34.0f * ease(u));
+    float alpha = u < 0.7f ? 1.0f : (1.0f - u) / 0.3f;
+    // Pop in slightly larger, then settle.
+    float size = t.size * (1.0f + 0.35f * std::max(0.0f, 1.0f - u * 6.0f));
+    text(dl, pos, withAlpha(t.color, alpha), size, t.text.c_str());
+  }
+}

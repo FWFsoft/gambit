@@ -188,6 +188,7 @@ add_executable(Client
     src/InputSystem.cpp
     src/NetworkProtocol.cpp
     src/ClientPrediction.cpp
+    src/ArenaData.cpp
     src/RemotePlayerInterpolation.cpp
     src/RenderSystem.cpp
     src/TiledMap.cpp
@@ -233,6 +234,9 @@ add_executable(Client
     src/CharacterKits.cpp
     src/Infusions.cpp
     src/MatchDirector.cpp
+    src/ArenaClient.cpp
+    src/ArenaView.cpp
+    src/ArenaHud.cpp
 )
 target_include_directories(Client SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
 target_include_directories(Client PRIVATE include)
@@ -271,6 +275,7 @@ add_executable(HeadlessClient
     src/InputSystem.cpp
     src/NetworkProtocol.cpp
     src/ClientPrediction.cpp
+    src/ArenaData.cpp
     src/RemotePlayerInterpolation.cpp
     src/HeadlessRenderSystem.cpp
     src/HeadlessUISystem.cpp
@@ -416,6 +421,7 @@ add_executable(test_client_prediction
     src/Logger.cpp
     src/NetworkProtocol.cpp
     src/ClientPrediction.cpp
+    src/ArenaData.cpp
     src/NetworkClient.cpp
     src/transport/ENetTransport.cpp
     src/CollisionSystem.cpp
@@ -504,6 +510,7 @@ add_executable(test_headless_movement
     src/InputSystem.cpp
     src/NetworkProtocol.cpp
     src/ClientPrediction.cpp
+    src/ArenaData.cpp
     src/RemotePlayerInterpolation.cpp
     src/HeadlessRenderSystem.cpp
     src/HeadlessUISystem.cpp
@@ -726,6 +733,9 @@ set(WASM_CLIENT_SOURCES
     src/CharacterKits.cpp
     src/Infusions.cpp
     src/MatchDirector.cpp
+    src/ArenaClient.cpp
+    src/ArenaView.cpp
+    src/ArenaHud.cpp
 )
 
 add_executable(WasmClient ${WASM_CLIENT_SOURCES})

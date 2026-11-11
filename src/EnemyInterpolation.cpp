@@ -15,7 +15,7 @@ EnemyInterpolation::EnemyInterpolation(AnimationSystem* animSystem)
         onNetworkPacketReceived(e);
       });
 
-  Logger::info("EnemyInterpolation initialized");
+  Logger::debug("EnemyInterpolation initialized");
 }
 
 void EnemyInterpolation::onNetworkPacketReceived(
@@ -34,7 +34,7 @@ void EnemyInterpolation::onNetworkPacketReceived(
     EnemyDiedPacket packet = deserializeEnemyDied(e.data, e.size);
     removeEnemy(packet.enemyId);
 
-    Logger::info("Enemy " + std::to_string(packet.enemyId) +
+    Logger::debug("Enemy " + std::to_string(packet.enemyId) +
                  " was killed by player " + std::to_string(packet.killerId));
   }
 }
@@ -64,7 +64,7 @@ void EnemyInterpolation::updateEnemyState(const NetworkEnemyState& state) {
     // Register with animation system
     animationSystem->registerEntity(&enemies[enemyId]);
 
-    Logger::info("Added new enemy ID=" + std::to_string(enemyId) +
+    Logger::debug("Added new enemy ID=" + std::to_string(enemyId) +
                  " type=" + std::to_string(static_cast<int>(enemy.type)));
   }
 
@@ -122,7 +122,7 @@ void EnemyInterpolation::removeEnemy(uint32_t enemyId) {
   }
   snapshots.erase(enemyId);
 
-  Logger::info("Removed enemy ID=" + std::to_string(enemyId));
+  Logger::debug("Removed enemy ID=" + std::to_string(enemyId));
 }
 
 bool EnemyInterpolation::getInterpolatedState(uint32_t enemyId,

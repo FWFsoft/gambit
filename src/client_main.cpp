@@ -2,6 +2,8 @@
 
 #include "AnimationAssetLoader.h"
 #include "AnimationSystem.h"
+#include "ArenaClient.h"
+#include "ArenaView.h"
 #include "Camera.h"
 #include "CharacterRegistry.h"
 #include "CharacterSelectionState.h"
@@ -45,7 +47,12 @@ int main(int argc, char* argv[]) {
   Logger::init();
 
   // Parse command line arguments
+  //   --embedded          run the server inside this process (solo play)
+  //   --connect <host>    server address (default 127.0.0.1)
+  //   --map <path.tmx>    map to load (must match the server's map)
+  //   --test-mode         scripted input + screenshots (see visual-test skill)
   bool embeddedMode = false;
+  std::string serverAddress = Config::Network::SERVER_ADDRESS;
   for (int i = 1; i < argc; i++) {
     std::string arg = argv[i];
     if (arg == "--test-mode") {
@@ -54,6 +61,10 @@ int main(int argc, char* argv[]) {
     } else if (arg == "--embedded") {
       embeddedMode = true;
       Logger::info("Embedded server mode enabled");
+    } else if (arg == "--connect" && i + 1 < argc) {
+      serverAddress = argv[++i];
+    } else if (arg == "--map" && i + 1 < argc) {
+      MapSelectionState::instance().setSelectedMap(argv[++i]);
     }
   }
 
@@ -78,8 +89,11 @@ int main(int argc, char* argv[]) {
     // Network mode: connect to remote server
     static auto transport = std::make_unique<ENetTransport>();
     static NetworkClient networkClient(std::move(transport));
-    if (!networkClient.connect(Config::Network::SERVER_ADDRESS,
-                               Config::Network::PORT)) {
+    Logger::info("Connecting to " + serverAddress + ":" +
+                 std::to_string(Config::Network::PORT));
+    if (!networkClient.connect(serverAddress, Config::Network::PORT)) {
+      Logger::error("Could not reach a server at " + serverAddress +
+                    ". Start ./build/Server first, or run with --embedded.");
       return EXIT_FAILURE;
     }
     clientPtr = &networkClient;
@@ -149,53 +163,17 @@ int main(int argc, char* argv[]) {
                     &effectTracker, &remoteInterpolation, &enemyInterpolation,
                     &camera);
 
+  // The match as the client sees it, and the view that draws it.
+  ArenaClient arenaClient;
+  ArenaView arenaView(&arenaClient, &clientPrediction, &effectTracker, &camera);
+  uiSystem.setArenaView(&arenaView);
+  renderSystem.setLegacyEntityRendering(false);
+
   // Load local player animations
   Player& localPlayer = clientPrediction.getLocalPlayerMutable();
   AnimationAssetLoader::loadPlayerAnimations(
       *localPlayer.getAnimationController(), "assets/player_animated.png");
   animationSystem.registerEntity(&localPlayer);
-
-  // Apply character selection (color tint for now)
-  if (CharacterSelectionState::instance().hasSelection()) {
-    uint32_t selectedId =
-        CharacterSelectionState::instance().getSelectedCharacterId();
-    const CharacterDefinition* character =
-        CharacterRegistry::instance().getCharacter(selectedId);
-
-    if (character) {
-      // Apply character color tint to local player
-      localPlayer.r = character->r;
-      localPlayer.g = character->g;
-      localPlayer.b = character->b;
-      localPlayer.characterId = selectedId;
-
-      Logger::info("Applied character selection: " + character->name +
-                   " (ID: " + std::to_string(selectedId) +
-                   ", RGB: " + std::to_string(character->r) + "," +
-                   std::to_string(character->g) + "," +
-                   std::to_string(character->b) + ")");
-    }
-  } else {
-    // Fallback: use default white if no selection
-    localPlayer.r = 255;
-    localPlayer.g = 255;
-    localPlayer.b = 255;
-    localPlayer.characterId = 0;
-    Logger::info("No character selected, using default appearance");
-  }
-
-  // Add test items to inventory for demonstration
-  localPlayer.inventory[0] = ItemStack(1, 5);    // 5x Health Potion
-  localPlayer.inventory[1] = ItemStack(2, 3);    // 3x Greater Health Potion
-  localPlayer.inventory[2] = ItemStack(3, 1);    // Iron Sword
-  localPlayer.inventory[3] = ItemStack(6, 1);    // Leather Armor
-  localPlayer.inventory[5] = ItemStack(4, 1);    // Steel Sword
-  localPlayer.inventory[10] = ItemStack(9, 10);  // 10x Mana Potion
-
-  // Equip items
-  localPlayer.equipment[EQUIPMENT_WEAPON_SLOT] =
-      ItemStack(5, 1);  // Dragon Sword
-  localPlayer.equipment[EQUIPMENT_ARMOR_SLOT] = ItemStack(7, 1);  // Iron Armor
 
   // Initialize test input reader if test mode enabled
   std::unique_ptr<TestInputReader> testInputReader;
@@ -203,6 +181,10 @@ int main(int argc, char* argv[]) {
     testInputReader = std::make_unique<TestInputReader>(
         Config::TestMode::testConfig.inputCommandPath);
   }
+
+  // Where scripted test input last put the mouse.
+  int testMouseX = Config::Screen::WIDTH / 2;
+  int testMouseY = Config::Screen::HEIGHT / 2;
 
   // Subscribe to UpdateEvent for network processing
   EventBus::instance().subscribe<UpdateEvent>([&](const UpdateEvent& e) {
@@ -251,6 +233,8 @@ int main(int argc, char* argv[]) {
             break;
           }
           case TestInputReader::CommandType::MOUSE_MOVE: {
+            testMouseX = command->intArg;
+            testMouseY = command->intArg2;
             SDL_Event mouseEvent;
             SDL_zero(mouseEvent);
             mouseEvent.type = SDL_MOUSEMOTION;
@@ -277,9 +261,9 @@ int main(int argc, char* argv[]) {
             mouseDownEvent.type = SDL_MOUSEBUTTONDOWN;
             mouseDownEvent.button.button = button;
             mouseDownEvent.button.clicks = 1;
-            // Get current mouse position
-            int mouseX, mouseY;
-            SDL_GetMouseState(&mouseX, &mouseY);
+            // Scripted clicks land where the script last moved the mouse
+            // (there is no real pointer under a virtual display).
+            int mouseX = testMouseX, mouseY = testMouseY;
             mouseDownEvent.button.x = mouseX;
             mouseDownEvent.button.y = mouseY;
             SDL_PushEvent(&mouseDownEvent);
@@ -293,6 +277,22 @@ int main(int argc, char* argv[]) {
             mouseUpEvent.button.x = mouseX;
             mouseUpEvent.button.y = mouseY;
             SDL_PushEvent(&mouseUpEvent);
+            break;
+          }
+          case TestInputReader::CommandType::MOUSE_DOWN:
+          case TestInputReader::CommandType::MOUSE_UP: {
+            bool down =
+                command->type == TestInputReader::CommandType::MOUSE_DOWN;
+            SDL_Event buttonEvent;
+            SDL_zero(buttonEvent);
+            buttonEvent.type = down ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
+            buttonEvent.button.button =
+                command->stringArg == "right" ? SDL_BUTTON_RIGHT
+                                              : SDL_BUTTON_LEFT;
+            buttonEvent.button.clicks = 1;
+            buttonEvent.button.x = testMouseX;
+            buttonEvent.button.y = testMouseY;
+            SDL_PushEvent(&buttonEvent);
             break;
           }
           default:
@@ -329,6 +329,9 @@ int main(int argc, char* argv[]) {
         constexpr float PICKUP_RADIUS = 32.0f;
 
         for (const auto& [worldItemId, worldItem] : worldItems) {
+          // Arena pickups (infusions, scrap, medkits) are collected by the
+          // server when you walk over them.
+          if (worldItem.itemId >= Arena::PickupId::InfusionBase) continue;
           float dx = localPlayer.x - worldItem.x;
           float dy = localPlayer.y - worldItem.y;
           float distanceSquared = dx * dx + dy * dy;

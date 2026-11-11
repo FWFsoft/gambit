@@ -14,6 +14,6 @@ class MapSelectionState {
   void reset() { selectedMapPath = ""; }
 
  private:
-  MapSelectionState() : selectedMapPath("assets/maps/test_map.tmx") {}
-  std::string selectedMapPath;  // Default to test_map.tmx
+  MapSelectionState() : selectedMapPath("assets/maps/arena.tmx") {}
+  std::string selectedMapPath;  // Default to the prototype arena
 };

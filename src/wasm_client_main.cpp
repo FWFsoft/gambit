@@ -10,6 +10,8 @@
 
 #include "AnimationAssetLoader.h"
 #include "AnimationSystem.h"
+#include "ArenaClient.h"
+#include "ArenaView.h"
 #include "Camera.h"
 #include "CharacterRegistry.h"
 #include "CharacterSelectionState.h"
@@ -117,6 +119,13 @@ int main(int argc, char* argv[]) {
   UISystem uiSystem(&window, &clientPrediction, &client, &damageNumberSystem,
                     &effectTracker, &remoteInterpolation, &enemyInterpolation,
                     &camera);
+
+  // The match as the client sees it, and the view that draws it.
+  static ArenaClient arenaClient;
+  static ArenaView arenaView(&arenaClient, &clientPrediction, &effectTracker,
+                             &camera);
+  uiSystem.setArenaView(&arenaView);
+  renderSystem.setLegacyEntityRendering(false);
 
   // Load local player animations
   Player& localPlayer = clientPrediction.getLocalPlayerMutable();

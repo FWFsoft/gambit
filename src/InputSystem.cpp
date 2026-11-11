@@ -3,6 +3,7 @@
 #include "ClientPrediction.h"
 #include "GameStateManager.h"
 #include "Logger.h"
+#include "NetworkProtocol.h"
 #include "Player.h"
 
 InputSystem::InputSystem(ClientPrediction* clientPrediction,
@@ -25,6 +26,11 @@ InputSystem::InputSystem(ClientPrediction* clientPrediction,
 
   EventBus::instance().subscribe<KeyUpEvent>(
       [this](const KeyUpEvent& e) { onKeyUp(e); });
+
+  EventBus::instance().subscribe<MouseMoveEvent>(
+      [this](const MouseMoveEvent& e) { onMouseMove(e); });
+  EventBus::instance().subscribe<MouseButtonEvent>(
+      [this](const MouseButtonEvent& e) { onMouseButton(e); });
 
   // Subscribe to update events to publish input state
   EventBus::instance().subscribe<UpdateEvent>(
@@ -54,6 +60,7 @@ void InputSystem::onKeyDown(const KeyDownEvent& e) {
     if (currentState == GameState::Playing) {
       // Clear movement state and reset animation to idle when pausing
       moveLeft = moveRight = moveUp = moveDown = false;
+      buttons = 0;
       if (clientPrediction) {
         Player& localPlayer = clientPrediction->getLocalPlayerMutable();
         localPlayer.getAnimationController()->updateAnimationState(0.0f, 0.0f);
@@ -73,6 +80,7 @@ void InputSystem::onKeyDown(const KeyDownEvent& e) {
                currentState == GameState::Paused) {
       // Clear movement state and reset animation to idle when opening inventory
       moveLeft = moveRight = moveUp = moveDown = false;
+      buttons = 0;
       if (clientPrediction) {
         Player& localPlayer = clientPrediction->getLocalPlayerMutable();
         localPlayer.getAnimationController()->updateAnimationState(0.0f, 0.0f);
@@ -114,17 +122,17 @@ void InputSystem::onKeyDown(const KeyDownEvent& e) {
     return;
   }
 
-  // Attack input (Spacebar)
-  if (e.key == SDLK_SPACE) {
-    Logger::info("InputSystem: SPACEBAR PRESSED - publishing AttackInputEvent");
-    EventBus::instance().publish(AttackInputEvent{});
-  }
+  // Abilities: LMB / RMB come from the mouse; these are the keyboard ones.
+  // Space doubles as the basic attack for trackpads.
+  if (e.key == SDLK_q) buttons |= InputButtons::Special;
+  if (e.key == SDLK_LSHIFT) buttons |= InputButtons::Mobility;
+  if (e.key == SDLK_e) buttons |= InputButtons::Core;
+  if (e.key == SDLK_SPACE) buttons |= InputButtons::Primary;
 
-  // Interact input (E key) - for objectives
-  if (e.key == SDLK_e) {
+  // Interact input (F key) - for objectives
+  if (e.key == SDLK_f) {
     if (!interactHeld) {
       interactHeld = true;
-      Logger::info("InputSystem: E PRESSED - publishing InteractInputEvent");
       EventBus::instance().publish(InteractInputEvent{});
     }
   }
@@ -145,7 +153,33 @@ void InputSystem::onKeyUp(const KeyUpEvent& e) {
   if (e.key == SDLK_d || e.key == SDLK_RIGHT) moveRight = false;
   if (e.key == SDLK_w || e.key == SDLK_UP) moveUp = false;
   if (e.key == SDLK_s || e.key == SDLK_DOWN) moveDown = false;
-  if (e.key == SDLK_e) interactHeld = false;
+  if (e.key == SDLK_f) interactHeld = false;
+  if (e.key == SDLK_q) buttons &= ~InputButtons::Special;
+  if (e.key == SDLK_LSHIFT) buttons &= ~InputButtons::Mobility;
+  if (e.key == SDLK_e) buttons &= ~InputButtons::Core;
+  if (e.key == SDLK_SPACE) buttons &= ~InputButtons::Primary;
+}
+
+void InputSystem::onMouseMove(const MouseMoveEvent& e) {
+  mouseX = e.x;
+  mouseY = e.y;
+}
+
+void InputSystem::onMouseButton(const MouseButtonEvent& e) {
+  mouseX = e.x;
+  mouseY = e.y;
+  uint8_t bit = 0;
+  if (e.button == SDL_BUTTON_LEFT) bit = InputButtons::Primary;
+  if (e.button == SDL_BUTTON_RIGHT) bit = InputButtons::Secondary;
+  if (bit == 0) return;
+  if (!e.down) {
+    buttons &= ~bit;
+    return;
+  }
+  // Only start abilities while actually playing (not in menus).
+  if (GameStateManager::instance().getCurrentState() == GameState::Playing) {
+    buttons |= bit;
+  }
 }
 
 void InputSystem::onUpdate(const UpdateEvent& e) {
@@ -161,6 +195,9 @@ void InputSystem::onUpdate(const UpdateEvent& e) {
   input.moveUp = moveUp;
   input.moveDown = moveDown;
   input.inputSequence = inputSequence++;
+  input.buttons = buttons;
+  input.mouseX = mouseX;
+  input.mouseY = mouseY;
 
   EventBus::instance().publish(input);
 }
