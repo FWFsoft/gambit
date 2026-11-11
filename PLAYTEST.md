@@ -174,7 +174,9 @@ first.
 
 ## What to look for in a playtest
 
-The design pillars, phrased as questions:
+The design pillars (full text in `docs/design/PILLARS.md`), phrased as
+questions. Design decisions made so far, and which ones still need a
+human review, are in `docs/design/DECISIONS.md`.
 
 - **Strategic crunch:** does the shrinking zone force real decisions
   (one more fight vs. head back)? Is round 1 too long or too short?
