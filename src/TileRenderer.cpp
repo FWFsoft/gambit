@@ -21,13 +21,15 @@ out vec2 TexCoord;
 uniform mat4 projection;
 uniform vec2 cameraPos;
 uniform vec2 screenCenter;
+uniform float zoom;
 
 void main() {
     TexCoord = aTexCoord;
 
-    // gridToWorld already converted to isometric, so just apply camera offset
-    float screenX = aPos.x - cameraPos.x + screenCenter.x;
-    float screenY = aPos.y - cameraPos.y + screenCenter.y;
+    // gridToWorld already converted to isometric, so just apply the camera
+    // offset and magnify around the screen centre
+    float screenX = (aPos.x - cameraPos.x) * zoom + screenCenter.x;
+    float screenY = (aPos.y - cameraPos.y) * zoom + screenCenter.y;
 
     gl_Position = projection * vec4(screenX, screenY, 0.0, 1.0);
 }
@@ -75,6 +77,7 @@ void TileRenderer::initBatchRenderer() {
   uniformProjection = glGetUniformLocation(shaderProgram, "projection");
   uniformCameraPos = glGetUniformLocation(shaderProgram, "cameraPos");
   uniformScreenCenter = glGetUniformLocation(shaderProgram, "screenCenter");
+  uniformZoom = glGetUniformLocation(shaderProgram, "zoom");
 
   // Create VAO/VBO for dynamic batched rendering
   glGenVertexArrays(1, &VAO);
@@ -255,6 +258,7 @@ void TileRenderer::renderBatch() {
 
   // Update camera uniforms every frame
   glUniform2f(uniformCameraPos, camera->x, camera->y);
+  glUniform1f(uniformZoom, camera->zoom);
   glUniform2f(uniformScreenCenter, camera->screenWidth / 2.0f,
               camera->screenHeight / 2.0f);
 

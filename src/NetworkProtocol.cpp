@@ -74,8 +74,11 @@ std::vector<uint8_t> serialize(const ClientInputPacket& packet) {
   if (packet.moveUp) flags |= 0x04;
   if (packet.moveDown) flags |= 0x08;
   writeUint8(buffer, flags);
+  writeUint8(buffer, packet.buttons);
+  writeFloat(buffer, packet.aimX);
+  writeFloat(buffer, packet.aimY);
 
-  assert(buffer.size() == 6);  // 1 + 4 + 1 = 6 bytes
+  assert(buffer.size() == 15);  // 1 + 4 + 1 + 1 + 4 + 4 = 15 bytes
   return buffer;
 }
 
@@ -97,9 +100,22 @@ std::vector<uint8_t> serialize(const StateUpdatePacket& packet) {
     writeUint8(buffer, player.g);
     writeUint8(buffer, player.b);
     writeUint32(buffer, player.lastInputSequence);
+    writeFloat(buffer, player.maxHealth);
+    writeFloat(buffer, player.shield);
+    writeUint8(buffer, player.characterId);
+    writeUint8(buffer, player.flags);
+    writeFloat(buffer, player.speedMult);
+    writeFloat(buffer, player.aimX);
+    writeFloat(buffer, player.aimY);
+    writeUint8(buffer, player.charge);
+    writeUint8(buffer, player.chargeSlot);
+    for (uint16_t cooldown : player.cooldowns) {
+      writeUint16(buffer, cooldown);
+    }
+    writeUint8(buffer, player.resource);
   }
 
-  // 1 + 4 + 2 + (playerCount * 31) bytes
+  assert(buffer.size() == 7 + packet.players.size() * PLAYER_STATE_BYTES);
   return buffer;
 }
 
@@ -151,7 +167,7 @@ std::vector<uint8_t> serialize(const PlayerRespawnedPacket& packet) {
 // Deserialization
 
 ClientInputPacket deserializeClientInput(const uint8_t* data, size_t size) {
-  assert(size >= 6);
+  assert(size >= 15);
   assert(data[0] == static_cast<uint8_t>(PacketType::ClientInput));
 
   ClientInputPacket packet;
@@ -162,6 +178,9 @@ ClientInputPacket deserializeClientInput(const uint8_t* data, size_t size) {
   packet.moveRight = (flags & 0x02) != 0;
   packet.moveUp = (flags & 0x04) != 0;
   packet.moveDown = (flags & 0x08) != 0;
+  packet.buttons = readUint8(data + 6);
+  packet.aimX = readFloat(data + 7);
+  packet.aimY = readFloat(data + 11);
 
   return packet;
 }
@@ -174,7 +193,7 @@ StateUpdatePacket deserializeStateUpdate(const uint8_t* data, size_t size) {
   packet.serverTick = readUint32(data + 1);
   uint16_t playerCount = readUint16(data + 5);
 
-  assert(size >= 7 + (playerCount * 31));
+  assert(size >= 7 + (playerCount * PLAYER_STATE_BYTES));
 
   size_t offset = 7;
   for (uint16_t i = 0; i < playerCount; ++i) {
@@ -199,6 +218,30 @@ StateUpdatePacket deserializeStateUpdate(const uint8_t* data, size_t size) {
     offset += 1;
     player.lastInputSequence = readUint32(data + offset);
     offset += 4;
+    player.maxHealth = readFloat(data + offset);
+    offset += 4;
+    player.shield = readFloat(data + offset);
+    offset += 4;
+    player.characterId = readUint8(data + offset);
+    offset += 1;
+    player.flags = readUint8(data + offset);
+    offset += 1;
+    player.speedMult = readFloat(data + offset);
+    offset += 4;
+    player.aimX = readFloat(data + offset);
+    offset += 4;
+    player.aimY = readFloat(data + offset);
+    offset += 4;
+    player.charge = readUint8(data + offset);
+    offset += 1;
+    player.chargeSlot = readUint8(data + offset);
+    offset += 1;
+    for (uint16_t& cooldown : player.cooldowns) {
+      cooldown = readUint16(data + offset);
+      offset += 2;
+    }
+    player.resource = readUint8(data + offset);
+    offset += 1;
 
     packet.players.push_back(player);
   }
@@ -270,10 +313,11 @@ std::vector<uint8_t> serialize(const EnemyStateUpdatePacket& packet) {
     writeFloat(buffer, enemy.vy);
     writeFloat(buffer, enemy.health);
     writeFloat(buffer, enemy.maxHealth);
+    writeUint8(buffer, enemy.flags);
+    writeUint8(buffer, enemy.windup);
   }
 
-  // 1 + 2 + (enemyCount * 30) bytes
-  // Per enemy: 4 + 1 + 1 + 4 + 4 + 4 + 4 + 4 + 4 = 30 bytes
+  assert(buffer.size() == 3 + packet.enemies.size() * ENEMY_STATE_BYTES);
   return buffer;
 }
 
@@ -323,7 +367,7 @@ EnemyStateUpdatePacket deserializeEnemyStateUpdate(const uint8_t* data,
   EnemyStateUpdatePacket packet;
   uint16_t enemyCount = readUint16(data + 1);
 
-  assert(size >= 3 + (enemyCount * 30));
+  assert(size >= 3 + (enemyCount * ENEMY_STATE_BYTES));
 
   size_t offset = 3;
   for (uint16_t i = 0; i < enemyCount; ++i) {
@@ -346,6 +390,10 @@ EnemyStateUpdatePacket deserializeEnemyStateUpdate(const uint8_t* data,
     offset += 4;
     enemy.maxHealth = readFloat(data + offset);
     offset += 4;
+    enemy.flags = readUint8(data + offset);
+    offset += 1;
+    enemy.windup = readUint8(data + offset);
+    offset += 1;
 
     packet.enemies.push_back(enemy);
   }
@@ -811,5 +859,186 @@ ShipLocationPacket deserializeShipLocation(const uint8_t* data, size_t size) {
   packet.x = readFloat(data + 1);
   packet.y = readFloat(data + 5);
 
+  return packet;
+}
+
+// ---------------------------------------------------------------------------
+// Arena packets
+// ---------------------------------------------------------------------------
+
+std::vector<uint8_t> serialize(const GameEventPacket& packet) {
+  std::vector<uint8_t> buffer;
+  buffer.reserve(37);
+  writeUint8(buffer, static_cast<uint8_t>(packet.type));
+  writeUint8(buffer, static_cast<uint8_t>(packet.kind));
+  writeUint32(buffer, packet.sourceId);
+  writeUint8(buffer, packet.sourceIsEnemy ? 1 : 0);
+  writeFloat(buffer, packet.x);
+  writeFloat(buffer, packet.y);
+  writeFloat(buffer, packet.x2);
+  writeFloat(buffer, packet.y2);
+  writeFloat(buffer, packet.value);
+  writeFloat(buffer, packet.value2);
+  writeUint8(buffer, packet.param);
+  writeUint8(buffer, packet.param2);
+  writeUint32(buffer, packet.extraId);
+  assert(buffer.size() == 37);
+  return buffer;
+}
+
+GameEventPacket deserializeGameEvent(const uint8_t* data, size_t size) {
+  assert(size >= 37);
+  assert(data[0] == static_cast<uint8_t>(PacketType::GameEvent));
+  GameEventPacket packet;
+  packet.kind = static_cast<GameEventKind>(readUint8(data + 1));
+  packet.sourceId = readUint32(data + 2);
+  packet.sourceIsEnemy = readUint8(data + 6) != 0;
+  packet.x = readFloat(data + 7);
+  packet.y = readFloat(data + 11);
+  packet.x2 = readFloat(data + 15);
+  packet.y2 = readFloat(data + 19);
+  packet.value = readFloat(data + 23);
+  packet.value2 = readFloat(data + 27);
+  packet.param = readUint8(data + 31);
+  packet.param2 = readUint8(data + 32);
+  packet.extraId = readUint32(data + 33);
+  return packet;
+}
+
+static constexpr size_t MATCH_HEADER_BYTES = 36;
+static constexpr size_t MATCH_PLAYER_BYTES = 31;
+
+std::vector<uint8_t> serialize(const MatchStatePacket& packet) {
+  std::vector<uint8_t> buffer;
+  writeUint8(buffer, static_cast<uint8_t>(packet.type));
+  writeUint8(buffer, packet.phase);
+  writeUint8(buffer, packet.round);
+  writeUint8(buffer, packet.roundCount);
+  writeFloat(buffer, packet.timeRemaining);
+  writeFloat(buffer, packet.shipHealth);
+  writeFloat(buffer, packet.shipMaxHealth);
+  writeFloat(buffer, packet.shipX);
+  writeFloat(buffer, packet.shipY);
+  writeFloat(buffer, packet.zoneRadius);
+  writeUint16(buffer, packet.scrapBanked);
+  writeUint8(buffer, packet.turretsOnline);
+  writeUint32(buffer, packet.bossId);
+  assert(packet.players.size() <= 255);
+  writeUint8(buffer, static_cast<uint8_t>(packet.players.size()));
+  assert(buffer.size() == MATCH_HEADER_BYTES);
+
+  for (const auto& p : packet.players) {
+    writeUint32(buffer, p.playerId);
+    writeUint8(buffer, p.characterId);
+    writeInt32(buffer, p.score);
+    writeUint16(buffer, p.kills);
+    writeUint8(buffer, p.deaths);
+    writeUint8(buffer, p.ready);
+    writeUint8(buffer, p.coreGenus);
+    for (uint8_t v : p.treeGenus) writeUint8(buffer, v);
+    for (uint8_t v : p.treeLevel) writeUint8(buffer, v);
+    for (uint8_t v : p.inventory) writeUint8(buffer, v);
+    writeUint8(buffer, p.carryingScrap);
+    writeFloat(buffer, p.reviveProgress);
+  }
+  assert(buffer.size() ==
+         MATCH_HEADER_BYTES + packet.players.size() * MATCH_PLAYER_BYTES);
+  return buffer;
+}
+
+MatchStatePacket deserializeMatchState(const uint8_t* data, size_t size) {
+  assert(size >= MATCH_HEADER_BYTES);
+  assert(data[0] == static_cast<uint8_t>(PacketType::MatchState));
+  MatchStatePacket packet;
+  packet.phase = readUint8(data + 1);
+  packet.round = readUint8(data + 2);
+  packet.roundCount = readUint8(data + 3);
+  packet.timeRemaining = readFloat(data + 4);
+  packet.shipHealth = readFloat(data + 8);
+  packet.shipMaxHealth = readFloat(data + 12);
+  packet.shipX = readFloat(data + 16);
+  packet.shipY = readFloat(data + 20);
+  packet.zoneRadius = readFloat(data + 24);
+  packet.scrapBanked = readUint16(data + 28);
+  packet.turretsOnline = readUint8(data + 30);
+  packet.bossId = readUint32(data + 31);
+  uint8_t count = readUint8(data + 35);
+  assert(size >= MATCH_HEADER_BYTES + count * MATCH_PLAYER_BYTES);
+
+  size_t offset = MATCH_HEADER_BYTES;
+  for (uint8_t i = 0; i < count; ++i) {
+    MatchPlayerState p;
+    p.playerId = readUint32(data + offset);
+    offset += 4;
+    p.characterId = readUint8(data + offset);
+    offset += 1;
+    p.score = readInt32(data + offset);
+    offset += 4;
+    p.kills = readUint16(data + offset);
+    offset += 2;
+    p.deaths = readUint8(data + offset);
+    offset += 1;
+    p.ready = readUint8(data + offset);
+    offset += 1;
+    p.coreGenus = readUint8(data + offset);
+    offset += 1;
+    for (uint8_t& v : p.treeGenus) v = readUint8(data + offset++);
+    for (uint8_t& v : p.treeLevel) v = readUint8(data + offset++);
+    for (uint8_t& v : p.inventory) v = readUint8(data + offset++);
+    p.carryingScrap = readUint8(data + offset);
+    offset += 1;
+    p.reviveProgress = readFloat(data + offset);
+    offset += 4;
+    packet.players.push_back(p);
+  }
+  return packet;
+}
+
+std::vector<uint8_t> serialize(const InfusionSlotPacket& packet) {
+  std::vector<uint8_t> buffer;
+  writeUint8(buffer, static_cast<uint8_t>(packet.type));
+  writeUint8(buffer, packet.genus);
+  writeUint8(buffer, packet.slot);
+  return buffer;
+}
+
+InfusionSlotPacket deserializeInfusionSlot(const uint8_t* data, size_t size) {
+  assert(size >= 3);
+  assert(data[0] == static_cast<uint8_t>(PacketType::InfusionSlot));
+  InfusionSlotPacket packet;
+  packet.genus = readUint8(data + 1);
+  packet.slot = readUint8(data + 2);
+  return packet;
+}
+
+std::vector<uint8_t> serialize(const PlayerReadyPacket& packet) {
+  std::vector<uint8_t> buffer;
+  writeUint8(buffer, static_cast<uint8_t>(packet.type));
+  writeUint8(buffer, packet.ready);
+  return buffer;
+}
+
+PlayerReadyPacket deserializePlayerReady(const uint8_t* data, size_t size) {
+  assert(size >= 2);
+  assert(data[0] == static_cast<uint8_t>(PacketType::PlayerReady));
+  PlayerReadyPacket packet;
+  packet.ready = readUint8(data + 1);
+  return packet;
+}
+
+std::vector<uint8_t> serialize(const DebugCommandPacket& packet) {
+  std::vector<uint8_t> buffer;
+  writeUint8(buffer, static_cast<uint8_t>(packet.type));
+  writeUint8(buffer, packet.command);
+  writeUint8(buffer, packet.arg);
+  return buffer;
+}
+
+DebugCommandPacket deserializeDebugCommand(const uint8_t* data, size_t size) {
+  assert(size >= 3);
+  assert(data[0] == static_cast<uint8_t>(PacketType::DebugCommand));
+  DebugCommandPacket packet;
+  packet.command = readUint8(data + 1);
+  packet.arg = readUint8(data + 2);
   return packet;
 }

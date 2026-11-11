@@ -18,6 +18,8 @@ class TestInputReader {
     SCREENSHOT,   // Capture screenshot
     MOUSE_MOVE,   // Move mouse to (x, y)
     MOUSE_CLICK,  // Click mouse button at current position
+    MOUSE_DOWN,   // Press and hold a mouse button (left/right)
+    MOUSE_UP,     // Release a held mouse button
   };
 
   struct Command {

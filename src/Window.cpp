@@ -102,6 +102,19 @@ void Window::pollEvents() {
       }
     } else if (event.type == SDL_KEYUP && !imguiWantsKeyboard) {
       EventBus::instance().publish(KeyUpEvent{event.key.keysym.sym});
+    } else if (event.type == SDL_MOUSEMOTION) {
+      EventBus::instance().publish(
+          MouseMoveEvent{event.motion.x, event.motion.y});
+    } else if (event.type == SDL_MOUSEBUTTONDOWN) {
+      // Clicks on UI (infusion panel, menus) must not fire abilities.
+      if (!io.WantCaptureMouse) {
+        EventBus::instance().publish(MouseButtonEvent{
+            event.button.button, true, event.button.x, event.button.y});
+      }
+    } else if (event.type == SDL_MOUSEBUTTONUP) {
+      // Always deliver releases so a held button can never get stuck.
+      EventBus::instance().publish(MouseButtonEvent{
+          event.button.button, false, event.button.x, event.button.y});
     }
   }
 }

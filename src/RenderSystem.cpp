@@ -96,8 +96,25 @@ void RenderSystem::onRender(const RenderEvent& e) {
   camera->follow(localPlayer.x, localPlayer.y);
 
   // Clear the screen with OpenGL
-  glClearColor(0.0f, 0.0f, 0.0f, 1.0f);  // Black background
+  glClearColor(0.03f, 0.03f, 0.06f, 1.0f);  // Night sky beyond the map
   glClear(GL_COLOR_BUFFER_BIT);
+
+  if (!legacyEntities) {
+    // Arena mode: ground only. Everything standing on it is drawn by
+    // ArenaView during the UI pass.
+    tileRenderer->render(*tiledMap, [](float, float) {});
+    if (musicZoneDebugRenderer) musicZoneDebugRenderer->render();
+    if (collisionDebugRenderer) {
+      collisionDebugRenderer->render();
+      if (tiledMap) {
+        collisionDebugRenderer->renderMapBounds(tiledMap->getWorldWidth(),
+                                                tiledMap->getWorldHeight());
+      }
+    }
+    if (objectiveDebugRenderer) objectiveDebugRenderer->render();
+    OpenGLUtils::checkGLError("RenderSystem::onRender");
+    return;
+  }
 
   // Gather all players
   std::vector<Player> allPlayers;
@@ -524,7 +541,7 @@ void RenderSystem::captureScreenshot(const std::string& path) {
     if (ec) {
       Logger::error("Failed to rename screenshot temp file: " + ec.message());
     } else {
-      Logger::info("Screenshot saved to " + path);
+      Logger::debug("Screenshot saved to " + path);
     }
   }
 

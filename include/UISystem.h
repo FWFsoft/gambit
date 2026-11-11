@@ -8,6 +8,7 @@
 #include "Camera.h"
 #include "EnemyInterpolation.h"
 #include "EventBus.h"
+#include "GameState.h"
 #include "RemotePlayerInterpolation.h"
 #include "Settings.h"
 
@@ -17,6 +18,7 @@ class NetworkClient;
 class Texture;
 class DamageNumberSystem;
 class EffectTracker;
+class ArenaView;
 struct ItemDefinition;
 
 // UISystem manages ImGui frame lifecycle and rendering
@@ -32,6 +34,10 @@ class UISystem {
 
   // Called each frame to render UI
   void render();
+
+  // When set, the arena view draws the world and in-game HUD while playing
+  // (replacing the old placeholder HUD).
+  void setArenaView(ArenaView* view) { arenaView = view; }
 
  private:
   void onRender(const RenderEvent& e);
@@ -87,6 +93,10 @@ class UISystem {
   RemotePlayerInterpolation* remoteInterpolation;
   EnemyInterpolation* enemyInterpolation;
   Camera* camera;
+  ArenaView* arenaView = nullptr;
+  // State shown on the last rendered frame. A key press that changes state
+  // (title -> character select) must not also act on the new screen.
+  GameState lastRenderedState = GameState::TitleScreen;
   Settings settings;
   Settings tempSettings;  // Temporary settings during editing
   bool showSettings;

@@ -31,12 +31,25 @@ struct KeyUpEvent {
   SDL_Keycode key;
 };
 
+struct MouseMoveEvent {
+  int x, y;  // window pixels
+};
+
+struct MouseButtonEvent {
+  uint8_t button;  // SDL_BUTTON_LEFT / SDL_BUTTON_RIGHT / ...
+  bool down;
+  int x, y;
+};
+
 struct LocalInputEvent {
   bool moveLeft;
   bool moveRight;
   bool moveUp;
   bool moveDown;
   uint32_t inputSequence;
+  uint8_t buttons = 0;  // InputButtons bitmask (LMB, RMB, Q, SHIFT, E)
+  int mouseX = 0;       // cursor in window pixels
+  int mouseY = 0;
 };
 
 struct AttackInputEvent {};

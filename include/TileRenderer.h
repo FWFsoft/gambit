@@ -37,6 +37,7 @@ class TileRenderer {
   GLint uniformProjection;
   GLint uniformCameraPos;
   GLint uniformScreenCenter;
+  GLint uniformZoom;
   std::vector<float> batchVertices;
   bool batchBuilt;        // Cache flag - tiles are static
   bool verticesUploaded;  // Cache flag - vertices uploaded to GPU

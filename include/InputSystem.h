@@ -19,7 +19,10 @@ class InputSystem {
   bool moveRight;
   bool moveUp;
   bool moveDown;
-  bool interactHeld;  // E key held for objective interaction
+  bool interactHeld;  // F key held for objective interaction
+  uint8_t buttons = 0;  // InputButtons bitmask: LMB, RMB, Q, LSHIFT, E
+  int mouseX = 0;
+  int mouseY = 0;
   uint32_t inputSequence;
   ClientPrediction* clientPrediction;
   CollisionDebugRenderer* collisionDebugRenderer;
@@ -28,5 +31,7 @@ class InputSystem {
 
   void onKeyDown(const KeyDownEvent& e);
   void onKeyUp(const KeyUpEvent& e);
+  void onMouseMove(const MouseMoveEvent& e);
+  void onMouseButton(const MouseButtonEvent& e);
   void onUpdate(const UpdateEvent& e);
 };

@@ -3,7 +3,9 @@
 #include <cstdlib>
 #include <memory>
 #include <unordered_map>
+#include <vector>
 
+#include "EnemySpawn.h"
 #include "EffectManager.h"
 #include "EventBus.h"
 #include "NetworkProtocol.h"
@@ -17,6 +19,8 @@
 class NetworkServer;
 class CollisionSystem;
 class EnemySystem;
+class AbilitySystem;
+class MatchDirector;
 
 class ServerGameState {
  public:
@@ -26,6 +30,9 @@ class ServerGameState {
   EnemySystem* getEnemySystem() { return enemySystem.get(); }
   EffectManager* getEffectManager() { return effectManager.get(); }
   ObjectiveSystem* getObjectiveSystem() { return objectiveSystem.get(); }
+  AbilitySystem* getAbilitySystem() { return abilitySystem.get(); }
+  MatchDirector* getMatchDirector() { return director.get(); }
+  std::unordered_map<uint32_t, Player>& getPlayers() { return players; }
 
  private:
   NetworkServer* server;
@@ -38,6 +45,13 @@ class ServerGameState {
   std::unique_ptr<EnemySystem> enemySystem;
   std::unique_ptr<EffectManager> effectManager;
   std::unique_ptr<ObjectiveSystem> objectiveSystem;
+  std::unique_ptr<AbilitySystem> abilitySystem;
+  std::unique_ptr<MatchDirector> director;
+  std::vector<EnemySpawn> noSpawns;  // used when no map is loaded
+  // Entities that had effects in the last effect broadcast, so one final
+  // empty update can clear them on clients.
+  std::vector<uint32_t> playersWithEffects;
+  std::vector<uint32_t> enemiesWithEffects;
 
   // Ship (home base) position loaded from map
   float shipX = 0.0f;
@@ -64,13 +78,13 @@ class ServerGameState {
   bool findValidSpawnPosition(float& x, float& y);
   void assignPlayerColor(Player& player, size_t playerCount);
 
-  // Death and respawn methods
-  void checkPlayerDeaths();
-  void handlePlayerRespawns();
-  void respawnPlayer(Player& player);
+  // Arena match glue
+  void handleEnemyDeaths();
+  void processArenaPickups();
+  void clearArenaPickups();
+  void broadcastEffects();
 
   // World item management methods
-  void checkEnemyLootDrops();
   void spawnWorldItem(uint32_t itemId, float x, float y);
   void processItemPickupRequest(uint32_t clientId, const uint8_t* data,
                                 size_t size);

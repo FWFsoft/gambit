@@ -152,6 +152,11 @@ add_executable(Server
     src/Effect.cpp
     src/EffectManager.cpp
     src/ObjectiveSystem.cpp
+    src/ArenaData.cpp
+    src/AbilitySystem.cpp
+    src/CharacterKits.cpp
+    src/Infusions.cpp
+    src/MatchDirector.cpp
 )
 target_include_directories(Server SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
 target_include_directories(Server PRIVATE include)
@@ -183,6 +188,7 @@ add_executable(Client
     src/InputSystem.cpp
     src/NetworkProtocol.cpp
     src/ClientPrediction.cpp
+    src/ArenaData.cpp
     src/RemotePlayerInterpolation.cpp
     src/RenderSystem.cpp
     src/TiledMap.cpp
@@ -223,6 +229,14 @@ add_executable(Client
     src/EnemySystem.cpp
     src/EffectManager.cpp
     src/ObjectiveSystem.cpp
+    src/ArenaData.cpp
+    src/AbilitySystem.cpp
+    src/CharacterKits.cpp
+    src/Infusions.cpp
+    src/MatchDirector.cpp
+    src/ArenaClient.cpp
+    src/ArenaView.cpp
+    src/ArenaHud.cpp
 )
 target_include_directories(Client SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
 target_include_directories(Client PRIVATE include)
@@ -261,6 +275,7 @@ add_executable(HeadlessClient
     src/InputSystem.cpp
     src/NetworkProtocol.cpp
     src/ClientPrediction.cpp
+    src/ArenaData.cpp
     src/RemotePlayerInterpolation.cpp
     src/HeadlessRenderSystem.cpp
     src/HeadlessUISystem.cpp
@@ -294,6 +309,43 @@ if(tmxlite_FOUND)
     target_link_libraries(HeadlessClient PRIVATE tmxlite::tmxlite)
 elseif(TARGET PkgConfig::TMXLITE)
     target_link_libraries(HeadlessClient PRIVATE
+        PkgConfig::TMXLITE
+        ZLIB::ZLIB
+        $<IF:$<TARGET_EXISTS:zstd::libzstd_shared>,zstd::libzstd_shared,zstd::libzstd_static>
+    )
+endif()
+
+# Headless match simulator: the real server driven by bot players, no
+# window and no sockets. See tests/arena_sim.cpp.
+add_executable(ArenaSim
+    tests/arena_sim.cpp
+    src/Logger.cpp
+    src/NetworkServer.cpp
+    src/transport/InMemoryServerTransport.cpp
+    src/NetworkProtocol.cpp
+    src/ServerGameState.cpp
+    src/TiledMap.cpp
+    src/CollisionSystem.cpp
+    src/AnimationController.cpp
+    src/AnimationSystem.cpp
+    src/AnimationAssetLoader.cpp
+    src/EnemySystem.cpp
+    src/ItemRegistry.cpp
+    src/Effect.cpp
+    src/EffectManager.cpp
+    src/ObjectiveSystem.cpp
+    src/ArenaData.cpp
+    src/AbilitySystem.cpp
+    src/CharacterKits.cpp
+    src/Infusions.cpp
+    src/MatchDirector.cpp
+)
+target_include_directories(ArenaSim PRIVATE include)
+target_link_libraries(ArenaSim PRIVATE SDL2::SDL2 spdlog::spdlog)
+if(tmxlite_FOUND)
+    target_link_libraries(ArenaSim PRIVATE tmxlite::tmxlite)
+elseif(TARGET PkgConfig::TMXLITE)
+    target_link_libraries(ArenaSim PRIVATE
         PkgConfig::TMXLITE
         ZLIB::ZLIB
         $<IF:$<TARGET_EXISTS:zstd::libzstd_shared>,zstd::libzstd_shared,zstd::libzstd_static>
@@ -369,6 +421,7 @@ add_executable(test_client_prediction
     src/Logger.cpp
     src/NetworkProtocol.cpp
     src/ClientPrediction.cpp
+    src/ArenaData.cpp
     src/NetworkClient.cpp
     src/transport/ENetTransport.cpp
     src/CollisionSystem.cpp
@@ -457,6 +510,7 @@ add_executable(test_headless_movement
     src/InputSystem.cpp
     src/NetworkProtocol.cpp
     src/ClientPrediction.cpp
+    src/ArenaData.cpp
     src/RemotePlayerInterpolation.cpp
     src/HeadlessRenderSystem.cpp
     src/HeadlessUISystem.cpp
@@ -509,6 +563,18 @@ add_test(NAME MusicSystem COMMAND test_music_system)
 add_test(NAME AnimationController COMMAND test_animation_controller)
 add_test(NAME AnimationSystem COMMAND test_animation_system)
 add_test(NAME GameLoop COMMAND test_gameloop)
+
+# Full match on the real server with bot players (lobby -> 3 rounds -> boss).
+# God mode makes the outcome deterministic: it must reach Victory.
+add_test(NAME ArenaMatchFlow
+         COMMAND ArenaSim --god --quiet --expect victory
+                 --bots Suds,Gravon,Isaac,Zephyr,Mina,Volgore,Wade,Presidente)
+set_tests_properties(ArenaMatchFlow PROPERTIES
+    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+# Same match without god mode: either result is fine, it just has to finish.
+add_test(NAME ArenaMatchBots COMMAND ArenaSim --quiet)
+set_tests_properties(ArenaMatchBots PROPERTIES
+    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
 # Headless integration test (requires running server on localhost:1234)
 # Note: This test will fail if no server is available
@@ -662,6 +728,14 @@ set(WASM_CLIENT_SOURCES
     src/EnemySystem.cpp
     src/EffectManager.cpp
     src/ObjectiveSystem.cpp
+    src/ArenaData.cpp
+    src/AbilitySystem.cpp
+    src/CharacterKits.cpp
+    src/Infusions.cpp
+    src/MatchDirector.cpp
+    src/ArenaClient.cpp
+    src/ArenaView.cpp
+    src/ArenaHud.cpp
 )
 
 add_executable(WasmClient ${WASM_CLIENT_SOURCES})

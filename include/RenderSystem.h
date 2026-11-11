@@ -33,6 +33,10 @@ class RenderSystem {
   // Access to sprite renderer for other systems
   SpriteRenderer* getSpriteRenderer() { return spriteRenderer.get(); }
 
+  // The arena view draws characters, enemies and effects itself; with this
+  // off, RenderSystem only draws the tile layer and debug overlays.
+  void setLegacyEntityRendering(bool enabled) { legacyEntities = enabled; }
+
   // Test mode: capture screenshot
   void captureScreenshot(const std::string& path);
 
@@ -51,6 +55,7 @@ class RenderSystem {
   std::unique_ptr<TileRenderer> tileRenderer;
   Texture* playerTexture;  // Managed by TextureManager, not owned
   Texture* shipTexture;    // Managed by TextureManager, not owned
+  bool legacyEntities = true;
 
   void onRender(const RenderEvent& e);
   void drawPlayer(const Player& player);

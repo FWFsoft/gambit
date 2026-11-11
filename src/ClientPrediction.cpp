@@ -10,6 +10,16 @@
 #include "Logger.h"
 #include "NetworkClient.h"
 #include "config/PlayerConfig.h"
+#include "config/ScreenConfig.h"
+
+namespace {
+// Movement modifiers the server last reported for the local player. Using
+// the same numbers keeps prediction in step with slows, hastes and roots.
+MovementModifiers modifiersFor(const Player& player) {
+  bool rooted = (player.stateFlags & PlayerFlags::Rooted) != 0;
+  return MovementModifiers(player.speedMult, !rooted);
+}
+}  // namespace
 
 ClientPrediction::ClientPrediction(NetworkClient* client,
                                    uint32_t localPlayerId,
@@ -44,35 +54,51 @@ ClientPrediction::ClientPrediction(NetworkClient* client,
       });
 }
 
+void ClientPrediction::sendToServer(const std::vector<uint8_t>& data) {
+  client->send(data);
+}
+
 void ClientPrediction::onLocalInput(const LocalInputEvent& e) {
-  // Skip input processing if player is dead
-  if (localPlayer.isDead()) {
-    return;
-  }
+  // The camera follows the local player, so the cursor's world position is
+  // its offset from the screen centre.
+  const float zoom = Config::Screen::WORLD_ZOOM;
+  aimX = localPlayer.x + (e.mouseX - Config::Screen::WIDTH / 2.0f) / zoom;
+  aimY = localPlayer.y + (e.mouseY - Config::Screen::HEIGHT / 2.0f) / zoom +
+         AIM_HEIGHT;
+  localPlayer.aimX = aimX;
+  localPlayer.aimY = aimY;
 
-  // Apply input immediately to local player (instant response)
-  MovementInput input(e.moveLeft, e.moveRight, e.moveUp, e.moveDown, 16.67f,
-                      worldWidth, worldHeight, collisionSystem);
-  applyInput(localPlayer, input);
-
-  // Store input in history for reconciliation
   LocalInputEvent inputCopy = e;
   inputCopy.inputSequence = localInputSequence++;
-  inputHistory.push_back(inputCopy);
 
-  // Keep only last 60 inputs (1 second at 60 FPS)
-  if (inputHistory.size() > 60) {
-    inputHistory.pop_front();
+  // Predict movement only when the server would also move us: alive, in the
+  // match, and not mid-dash.
+  bool canPredict =
+      localPlayer.isAlive() && localPlayer.characterId != 0 &&
+      (localPlayer.stateFlags & PlayerFlags::MoveLocked) == 0;
+  if (canPredict) {
+    MovementInput input(e.moveLeft, e.moveRight, e.moveUp, e.moveDown, 16.67f,
+                        worldWidth, worldHeight, collisionSystem);
+    applyInput(localPlayer, input, modifiersFor(localPlayer));
+
+    inputHistory.push_back(inputCopy);
+    if (inputHistory.size() > 60) {
+      inputHistory.pop_front();
+    }
+  } else {
+    inputHistory.clear();
   }
 
-  // Serialize and send to server
+  // Inputs are sent even while dead so aim and buttons stay current.
   ClientInputPacket packet;
   packet.inputSequence = inputCopy.inputSequence;
   packet.moveLeft = e.moveLeft;
   packet.moveRight = e.moveRight;
   packet.moveUp = e.moveUp;
   packet.moveDown = e.moveDown;
-
+  packet.buttons = e.buttons;
+  packet.aimX = aimX;
+  packet.aimY = aimY;
   client->send(serialize(packet));
 }
 
@@ -212,56 +238,48 @@ void ClientPrediction::reconcile(const StateUpdatePacket& stateUpdate) {
   // Update server tick
   localPlayer.lastServerTick = stateUpdate.serverTick;
 
-  // Calculate prediction error
-  float dx = localPlayer.x - serverState->x;
-  float dy = localPlayer.y - serverState->y;
-  float error = std::sqrt(dx * dx + dy * dy);
-
-  // Tiger Style: Warn if prediction error is large
-  if (error > 50.0f) {
-    Logger::info("Large prediction error: " + std::to_string(error) +
-                 " pixels");
-  }
-
   // Rewind to server state
   localPlayer.x = serverState->x;
   localPlayer.y = serverState->y;
   localPlayer.vx = serverState->vx;
   localPlayer.vy = serverState->vy;
-
-  // Check for health decrease (player took damage)
-  float oldHealth = localPlayer.health;
   localPlayer.health = serverState->health;
-
-  if (localPlayer.health < oldHealth && localPlayer.isAlive()) {
-    // Player took damage - publish event for damage numbers
-    float damageTaken = oldHealth - localPlayer.health;
-    DamageReceivedEvent damageEvent;
-    damageEvent.x = localPlayer.x;
-    damageEvent.y = localPlayer.y;
-    damageEvent.damageAmount = damageTaken;
-    EventBus::instance().publish(damageEvent);
-  }
   localPlayer.r = serverState->r;
   localPlayer.g = serverState->g;
   localPlayer.b = serverState->b;
 
-  // Find inputs that happened AFTER the server state
-  // (These are inputs the server hasn't processed yet)
-  std::deque<LocalInputEvent> inputsToReplay;
-  for (const auto& input : inputHistory) {
-    // Only replay inputs the server hasn't processed yet
-    if (input.inputSequence > serverState->lastInputSequence) {
-      inputsToReplay.push_back(input);
-    }
+  // Combat state mirrored from the server
+  localPlayer.maxHealth = serverState->maxHealth;
+  localPlayer.shield = serverState->shield;
+  localPlayer.stateFlags = serverState->flags;
+  localPlayer.speedMult = serverState->speedMult;
+  localPlayer.resource = serverState->resource;
+  localPlayer.chargeSlot =
+      serverState->chargeSlot == 255 ? -1 : serverState->chargeSlot;
+  localPlayer.chargeMs = serverState->charge;  // 0-255 progress on the client
+  for (int slot = 0; slot < Arena::SLOT_COUNT; slot++) {
+    localPlayer.cooldownMs[slot] = serverState->cooldowns[slot] * 10.0f;
+  }
+  localPlayer.characterId = serverState->characterId;
+  const Arena::KitInfo* kit = Arena::kitInfo(localPlayer.characterId);
+  localPlayer.moveSpeed = kit ? kit->moveSpeed : Config::Player::SPEED;
+
+  // While the server is moving us (dash, blink, round teleport) there is
+  // nothing to predict: follow it exactly.
+  if ((serverState->flags & PlayerFlags::MoveLocked) != 0 ||
+      localPlayer.isDead()) {
+    inputHistory.clear();
+    return;
   }
 
-  // Re-apply all inputs that happened after the server state
-  for (const auto& inputEvent : inputsToReplay) {
+  // Re-apply inputs the server has not processed yet
+  MovementModifiers modifiers = modifiersFor(localPlayer);
+  for (const auto& inputEvent : inputHistory) {
+    if (inputEvent.inputSequence <= serverState->lastInputSequence) continue;
     MovementInput input(inputEvent.moveLeft, inputEvent.moveRight,
                         inputEvent.moveUp, inputEvent.moveDown, 16.67f,
                         worldWidth, worldHeight, collisionSystem);
-    applyInput(localPlayer, input);
+    applyInput(localPlayer, input, modifiers);
   }
 
   // Remove old inputs from history (server has processed these)
@@ -272,7 +290,7 @@ void ClientPrediction::reconcile(const StateUpdatePacket& stateUpdate) {
 }
 
 void ClientPrediction::setupObjectiveEventHandlers() {
-  // Subscribe to InteractInputEvent for objective interaction (E key)
+  // Subscribe to InteractInputEvent for objective interaction (F key)
   EventBus::instance().subscribe<InteractInputEvent>(
       [this](const InteractInputEvent&) {
         GameState currentState = GameStateManager::instance().getCurrentState();

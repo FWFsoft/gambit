@@ -13,7 +13,13 @@ const std::unordered_map<std::string, SDL_Scancode> TestInputReader::keyMap = {
     {"Space", SDL_SCANCODE_SPACE},   {"Enter", SDL_SCANCODE_RETURN},
     {"Escape", SDL_SCANCODE_ESCAPE}, {"E", SDL_SCANCODE_E},
     {"I", SDL_SCANCODE_I},           {"Tab", SDL_SCANCODE_TAB},
-    {"F1", SDL_SCANCODE_F1},
+    {"F1", SDL_SCANCODE_F1},         {"Q", SDL_SCANCODE_Q},
+    {"F", SDL_SCANCODE_F},           {"R", SDL_SCANCODE_R},
+    {"B", SDL_SCANCODE_B},           {"Shift", SDL_SCANCODE_LSHIFT},
+    {"F5", SDL_SCANCODE_F5},         {"F6", SDL_SCANCODE_F6},
+    {"F7", SDL_SCANCODE_F7},         {"F8", SDL_SCANCODE_F8},
+    {"F9", SDL_SCANCODE_F9},         {"F10", SDL_SCANCODE_F10},
+    {"F11", SDL_SCANCODE_F11},
 };
 
 TestInputReader::TestInputReader(const std::string& commandFilePath)
@@ -141,6 +147,14 @@ std::optional<TestInputReader::Command> TestInputReader::parseLine(
       cmd.stringArg = "left";  // Default to left click
     }
     Logger::info("TestInput: MOUSE_CLICK " + cmd.stringArg);
+    return cmd;
+  } else if (commandStr == "MOUSE_DOWN" || commandStr == "MOUSE_UP") {
+    cmd.type = commandStr == "MOUSE_DOWN" ? CommandType::MOUSE_DOWN
+                                          : CommandType::MOUSE_UP;
+    iss >> cmd.stringArg;
+    if (cmd.stringArg.empty()) {
+      cmd.stringArg = "left";
+    }
     return cmd;
   }
 

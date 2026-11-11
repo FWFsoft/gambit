@@ -13,7 +13,7 @@
 #include "config/PlayerConfig.h"
 
 EffectManager::EffectManager() : accumulatedTime(0.0f) {
-  Logger::info("EffectManager created");
+  Logger::debug("EffectManager created");
 }
 
 void EffectManager::update(float deltaTime,
@@ -27,14 +27,14 @@ void EffectManager::update(float deltaTime,
     auto playerIt = players.find(playerId);
     if (playerIt != players.end()) {
       Player& player = playerIt->second;
-      updateEntityEffects(playerId, effects, player.health,
-                          Config::Player::MAX_HEALTH, deltaTime, player.x,
-                          player.y);
+      if (player.isDead()) continue;  // the dead do not bleed or mend
+      updateEntityEffects(playerId, false, effects, player.health,
+                          player.maxHealth, deltaTime, player.x, player.y);
 
       // Check if player died from DoT
       if (player.health <= 0.0f && !player.isDead()) {
         player.health = 0.0f;
-        Logger::info("💀 Player " + std::to_string(playerId) +
+        Logger::debug("💀 Player " + std::to_string(playerId) +
                      " died from DoT");
       }
     }
@@ -45,10 +45,9 @@ void EffectManager::update(float deltaTime,
     auto enemyIt = enemies.find(enemyId);
     if (enemyIt != enemies.end()) {
       Enemy& enemy = enemyIt->second;
-      float oldHealth = enemy.health;
-
-      updateEntityEffects(enemyId, effects, enemy.health, enemy.maxHealth,
-                          deltaTime, enemy.x, enemy.y);
+      if (enemy.state == EnemyState::Dead) continue;
+      updateEntityEffects(enemyId, true, effects, enemy.health,
+                          enemy.maxHealth, deltaTime, enemy.x, enemy.y);
 
       // Check if enemy died from DoT
       if (enemy.health <= 0.0f && enemy.state != EnemyState::Dead) {
@@ -57,12 +56,7 @@ void EffectManager::update(float deltaTime,
         enemy.vx = 0.0f;
         enemy.vy = 0.0f;
         enemy.deathTime = accumulatedTime;
-
-        // Set random respawn delay (5-10 seconds)
-        static std::random_device rd;
-        static std::mt19937 gen(rd());
-        std::uniform_real_distribution<float> dist(5000.0f, 10000.0f);
-        enemy.respawnDelay = dist(gen);
+        enemy.deadMs = 0.0f;
 
         // Find Wound effect to credit the killer
         uint32_t killerId = 0;
@@ -70,11 +64,13 @@ void EffectManager::update(float deltaTime,
         if (woundEffect) {
           killerId = woundEffect->sourceId;
         }
+        if (killerId == 0) {
+          killerId = enemy.lastHitBy;
+        }
 
-        Logger::info("💀 Enemy " + std::to_string(enemyId) +
+        Logger::debug("💀 Enemy " + std::to_string(enemyId) +
                      " died from DoT (killed by player " +
-                     std::to_string(killerId) + ", respawn in " +
-                     std::to_string(enemy.respawnDelay / 1000.0f) + "s)");
+                     std::to_string(killerId) + ")");
 
         // Record death for broadcasting
         if (enemySystem) {
@@ -188,15 +184,18 @@ EffectManager::StatModifiers EffectManager::calculateModifiers(
                  !effects.hasEffect(EffectType::Snared) &&
                  !effects.hasEffect(EffectType::Grappled);
 
-  mods.canAct = !effects.hasEffect(EffectType::Stunned);
+  // A grappled creature is helpless in its captor's arms.
+  mods.canAct = !effects.hasEffect(EffectType::Stunned) &&
+                !effects.hasEffect(EffectType::Grappled);
 
   mods.canUseAbilities = !effects.hasEffect(EffectType::Silenced);
 
   return mods;
 }
 
-void EffectManager::consumeOnDamage(uint32_t targetId, bool isEnemy,
-                                    float& incomingDamage) {
+EffectManager::ConsumeResult EffectManager::consumeOnDamage(
+    uint32_t targetId, bool isEnemy, float& incomingDamage) {
+  ConsumeResult result;
   ActiveEffects* effects =
       isEnemy ? &enemyEffects[targetId] : &playerEffects[targetId];
 
@@ -204,7 +203,9 @@ void EffectManager::consumeOnDamage(uint32_t targetId, bool isEnemy,
   if (EffectInstance* guard = effects->findEffect(EffectType::Guard)) {
     float reductionPerStack =
         EffectRegistry::get(EffectType::Guard).baseIntensity;
-    float totalReduction = reductionPerStack * guard->stacks;
+    float totalReduction =
+        std::min(0.9f, reductionPerStack * guard->stacks);
+    result.guardPrevented = incomingDamage * totalReduction;
     incomingDamage *= (1.0f - totalReduction);
 
     // Consume one stack
@@ -223,6 +224,7 @@ void EffectManager::consumeOnDamage(uint32_t targetId, bool isEnemy,
     float increasePerStack =
         EffectRegistry::get(EffectType::Expose).baseIntensity;
     float totalIncrease = increasePerStack * expose->stacks;
+    result.exposeAdded = incomingDamage * totalIncrease;
     incomingDamage *= (1.0f + totalIncrease);
 
     // Consume one stack
@@ -239,6 +241,26 @@ void EffectManager::consumeOnDamage(uint32_t targetId, bool isEnemy,
   // Apply Vulnerable/Fortified (NOT consumed - applied via calculateModifiers)
   auto mods = calculateModifiers(targetId, isEnemy);
   incomingDamage *= mods.damageTakenMultiplier;
+  return result;
+}
+
+void EffectManager::removeEffect(uint32_t entityId, bool isEnemy,
+                                 EffectType type) {
+  auto& map = isEnemy ? enemyEffects : playerEffects;
+  auto it = map.find(entityId);
+  if (it != map.end()) it->second.removeEffect(type);
+}
+
+ActiveEffects& EffectManager::mutableEffects(uint32_t entityId, bool isEnemy) {
+  return isEnemy ? enemyEffects[entityId] : playerEffects[entityId];
+}
+
+void EffectManager::clearEntity(uint32_t entityId, bool isEnemy) {
+  if (isEnemy) {
+    enemyEffects.erase(entityId);
+  } else {
+    playerEffects.erase(entityId);
+  }
 }
 
 // Internal implementation
@@ -297,7 +319,7 @@ void EffectManager::applyEffectInternal(ActiveEffects& activeEffects,
     // New effect
     EffectInstance instance(type, stacks, modifiedDuration, sourceId);
     activeEffects.effects.push_back(instance);
-    Logger::info("✨ Applied new effect " + std::string(def.name) + " with " +
+    Logger::debug("✨ Applied new effect " + std::string(def.name) + " with " +
                  std::to_string(stacks) + " stacks, duration " +
                  std::to_string(modifiedDuration) + "ms");
   }
@@ -306,7 +328,7 @@ void EffectManager::applyEffectInternal(ActiveEffects& activeEffects,
   applySecondaryEffects(activeEffects, type, sourceId, isPlayer);
 }
 
-void EffectManager::updateEntityEffects(uint32_t entityId,
+void EffectManager::updateEntityEffects(uint32_t entityId, bool isEnemy,
                                         ActiveEffects& activeEffects,
                                         float& health, float maxHealth,
                                         float deltaTime, float entityX,
@@ -329,14 +351,19 @@ void EffectManager::updateEntityEffects(uint32_t entityId,
 
     // Apply Wound/Mend DoT/HoT
     if (effect.type == EffectType::Wound || effect.type == EffectType::Mend) {
-      tickWoundMend(effect, deltaTime, health, maxHealth, entityX, entityY);
+      float applied =
+          tickWoundMend(effect, deltaTime, health, maxHealth, entityX, entityY);
+      if (applied > 0.0f && dotCallback) {
+        dotCallback({entityId, isEnemy, effect.type == EffectType::Mend,
+                     applied, entityX, entityY, effect.sourceId});
+      }
     }
   }
 
   // Remove expired effects
   for (EffectType expiredType : expiredEffects) {
     activeEffects.removeEffect(expiredType);
-    Logger::info("⏱️  Effect " +
+    Logger::debug("⏱️  Effect " +
                  std::string(EffectRegistry::getName(expiredType)) +
                  " expired on entity " + std::to_string(entityId));
   }
@@ -427,9 +454,12 @@ void EffectManager::applySecondaryEffects(ActiveEffects& activeEffects,
   }
 }
 
-void EffectManager::tickWoundMend(EffectInstance& instance, float deltaTime,
-                                  float& health, float maxHealth, float entityX,
-                                  float entityY) {
+float EffectManager::tickWoundMend(EffectInstance& instance, float deltaTime,
+                                   float& health, float maxHealth,
+                                   float entityX, float entityY) {
+  (void)entityX;
+  (void)entityY;
+  float applied = 0.0f;
   constexpr float TICK_INTERVAL = 1000.0f;  // 1 second per tick
 
   instance.lastTickTime += deltaTime;
@@ -442,17 +472,18 @@ void EffectManager::tickWoundMend(EffectInstance& instance, float deltaTime,
     float totalValue = valuePerStack * instance.stacks;
 
     if (instance.type == EffectType::Wound) {
+      applied = std::min(health, totalValue);
       health -= totalValue;
       health = std::max(0.0f, health);
-      Logger::info("💉 Wound ticked for " + std::to_string(totalValue) +
+      Logger::debug("💉 Wound ticked for " + std::to_string(totalValue) +
                    " damage");
     } else {  // Mend
+      applied = std::min(maxHealth - health, totalValue);
       health += totalValue;
       health = std::min(maxHealth, health);
-      Logger::info("💚 Mend ticked for " + std::to_string(totalValue) +
+      Logger::debug("💚 Mend ticked for " + std::to_string(totalValue) +
                    " healing");
-      // Note: Healing events are published client-side when health increase is
-      // detected
     }
   }
+  return applied;
 }

@@ -4,14 +4,13 @@
 
 #include "Animatable.h"
 #include "AnimationController.h"
+#include "ArenaData.h"
 
+// Attack = winding up a telegraphed attack.
 enum class EnemyState : uint8_t { Idle = 0, Chase = 1, Attack = 2, Dead = 3 };
 
-enum class EnemyType : uint8_t {
-  Slime = 0,    // POC: Only implement this one
-  Goblin = 1,   // Future
-  Skeleton = 2  // Future
-};
+// The twelve alien kinds (4 genera x 3 tiers) plus the boss.
+using EnemyType = Arena::EnemyKind;
 
 struct Enemy : public Animatable {
   uint32_t id;       // Unique enemy ID
@@ -37,6 +36,24 @@ struct Enemy : public Animatable {
   // LittleJohn: guardian starts passive (won't chase) until player enters zone
   bool passive = false;
 
+  // --- Arena combat state -------------------------------------------------
+  float radius = 12.0f;
+  float windupMs = 0.0f;       // remaining telegraph time (state == Attack)
+  float windupTotalMs = 0.0f;
+  float cooldownMs = 0.0f;     // until the next attack may start
+  float aimX = 0.0f, aimY = 0.0f;  // where the attack was aimed
+  float knockVx = 0.0f, knockVy = 0.0f, knockMs = 0.0f;
+  float deadMs = 0.0f;         // time since death (removed after a delay)
+  bool targetShip = false;     // marches on the ship instead of players
+  bool elite = false;
+  bool campGuard = false;      // stays near its camp until provoked
+  float homeX = 0.0f, homeY = 0.0f;
+  uint32_t lastHitBy = 0;      // player who last damaged it
+  int bossMove = 0;            // boss attack rotation
+  float bossTimerMs = 0.0f;
+  uint8_t netFlags = 0;        // EnemyFlags, mirrored to clients
+  bool heldLow = false;        // grappled at chest height (set by a kit)
+
   // Respawn tracking
   uint32_t spawnIndex;  // Which spawn point this enemy came from
   float deathTime;      // Timestamp when enemy died (milliseconds)
@@ -58,7 +75,7 @@ struct Enemy : public Animatable {
   // Constructor with defaults for Slime enemy type
   Enemy()
       : id(0),
-        type(EnemyType::Slime),
+        type(EnemyType::Toxlith),
         state(EnemyState::Idle),
         x(0.0f),
         y(0.0f),
