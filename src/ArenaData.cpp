@@ -229,8 +229,8 @@ static const KitInfo KITS[] = {
           600.0f, AbilityMode::Tap, 0.0f},
          {"Pesado",
           "Hold: charge forward shoulder-first, scattering enemies and grabbing "
-          "the first one. Holding a foe: Bomba - leap and slam them into the "
-          "ground. Charge for distance and size.",
+          "the first one. Holding a foe: Bomba - a leaping sit-out powerbomb "
+          "that drives them into the ground. Charge for distance and size.",
           6500.0f, AbilityMode::Charge, 1000.0f},
          {"Grande Cajones",
           "Flex. Enemies in front lose their buffs and become Vulnerable; you "

@@ -56,9 +56,16 @@ class ArenaView {
 
   // Baked, fully animated sheets from tools/sprite_forge. When a character
   // or enemy has one it replaces the placeholder sprite.
+  // Where a carried thing sits in one frame: pixels from the feet, its
+  // roll, and whether it is in front of the carrier (see sprite_forge).
+  struct ActorSocket {
+    float x = 0.0f, y = 0.0f, rollDeg = 0.0f;
+    bool front = true;
+  };
   struct ActorAnim {
     int start = 0, frames = 1, fps = 10;
     bool loop = true;
+    std::vector<ActorSocket> sockets;  // direction * frames + frame, or empty
   };
   struct ActorSheet {
     Texture* texture = nullptr;
@@ -81,6 +88,19 @@ class ArenaView {
   };
   std::unordered_map<uint32_t, AnimState> playerAnim;
   std::unordered_map<uint32_t, AnimState> enemyAnim;
+  // Where each carrier's hands were last drawn, so a grappled foe can be
+  // pinned to them (and drawn in front of or behind the carrier).
+  struct CarryPoint {
+    float worldX = 0.0f, worldY = 0.0f;
+    float screenX = 0.0f, screenY = 0.0f;
+    float rollDeg = 0.0f;
+    bool front = true, faceLeft = false;
+    float seenAt = -1.0f;
+  };
+  std::unordered_map<uint32_t, CarryPoint> carryPoints;
+  const CarryPoint* carrierNear(float x, float y) const;
+  static int actorFrameIndex(const ActorAnim& anim, float elapsed, bool hold,
+                             int forcedFrame);
   void drawActorFrame(ImDrawList* dl, const ActorSheet& sheet,
                       const ActorAnim& anim, int direction, float elapsed,
                       ImVec2 feet, float scale, unsigned int tint, bool hold = true,

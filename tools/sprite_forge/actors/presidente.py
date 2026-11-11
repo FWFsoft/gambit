@@ -16,7 +16,10 @@ import math
 from forge import Clip, Key, Model
 
 NAME = "Presidente"
-CELL = (144, 168, 146)
+CELL = (144, 196, 174)
+# The game pins a grappled foe to the midpoint of his hands.
+SOCKET = ("wrist_L", "wrist_R")
+LEAP_HEIGHT = 1.15   # root lift at the top of a leap (was 0.72)
 
 SKIN = (200, 112, 56)
 MASK = (44, 78, 186)
@@ -167,6 +170,7 @@ def build():
 def stance(sway=0.0):
     """Wide wrestler's stance, arms out, ready to grab."""
     return {
+        "carry": (0, 0, 0),   # roll of a held foe: 0 upright, 90 lying across
         "hips": (0, 0, 0),
         "chest": (6 + sway, 0, 0),
         "neck": (-4, 0, 0),
@@ -187,6 +191,7 @@ def overhead(sway=0.0):
         "shoulder_L": (-168, -14, 0), "elbow_L": (-24, 0, 0),
         "shoulder_R": (-168, 14, 0), "elbow_R": (-24, 0, 0),
         "cape": (10, 0, 0),
+        "carry": (90, 0, 0),
     })
     return p
 
@@ -217,9 +222,10 @@ def run_pose(phase, holding=False):
     return p
 
 
-def leap_keys(frames, holding):
+def leap_keys(frames, holding, land_t=0.83):
     """Crouch, launch, hang, crash down. Height comes from root offset;
-    the server moves him across the ground."""
+    the server moves him across the ground. `land_t` is when he touches
+    down (the server's leap time divided by the clip's length)."""
     up = overhead() if holding else with_(
         stance(), shoulder_L=(-160, -40, 0), elbow_L=(-20, 0, 0),
         shoulder_R=(-160, 40, 0), elbow_R=(-20, 0, 0))
@@ -240,18 +246,74 @@ def leap_keys(frames, holding):
             with_(stance(), chest=(46, 0, 0), shoulder_L=(-80, -10, 0),
                   shoulder_R=(-80, 10, 0), elbow_L=(-10, 0, 0),
                   elbow_R=(-10, 0, 0), hip_L=(-60, -12, 0), knee_L=(100, 0, 0),
-                  hip_R=(-60, 12, 0), knee_R=(100, 0, 0)))
+                  hip_R=(-60, 12, 0), knee_R=(100, 0, 0), carry=(150, 0, 0)))
+    t0 = 0.14
     keys = [Key(0.0, stance() if not holding else overhead(), (0, 0, 0)),
-            Key(0.12, crouch, (0, 0, -0.14), ease="out")]
+            Key(t0, crouch, (0, 0, -0.16), ease="out")]
     # Parabolic hop sampled densely so the arc is smooth.
-    for i in range(1, 7):
-        u = i / 7
-        t = 0.12 + u * 0.66
-        height = 0.72 * 4 * u * (1 - u)
-        keys.append(Key(t, tuck, (0, -0.05 * u, height), ease="linear"))
-    keys.append(Key(0.82, land, (0, -0.06, -0.16), ease="in"))
+    span = land_t - 0.02 - t0
+    for i in range(1, 8):
+        u = i / 8
+        height = LEAP_HEIGHT * 4 * u * (1 - u)
+        keys.append(Key(t0 + u * span, tuck, (0, -0.06 * u, height),
+                        ease="linear"))
+    keys.append(Key(land_t, land, (0, -0.06, -0.16), ease="in"))
     keys.append(Key(1.0, land if not holding else overhead(),
                     (0, -0.06, -0.12 if not holding else 0.0)))
+    return keys
+
+
+def sitout_keys(land_t):
+    """Bomba: a leaping sit-out powerbomb. He jumps with the foe overhead,
+    swings them down in front of him on the way down and sits out, driving
+    them back-first into the ground between his legs."""
+    up = overhead()
+    crouch = with_(up, chest=(24, 0, 0),
+                   hip_L=(-50, -10, 0), knee_L=(90, 0, 0), ankle_L=(-30, 0, 0),
+                   hip_R=(-50, 10, 0), knee_R=(90, 0, 0), ankle_R=(-30, 0, 0))
+    # Rising: foe hoisted high, body arched back, knees tucked.
+    hoist = with_(up, chest=(-16, 0, 0), neck=(-20, 0, 0), cape=(34, 0, 0),
+                  cape_low=(20, 0, 0), shoulder_L=(-176, -10, 0),
+                  shoulder_R=(-176, 10, 0), elbow_L=(-6, 0, 0),
+                  elbow_R=(-6, 0, 0), hip_L=(-50, -14, 0), knee_L=(80, 0, 0),
+                  hip_R=(-30, 14, 0), knee_R=(70, 0, 0), carry=(120, 0, 0))
+    # Falling: arms whip the foe forward, legs kick out ahead for the sit.
+    drive = with_(up, chest=(14, 0, 0), neck=(4, 0, 0), cape=(50, 0, 0),
+                  cape_low=(30, 0, 0), shoulder_L=(-110, -8, 0),
+                  shoulder_R=(-110, 8, 0), elbow_L=(-14, 0, 0),
+                  elbow_R=(-14, 0, 0), hip_L=(-80, -18, 0), knee_L=(30, 0, 0),
+                  hip_R=(-80, 18, 0), knee_R=(30, 0, 0), ankle_L=(-10, 0, 0),
+                  ankle_R=(-10, 0, 0), carry=(160, 0, 0))
+    # The sit-out: seated, legs straight out in a V, foe pinned in front.
+    sit = with_(stance(), chest=(34, 0, 0), neck=(16, 0, 0), cape=(-20, 0, 0),
+                cape_low=(-30, 0, 0), shoulder_L=(-58, -12, 0),
+                shoulder_R=(-58, 12, 0), elbow_L=(-8, 0, 0),
+                elbow_R=(-8, 0, 0), hip_L=(-90, -22, 0), knee_L=(4, 0, 0),
+                ankle_L=(20, 0, 0), hip_R=(-90, 22, 0), knee_R=(4, 0, 0),
+                ankle_R=(20, 0, 0), carry=(180, 0, 0))
+    sit_low = -0.78   # hips 1.02 -> ~0.24: seat on the floor
+    t0 = 0.12
+    apex = t0 + (land_t - t0) * 0.45
+    keys = [Key(0.0, up, (0, 0, 0)),
+            Key(t0, crouch, (0, 0, -0.16), ease="out")]
+    for i in range(1, 9):
+        u = i / 9
+        t = t0 + u * (land_t - 0.03 - t0)
+        height = LEAP_HEIGHT * 1.1 * 4 * u * (1 - u)
+        pose = hoist if t <= apex else drive
+        # Fall toward the seat, not the standing height.
+        if u > 0.5:
+            height += sit_low * ((u - 0.5) / 0.5) ** 2
+        keys.append(Key(t, pose, (0, -0.06 * u, height), ease="linear"))
+    keys.append(Key(land_t, sit, (0, 0.06, sit_low), ease="in"))
+    keys.append(Key(land_t + 0.05, with_(sit, chest=(40, 0, 0)),
+                    (0, 0.06, sit_low + 0.04), ease="out"))
+    keys.append(Key(0.9, sit, (0, 0.06, sit_low)))
+    keys.append(Key(1.0, with_(stance(), chest=(30, 0, 0),
+                               hip_L=(-70, -10, 0), knee_L=(110, 0, 0),
+                               hip_R=(-70, 10, 0), knee_R=(110, 0, 0),
+                               ankle_L=(-30, 0, 0), ankle_R=(-30, 0, 0)),
+                    (0, 0.02, -0.22), ease="out"))
     return keys
 
 
@@ -283,7 +345,8 @@ def clips():
         whirl.append(Key(0.12 + i * 0.16, with_(
             s, chest=(-6, 0, 0), shoulder_L=(-90, -60, 0), elbow_L=(-10, 0, 0),
             shoulder_R=(-90, 60, 0), elbow_R=(-10, 0, 0), cape=(30, 0, 0),
-            cape_low=(18, 0, 0)), (0, 0, 0), (0, 0, angle), ease="linear"))
+            cape_low=(18, 0, 0), carry=(90, 0, 0)), (0, 0, 0), (0, 0, angle),
+            ease="linear"))
     whirl.append(Key(0.86, with_(s, chest=(20, 0, 0), shoulder_L=(-100, 0, 0),
                                  shoulder_R=(-100, 0, 0), elbow_L=(0, 0, 0),
                                  elbow_R=(0, 0, 0)),
@@ -334,14 +397,16 @@ def clips():
         Clip("hold_run", 8, 12, True, hold_run),
         Clip("grab", 5, 18, False, [
             Key(0.0, s), Key(0.4, reach, (0, -0.10, -0.04), ease="out"),
-            Key(0.7, clamp, (0, -0.06, -0.02)), Key(1.0, overhead())]),
+            Key(0.7, clamp, (0, -0.06, -0.02)),
+            Key(1.0, overhead())]),
         Clip("latigo", 8, 20, False, whirl),
         Clip("pesado", 6, 18, False, [
             Key(0.0, charge_a, (0, -0.04, -0.04)),
             Key(0.33, charge_b, (0, -0.06, -0.02), ease="linear"),
             Key(0.66, charge_a, (0, -0.06, -0.04), ease="linear"),
             Key(1.0, s, (0, 0, 0))]),
-        Clip("bomba", 9, 18, False, leap_keys(9, True)),
+        # Timings match the server: Bomba lands at 620ms, leaps at 600ms.
+        Clip("bomba", 16, 18, False, sitout_keys(0.62 / (15 / 18))),
         Clip("cajones", 8, 14, False, [
             Key(0.0, s), Key(0.3, flex, (0, 0.02, 0.02), ease="out"),
             Key(0.75, with_(flex, chest=(-20, 0, 0)), (0, 0.02, 0.03)),
@@ -351,8 +416,8 @@ def clips():
             Key(0.3, squeeze, ease="in"), Key(0.42, hug),
             Key(0.55, squeeze, ease="in"), Key(0.67, hug),
             Key(0.8, squeeze, ease="in"), Key(1.0, s)]),
-        Clip("splash", 10, 18, False, leap_keys(10, False)),
-        Clip("rana_bomba", 10, 18, False, leap_keys(10, True)),
+        Clip("splash", 14, 18, False, leap_keys(14, False, 0.60 / (13 / 18))),
+        Clip("rana_bomba", 14, 18, False, leap_keys(14, True, 0.60 / (13 / 18))),
         Clip("hit", 4, 16, False, [
             Key(0.0, s), Key(0.3, hurt, (0, 0.06, -0.02), ease="out"),
             Key(1.0, s)]),

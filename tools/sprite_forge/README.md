@@ -63,3 +63,15 @@ in `src/ArenaView.cpp` (Wade: `jab` / `cross` on LMB, `uppercut_R` /
 `make_ramp()` (shadow and highlight hue shifts), `OUTLINE_RGB`,
 `DEPTH_EDGE` (how readily internal lines are drawn). Change one, rebake,
 and the whole cast changes together.
+
+## Carry sockets
+
+An actor can set `SOCKET = ("wrist_L", "wrist_R")`. The forge then writes a
+`socket <Actor> <clip> x,y,roll,front ...` line per clip: for every
+direction and frame, where the midpoint of those joints is (pixels from the
+feet pivot), the roll of whatever is being carried (the `carry` pseudo-joint's
+x rotation in the pose, in degrees: 0 upright, 90 lying across the hands,
+180 head-down) and whether it is in front of the body. The game pins a
+grappled foe to that point, so El Presidente's held foe follows his hands
+through leaps, the Látigo whirl and the sit-out powerbomb with no extra code
+per move.

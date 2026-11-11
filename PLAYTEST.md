@@ -72,7 +72,7 @@ as concept-only.
 | Mina | Striker | Exploding bomb balls, a charged lob, an artillery barrage |
 | Volgore | Defender | Drags enemies in, snares and dooms them, goes Berserk to become a wall |
 | Wade | Striker | Fast punches, held uppercuts, Slip to counter-punch, Roll |
-| El Presidente | Playmaker | Grappler: grab a foe and carry it overhead, then every button changes: Látigo spin-throw, Bomba leaping slam, Abrazo bear hug, Grande Rana Bomba belly splash |
+| El Presidente | Playmaker | Grappler: grab a foe and carry it overhead, then every button changes: Látigo spin-throw, Bomba leaping sit-out powerbomb, Abrazo bear hug, Grande Rana Bomba belly splash |
 
 Every hit goes through the effects system from the spec (Guard, Wound,
 Stunned, Berserk, Vulnerable, and so on), and the 16 infusion effects plus

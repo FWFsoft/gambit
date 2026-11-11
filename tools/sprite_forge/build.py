@@ -51,7 +51,8 @@ def main():
         w, h, feet = getattr(mod, "CELL", (128, 112, 98))
         name = mod.__name__.capitalize()
         name = getattr(mod, "NAME", name)
-        spec = forge.ActorSpec(name, mod.build, mod.clips(), w, h, feet)
+        spec = forge.ActorSpec(name, mod.build, mod.clips(), w, h, feet,
+                               getattr(mod, "SOCKET", None))
         rel = f"assets/sprites/actors/{name}.png"
         start = time.time()
         print(f"{name}:")

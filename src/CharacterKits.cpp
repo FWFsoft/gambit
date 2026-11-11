@@ -834,8 +834,9 @@ class WadeKit : public Kit {
 class PresidenteKit : public Kit {
  public:
   static constexpr float HOLD_MS = 3800.0f;
-  static constexpr float LEAP_MS = 520.0f;
-  static constexpr float BOMBA_MS = 480.0f;
+  static constexpr float LEAP_MS = 600.0f;   // matches the forge clips
+  static constexpr float BOMBA_MS = 620.0f;
+  static constexpr float SITOUT_MS = 260.0f;  // seated after the powerbomb
 
   static Enemy* held(AbilitySystem& sys, Player& self) {
     if (self.kitTarget == 0) return nullptr;
@@ -973,20 +974,27 @@ class PresidenteKit : public Kit {
       }
     } else if (slot == 1) {
       if (foe) {
-        // Bomba: leap and pile-drive the foe into the ground.
-        float range = 120.0f + 200.0f * ctx.charge;
+        // Bomba: a leaping sit-out powerbomb. He comes down seated with
+        // the foe driven into the ground just in front of him.
+        float range = 170.0f + 250.0f * ctx.charge;
         float x = self.x + ctx.dirX * range, y = self.y + ctx.dirY * range;
         sys.clampToWorld(x, y);
         float radius = 90.0f + 70.0f * ctx.charge;
         float damage = 40.0f + 40.0f * ctx.charge;
+        float fx = ctx.dirX, fy = ctx.dirY;
         sys.fxTelegraphCircle(x, y, radius, BOMBA_MS, VfxTheme::Holy);
-        leap(sys, self, x, y, BOMBA_MS, [&sys, radius, damage](Player& p) {
+        self.kitTimer[0] = std::max(self.kitTimer[0], BOMBA_MS + 200.0f);
+        leap(sys, self, x, y, BOMBA_MS,
+             [&sys, radius, damage, fx, fy](Player& p) {
           AbilitySystem& s2 = sys;
           slam(s2, p, radius, damage, 1000.0f, VfxTheme::Holy);
+          // Sit out for a beat before getting up.
+          p.forcedVx = p.forcedVy = 0.0f;
+          p.forcedMs = SITOUT_MS;
           if (Enemy* victim = held(s2, p)) {
             uint32_t vid = victim->id;
-            victim->x = p.x + 6.0f;
-            victim->y = p.y + 4.0f;
+            victim->x = p.x + fx * 30.0f;
+            victim->y = p.y + fy * 30.0f;
             release(s2, p);
             if (Enemy* v = s2.findEnemy(vid)) {
               s2.damageEnemy(p.id, *v, damage * 1.5f, DamageFlag::Explosion);
@@ -1077,11 +1085,11 @@ class PresidenteKit : public Kit {
     } else if (slot == 3) {
       // El Splash de Rana / Grande Rana Bomba: leap to the cursor.
       float x, y;
-      aimPoint(ctx, 360.0f, x, y);
+      aimPoint(ctx, 460.0f, x, y);
       bool carrying = foe != nullptr;
       float radius = carrying ? 150.0f : 110.0f;
       sys.fxTelegraphCircle(x, y, radius, LEAP_MS, VfxTheme::Holy);
-      if (carrying) self.kitTimer[0] = std::max(self.kitTimer[0], LEAP_MS + 200);
+      if (carrying) self.kitTimer[0] = std::max(self.kitTimer[0], LEAP_MS + 200.0f);
       leap(sys, self, x, y, LEAP_MS, [&sys, carrying, radius](Player& p) {
         slam(sys, p, radius, carrying ? 45.0f : 30.0f, carrying ? 900.0f : 600.0f,
              carrying ? VfxTheme::Fire : VfxTheme::Holy);

@@ -188,7 +188,26 @@ void ArenaView::loadManifest() {
       int loop = 1;
       in >> clip >> anim.start >> anim.frames >> anim.fps >> loop;
       anim.loop = loop != 0;
+      auto old = actorSheets[name].anims.find(clip);
+      if (old != actorSheets[name].anims.end()) {
+        anim.sockets = std::move(old->second.sockets);
+      }
       actorSheets[name].anims[clip] = anim;
+    } else if (kind == "socket") {
+      // socket <actor> <clip> x,y,roll,front ... (one per direction x frame)
+      std::string clip, entry;
+      in >> clip;
+      std::vector<ActorSocket>& sockets = actorSheets[name].anims[clip].sockets;
+      sockets.clear();
+      while (in >> entry) {
+        ActorSocket socket;
+        int front = 1;
+        if (std::sscanf(entry.c_str(), "%f,%f,%f,%d", &socket.x, &socket.y,
+                        &socket.rollDeg, &front) == 4) {
+          socket.front = front != 0;
+          sockets.push_back(socket);
+        }
+      }
     }
   }
   for (auto it = actorSheets.begin(); it != actorSheets.end();) {
@@ -222,11 +241,8 @@ const ArenaView::ActorSheet* ArenaView::actorFor(const std::string& name) const 
   return it == actorSheets.end() ? nullptr : &it->second;
 }
 
-void ArenaView::drawActorFrame(ImDrawList* dl, const ActorSheet& sheet,
-                               const ActorAnim& anim, int direction,
-                               float elapsed, ImVec2 feet, float scale,
-                               ImU32 tint, bool hold, int forcedFrame,
-                               float rotation) {
+int ArenaView::actorFrameIndex(const ActorAnim& anim, float elapsed, bool hold,
+                               int forcedFrame) {
   int frame = forcedFrame >= 0 ? forcedFrame
                                : static_cast<int>(elapsed * anim.fps);
   if (anim.loop && !hold) {
@@ -236,6 +252,30 @@ void ArenaView::drawActorFrame(ImDrawList* dl, const ActorSheet& sheet,
   } else {
     frame = std::max(0, std::min(anim.frames - 1, frame));
   }
+  return frame;
+}
+
+const ArenaView::CarryPoint* ArenaView::carrierNear(float x, float y) const {
+  const CarryPoint* best = nullptr;
+  float bestDist = 70.0f * 70.0f;
+  for (const auto& [id, point] : carryPoints) {
+    if (timeSeconds - point.seenAt > 0.25f) continue;
+    float dx = point.worldX - x, dy = point.worldY - y;
+    float d = dx * dx + dy * dy;
+    if (d < bestDist) {
+      bestDist = d;
+      best = &point;
+    }
+  }
+  return best;
+}
+
+void ArenaView::drawActorFrame(ImDrawList* dl, const ActorSheet& sheet,
+                               const ActorAnim& anim, int direction,
+                               float elapsed, ImVec2 feet, float scale,
+                               ImU32 tint, bool hold, int forcedFrame,
+                               float rotation) {
+  int frame = actorFrameIndex(anim, elapsed, hold, forcedFrame);
   int cell = anim.start + direction * anim.frames + frame;
   int col = cell % sheet.columns;
   int row = cell / sheet.columns;
@@ -717,9 +757,25 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
       elapsed = view.animTime;
     }
     if (clip) {
-      drawActorFrame(dl, *actor, *clip, anim.direction, elapsed,
-                     ImVec2(feet.x, feet.y + (dead ? 0.0f : 0.0f)), 1.0f,
+      drawActorFrame(dl, *actor, *clip, anim.direction, elapsed, feet, 1.0f,
                      tint);
+      // Carriers (Presidente) publish where their hands are this frame.
+      if (!clip->sockets.empty() && state.resource >= 200 && !dead) {
+        int frame = actorFrameIndex(*clip, elapsed, true, -1);
+        size_t index = static_cast<size_t>(anim.direction * clip->frames + frame);
+        if (index < clip->sockets.size()) {
+          const ActorSocket& socket = clip->sockets[index];
+          CarryPoint& point = carryPoints[state.playerId];
+          point.worldX = worldX;
+          point.worldY = worldY;
+          point.screenX = feet.x + socket.x;
+          point.screenY = feet.y + socket.y;
+          point.rollDeg = socket.rollDeg;
+          point.front = socket.front;
+          point.faceLeft = anim.direction >= 5;
+          point.seenAt = timeSeconds;
+        }
+      }
     }
   } else if (sprite && sprite->texture) {
     int frame = 0;
@@ -822,10 +878,29 @@ void ArenaView::drawEnemy(ImDrawList* dl, const ArenaClient::EnemyView& view) {
 
   ImVec2 at(feet.x + offsetX, feet.y + offsetY);
   const ActorSheet* actor = boss ? nullptr : actorFor(def.name);
-  // Grappled: held overhead by El Presidente, lying across his hands.
+  // Grappled: in El Presidente's hands. Pinned to the carry socket his
+  // animation exports, so the foe rises with his leaps, whirls with the
+  // Látigo and is driven down by the powerbomb.
   bool lifted = (view.state.flags & EnemyFlags::Grappled) != 0;
   float liftRotation = 0.0f;
-  if (lifted && (view.state.flags & EnemyFlags::HeldLow) != 0) {
+  const CarryPoint* carrier = lifted ? carrierNear(view.x, view.y) : nullptr;
+  if (carrier) {
+    // Rolls are authored for an upright body (90 = lying across his hands).
+    // The aliens are long, low creatures, so a quarter turn more puts them
+    // on their backs, legs up.
+    liftRotation = (carrier->rollDeg + 90.0f) * (PI / 180.0f) *
+                   (carrier->faceLeft ? -1.0f : 1.0f);
+    // Put the foe's middle on his hands. Sprites rotate about the bottom
+    // of their cell, which sits `drop` pixels below their feet.
+    float drop = actor ? (actor->cellH - actor->pivotY) * scale : 0.0f;
+    float half = actor ? actor->pivotY * 0.3f * scale
+                       : (sprite ? sprite->cellH * 0.3f * scale : 16.0f);
+    float reach = drop + half;
+    ImVec2 base(carrier->screenX - reach * std::sin(liftRotation),
+                carrier->screenY + reach * std::cos(liftRotation));
+    feet = ImVec2(base.x, base.y - drop);
+    at = ImVec2(feet.x + offsetX, feet.y + offsetY);
+  } else if (lifted && (view.state.flags & EnemyFlags::HeldLow) != 0) {
     // Crushed against his chest in the bear hug.
     at.y -= 34.0f;
     feet.y -= 34.0f;
@@ -918,8 +993,13 @@ void ArenaView::drawEntities(ImDrawList* dl) {
     items.push_back({y, 0, &view, id, x, y});
   }
   for (const auto& [id, view] : arena->enemies()) {
-    // Grappled foes are up in their captor's arms: draw them over him.
-    float depth = (view.state.flags & EnemyFlags::Grappled) ? view.y + 80.0f
+    // Grappled foes are in their captor's arms: draw them just in front of
+    // or behind him, as his animation says.
+    const CarryPoint* carrier = (view.state.flags & EnemyFlags::Grappled)
+                                    ? carrierNear(view.x, view.y)
+                                    : nullptr;
+    float depth = carrier ? carrier->worldY + (carrier->front ? 0.5f : -0.5f)
+                  : (view.state.flags & EnemyFlags::Grappled) ? view.y + 80.0f
                                                              : view.y;
     items.push_back({depth, 1, &view, id, view.x, view.y});
   }

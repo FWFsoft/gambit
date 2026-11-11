@@ -490,10 +490,33 @@ class ActorSpec:
     cell_w: int = 128
     cell_h: int = 112
     pivot_y: int = 98     # feet line in the cell
+    # Optional carry socket: (joint_a, joint_b). Their midpoint is exported
+    # per frame so the game can pin a carried thing (a grappled foe) to the
+    # hands. A pseudo-joint "carry" in the pose sets the carried thing's
+    # roll in degrees (its rx).
+    socket: Optional[Tuple[str, str]] = None
 
 
 SHEET_COLUMNS = 16   # minimum cells per sheet row
 MAX_SHEET = 8192     # px; safe texture size on desktop GPUs and WebGL2
+
+
+def _socket_sample(model, renderer, spec, pose):
+    from bpy_extras.object_utils import world_to_camera_view
+    sc = bpy.context.scene
+    a = model.joints[spec.socket[0]].matrix_world.translation
+    b = model.joints[spec.socket[1]].matrix_world.translation
+    mid = (a + b) * 0.5
+    body = model.joints["chest"].matrix_world.translation if "chest" in \
+        model.joints else model.root.matrix_world.translation
+    cam = renderer.camera
+    p = world_to_camera_view(sc, cam, mid)
+    q = world_to_camera_view(sc, cam, body)
+    x = p.x * spec.cell_w - spec.cell_w / 2.0
+    y = (1.0 - p.y) * spec.cell_h - spec.pivot_y
+    roll = pose.get("carry", (0, 0, 0))[0]
+    front = 1 if p.z < q.z - 0.02 else 0
+    return f"{x:.0f},{y:.0f},{roll:.0f},{front}"
 
 
 def render_actor(spec: ActorSpec, out_png: str, rel_png: str, log=print):
@@ -519,6 +542,7 @@ def render_actor(spec: ActorSpec, out_png: str, rel_png: str, log=print):
     lines = [f"actor {spec.name} {rel_png} {spec.cell_w} {spec.cell_h} "
              f"{spec.cell_w // 2} {spec.pivot_y} {cols}"]
     cell = 0
+    sockets = []
     for clip in spec.clips:
         start = cell
         for di, _ in enumerate(DIRECTIONS):
@@ -528,11 +552,18 @@ def render_actor(spec: ActorSpec, out_png: str, rel_png: str, log=print):
                 pose, offset, rot = sample(clip, f / denom, base)
                 model.pose(pose, offset, rot, yaw)
                 img = renderer.frame(model)
+                if spec.socket:
+                    sockets.append(_socket_sample(model, renderer, spec, pose))
                 sheet.alpha_composite(img, ((cell % cols) * spec.cell_w,
                                             (cell // cols) * spec.cell_h))
                 cell += 1
         lines.append(f"anim {spec.name} {clip.name} {start} {clip.frames} "
                      f"{clip.fps} {1 if clip.loop else 0}")
+        if spec.socket:
+            # x,y: pixels from the feet pivot; r: roll (deg); f: 1 = the
+            # socket is nearer the camera than his body (draw the foe over him)
+            lines.append(f"socket {spec.name} {clip.name} " +
+                         " ".join(sockets[start:cell]))
         log(f"  {spec.name}.{clip.name}: {clip.frames} frames x 8 directions")
     sheet.save(out_png)
     return lines
