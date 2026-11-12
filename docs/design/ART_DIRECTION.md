@@ -8,6 +8,57 @@ the wrong one because you didn't know what you were looking at.
 
 ![Silhouettes before and after the shape pass](../prototype/silhouettes_before_after.png)
 
+## The look: inked heroes on a dark world
+
+The splash art is the promise: comic-book inking (heavy black shadow
+shapes, hard edges, hatching), hot saturated colour, neon accents, on
+black. The game keeps that promise with three layers, each with one job.
+
+![Style frame: today, and the target](../prototype/styleframe_target.png)
+
+*A mock-up composited in Python from the game's real sprites
+(`tools/sprite_forge/styleframe.py`), not the engine. A is the game today.
+B is the same sprites with the presentation layer. C swaps in Wade from
+his AI-drawn turnaround.*
+
+| Layer | Job | Rules |
+| --- | --- | --- |
+| **World** | stay out of the way | Dark, cool and low in contrast: floor values in the bottom fifth of the range, slate blue-violet, detail in seams and cracks, not in texture. Genus colour arrives as light and glow (toxic green leaking from Venoxarid ground), never as bright floor tiles. |
+| **Characters** | carry identity | The brightest, most saturated things on screen. Warm key light, cool shadows, shadow cores filled with solid ink ("spot blacks"), a thick ink contour, a rim light in the character's signature colour. |
+| **Effects** | carry the action | Additive light with bloom. Every hit, cast and telegraph glows against the dark floor and lights the ground around it. Animation and effects sell the feel more than character detail does: characters are about 100 px tall. |
+
+Value is what makes it read: dark world, mid-to-bright characters, effects
+brighter than both. If a floor tile is brighter than a hero's shadow side,
+it is wrong. This serves **Clarity** before anything else: at a glance you
+see who is where and what is about to hurt you.
+
+**Built so far:** the character layer's shading (the forge's `ink`
+style). **Not built:** the world and effects layers in the engine (dark
+floor, light pools, cast shadows, bloom, colour grade). The style frame
+and its script are the reference for that work.
+
+### Where the drawing comes from
+
+Code cannot draw. A body built from blobs and tubes in Python comes out as
+a clay figure whatever the shading, and after many passes it still did not
+match the splash art. So:
+
+- **The design comes from the concept art.** Each character's splash and
+  turnaround go through an image-to-3D tool to make a textured model
+  (`art/models/<Name>.glb`, see `art/models/README.md`). Its shape and
+  texture carry the face, the muscle, the costume and the line work.
+- **Code does motion, ink, light and consistency.** The forge puts that
+  model on its skeleton, animates it with fighting-game timing, shades
+  every character with the same ink rules and bakes eight directions.
+
+![Forge Wade, forge Wade inked, turnaround Wade](../prototype/styleframe_closeup.png)
+
+*At game size (shown 3x): the code-built Wade, the same with ink blacks,
+and the AI-drawn Wade. The third is the target for the model route.*
+
+The steps are in the `/character-art` skill. This is how Hades was made
+too: 3D models with painted textures, rendered to sprites.
+
 ## Style target
 
 Inspirations: **Street Fighter III: 3rd Strike / Marvel vs Capcom 2**,
@@ -20,30 +71,37 @@ Inspirations: **Street Fighter III: 3rd Strike / Marvel vs Capcom 2**,
 | Risk of Rain 2 | simple, bold forms and clean colour blocks; every survivor has their own body plan and reads from far away |
 | Battlerite | top-down readability: chunky proportions, oversized weapons and heads, clear colour coding |
 
-**No pixel art.** Characters are 3D models rendered in the forge's "toon"
-style (`STYLE = "toon"` in an actor module):
+**No pixel art.** Characters are 3D models rendered by the forge:
 - anti-aliased edges;
-- three flat cel bands;
-- bold ink outlines and creases;
+- a lit tone, a cool shadow tone and solid ink in the shadow cores
+  (`STYLE = "ink"`; the older `toon` style has three soft cel bands and no
+  blacks);
+- bold ink outlines;
 - a rim light in the hero's signature colour (`RIM`).
 
-Models use curved, tapering `tube`s and smooth blobs, not boxes.
+Bodies are generated models (above). The five actors built before that
+decision (Wade, Gravon, Presidente, Suds, Toxlith) are still code-built
+from `tube`s and blobs in the `toon` or pixel style. They are placeholders
+until each gets a model; their poses and clips carry over.
 
 ![Gravon before and after](../prototype/gravon_style_before_after.png)
 
 **Still open:** pre-rendered sprites versus real-time 3D. At full
 resolution a pre-rendered hero costs a lot of texture memory (Gravon's
-sheet is about 200 MB of GPU memory). See `DECISIONS.md`.
+sheet is about 200 MB of GPU memory). Generated models make real-time
+rendering more attractive later, since the mesh, skeleton and clips
+already exist. See `DECISIONS.md`.
 
 ## Proportions and motion: what "feel" is made of
 
 The 3rd Strike / MvC2 feel lives in proportions and movement more than
-in rendering detail. Every hero is built on the **heroic body kit**
-(`tools/sprite_forge/actors/_body.py`):
-- a real spine (hips, abdomen, chest, neck, head),
-- curved muscle,
-- proportion parameters: head, shoulders, waist, forearms, hands, legs,
-  feet.
+in rendering detail. Every hero uses the **heroic skeleton**
+(`tools/sprite_forge/actors/_body.py`, and `skin.HUMANOID` for generated
+models): a real spine (hips, abdomen, chest, neck, head), shoulders,
+elbows, wrists, hips, knees, ankles. For a generated model the
+proportions come from the concept art, so the targets below go into the
+image prompt and the choice of which generation to keep. For the older
+code-built bodies they are `Build` parameters.
 
 Animation follows fighting-game principles. The forge supports each of
 them directly:

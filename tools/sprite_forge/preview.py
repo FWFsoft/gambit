@@ -29,7 +29,7 @@ def main():
     cell = [round(v / k) for v in getattr(mod, "CELL", (128, 112, 98))]
     style = getattr(mod, "STYLE", "pixel")
     r = forge.Renderer(*cell, forge.PIXEL_SIZE * k,
-                       supersample=2 if style == "toon" else 1)
+                       supersample=1 if style == "pixel" else 2)
     clip = next(c for c in mod.clips() if c.name == clip_name)
     frames = frames or list(range(clip.frames))
     scale = max(1, round(3 * k))

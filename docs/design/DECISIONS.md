@@ -21,6 +21,61 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-12: The look: inked heroes on a dark world
+- **Decision:** The in-game look is set as three layers:
+  - **World:** dark, cool, low contrast (floor values in the bottom fifth
+    of the range); genus colour arrives as light and glow, not bright
+    tiles.
+  - **Characters:** the brightest, most saturated things on screen, with
+    solid ink shadows, a thick contour and a signature rim light.
+  - **Effects:** additive light with bloom that lights the ground.
+- **Pillars:** Clarity decided it: value separates floor, fighters and
+  danger at a glance. It trades nothing against the other pillars. One
+  risk for Clarity: a dark floor can hide dark enemies, so enemies need
+  the same rim and ink treatment as heroes.
+- **Why:** The splash art promises comic inking on black with neon
+  accents; the game showed smooth clay figures on a flat brown floor. A
+  mock-up with the game's own sprites showed the presentation layer
+  alone closes much of the gap (`docs/prototype/styleframe_target.png`).
+- **Status:** Proposed. Only the characters' ink shading exists (see the
+  next entry). The world and effects layers are **not built**; the
+  mock-up is Python, not the engine.
+- **Where:** `docs/design/ART_DIRECTION.md` ("The look"),
+  `tools/sprite_forge/styleframe.py`
+
+## 2026-11-12: Character bodies come from generated models; ink style
+- **Decision:**
+  - **Bodies:** a character's body is an image-to-3D model made from its
+    concept art (`art/models/<Name>.glb`). The forge puts it on the
+    existing skeleton, so clips, eight directions and carry sockets are
+    unchanged. Code-built parts remain for props, springy cloth and
+    simple creatures.
+  - **Shading:** a new `ink` style: lit tone, cool shadow tone, solid ink
+    in the shadow cores.
+  - **This reverses** the earlier ruling against image-to-3D tools
+    ("Heroic body kit" entry below). A human reopened and decided it.
+- **Pillars:** Clarity: a character that matches its splash art is
+  recognised at once, and ink blacks hold shapes together at 100 px.
+  Creative Builds is helped indirectly: a 30-character cast is only
+  reachable if a body costs a generation and a fit, not days of code
+  modelling.
+- **Why:** After many passes the code-built bodies still read as clay
+  figures; code cannot draw a face or cloth. At game size the AI-drawn
+  Wade turnaround already matches the splash art
+  (`docs/prototype/styleframe_closeup.png`). Rejected: 2D frames from the
+  image pipeline (every move in eight directions must stay consistent,
+  which has not been tenable) and more shading on code-built bodies (the
+  mock-up shows its ceiling).
+- **Not yet shown:** the route is proven end to end only with a stand-in
+  model exported from the code-built Wade. **No real generated model has
+  been baked**, so the quality claim is untested. No shipped sprite
+  changed; the five existing actors are still code-built.
+- **Status:** Accepted (route chosen by a human); the pipeline is Built,
+  needs review
+- **Where:** `tools/sprite_forge/skin.py`, `fit.py`, `selftest_skin.py`,
+  `forge.py` (`shade_ink`, albedo pass), `actors/_mesh_template.py`,
+  `art/models/README.md`, `.claude/skills/character-art/SKILL.md`
+
 ## 2026-11-12: Wade's boxer guard and likeness restored
 - **Decision:**
   - **Guard:** a boxer's guard, not Ken's stance. Chin tucked behind high,

@@ -69,3 +69,7 @@ test_output/
 vcpkg_installed/
 # Embedded emsdk
 emsdk
+
+# Sprite forge (local Blender venv, cached skin weights)
+tools/sprite_forge/.venv/
+*.weights.npz
