@@ -236,6 +236,7 @@ add_executable(Client
     src/MatchDirector.cpp
     src/ArenaClient.cpp
     src/ArenaView.cpp
+    src/EffectVisuals.cpp
     src/ArenaHud.cpp
 )
 target_include_directories(Client SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
@@ -735,6 +736,7 @@ set(WASM_CLIENT_SOURCES
     src/MatchDirector.cpp
     src/ArenaClient.cpp
     src/ArenaView.cpp
+    src/EffectVisuals.cpp
     src/ArenaHud.cpp
 )
 

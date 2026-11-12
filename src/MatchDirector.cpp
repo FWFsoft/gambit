@@ -640,6 +640,11 @@ void MatchDirector::updateScrapDelivery() {
 void MatchDirector::updateDeathsAndRevives(float dtMs) {
   for (auto& [id, player] : players) {
     if (!isParticipant(player)) continue;
+    // Effect-lab training allies shrug off everything, damage over time too.
+    if (player.trainingDummy) {
+      player.health = player.maxHealth;
+      continue;
+    }
 
     bool dead = player.isDead();
     if (dead && !wasDead[id]) {
@@ -826,6 +831,122 @@ void MatchDirector::onObjectiveCompleted(Player& player, bool deliveredScrap) {
   }
 }
 
+void MatchDirector::runEffectLab(Player& player, EffectLabAction action) {
+  AbilitySystem& sys = *abilities;
+  float ax = player.aimX, ay = player.aimY;
+  // The enemy nearest the cursor that carries `type` (or any, if None).
+  auto pick = [&](EffectType type, bool any) -> Enemy* {
+    Enemy* best = nullptr;
+    float bestDist = 260.0f;
+    for (auto& [id, enemy] : enemies->getEnemies()) {
+      if (enemy.state == EnemyState::Dead) continue;
+      if (!any && !sys.effects().getEnemyEffects(id).hasEffect(type)) continue;
+      float d = dist(ax, ay, enemy.x, enemy.y);
+      if (d < bestDist) {
+        bestDist = d;
+        best = &enemy;
+      }
+    }
+    return best;
+  };
+  auto allies = [&](const std::function<void(Player&)>& fn) {
+    for (auto& [id, other] : players) {
+      if (id == player.id || !isParticipant(other) || other.isDead()) continue;
+      if (dist(player.x, player.y, other.x, other.y) <= 520.0f) fn(other);
+    }
+  };
+
+  switch (action) {
+    case EffectLabAction::SpawnAllies:
+      break;  // handled by ServerGameState, which can add players
+    case EffectLabAction::SpawnCrowd:
+      for (int i = 0; i < 4; i++) {
+        float a = i * PI * 0.5f;
+        spawnPack(ax + std::cos(a) * 70.0f, ay + std::sin(a) * 50.0f, 6, false,
+                  Genus::Venoxarid, true);
+      }
+      break;
+    case EffectLabAction::Poison:
+      if (Enemy* e = pick(EffectType::Poison, true)) {
+        sys.applyFrom(player, *e, EffectType::Poison, 3);
+      }
+      break;
+    case EffectLabAction::AmplifyPoison:
+      if (Enemy* e = pick(EffectType::Poison, false)) {
+        sys.amplifyEffect(e->id, true, EffectType::Poison, 4.0f);
+      }
+      break;
+    case EffectLabAction::SpreadPoison:
+      if (Enemy* e = pick(EffectType::Poison, false)) {
+        sys.spreadEffect(*e, EffectType::Poison, 300.0f, 1.0f);
+      }
+      break;
+    case EffectLabAction::DetonatePoison: {
+      // A cascade: nearest to the cursor first, rippling outward.
+      std::vector<std::pair<float, uint32_t>> order;
+      for (auto& [id, enemy] : enemies->getEnemies()) {
+        if (enemy.state == EnemyState::Dead) continue;
+        if (!sys.effects().getEnemyEffects(id).hasEffect(EffectType::Poison)) {
+          continue;
+        }
+        float d = dist(ax, ay, enemy.x, enemy.y);
+        if (d <= 450.0f) order.push_back({d, id});
+      }
+      std::sort(order.begin(), order.end());
+      uint32_t casterId = player.id;
+      for (size_t i = 0; i < order.size(); i++) {
+        uint32_t id = order[i].second;
+        AbilitySystem* s = &sys;
+        sys.schedule(i * 55.0f, [s, id, casterId]() {
+          if (Enemy* e = s->findEnemy(id)) {
+            if (e->state != EnemyState::Dead) {
+              s->detonateEffect(casterId, *e, EffectType::Poison, 3.0f);
+            }
+          }
+        });
+      }
+      break;
+    }
+    case EffectLabAction::Empower:
+      sys.applyFrom(player, player, EffectType::Empowered, 1);
+      break;
+    case EffectLabAction::AmplifyEmpower:
+      sys.amplifyEffect(player.id, false, EffectType::Empowered, 5.0f);
+      break;
+    case EffectLabAction::SpreadEmpower:
+      sys.spreadEffectToAllies(player, EffectType::Empowered, 520.0f, 1.0f);
+      break;
+    case EffectLabAction::EnrageEnemy:
+      if (Enemy* e = pick(EffectType::Empowered, true)) {
+        e->elite = true;
+        uint32_t id = e->id;
+        sys.applyToEnemy(*e, EffectType::Empowered, 5, id, 15000.0f);
+        if (Enemy* still = sys.findEnemy(id)) {
+          sys.applyToEnemy(*still, EffectType::Fortified, 5, id, 15000.0f);
+        }
+        if (Enemy* still = sys.findEnemy(id)) {
+          sys.applyToEnemy(*still, EffectType::Haste, 3, id, 15000.0f);
+        }
+      }
+      break;
+    case EffectLabAction::Corrupt:
+      if (Enemy* e = pick(EffectType::Empowered, false)) {
+        sys.corruptBuffs(player.id, e->id, true);
+      }
+      break;
+    case EffectLabAction::AfflictAllies:
+      allies([&](Player& ally) {
+        sys.applyToPlayer(ally, EffectType::Poison, 12, 0, 15000.0f);
+        sys.applyToPlayer(ally, EffectType::Weakened, 4, 0, 15000.0f);
+        sys.applyToPlayer(ally, EffectType::Slow, 2, 0, 15000.0f);
+      });
+      break;
+    case EffectLabAction::Purify:
+      allies([&](Player& ally) { sys.purifyDebuffs(player.id, ally.id, false); });
+      break;
+  }
+}
+
 void MatchDirector::damageShip(float amount) {
   if (currentPhase != MatchPhase::Round) return;
   shipHp = std::max(0.0f, shipHp - amount * Tuning::SHIP_DAMAGE_SCALE);
@@ -875,6 +996,9 @@ void MatchDirector::onDebugCommand(Player& player, DebugCommandKind command,
       break;
     case DebugCommandKind::SpawnBoss:
       if (inCombat() && !bossSpawned) spawnBoss();
+      break;
+    case DebugCommandKind::EffectLab:
+      runEffectLab(player, static_cast<EffectLabAction>(arg));
       break;
     case DebugCommandKind::KillAll: {
       std::vector<uint32_t> ids;

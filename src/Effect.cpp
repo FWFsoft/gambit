@@ -275,6 +275,13 @@ const EffectDefinition EffectRegistry::definitions[EFFECT_TYPE_COUNT] = {
                   Config::Effects::RESONANCE_INTENSITY,
                   Config::Effects::RESONANCE_MAX_STACKS, EffectType::Resonance,
                   false),
+
+    // Damage over time, continued (29). Mend cleanses it, one way: Mend's
+    // own opposite stays Wound.
+    DEFINE_EFFECT(EffectType::Poison, "Poison", EffectCategory::Debuff,
+                  StackBehavior::Stacks, Config::Effects::POISON_DURATION,
+                  Config::Effects::POISON_INTENSITY,
+                  Config::Effects::POISON_MAX_STACKS, EffectType::Mend, true),
 };
 
 #undef DEFINE_EFFECT

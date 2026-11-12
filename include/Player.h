@@ -70,6 +70,8 @@ struct Player : public Animatable {
   int kitCounter[4] = {0, 0, 0, 0};
   uint32_t kitTarget = 0;
   bool godMode = false;
+  // Effect-lab training ally: takes effects but never takes damage.
+  bool trainingDummy = false;
 
   // Downed / revive
   float reviveProgress = 0.0f;

@@ -77,6 +77,7 @@ void ArenaView::renderHud() {
   drawScoreboard(ImGui::IsKeyDown(ImGuiKey_Tab));
   drawAbilityBar();
   drawPrompts();
+  drawEffectLabPanel();
   drawBanners();
 
   if (phase == MatchPhase::Lobby) drawLobby();
@@ -134,6 +135,61 @@ void ArenaView::handleHotkeys() {
   if (ImGui::IsKeyPressed(ImGuiKey_F11, false)) {
     debug(DebugCommandKind::SpawnWave,
           static_cast<uint8_t>(Arena::Genus::Venoxarid));
+  }
+
+  // Effect lab (F12): number keys drive each effect verb near the cursor.
+  if (ImGui::IsKeyPressed(ImGuiKey_F12, false)) {
+    effectLab = !effectLab;
+    if (effectLab) {
+      debug(DebugCommandKind::EffectLab,
+            static_cast<uint8_t>(EffectLabAction::SpawnAllies));
+    }
+  }
+  if (effectLab) {
+    static const std::pair<ImGuiKey, EffectLabAction> LAB_KEYS[] = {
+        {ImGuiKey_1, EffectLabAction::SpawnCrowd},
+        {ImGuiKey_2, EffectLabAction::Poison},
+        {ImGuiKey_3, EffectLabAction::AmplifyPoison},
+        {ImGuiKey_4, EffectLabAction::SpreadPoison},
+        {ImGuiKey_5, EffectLabAction::DetonatePoison},
+        {ImGuiKey_6, EffectLabAction::Empower},
+        {ImGuiKey_7, EffectLabAction::AmplifyEmpower},
+        {ImGuiKey_8, EffectLabAction::SpreadEmpower},
+        {ImGuiKey_9, EffectLabAction::EnrageEnemy},
+        {ImGuiKey_0, EffectLabAction::Corrupt},
+        {ImGuiKey_Minus, EffectLabAction::AfflictAllies},
+        {ImGuiKey_Equal, EffectLabAction::Purify},
+        {ImGuiKey_F12, EffectLabAction::SpawnAllies},
+    };
+    for (const auto& [key, action] : LAB_KEYS) {
+      if (key == ImGuiKey_F12) continue;
+      if (ImGui::IsKeyPressed(key, false)) {
+        debug(DebugCommandKind::EffectLab, static_cast<uint8_t>(action));
+      }
+    }
+  }
+}
+
+void ArenaView::drawEffectLabPanel() {
+  if (!effectLab) return;
+  static const char* LINES[] = {
+      "EFFECT LAB  (F12 to close)",
+      "1  spawn a crowd at the cursor",
+      "2  poison    3  amplify x4",
+      "4  spread    5  detonate all",
+      "6  empower yourself   7  amplify x5",
+      "8  share it with allies",
+      "9  enrage an enemy   0  corrupt it",
+      "-  afflict allies    =  purify them",
+  };
+  ImDrawList* dl = ImGui::GetForegroundDrawList();
+  float x = 14.0f, y = 120.0f;
+  dl->AddRectFilled(ImVec2(x - 6, y - 6), ImVec2(x + 236, y + 8 * 15 + 4),
+                    IM_COL32(10, 12, 20, 190), 4.0f);
+  for (int i = 0; i < 8; i++) {
+    text(dl, ImVec2(x, y + i * 15.0f),
+         i == 0 ? IM_COL32(255, 220, 120, 255) : IM_COL32(220, 225, 235, 255),
+         12.0f, LINES[i], false);
   }
 }
 

@@ -21,6 +21,39 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-12: Effect visual language and effect verbs
+- **Decision:** Every effect gets its own colour, motion and icon. Stacks
+  drive the size of its aura, its particles and the body tint. Six verbs
+  have their own moments: apply, amplify, spread, detonate, corrupt
+  (buff → debuff) and purify (debuff → buff). Ordinary enemies show
+  small pips instead of icons; damage-over-time numbers are smaller and
+  dimmer. There is an effect lab on F12 for trying it all.
+- **Pillars:** Clarity serves: effects were text tags before. Creative
+  Builds serves: this is the substrate for spread, detonate and corrupt
+  builds. Clarity trades a little at scale: a big poisoned crowd makes a
+  large green blob of auras. That reads as "the crowd is poisoned", but
+  watch it in playtests.
+- **Why:** Requested as a slice to judge before designing build pools. See
+  `docs/design/EFFECT_VISUALS.md`.
+- **Status:** Accepted (requested by a human); the specific look is Built,
+  needs review
+- **Where:** `src/EffectVisuals.cpp`, `src/AbilitySystem.cpp`, `src/MatchDirector.cpp`
+
+## 2026-11-12: Poison is its own effect, separate from Wound
+- **Decision:** Venoxarid infusions (Toxic Miasma, Toxic Blade, Acidic
+  Shell, Speed Siphon, Venom Infusion) now apply Poison instead of Wound.
+  Poison does 5 damage per tick per stack like Wound, but caps at 30
+  stacks instead of 10. Cauterize consumes both. Mend purifies Poison.
+- **Pillars:** Clarity: poison and bleeding look different. Creative
+  Builds: a higher cap leaves room for amplify and spread builds.
+- **Why:** Weaker per-stack values were tried. At 2 per stack the
+  Suds/Gravon/Isaac/Zephyr bots won 1 of 3, and at 4 per stack 4 of 10.
+  At 5 per stack they win 7 of 10, whether the cap is 10 or 30, the same
+  as before the change. Mina/Volgore/Wade/Isaac still lose all 10, as
+  before. Magnarok burn still uses Wound and should be split the same way.
+- **Status:** Built, needs review
+- **Where:** `include/config/EffectConfig.h`, `src/Infusions.cpp`
+
 ## 2026-11-11: El Presidente's leaps go higher and farther; Bomba is a sit-out powerbomb
 - **Decision:** Leap height up about 60%. Bomba range is 170 to 420 by
   charge (was 120 to 320), Splash range 460 (was 360). Air time is 620ms

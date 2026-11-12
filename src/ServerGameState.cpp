@@ -398,7 +398,13 @@ void ServerGameState::onNetworkPacketReceived(
       if (e.size < 3) break;
       DebugCommandPacket packet = deserializeDebugCommand(e.data, e.size);
       auto playerIt = players.find(e.clientId);
-      if (playerIt != players.end()) {
+      if (playerIt != players.end() &&
+          packet.command ==
+              static_cast<uint8_t>(DebugCommandKind::EffectLab) &&
+          packet.arg ==
+              static_cast<uint8_t>(EffectLabAction::SpawnAllies)) {
+        spawnTrainingAllies(playerIt->second);
+      } else if (playerIt != players.end()) {
         director->onDebugCommand(
             playerIt->second, static_cast<DebugCommandKind>(packet.command),
             packet.arg);
@@ -681,6 +687,40 @@ void ServerGameState::broadcastEffects() {
     if (!effects.effects.empty()) nowEnemies.push_back(id);
   }
   enemiesWithEffects.swap(nowEnemies);
+}
+
+void ServerGameState::spawnTrainingAllies(const Player& owner) {
+  // Ids far above real client ids. A second press moves them back beside you.
+  const uint32_t ids[2] = {900001, 900002};
+  const uint32_t characters[2] = {Arena::CharacterId::Wade,
+                                  Arena::CharacterId::Suds};
+  for (int i = 0; i < 2; i++) {
+    uint32_t id = ids[i];
+    bool fresh = players.find(id) == players.end();
+    if (fresh) {
+      Player ally = createPlayer(id);
+      assignPlayerColor(ally, players.size());
+      ally.characterId = characters[i];
+      ally.trainingDummy = true;
+      players[id] = ally;
+      director->onPlayerJoined(players[id]);
+      PlayerJoinedPacket joined;
+      joined.playerId = id;
+      joined.r = ally.r;
+      joined.g = ally.g;
+      joined.b = ally.b;
+      server->broadcastPacket(serialize(joined));
+    }
+    Player& ally = players[id];
+    ally.characterId = characters[i];
+    ally.x = owner.x + (i == 0 ? -90.0f : 90.0f);
+    ally.y = owner.y + 40.0f;
+    ally.aimX = ally.x;
+    ally.aimY = ally.y + 100.0f;
+    ally.health = ally.maxHealth;
+  }
+  Logger::info("Effect lab: training allies beside player " +
+               std::to_string(owner.id));
 }
 
 Player ServerGameState::createPlayer(uint32_t playerId) {

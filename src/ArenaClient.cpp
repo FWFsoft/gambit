@@ -17,7 +17,7 @@ constexpr float SMOOTHING_RATE = 18.0f;     // per second, toward server pos
 // 0xAABBGGRR
 constexpr uint32_t COLOR_DAMAGE = 0xFFFFFFFF;
 constexpr uint32_t COLOR_CRIT = 0xFF40D8FF;
-constexpr uint32_t COLOR_DOT = 0xFF78D878;
+constexpr uint32_t COLOR_DOT = 0xA078D878;  // dimmed
 constexpr uint32_t COLOR_PLAYER_HURT = 0xFF5050FF;
 constexpr uint32_t COLOR_HEAL = 0xFF90FF90;
 constexpr uint32_t COLOR_BUFF = 0xFFFFE080;
@@ -316,9 +316,11 @@ void ArenaClient::onGameEvent(const GameEventPacket& p) {
         text.size = 24.0f;
         text.lifeMs = 1100.0f;
       } else if (dot) {
+        // Ticks are the background hum of a build: keep them quiet so the
+        // big moments (detonations, crits) stand out.
         text.color = COLOR_DOT;
-        text.size = 13.0f;
-        text.lifeMs = 700.0f;
+        text.size = 11.0f;
+        text.lifeMs = 600.0f;
       } else {
         text.color = COLOR_DAMAGE;
         text.size = p.value >= 40.0f ? 20.0f : 16.0f;

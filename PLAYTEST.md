@@ -56,6 +56,9 @@ the ship slowly heals you.
 F5 skip phase, F6 +2 of every infusion, F7 spawn a pack near you,
 F8 god mode, F9 kill everything, F10 spawn the boss, F11 spawn a swarm
 of Toxliths where you are aiming.
+F12 opens the effect lab: training allies plus number keys that
+poison, amplify, spread, detonate, empower, corrupt and purify (see
+`docs/design/EFFECT_VISUALS.md`).
 
 ## Playable characters
 

@@ -65,6 +65,14 @@ void drawSprite(ImDrawList* dl, const Texture* texture, int srcX, int srcY,
                    ImVec2(u0, v1), color);
 }
 
+ImU32 multiplyColor(ImU32 a, ImU32 b) {
+  auto ch = [](ImU32 c, int shift) { return (c >> shift) & 0xFF; };
+  return IM_COL32(ch(a, IM_COL32_R_SHIFT) * ch(b, IM_COL32_R_SHIFT) / 255,
+                  ch(a, IM_COL32_G_SHIFT) * ch(b, IM_COL32_G_SHIFT) / 255,
+                  ch(a, IM_COL32_B_SHIFT) * ch(b, IM_COL32_B_SHIFT) / 255,
+                  ch(a, IM_COL32_A_SHIFT) * ch(b, IM_COL32_A_SHIFT) / 255);
+}
+
 void drawShadow(ImDrawList* dl, ImVec2 feet, float radius, float alpha = 0.35f) {
   dl->AddEllipseFilled(feet, ImVec2(radius, radius * 0.38f),
                        IM_COL32(0, 0, 0, static_cast<int>(255 * alpha)), 0.0f,
@@ -380,6 +388,7 @@ void ArenaView::renderWorld(ImDrawList* dl) {
   // Lay the world out at 1x, then magnify every vertex around the screen
   // centre. One place applies the zoom, and no drawing code has to care.
   int firstVertex = dl->VtxBuffer.Size;
+  effectFx.beginFrame(timeSeconds);
   drawGround(dl);
   drawEntities(dl);
   drawAir(dl);
@@ -391,6 +400,14 @@ void ArenaView::renderWorld(ImDrawList* dl) {
       ImDrawVert& v = dl->VtxBuffer[i];
       v.pos.x = cx + (v.pos.x - cx) * zoom;
       v.pos.y = cy + (v.pos.y - cy) * zoom;
+    }
+  }
+  // Big effect moments (detonations, corruptions) shake the world a little.
+  ImVec2 shake = effectFx.shakeOffset();
+  if (shake.x != 0.0f || shake.y != 0.0f) {
+    for (int i = firstVertex; i < dl->VtxBuffer.Size; i++) {
+      dl->VtxBuffer[i].pos.x += shake.x;
+      dl->VtxBuffer[i].pos.y += shake.y;
     }
   }
   drawOverhead(dl);
@@ -541,6 +558,9 @@ void ArenaView::drawGround(ImDrawList* dl) {
              0);
     }
   }
+
+  // Scorch marks left by detonations.
+  effectFx.drawGround(dl, [this](float x, float y) { return toScreen(x, y); });
 }
 
 // ---------------------------------------------------------------------------
@@ -697,6 +717,12 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
 
   if (!dead) drawShadow(dl, feet, 15.0f);
 
+  static const std::vector<EffectInstance> noEffects;
+  const std::vector<EffectInstance>& playerEffects =
+      effects && !dead ? effects->getEffects(state.playerId, false) : noEffects;
+  effectFx.drawUnder(dl, state.playerId, false, feet, 16.0f, playerEffects);
+  tint = multiplyColor(tint, effectFx.bodyTint(playerEffects));
+
   // Ring under the local player so you never lose yourself in a brawl.
   if (isLocal && !dead) {
     dl->AddEllipse(feet, ImVec2(20.0f, 8.5f), IM_COL32(255, 255, 255, 110), 0.0f,
@@ -794,6 +820,8 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
                       IM_COL32(state.r, state.g, state.b, 255), 10.0f);
   }
 
+  effectFx.drawOver(dl, state.playerId, false, feet, 64.0f, playerEffects);
+
   // Shield bubble
   if (view.shieldBubbleMs > 0.0f && !dead) {
     VfxTheme theme = view.shieldTheme ? static_cast<VfxTheme>(view.shieldTheme)
@@ -872,6 +900,14 @@ void ArenaView::drawEnemy(ImDrawList* dl, const ArenaClient::EnemyView& view) {
   }
 
   if (!view.dying) drawShadow(dl, feet, def.radius * scale / def.drawScale * 1.05f);
+
+  static const std::vector<EffectInstance> noEnemyEffects;
+  const std::vector<EffectInstance>& enemyEffects =
+      effects && !view.dying ? effects->getEffects(view.state.id, true)
+                             : noEnemyEffects;
+  float bodyRadius = def.radius * scale / def.drawScale;
+  effectFx.drawUnder(dl, view.state.id, true, feet, bodyRadius, enemyEffects);
+  tint = multiplyColor(tint, effectFx.bodyTint(enemyEffects));
   if (elite && !view.dying) {
     dl->AddCircle(feet, def.radius * 1.5f, IM_COL32(255, 210, 80, 200), 28, 2.5f);
   }
@@ -968,6 +1004,8 @@ void ArenaView::drawEnemy(ImDrawList* dl, const ArenaClient::EnemyView& view) {
     dl->AddCircleFilled(ImVec2(at.x, at.y - def.radius), def.radius,
                         themeColor(genusTheme(def.genus), 1.0f));
   }
+  effectFx.drawOver(dl, view.state.id, true, feet,
+                    std::max(26.0f, bodyRadius * 3.2f), enemyEffects);
 }
 
 void ArenaView::drawEntities(ImDrawList* dl) {
@@ -1037,6 +1075,23 @@ void ArenaView::drawEntities(ImDrawList* dl) {
 // ---------------------------------------------------------------------------
 
 void ArenaView::drawAir(ImDrawList* dl) {
+  effectFx.drawVerbs(
+      dl, [this](float x, float y) { return toScreen(x, y); },
+      [this](uint32_t id, bool isEnemy, float& x, float& y) {
+        if (isEnemy) {
+          auto it = arena->enemies().find(id);
+          if (it == arena->enemies().end()) return false;
+          x = it->second.x;
+          y = it->second.y;
+          return true;
+        }
+        if (id == localId()) return localPosition(x, y);
+        auto it = arena->players().find(id);
+        if (it == arena->players().end()) return false;
+        x = it->second.x;
+        y = it->second.y;
+        return true;
+      });
   for (const ArenaClient::Fx& f : arena->effects()) {
     float t = std::min(1.0f, f.ageMs / f.lifeMs);
     float fade = 1.0f - t;
@@ -1282,28 +1337,6 @@ void ArenaView::drawOverhead(ImDrawList* dl) {
   uint32_t me = localId();
   const Player& local = prediction->getLocalPlayer();
 
-  auto drawEffects = [&](uint32_t id, bool isEnemy, ImVec2 at, int limit) {
-    if (!effects) return;
-    const auto& list = effects->getEffects(id, isEnemy);
-    int shown = 0;
-    char buffer[40];
-    for (const EffectInstance& effect : list) {
-      if (shown >= limit) break;
-      bool buff =
-          EffectRegistry::getCategory(effect.type) == EffectCategory::Buff;
-      if (effect.stacks > 1) {
-        std::snprintf(buffer, sizeof(buffer), "%s x%d",
-                      EffectRegistry::getName(effect.type), effect.stacks);
-      } else {
-        std::snprintf(buffer, sizeof(buffer), "%s",
-                      EffectRegistry::getName(effect.type));
-      }
-      text(dl, ImVec2(at.x, at.y - shown * 12.0f),
-           buff ? IM_COL32(255, 224, 128, 255) : IM_COL32(255, 144, 208, 255),
-           11.0f, buffer);
-      shown++;
-    }
-  };
 
   // Objectives: name and progress
   for (const auto& [id, objective] : prediction->getObjectives()) {
@@ -1369,27 +1402,16 @@ void ArenaView::drawOverhead(ImDrawList* dl) {
           view.state.health / std::max(1.0f, view.state.maxHealth),
           elite ? IM_COL32(255, 200, 70, 255) : IM_COL32(230, 60, 60, 255));
     }
-    // One compact line of status tags; full names would bury a pack.
+    // Effects: full badges on elites and the boss, small pips on the rest
+    // (auras and tints already say a lot; a pack of badges says nothing).
     if (effects) {
-      const auto& list = effects->getEffects(id, true);
-      if (!list.empty()) {
-        std::string line;
-        bool control = false;
-        int shown = 0;
-        for (const EffectInstance& effect : list) {
-          if (shown >= 3) break;
-          if (!line.empty()) line += ' ';
-          line += effectTag(effect.type);
-          if (effect.stacks > 1) line += std::to_string(effect.stacks);
-          control = control || effect.type == EffectType::Stunned ||
-                    effect.type == EffectType::Snared ||
-                    effect.type == EffectType::Confused;
-          shown++;
-        }
-        text(dl, ImVec2(feet.x, top - 12.0f),
-             control ? IM_COL32(255, 240, 120, 255)
-                     : IM_COL32(215, 190, 255, 255),
-             10.0f, line.c_str());
+      bool notable = elite || kind == Arena::EnemyKind::Boss;
+      if (notable) {
+        effectFx.drawBadges(dl, id, true, ImVec2(feet.x, top - 11.0f),
+                            effects->getEffects(id, true), 3);
+      } else {
+        effectFx.drawPips(dl, ImVec2(feet.x, top - 8.0f),
+                          effects->getEffects(id, true), 3);
       }
     }
   }
@@ -1444,7 +1466,11 @@ void ArenaView::drawOverhead(ImDrawList* dl) {
     if (id != me) {
       text(dl, ImVec2(feet.x, top - 15.0f), IM_COL32(210, 230, 255, 255), 12.0f,
            name);
-      drawEffects(id, false, ImVec2(feet.x, top - 28.0f), 3);
+    }
+    if (effects) {
+      effectFx.drawBadges(dl, id, false,
+                          ImVec2(feet.x, top - (id != me ? 25.0f : 11.0f)),
+                          effects->getEffects(id, false), 4);
     }
     const MatchPlayerState* mp = arena->matchPlayer(id);
     if (mp && mp->carryingScrap) {
@@ -1462,4 +1488,8 @@ void ArenaView::drawOverhead(ImDrawList* dl) {
     float size = t.size * (1.0f + 0.35f * std::max(0.0f, 1.0f - u * 6.0f));
     text(dl, pos, withAlpha(t.color, alpha), size, t.text.c_str());
   }
+
+  // Effect callouts ("SPREAD x23", "CORRUPTED") over everything else.
+  effectFx.drawCallouts(
+      dl, [this](float x, float y) { return toZoomedScreen(x, y); });
 }

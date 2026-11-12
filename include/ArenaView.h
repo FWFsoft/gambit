@@ -6,6 +6,7 @@
 
 #include "ArenaClient.h"
 #include "Camera.h"
+#include "EffectVisuals.h"
 
 class ClientPrediction;
 class EffectTracker;
@@ -41,6 +42,7 @@ class ArenaView {
   ArenaClient* arena;
   ClientPrediction* prediction;
   EffectTracker* effects;
+  EffectVisuals effectFx;  // how effects look (EffectVisuals.h)
   Camera* camera;
 
   struct EnemySprite {
@@ -115,6 +117,8 @@ class ArenaView {
   // HUD state
   int selectedGenus = 0;        // infusion picked up in the suit screen
   bool suitScreenOpen = false;  // toggled with B outside intermission
+  bool effectLab = false;       // F12: number keys drive effect verbs
+  void drawEffectLabPanel();
   float timeSeconds = 0.0f;
 
   void loadManifest();
