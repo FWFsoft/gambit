@@ -48,14 +48,28 @@ oversized white wrapped mitts held up beside his face: bright blobs that
 read at any size. Swept-back white hair streams behind his head in side
 views.
 
-**Toxlith: the low skitterer.**
-A small quadruped with a hunched back and a whip tail: wider than tall,
-the opposite of every hero.
+**Suds: the barrel and the cooler.**
+A wide barrel of a torso in a blue Hawaiian shirt, on red armoured legs. A
+big white cooler juts out at his left hip, and a brew can is raised high in
+his right hand, so his outline is lopsided from every side. His moves
+(toss, belch, a volley of brews, chug-and-flex) all come from the can arm.
+
+**Gravon: the blade.**
+A slim, shirtless body under a slab of a sword longer than he is tall. At
+rest it lies back over his right shoulder, angled across his back, so it is
+the top of his outline from every side, behind him included. In a fight it
+sweeps level, rises straight up, or drives into the ground.
+
+**Toxlith: the warty toad.**
+Squat and wide: lumpy acid-green skin, a crest of magenta spines with
+glowing venom beads on the tips, red eyes and a long pink tongue. Low and
+wide, the opposite of every hero; the spiky crest is its top edge from any
+side.
+
+![The forge cast](../prototype/silhouettes_cast.png)
 
 **For the rest of the cast**, start from their concept art; most of it
 already has strong outline hooks:
-- Suds: barrel body, raised brew arm.
-- Gravon: a blade taller than he is.
 - Zephyr: a ragged, flowing cloak.
 
 ## Enemies

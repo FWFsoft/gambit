@@ -1,32 +1,38 @@
 """Toxlith: the Venoxarid swarmer.
 
-Knee-high, fast and stupid. A hunched, digitigrade lizard-insect in olive
-chitin with a venom-sac hump that glows sickly green, a heavy underbite and
-two cyan eyes. Built to read at ~40px: a big head, long claws and a glow
-that pops against the ground, so a pack of them is readable at a glance.
+Knee-high, fast and stupid: a squat, warty toad-lizard in acid green with
+a crest of magenta spines along its back, venom beading on the tips, red
+eyes and a long pink tongue lolling out of a wide mouth.
+
+Shape brief: low and wide, the opposite of every hero. The spiky crest is
+the top of its outline from any side; the tongue hangs out front.
 """
 
 import math
 
 from forge import Clip, Key, Model
 
-CELL = (96, 80, 66)   # cell w, h, feet line
+CELL = (96, 88, 72)   # cell w, h, feet line
 
-CHITIN = (150, 150, 52)
-BELLY = (92, 98, 44)
-PLATE = (186, 176, 74)
-SAC = (140, 236, 84)
-EYE = (110, 250, 236)
+SKIN = (122, 204, 58)
+WART = (66, 138, 44)
+BELLY = (196, 222, 112)
+CREST = (206, 36, 112)
+ORB = (255, 96, 176)
+TONGUE = (236, 104, 148)
+EYE = (240, 46, 56)
 CLAW = (226, 214, 176)
-MOUTH = (60, 24, 40)
+MOUTH = (72, 18, 42)
 
 
 def build():
     m = Model("Toxlith")
-    chitin = m.material("chitin", CHITIN)
+    skin = m.material("skin", SKIN)
+    wart = m.material("wart", WART)
     belly = m.material("belly", BELLY)
-    plate = m.material("plate", PLATE)
-    sac = m.material("sac", SAC, glow=True)
+    crest = m.material("crest", CREST)
+    orb = m.material("orb", ORB, glow=True)
+    tongue = m.material("tongue", TONGUE)
     eye = m.material("eye", EYE, glow=True)
     claw = m.material("claw", CLAW)
     mouth = m.material("mouth", MOUTH)
@@ -45,65 +51,90 @@ def build():
         m.joint(f"shin_{side}", f"thigh_{side}", (0.13 * x, -0.10, 0.26))
         m.joint(f"foot_{side}", f"shin_{side}", (0.13 * x, 0.06, 0.10))
 
-    # ---- body: a hunched barrel with a glowing venom hump -----------------
-    m.blob("pelvis", belly, (0, 0.05, 0.43), (0.26, 0.26, 0.20), segments=8,
+    # ---- body: a squat, lumpy barrel --------------------------------------
+    m.blob("pelvis", skin, (0, 0.06, 0.42), (0.34, 0.30, 0.22), segments=9,
            rings=6)
-    m.blob("spine", chitin, (0, -0.07, 0.56), (0.30, 0.34, 0.24), rot=(-20, 0, 0),
-           segments=9, rings=6)
-    m.blob("spine", belly, (0, -0.15, 0.51), (0.22, 0.18, 0.16), segments=8,
+    m.blob("spine", skin, (0, -0.06, 0.55), (0.40, 0.40, 0.27), rot=(-14, 0, 0),
+           segments=10, rings=7)
+    m.blob("spine", belly, (0, -0.17, 0.47), (0.28, 0.20, 0.18), segments=8,
            rings=5)
-    m.blob("spine", sac, (0, 0.03, 0.67), (0.22, 0.22, 0.16), segments=8,
-           rings=6, smooth=True)
-    for x in (1, -1):
-        m.blob("spine", sac, (0.10 * x, 0.10, 0.60), (0.12, 0.12, 0.10),
-               segments=7, rings=5, smooth=True)
-    for i, (y, z) in enumerate(((-0.12, 0.68), (-0.02, 0.71), (0.09, 0.70))):
-        m.box("spine", plate, (0, y, z + 0.02), (0.13 - i * 0.02, 0.07, 0.04),
-              rot=(-20, 0, 0))
+    # Warts: darker lumps scattered over the back and flanks.
+    warts = ((0.12, -0.10, 0.70, 0.07), (-0.13, -0.02, 0.70, 0.06),
+             (0.19, 0.05, 0.62, 0.06), (-0.20, -0.12, 0.60, 0.07),
+             (0.06, 0.10, 0.68, 0.05), (-0.07, -0.20, 0.67, 0.05),
+             (0.22, -0.16, 0.54, 0.05), (-0.23, 0.06, 0.53, 0.05),
+             (0.16, 0.16, 0.50, 0.05), (-0.15, 0.17, 0.52, 0.05))
+    for x, y, z, r in warts:
+        m.blob("spine", wart, (x, y, z), (r, r, r * 0.8), segments=6, rings=4)
+    # The crest: magenta spines down the back, venom beading on the tips.
+    spines = ((-0.20, 0.70, 0.16, -12), (-0.08, 0.76, 0.22, -4),
+              (0.04, 0.76, 0.20, 6), (0.15, 0.70, 0.16, 14),
+              (0.25, 0.62, 0.12, 22))
+    for k, (y, z, h, lean) in enumerate(spines):
+        tip_y = y + h * math.sin(math.radians(lean))
+        tip_z = z + h * math.cos(math.radians(lean))
+        m.limb("spine", crest, (0, y, z - 0.04), (0, tip_y, tip_z), 0.05, 0.008,
+               sides=5)
+        for x in (1, -1):
+            m.limb("spine", crest, (0.05 * x, y, z - 0.05),
+                   (0.12 * x, tip_y, tip_z - 0.05), 0.03, 0.006, sides=4)
+        m.blob("spine", orb, (0, tip_y, tip_z + 0.02),
+               (0.065, 0.065, 0.065) if k % 2 == 0 else (0.045, 0.045, 0.045),
+               smooth=True)
 
-    # ---- head: wedge skull, underbite, cyan eyes ---------------------------
-    m.blob("head", chitin, (0, -0.31, 0.68), (0.22, 0.26, 0.17), segments=8,
+    # ---- head: a wide toad head, mouth open, tongue out --------------------
+    m.blob("head", skin, (0, -0.31, 0.66), (0.30, 0.28, 0.16), segments=9,
            rings=6)
-    m.box("head", plate, (0, -0.31, 0.755), (0.16, 0.20, 0.04), rot=(-8, 0, 0))
     for x in (1, -1):
-        m.box("head", eye, (0.075 * x, -0.42, 0.705), (0.05, 0.03, 0.035))
-        m.limb("head", plate, (0.08 * x, -0.25, 0.75), (0.13 * x, -0.12, 0.82),
-               0.025, 0.008, sides=5)                         # horns
-    m.box("jaw", belly, (0, -0.37, 0.60), (0.18, 0.18, 0.06))
-    m.box("jaw", mouth, (0, -0.40, 0.635), (0.13, 0.10, 0.02))
-    for x in (1, -1):
-        m.box("jaw", claw, (0.05 * x, -0.45, 0.645), (0.025, 0.02, 0.04))
-
-    # ---- tail ---------------------------------------------------------------
-    m.limb("tail1", chitin, (0, 0.14, 0.43), (0, 0.34, 0.31), 0.08, 0.055)
-    m.limb("tail2", chitin, (0, 0.34, 0.31), (0, 0.50, 0.20), 0.055, 0.02,
+        m.blob("head", skin, (0.10 * x, -0.30, 0.76), (0.10, 0.10, 0.09))
+        m.blob("head", eye, (0.12 * x, -0.36, 0.80), (0.075, 0.06, 0.065),
+               smooth=True)
+        m.blob("head", wart, (0.15 * x, -0.24, 0.72), (0.05, 0.05, 0.04),
+               segments=6, rings=4)
+    m.box("head", mouth, (0, -0.42, 0.63), (0.24, 0.06, 0.05))
+    m.box("jaw", belly, (0, -0.36, 0.56), (0.28, 0.20, 0.06))
+    m.box("jaw", mouth, (0, -0.40, 0.595), (0.22, 0.12, 0.02))
+    # The tongue lolls out over the lower jaw and hangs, with a venom drop.
+    m.limb("jaw", tongue, (0, -0.40, 0.60), (0.02, -0.50, 0.55), 0.045, 0.04,
            sides=6)
-    m.blob("tail2", sac, (0, 0.47, 0.22), (0.07, 0.07, 0.07), smooth=True)
+    m.limb("jaw", tongue, (0.02, -0.50, 0.55), (0.03, -0.53, 0.40), 0.04, 0.03,
+           sides=6)
+    m.blob("jaw", orb, (0.03, -0.53, 0.37), (0.035, 0.035, 0.04), smooth=True)
+    for x in (1, -1):
+        m.box("jaw", claw, (0.09 * x, -0.45, 0.61), (0.025, 0.02, 0.04))
 
-    # ---- arms: long, ending in big hooked claws ------------------------------
+    # ---- tail: a short, thick club --------------------------------------------
+    m.limb("tail1", skin, (0, 0.16, 0.42), (0, 0.34, 0.31), 0.11, 0.08)
+    m.limb("tail2", skin, (0, 0.34, 0.31), (0, 0.48, 0.22), 0.08, 0.03,
+           sides=6)
+    m.blob("tail2", wart, (0, 0.30, 0.38), (0.05, 0.05, 0.04), segments=6,
+           rings=4)
+
+    # ---- arms: thick and short, splayed, with hooked claws -------------------
     for side, x in (("L", 1), ("R", -1)):
         a, f = f"arm_{side}", f"fore_{side}"
-        m.blob(a, chitin, (0.15 * x, -0.14, 0.62), (0.11, 0.11, 0.11))
-        m.limb(a, chitin, (0.15 * x, -0.14, 0.62), (0.20 * x, -0.20, 0.47),
-               0.05, 0.04, sides=6)
-        m.limb(f, belly, (0.20 * x, -0.20, 0.47), (0.21 * x, -0.29, 0.36),
-               0.04, 0.03, sides=6)
+        m.blob(a, skin, (0.17 * x, -0.14, 0.60), (0.14, 0.14, 0.13))
+        m.limb(a, skin, (0.17 * x, -0.14, 0.60), (0.22 * x, -0.20, 0.47),
+               0.075, 0.06, sides=6)
+        m.limb(f, belly, (0.22 * x, -0.20, 0.47), (0.23 * x, -0.27, 0.34),
+               0.06, 0.05, sides=6)
         for k in (-1, 0, 1):
-            m.limb(f, claw, (0.21 * x + 0.02 * k, -0.29, 0.36),
-                   (0.21 * x + 0.035 * k, -0.37, 0.27), 0.016, 0.004, sides=4)
+            m.limb(f, claw, (0.23 * x + 0.025 * k, -0.27, 0.34),
+                   (0.23 * x + 0.04 * k, -0.35, 0.27), 0.018, 0.004, sides=4)
 
-    # ---- legs: digitigrade ---------------------------------------------------
+    # ---- legs: frog-thick haunches ----------------------------------------------
     for side, x in (("L", 1), ("R", -1)):
-        t, s, ft = f"thigh_{side}", f"shin_{side}", f"foot_{side}"
-        m.limb(t, chitin, (0.11 * x, 0.04, 0.44), (0.13 * x, -0.10, 0.26),
-               0.07, 0.05, sides=6)
-        m.limb(s, belly, (0.13 * x, -0.10, 0.26), (0.13 * x, 0.06, 0.10),
-               0.045, 0.035, sides=6)
-        m.limb(ft, chitin, (0.13 * x, 0.06, 0.10), (0.13 * x, -0.02, 0.02),
-               0.035, 0.03, sides=5)
+        t, sh, ft = f"thigh_{side}", f"shin_{side}", f"foot_{side}"
+        m.blob(t, skin, (0.17 * x, 0.04, 0.38), (0.15, 0.17, 0.14))
+        m.limb(t, skin, (0.13 * x, 0.04, 0.44), (0.15 * x, -0.10, 0.26),
+               0.10, 0.07, sides=6)
+        m.limb(sh, belly, (0.15 * x, -0.10, 0.26), (0.15 * x, 0.06, 0.10),
+               0.06, 0.05, sides=6)
+        m.limb(ft, skin, (0.15 * x, 0.06, 0.10), (0.15 * x, -0.03, 0.02),
+               0.05, 0.04, sides=5)
         for k in (-1, 1):
-            m.limb(ft, claw, (0.13 * x + 0.025 * k, -0.02, 0.02),
-                   (0.13 * x + 0.04 * k, -0.11, 0.01), 0.014, 0.004, sides=4)
+            m.limb(ft, claw, (0.15 * x + 0.03 * k, -0.03, 0.02),
+                   (0.15 * x + 0.05 * k, -0.12, 0.01), 0.016, 0.004, sides=4)
 
     return m, rest()
 

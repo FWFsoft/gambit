@@ -129,10 +129,10 @@ Everyone must run the same build.
 
 ## What is real and what is placeholder
 
-- **Characters:** Wade and El Presidente are built by the sprite forge
+- **Characters:** Wade, El Presidente, Suds and Gravon are built by the sprite forge
   (`tools/sprite_forge`, see its README): 3D models in code, rendered to
   8-direction pixel art with real animation frames for every move. The
-  other six are still a single pose cut from their concept art, mirrored,
+  other four are still a single pose cut from their concept art, mirrored,
   with procedural animation (bob, lean, lunge, squash, hit flash) until
   they get a forge actor. New art follows the silhouette rules in
   `docs/design/ART_DIRECTION.md`.

@@ -21,6 +21,25 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-12: Suds and Gravon get forge art; Toxlith restyled
+- **Decision:**
+  - **Suds** is "the barrel and the cooler": a cooler at his hip and a can
+    raised high. His abilities play toss, belch, rounds and chug.
+  - **Gravon** is "the blade": a sword longer than he is tall, resting
+    across his back. His abilities play alternating slashes, the Ravager
+    overhead smash, Fury and Rush.
+  - **Toxlith** follows the reference image: a warty acid-green toad-lizard
+    with a magenta spine crest, venom beads and a hanging tongue.
+- **Pillars:** Clarity serves. The silhouette check flags no pair among
+  the forge cast; Presidente and Suds side-on are the closest at 0.66.
+  Creative Builds: the characters are visually distinct, and each move has
+  its own animation.
+- **Why:** Requested by a human. Suds is the MVP's lead character, and
+  Gravon's blade is the cast's strongest silhouette hook.
+- **Status:** Accepted (requested by a human); the specific looks are
+  Built, needs review
+- **Where:** `tools/sprite_forge/actors/`, `src/ArenaView.cpp` (`actionClip`)
+
 ## 2026-11-12: Silhouette-first art direction; Presidente and Wade reshaped
 - **Decision:** Every in-game asset must pass the "who's that?" silhouette
   test from the art on-ramp. `tools/sprite_forge/silhouette.py` checks it.

@@ -332,6 +332,34 @@ std::string actionClip(const std::string& character, int slot,
         return "cross";
     }
   }
+  if (character == "Suds") {
+    switch (slot) {
+      case 0:
+        return "toss";     // Brew Toss
+      case 1:
+        return "belch";    // Frothy Cleanse
+      case 2:
+        return "rounds";   // Round's On Me!
+      case 3:
+        return "chug";     // What's In This Stuff?
+      default:
+        return "toss";
+    }
+  }
+  if (character == "Gravon") {
+    switch (slot) {
+      case 0:
+        return odd ? "slash_a" : "slash_b";  // Titan's Slash, back and forth
+      case 1:
+        return "ravager";  // Ravager's Edge
+      case 2:
+        return "fury";     // Fury of the Blade
+      case 3:
+        return "rush";     // Blade Rush
+      default:
+        return "slash_a";
+    }
+  }
   static const char* GENERIC[5] = {"attack", "secondary", "special",
                                    "mobility", "special"};
   return GENERIC[std::max(0, std::min(4, slot))];
