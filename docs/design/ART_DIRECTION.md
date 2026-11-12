@@ -125,10 +125,15 @@ A no-nonsense veteran boxer: a tight, short white crop (never spiked),
 a full dark beard and hard brows, and bold black tiger stripes from his
 left shoulder down to the wrist. White wraps run up his forearms, he wears
 a brown belt over baggy khakis, and his lower legs are bandaged. His guard
-is a boxer's, not a karateka's:
-- chin tucked behind high fists, wrists at brow height, elbows flared out;
-- shoulders hunched and rolled forward, with a slight lean in;
-- bladed feet about shoulder width, rear heel light.
+is a peek-a-boo (Tyson) guard:
+- gloves up at the cheeks, forearms near vertical;
+- elbows pointing down, tucked just in front of the ribs;
+- chin tucked behind the gloves, a slight forward crouch, knees bent,
+  bladed feet about shoulder width.
+
+Arms hang off the chest, so leaning forward tips them back. Solve the
+shoulder and elbow angles by measuring joint positions (wrist height
+against the head joint), not by eye.
 
 **Suds: the barrel and the cooler.**
 A wide barrel of a torso in a blue Hawaiian shirt, on red armoured legs. A

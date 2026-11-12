@@ -173,24 +173,31 @@ def build():
 # ---------------------------------------------------------------------------
 
 def guard(bounce=0.0, roll=0.0):
-    """A boxer's guard: chin tucked down behind high, tight fists, elbows
-    flared slightly out, shoulders hunched and rolled forward, a slight lean
-    in, bladed feet about shoulder width with the rear heel light.
-    `bounce` 0..1 sinks into the knees, `roll` -1..1 rolls the shoulders."""
+    """Peek-a-boo (the Tyson guard): crouched forward from the waist, chin
+    tucked behind the gloves, gloves up at the cheeks side by side, forearms
+    near vertical, elbows pointing down and tight to the ribs (just outside
+    them), knees bent, feet bladed about shoulder width.
+    `bounce` 0..1 sinks into the knees, `roll` -1..1 weaves the head.
+
+    The arms hang off the chest joint, so leaning forward tips them back
+    with the torso: the shoulders swing well forward (about -84) to put the
+    elbows down in front of the lower chest, and the elbows bend about -114
+    so the forearms stand upright with the gloves at the cheeks, just in
+    front of the face. Measured with joint positions, not guessed."""
     return {
-        "hips": (0, 0, 16 + 3 * roll),
-        "abdomen": (8 + 2 * bounce, 0, -4),
-        "chest": (10 + 3 * bounce, 0, -8 - 4 * roll),
-        "neck": (4, 0, -4),
-        "head": (2, 0, -4 + 3 * roll),
-        "shoulder_L": (-84 - 3 * roll, -30, -26), "elbow_L": (-132, 0, 0),
-        "wrist_L": (-14, 0, 0),
-        "shoulder_R": (-78 + 3 * roll, 30, 26), "elbow_R": (-138, 0, 0),
-        "wrist_R": (-14, 0, 0),
-        "hip_L": (-20 - 6 * bounce, -6, -6), "knee_L": (18 + 14 * bounce, 0, 0),
-        "ankle_L": (-2 - 8 * bounce, 6, 0),
-        "hip_R": (14 - 6 * bounce, 6, 10), "knee_R": (24 + 14 * bounce, 0, 0),
-        "ankle_R": (-18 - 8 * bounce, -6, 0),
+        "hips": (0, 0, 10 + 3 * roll),
+        "abdomen": (8 + 2 * bounce, 0, -3),
+        "chest": (10 + 3 * bounce, 0, -4 - 4 * roll),
+        "neck": (2, 0, -2),
+        "head": (8, 0, -2 + 4 * roll),
+        "shoulder_L": (-84 - 2 * roll, -8, -27), "elbow_L": (-114, 0, 0),
+        "wrist_L": (-6, 0, 0),
+        "shoulder_R": (-80 + 2 * roll, 8, 27), "elbow_R": (-116, 0, 0),
+        "wrist_R": (-6, 0, 0),
+        "hip_L": (-24 - 6 * bounce, -6, -6), "knee_L": (28 + 14 * bounce, 0, 0),
+        "ankle_L": (-6 - 8 * bounce, 6, 0),
+        "hip_R": (12 - 6 * bounce, 6, 10), "knee_R": (32 + 14 * bounce, 0, 0),
+        "ankle_R": (-20 - 8 * bounce, -6, 0),
         "hair": (0, 0, 0), "sash": (0, 0, 0),
     }
 
