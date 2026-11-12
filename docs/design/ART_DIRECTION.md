@@ -126,7 +126,7 @@ a full dark beard and hard brows, and bold black tiger stripes from his
 left shoulder down to the wrist. White wraps run up his forearms, he wears
 a brown belt over baggy khakis, and his lower legs are bandaged. His guard
 is a boxer's, not a karateka's:
-- chin tucked behind high, tight fists, with elbows in to guard the ribs;
+- chin tucked behind high, tight fists, with the elbows flared slightly out;
 - shoulders hunched and rolled forward, with a slight lean in;
 - bladed feet about shoulder width, rear heel light.
 

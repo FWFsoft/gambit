@@ -173,8 +173,8 @@ def build():
 # ---------------------------------------------------------------------------
 
 def guard(bounce=0.0, roll=0.0):
-    """A boxer's guard: chin tucked down behind high, tight fists, elbows in
-    to protect the ribs, shoulders hunched and rolled forward, a slight lean
+    """A boxer's guard: chin tucked down behind high, tight fists, elbows
+    flared slightly out, shoulders hunched and rolled forward, a slight lean
     in, bladed feet about shoulder width with the rear heel light.
     `bounce` 0..1 sinks into the knees, `roll` -1..1 rolls the shoulders."""
     return {
@@ -183,9 +183,9 @@ def guard(bounce=0.0, roll=0.0):
         "chest": (10 + 3 * bounce, 0, -8 - 4 * roll),
         "neck": (4, 0, -4),
         "head": (2, 0, -4 + 3 * roll),
-        "shoulder_L": (-54 - 3 * roll, 10, -16), "elbow_L": (-136, 0, 0),
+        "shoulder_L": (-54 - 3 * roll, -16, -20), "elbow_L": (-136, 0, 0),
         "wrist_L": (-14, 0, 0),
-        "shoulder_R": (-44 + 3 * roll, -12, 16), "elbow_R": (-146, 0, 0),
+        "shoulder_R": (-44 + 3 * roll, 16, 20), "elbow_R": (-146, 0, 0),
         "wrist_R": (-14, 0, 0),
         "hip_L": (-20 - 6 * bounce, -6, -6), "knee_L": (18 + 14 * bounce, 0, 0),
         "ankle_L": (-2 - 8 * bounce, 6, 0),
