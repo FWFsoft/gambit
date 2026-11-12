@@ -15,6 +15,7 @@ import math
 
 from forge import Clip, Key, Model
 
+PIXEL_SCALE = 1.35  # chunkier art pixels, same size on screen (see forge.ActorSpec)
 NAME = "Presidente"
 CELL = (144, 196, 174)
 # The game pins a grappled foe to the midpoint of his hands.
@@ -57,9 +58,9 @@ def build():
     m.joint("cape", "chest", (0, 0.20, 1.58))
     m.joint("cape_low", "cape", (0, 0.24, 1.08))
     for side, x in (("L", 1), ("R", -1)):
-        m.joint(f"shoulder_{side}", "chest", (0.34 * x, 0, 1.55))
-        m.joint(f"elbow_{side}", f"shoulder_{side}", (0.39 * x, 0, 1.24))
-        m.joint(f"wrist_{side}", f"elbow_{side}", (0.40 * x, 0, 0.98))
+        m.joint(f"shoulder_{side}", "chest", (0.44 * x, 0, 1.55))
+        m.joint(f"elbow_{side}", f"shoulder_{side}", (0.49 * x, 0, 1.24))
+        m.joint(f"wrist_{side}", f"elbow_{side}", (0.50 * x, 0, 0.98))
         m.joint(f"hip_{side}", "hips", (0.15 * x, 0, 0.98))
         m.joint(f"knee_{side}", f"hip_{side}", (0.16 * x, 0, 0.55))
         m.joint(f"ankle_{side}", f"knee_{side}", (0.16 * x, 0, 0.13))
@@ -67,7 +68,7 @@ def build():
     # ---- belly, chest and abs: a heavyweight's barrel --------------------
     m.blob("chest", skin, (0, -0.02, 1.22), (0.40, 0.30, 0.28), segments=9,
            rings=6)
-    m.blob("chest", skin, (0, 0.01, 1.42), (0.56, 0.34, 0.34), segments=10,
+    m.blob("chest", skin, (0, 0.01, 1.44), (0.72, 0.36, 0.38), segments=10,
            rings=7)
     for x in (1, -1):
         m.blob("chest", skin, (0.12 * x, -0.13, 1.45), (0.24, 0.10, 0.17),
@@ -77,13 +78,13 @@ def build():
 
     # Open suit jacket: side panels, back, lapels with a white shirt collar
     for x in (1, -1):
-        m.box("chest", jacket, (0.27 * x, 0.05, 1.36), (0.10, 0.30, 0.46),
-              taper=1.15)
+        m.box("chest", jacket, (0.33 * x, 0.05, 1.38), (0.13, 0.34, 0.50),
+              taper=1.35)
         m.box("chest", jacket, (0.25 * x, -0.12, 1.42), (0.06, 0.06, 0.32),
               rot=(0, 10 * x, 0))                              # lapel
         m.box("chest", shirt, (0.13 * x, -0.14, 1.56), (0.08, 0.05, 0.08),
               rot=(0, -20 * x, 0))                             # collar
-    m.box("chest", jacket, (0, 0.17, 1.36), (0.52, 0.06, 0.48), taper=1.12)
+    m.box("chest", jacket, (0, 0.18, 1.38), (0.70, 0.07, 0.52), taper=1.3)
     # gold chain across the chest and the flag pin
     m.limb("chest", gold, (0.17, -0.155, 1.56), (0.0, -0.18, 1.44), 0.012, 0.012,
            sides=4)
@@ -102,7 +103,12 @@ def build():
               rot=(0, 18 * x, 0))
         m.box("neck", eye, (0.055 * x, -0.142, 1.81), (0.035, 0.02, 0.022))
         m.box("neck", white, (0.10 * x, -0.06, 1.90), (0.03, 0.03, 0.03))  # stars
-    m.box("neck", gold, (0, -0.13, 1.885), (0.05, 0.02, 0.06))      # crest
+    m.box("neck", gold, (0, -0.13, 1.885), (0.05, 0.02, 0.06))      # badge
+    # The crest: a tall striped fin, the top of his silhouette from any side.
+    m.box("neck", red, (0, 0.01, 2.06), (0.07, 0.34, 0.26), taper=0.7)
+    for x in (1, -1):
+        m.box("neck", white, (0.04 * x, 0.01, 2.04), (0.02, 0.32, 0.22),
+              taper=0.7)
     m.box("neck", red, (0, 0.0, 1.955), (0.05, 0.22, 0.03))         # stripe
     m.box("neck", white, (0.035, 0.0, 1.95), (0.02, 0.22, 0.03))
     m.box("neck", white, (-0.035, 0.0, 1.95), (0.02, 0.22, 0.03))
@@ -123,20 +129,22 @@ def build():
     # ---- arms: jacket sleeves, big fists ------------------------------------
     for side, x in (("L", 1), ("R", -1)):
         sh, el, wr = f"shoulder_{side}", f"elbow_{side}", f"wrist_{side}"
-        m.blob(sh, jacket, (0.34 * x, 0, 1.54), (0.24, 0.24, 0.22))
-        m.limb(sh, jacket, (0.35 * x, 0, 1.52), (0.39 * x, 0, 1.24), 0.12, 0.10)
-        m.limb(el, jacket, (0.39 * x, 0, 1.24), (0.40 * x, 0, 1.03), 0.10, 0.09)
-        m.limb(el, gold, (0.40 * x, 0, 1.08), (0.40 * x, 0, 1.05), 0.095, 0.095)
-        m.box(wr, skin, (0.40 * x, -0.005, 0.92), (0.15, 0.16, 0.15), bevel=0.02)
+        m.blob(sh, jacket, (0.45 * x, 0, 1.55), (0.34, 0.30, 0.30))  # boulder
+        m.limb(sh, jacket, (0.36 * x, 0.02, 1.62), (0.10 * x, 0.02, 1.68), 0.15,
+               0.12)                                                # trapezius
+        m.limb(sh, jacket, (0.45 * x, 0, 1.52), (0.49 * x, 0, 1.24), 0.15, 0.12)
+        m.limb(el, jacket, (0.49 * x, 0, 1.24), (0.50 * x, 0, 1.03), 0.12, 0.10)
+        m.limb(el, gold, (0.50 * x, 0, 1.08), (0.50 * x, 0, 1.05), 0.095, 0.095)
+        m.box(wr, skin, (0.50 * x, -0.005, 0.91), (0.19, 0.20, 0.19), bevel=0.03)
         if side == "L":
-            m.box(el, gold, (0.40 * x, -0.07, 1.00), (0.11, 0.06, 0.09))  # gadget
-            m.box(el, red, (0.40 * x, -0.10, 1.00), (0.06, 0.02, 0.05))
+            m.box(el, gold, (0.50 * x, -0.07, 1.00), (0.11, 0.06, 0.09))  # gadget
+            m.box(el, red, (0.50 * x, -0.10, 1.00), (0.06, 0.02, 0.05))
         else:
             for i, mat in enumerate((cred, white, cblue)):
-                m.limb(wr, mat, (0.40 * x, 0, 1.0 - i * 0.025),
-                       (0.40 * x, 0, 0.975 - i * 0.025), 0.088, 0.088,
+                m.limb(wr, mat, (0.50 * x, 0, 1.0 - i * 0.025),
+                       (0.50 * x, 0, 0.975 - i * 0.025), 0.088, 0.088,
                        cap=False)
-        m.box(wr, white, (0.40 * x, -0.075, 0.92), (0.155, 0.03, 0.10))
+        m.box(wr, white, (0.50 * x, -0.075, 0.92), (0.155, 0.03, 0.10))
 
     # ---- belt: the championship ---------------------------------------------
     m.box("hips", boot, (0, 0, 1.07), (0.50, 0.33, 0.10))
@@ -153,8 +161,8 @@ def build():
     m.box("hips", pants, (0, 0, 0.94), (0.52, 0.34, 0.22), taper=1.04)
     for side, x in (("L", 1), ("R", -1)):
         hp, kn, an = f"hip_{side}", f"knee_{side}", f"ankle_{side}"
-        m.limb(hp, pants, (0.15 * x, 0, 1.00), (0.16 * x, 0, 0.55), 0.17, 0.14)
-        m.limb(kn, pants, (0.16 * x, 0, 0.57), (0.16 * x, 0, 0.30), 0.145, 0.12)
+        m.limb(hp, pants, (0.15 * x, 0, 1.00), (0.16 * x, 0, 0.55), 0.16, 0.13)
+        m.limb(kn, pants, (0.16 * x, 0, 0.57), (0.16 * x, 0, 0.30), 0.13, 0.11)
         m.limb(kn, boot, (0.16 * x, 0, 0.33), (0.16 * x, 0, 0.08), 0.10, 0.10)
         m.box(kn, gold, (0.16 * x, -0.10, 0.22), (0.035, 0.02, 0.20))  # laces
         m.box(an, boot, (0.16 * x, -0.06, 0.05), (0.15, 0.30, 0.10), bevel=0.025)
@@ -168,18 +176,19 @@ def build():
 # ---------------------------------------------------------------------------
 
 def stance(sway=0.0):
-    """Wide wrestler's stance, arms out, ready to grab."""
+    """The power pose: fists on hips, elbows flared, feet planted wide.
+    The gaps between arms and body are what make his outline his."""
     return {
         "carry": (0, 0, 0),   # roll of a held foe: 0 upright, 90 lying across
         "hips": (0, 0, 0),
-        "chest": (6 + sway, 0, 0),
-        "neck": (-4, 0, 0),
+        "chest": (-8 + sway, 0, 0),
+        "neck": (-16, 0, 0),
         "cape": (4 - sway * 2, 0, 0),
         "cape_low": (6 - sway * 3, 0, 0),
-        "shoulder_L": (-14, -16, 0), "elbow_L": (-44, 0, 0),
-        "shoulder_R": (-14, 16, 0), "elbow_R": (-44, 0, 0),
-        "hip_L": (-6, -10, 0), "knee_L": (18 + sway, 0, 0), "ankle_L": (-10, 8, 0),
-        "hip_R": (-6, 10, 0), "knee_R": (18 + sway, 0, 0), "ankle_R": (-10, -8, 0),
+        "shoulder_L": (-8, -44, 0), "elbow_L": (-10, 105, 0),
+        "shoulder_R": (-8, 44, 0), "elbow_R": (-10, -105, 0),
+        "hip_L": (-6, -17, 0), "knee_L": (22 + sway, 0, 0), "ankle_L": (-10, 14, 0),
+        "hip_R": (-6, 17, 0), "knee_R": (22 + sway, 0, 0), "ankle_R": (-10, -14, 0),
     }
 
 
@@ -378,9 +387,11 @@ def clips():
                     elbow_L=(0, 100, 0), elbow_R=(0, -100, 0))
     hurt = with_(s, chest=(-18, -6, 10), neck=(-20, 0, 0),
                  shoulder_L=(-20, -50, 0), shoulder_R=(-20, 50, 0),
+                 elbow_L=(-30, 0, 0), elbow_R=(-30, 0, 0),
                  cape=(-10, 0, 0))
     kneel = with_(s, chest=(30, 0, 0), neck=(30, 0, 0),
                   shoulder_L=(-10, -20, 0), shoulder_R=(-10, 20, 0),
+                  elbow_L=(-30, 0, 0), elbow_R=(-30, 0, 0),
                   hip_L=(-80, -6, 0), knee_L=(120, 0, 0), ankle_L=(-40, 0, 0),
                   hip_R=(-80, 6, 0), knee_R=(120, 0, 0), ankle_R=(-40, 0, 0))
     lying = {"hips": (0, 0, 0), "chest": (-4, 0, 6), "neck": (-10, 0, 14),

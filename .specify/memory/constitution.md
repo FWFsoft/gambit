@@ -1,7 +1,11 @@
 <!--
   SYNC IMPACT REPORT
   ==================
-  Version change: (new) → 1.0.0
+  Version change: 1.0.0 → 1.1.0 (2026-11-11)
+  Added principle: VIII. Game Design Pillars (gameplay decisions must
+  serve docs/design/PILLARS.md and be logged in docs/design/DECISIONS.md)
+
+  Previous: Version change: (new) → 1.0.0
   Ratification: Initial constitution creation
 
   Added principles:
@@ -131,6 +135,20 @@ developer understanding over hand-holding abstractions.
 - Dependencies MUST be kept minimal; each dependency MUST justify
   its inclusion by replacing significant complexity.
 
+### VIII. Game Design Pillars
+
+Gambit exists to build Alien Arena. Every feature that changes how the
+game plays, looks or feels MUST serve the design pillars in
+`docs/design/PILLARS.md`: Strategic Crunch, Comradery in Competition,
+Creative Builds & Dynamic Play, and Clarity.
+
+- Feature specs and plans MUST name the pillars they serve and any
+  they trade against.
+- Gameplay decisions MUST be recorded in `docs/design/DECISIONS.md`
+  so humans can review decisions they did not see being made.
+- A change that significantly weakens a pillar, or contradicts the
+  team's design docs, MUST be flagged to a human, not silently shipped.
+
 ## Technology & Constraints
 
 - **Language**: C++17
@@ -180,4 +198,4 @@ developer understanding over hand-holding abstractions.
 - Compliance is verified during code review: reviewers MUST
   flag violations of any numbered principle.
 
-**Version**: 1.0.0 | **Ratified**: 2026-01-29 | **Last Amended**: 2026-01-29
+**Version**: 1.1.0 | **Ratified**: 2026-01-29 | **Last Amended**: 2026-11-11

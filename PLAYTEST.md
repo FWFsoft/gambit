@@ -56,6 +56,9 @@ the ship slowly heals you.
 F5 skip phase, F6 +2 of every infusion, F7 spawn a pack near you,
 F8 god mode, F9 kill everything, F10 spawn the boss, F11 spawn a swarm
 of Toxliths where you are aiming.
+F12 opens the effect lab: training allies plus number keys that
+poison, amplify, spread, detonate, empower, corrupt and purify (see
+`docs/design/EFFECT_VISUALS.md`).
 
 ## Playable characters
 
@@ -126,12 +129,13 @@ Everyone must run the same build.
 
 ## What is real and what is placeholder
 
-- **Characters:** Wade and El Presidente are built by the sprite forge
+- **Characters:** Wade, El Presidente, Suds and Gravon are built by the sprite forge
   (`tools/sprite_forge`, see its README): 3D models in code, rendered to
   8-direction pixel art with real animation frames for every move. The
-  other six are still a single pose cut from their concept art, mirrored,
+  other four are still a single pose cut from their concept art, mirrored,
   with procedural animation (bob, lean, lunge, squash, hit flash) until
-  they get a forge actor.
+  they get a forge actor. New art follows the silhouette rules in
+  `docs/design/ART_DIRECTION.md`.
 - **Enemies:** Toxlith is a forge actor; the rest are the alien-arena sprite sheets (idle / run / die),
   with the per-genus stats from the Unity project. The boss reuses the
   Synaptogon body, tinted.
@@ -174,7 +178,9 @@ first.
 
 ## What to look for in a playtest
 
-The design pillars, phrased as questions:
+The design pillars (full text in `docs/design/PILLARS.md`), phrased as
+questions. Design decisions made so far, and which ones still need a
+human review, are in `docs/design/DECISIONS.md`.
 
 - **Strategic crunch:** does the shrinking zone force real decisions
   (one more fight vs. head back)? Is round 1 too long or too short?

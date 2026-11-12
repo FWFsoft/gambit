@@ -35,6 +35,12 @@ constexpr float WOUND_DURATION = 6000.0f;  // 6 seconds
 constexpr float WOUND_INTENSITY = 5.0f;    // 5 damage per tick per stack
 constexpr uint8_t WOUND_MAX_STACKS = 10;
 
+// Venoxarid venom: as strong per stack as Wound, but stacks three times
+// higher so builds can multiply and spread it.
+constexpr float POISON_DURATION = 6000.0f;  // 6 seconds
+constexpr float POISON_INTENSITY = 5.0f;    // 5 damage per tick per stack
+constexpr uint8_t POISON_MAX_STACKS = 30;
+
 constexpr float MEND_DURATION = 6000.0f;  // 6 seconds
 constexpr float MEND_INTENSITY = 5.0f;    // 5 healing per tick per stack
 constexpr uint8_t MEND_MAX_STACKS = 10;

@@ -339,8 +339,26 @@ enum class GameEventKind : uint8_t {
   SpawnPuff = 21,
   // Shield bubble on player sourceId for value2 ms.
   ShieldBubble = 22,
+  // An effect verb (see EffectVerb): the moments builds are made of.
+  // sourceId/sourceIsEnemy = the target, at x,y. param = EffectVerb,
+  // param2 = EffectType (the result). value = stacks before, value2 =
+  // stacks after. Spread / Apply: extraId = where it came from (same kind
+  // as the target for Spread; a player for Apply), at x2,y2.
+  // Corrupt / Purify: extraId = the EffectType it was before.
+  // Detonate: value = stacks consumed, value2 = blast radius.
+  EffectVerb = 23,
   // Client-only (never sent): impact flash where a hit landed.
   HitSpark = 200
+};
+
+// What happened to an effect (GameEventKind::EffectVerb, param).
+enum class EffectVerb : uint8_t {
+  Apply = 1,     // put on a target by someone, deliberately
+  Amplify = 2,   // stacks multiplied in place
+  Spread = 3,    // copied from one target to another
+  Detonate = 4,  // stacks consumed for a burst of damage
+  Corrupt = 5,   // a buff flipped into its mirrored debuff
+  Purify = 6     // a debuff flipped into its mirrored buff
 };
 
 // Colour themes for VFX (GameEventPacket::param2).
@@ -441,7 +459,26 @@ enum class DebugCommandKind : uint8_t {
   SpawnWave = 3,       // spawn a pack around the player
   ToggleGodMode = 4,
   SpawnBoss = 5,
-  KillAll = 6
+  KillAll = 6,
+  EffectLab = 7  // arg = EffectLabAction
+};
+
+// Effect lab: drive each effect verb by hand to judge how it looks.
+// Targets are picked near the cursor.
+enum class EffectLabAction : uint8_t {
+  SpawnAllies = 1,     // two training allies beside you (they never die)
+  SpawnCrowd = 2,      // a big pack of Toxliths at the cursor
+  Poison = 3,          // poison the enemy nearest the cursor
+  AmplifyPoison = 4,   // multiply its poison
+  SpreadPoison = 5,    // spread it to everything around it
+  DetonatePoison = 6,  // detonate every poisoned enemy near the cursor
+  Empower = 7,         // empower yourself
+  AmplifyEmpower = 8,  // multiply your Empowered
+  SpreadEmpower = 9,   // share it with nearby allies
+  EnrageEnemy = 10,    // stack big buffs on the enemy nearest the cursor
+  Corrupt = 11,        // flip that enemy's buffs into debuffs
+  AfflictAllies = 12,  // debuff your allies
+  Purify = 13          // flip your allies' debuffs into buffs
 };
 
 struct DebugCommandPacket {

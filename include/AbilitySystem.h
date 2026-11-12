@@ -169,6 +169,36 @@ class AbilitySystem {
                      uint32_t sourceId, float durationMs = -1.0f);
   void grantShield(Player& player, float amount, float durationMs);
 
+  // ---- effect verbs ------------------------------------------------------
+  // The effect manipulations builds are made of. Each one also sends an
+  // EffectVerb event so clients can show the moment. Return values are the
+  // number of stacks or targets affected.
+  //
+  // Multiply the stacks of `type` on a target (capped at its max).
+  int amplifyEffect(uint32_t targetId, bool isEnemy, EffectType type,
+                    float factor);
+  // Copy `type` from an enemy to every other enemy within radius, each
+  // getting `fraction` of its stacks (at least 1).
+  int spreadEffect(Enemy& from, EffectType type, float radius,
+                   float fraction = 1.0f);
+  // The same for a player's buff, to living allies within radius.
+  int spreadEffectToAllies(Player& from, EffectType type, float radius,
+                           float fraction = 1.0f);
+  // Consume every stack of `type` on an enemy: a blast around it whose
+  // damage and size grow with the stacks consumed.
+  int detonateEffect(uint32_t attackerId, Enemy& on, EffectType type,
+                     float damagePerStack);
+  // Flip every buff that has a mirrored debuff into that debuff, keeping
+  // stacks (Empowered x5 -> Weakened x5).
+  int corruptBuffs(uint32_t sourceId, uint32_t targetId, bool isEnemy);
+  // The reverse: debuffs into their mirrored buffs (Poison -> Mend).
+  int purifyDebuffs(uint32_t sourceId, uint32_t targetId, bool isEnemy);
+  // Apply with a visible source (a bolt from the caster to the target).
+  void applyFrom(const Player& caster, Enemy& enemy, EffectType type,
+                 int stacks);
+  void applyFrom(const Player& caster, Player& ally, EffectType type,
+                 int stacks);
+
   // ---- motion ------------------------------------------------------------
   void dashPlayer(Player& player, float dirX, float dirY, float distance,
                   float durationMs, bool ghost);
@@ -257,6 +287,9 @@ class AbilitySystem {
   void fxTether(float x0, float y0, float x1, float y1, float durationMs,
                 VfxTheme theme);
   void fxEffectText(float x, float y, EffectType type);
+  void fxEffectVerb(EffectVerb verb, EffectType type, uint32_t targetId,
+                    bool isEnemy, float x, float y, float before, float after,
+                    uint32_t extraId = 0, float x2 = 0.0f, float y2 = 0.0f);
   void fxAnnounce(Announcement announcement);
 
   // ---- misc --------------------------------------------------------------

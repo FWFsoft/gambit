@@ -6,6 +6,7 @@
 
 #include "ArenaClient.h"
 #include "Camera.h"
+#include "EffectVisuals.h"
 
 class ClientPrediction;
 class EffectTracker;
@@ -41,6 +42,7 @@ class ArenaView {
   ArenaClient* arena;
   ClientPrediction* prediction;
   EffectTracker* effects;
+  EffectVisuals effectFx;  // how effects look (EffectVisuals.h)
   Camera* camera;
 
   struct EnemySprite {
@@ -70,6 +72,7 @@ class ArenaView {
   struct ActorSheet {
     Texture* texture = nullptr;
     int cellW = 0, cellH = 0, pivotX = 0, pivotY = 0, columns = 1;
+    float scale = 1.0f;  // drawn this much larger (chunkier art pixels)
     std::unordered_map<std::string, ActorAnim> anims;
     const ActorAnim* find(const std::string& name) const {
       auto it = anims.find(name);
@@ -115,6 +118,8 @@ class ArenaView {
   // HUD state
   int selectedGenus = 0;        // infusion picked up in the suit screen
   bool suitScreenOpen = false;  // toggled with B outside intermission
+  bool effectLab = false;       // F12: number keys drive effect verbs
+  void drawEffectLabPanel();
   float timeSeconds = 0.0f;
 
   void loadManifest();

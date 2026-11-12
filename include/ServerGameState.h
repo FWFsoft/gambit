@@ -83,6 +83,8 @@ class ServerGameState {
   void processArenaPickups();
   void clearArenaPickups();
   void broadcastEffects();
+  // Effect lab: add server-side allies that stand beside `owner`.
+  void spawnTrainingAllies(const Player& owner);
 
   // World item management methods
   void spawnWorldItem(uint32_t itemId, float x, float y);

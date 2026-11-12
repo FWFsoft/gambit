@@ -126,6 +126,7 @@ class MatchDirector {
   int participantCount() const;
   int livingParticipants() const;
   bool allParticipantsReady() const;
+  void runEffectLab(Player& player, EffectLabAction action);
   bool isParticipant(const Player& player) const {
     return player.characterId != 0;
   }

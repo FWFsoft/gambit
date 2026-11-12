@@ -4,6 +4,40 @@
 
 Gambit is a C++ game engine designed for building 2D isometric ARPG games with a focus on debuggability, stability, and performance. The engine follows a "high-code" philosophy, prioritizing APIs over UIs and developer understanding over hand-holding abstractions.
 
+## Game Design Pillars (read before any gameplay decision)
+
+Gambit is the engine for **Alien Arena**. Every gameplay, balance, UI,
+content or art decision, however small, must be made with the four design
+pillars in mind. The full text, with how to apply each pillar, is in
+`docs/design/PILLARS.md`. Read it before designing or tuning anything.
+
+1. **Strategic Crunch**: every decision carries weight and urgency. Choices
+   are trade-offs under time pressure. Dead time (walking through empty,
+   explored space) feels very bad.
+2. **Comradery in Competition**: push each other, never deny each other's
+   fun. Reward individual performance in ways that help the team: "When I
+   win, we win."
+3. **Creative Builds & Dynamic Play**: systems should combine and
+   synergise, with no single dominant build, and no two runs alike.
+4. **Clarity (Feedback and Recognition)**: game state is readable at a
+   glance, every hit has feedback, and dangerous attacks are telegraphed.
+
+Rules for agents:
+
+- **Log decisions.** Any change to how the game plays, looks or feels
+  gets an entry in `docs/design/DECISIONS.md`: what was decided, which
+  pillars it serves or trades against, and why. Use status "Built, needs
+  review". Humans review this log instead of every diff.
+- **Name the pillar.** When you choose between options, say which pillar
+  decided it, in the log entry and in your summary to the user.
+- **Flag conflicts; don't hide them.** If a request, a shortcut or a
+  prototype simplification works against a pillar or a design doc, still
+  do what was asked, but say so to the user and in the log.
+- **Ask before big trade-offs.** If a choice significantly weakens a pillar
+  and is hard to undo, ask a human first.
+- **Self-check.** Before finishing gameplay work, run the `/design-review`
+  skill on your change.
+
 ## Project Architecture
 
 ### Core Design Principles
@@ -176,6 +210,7 @@ The project includes several Claude Code skills for common development tasks:
 - **`/run-client`**: Start a single client connecting to 127.0.0.1:1234
 - **`/headless-test`**: Run headless client for automated testing and verification
 - **`/pre-commit`**: Run pre-commit hooks (clang-format, clang-tidy) on all files
+- **`/design-review`**: Check a gameplay change against the design pillars and log the decision
 - **`/search <symbol>`**: Advanced code search - finds definitions and usages across code, tests, examples, and benchmarks
 
 ### Full Development Environment
@@ -342,6 +377,7 @@ The repository uses `main` as the primary branch. When creating pull requests, t
 
 ## Notes for Claude
 
+- **Design pillars first**: gameplay decisions follow `docs/design/PILLARS.md` and are logged in `docs/design/DECISIONS.md` (see Game Design Pillars above)
 - This engine prioritizes **performance and debuggability** over convenience
 - Follow the **Tiger Style** approach: assert aggressively, fail fast
 - Maintain the **event-based architecture** - avoid coupling to update/render loops

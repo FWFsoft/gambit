@@ -22,6 +22,9 @@ class Texture {
   // Bind this texture for rendering
   void bind() const;
 
+  // Linear filtering for smooth (non-pixel) art; nearest is the default.
+  void setSmooth(bool smooth);
+
   // Unbind texture
   static void unbind();
 

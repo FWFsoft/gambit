@@ -49,10 +49,17 @@ def main():
     for key in wanted:
         mod = importlib.import_module(key)
         w, h, feet = getattr(mod, "CELL", (128, 112, 98))
+        k = getattr(mod, "PIXEL_SCALE", 1.0)
+        # CELL is in standard pixels; chunkier pixels need fewer of them.
+        w, h, feet = round(w / k), round(h / k), round(feet / k)
         name = mod.__name__.capitalize()
         name = getattr(mod, "NAME", name)
         spec = forge.ActorSpec(name, mod.build, mod.clips(), w, h, feet,
-                               getattr(mod, "SOCKET", None))
+                               pixel_scale=k,
+                               socket=getattr(mod, "SOCKET", None),
+                               style=getattr(mod, "STYLE", "pixel"),
+                               rim_rgb=getattr(mod, "RIM", None),
+                               follow=getattr(mod, "FOLLOW", None))
         rel = f"assets/sprites/actors/{name}.png"
         start = time.time()
         print(f"{name}:")

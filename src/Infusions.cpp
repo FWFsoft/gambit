@@ -122,7 +122,7 @@ void castCore(AbilityContext& ctx) {
       cloud.theme = VfxTheme::Poison;
       cloud.variant = 0;
       cloud.onEnemyTick = [s, selfId](AbilitySystem::Zone&, Enemy& enemy) {
-        s->applyToEnemy(enemy, EffectType::Wound, 1, selfId);
+        s->applyToEnemy(enemy, EffectType::Poison, 1, selfId);
         s->damageEnemy(selfId, enemy, 3.0f, DamageFlag::Core);
       };
       sys.spawnZone(cloud);
@@ -177,22 +177,34 @@ void castCore(AbilityContext& ctx) {
       std::vector<Blast> blasts;
       sys.enemiesInCircle(self.x, self.y, reach, [&](Enemy& enemy) {
         ActiveEffects& fx = sys.effects().mutableEffects(enemy.id, true);
-        const EffectInstance* wound = fx.findEffect(EffectType::Wound);
-        if (!wound) return;
+        // Bleeding and venom both go up.
+        int stacks = 0;
+        float remainingMs = 0.0f;
+        for (EffectType dot : {EffectType::Wound, EffectType::Poison}) {
+          if (const EffectInstance* e = fx.findEffect(dot)) {
+            stacks += e->stacks;
+            remainingMs = std::max(remainingMs, e->remainingDuration);
+          }
+        }
+        if (stacks == 0) return;
         // More stacks and more time left make a bigger blast.
-        float remaining = std::max(1.0f, wound->remainingDuration / 1000.0f);
-        float damage = wound->stacks * 5.0f * std::min(remaining, 6.0f) * 0.6f;
-        blasts.push_back({enemy.x, enemy.y, 55.0f + wound->stacks * 9.0f,
+        float remaining = std::max(1.0f, remainingMs / 1000.0f);
+        float damage = stacks * 5.0f * std::min(remaining, 6.0f) * 0.6f;
+        blasts.push_back({enemy.x, enemy.y,
+                          55.0f + std::min(stacks, 30) * 9.0f,
                           std::max(12.0f, damage)});
         fx.removeEffect(EffectType::Wound);
+        fx.removeEffect(EffectType::Poison);
       });
       // The player's own over-time effects go up too.
       ActiveEffects& mine = sys.effects().mutableEffects(selfId, false);
       int ownStacks = mine.getStacks(EffectType::Wound) +
-                      mine.getStacks(EffectType::Mend);
+                      mine.getStacks(EffectType::Mend) +
+                      mine.getStacks(EffectType::Poison);
       if (ownStacks > 0) {
         mine.removeEffect(EffectType::Wound);
         mine.removeEffect(EffectType::Mend);
+        mine.removeEffect(EffectType::Poison);
         blasts.push_back(
             {self.x, self.y, 100.0f + ownStacks * 10.0f, ownStacks * 16.0f});
       }
@@ -224,7 +236,7 @@ void onHitEnemy(AbilitySystem& sys, Player& player, Enemy& enemy, float damage,
     if (level > 0) {
       switch (genus) {
         case Genus::Venoxarid:
-          sys.applyToEnemy(enemy, EffectType::Wound, level, playerId);
+          sys.applyToEnemy(enemy, EffectType::Poison, level, playerId);
           break;
         case Genus::Cerebrian:
           sys.applyToEnemy(enemy, EffectType::Confused, 1, playerId,
@@ -255,12 +267,12 @@ void onHitEnemy(AbilitySystem& sys, Player& player, Enemy& enemy, float damage,
   switch (genus) {
     case Genus::Venoxarid: {
       // Toxic Blade: venom splashes to nearby enemies.
-      sys.applyToEnemy(enemy, EffectType::Wound, level, playerId);
+      sys.applyToEnemy(enemy, EffectType::Poison, level, playerId);
       if (player.infusionTimer[OFFENSE] <= 0.0f) {
         player.infusionTimer[OFFENSE] = 200.0f;
         sys.enemiesInCircle(ex, ey, 75.0f, [&](Enemy& other) {
           if (other.id != enemyId) {
-            sys.applyToEnemy(other, EffectType::Wound, 1, playerId);
+            sys.applyToEnemy(other, EffectType::Poison, 1, playerId);
           }
         });
       }
@@ -308,10 +320,10 @@ float onPlayerDamaged(AbilitySystem& sys, Player& player, float damage,
     case Genus::Venoxarid: {
       // Acidic Shell
       if (melee) {
-        sys.applyToEnemy(*source, EffectType::Wound, level, player.id);
+        sys.applyToEnemy(*source, EffectType::Poison, level, player.id);
       }
       if (source && sys.effects().getEnemyEffects(source->id).hasEffect(
-                        EffectType::Wound)) {
+                        EffectType::Poison)) {
         damage *= std::max(0.4f, 1.0f - 0.12f * level);
       }
       break;
@@ -431,7 +443,7 @@ void tick(AbilitySystem& sys, Player& player, float dtMs) {
           int poisoned = sys.countEnemies(
               player.x, player.y, 420.0f, [&](const Enemy& enemy) {
                 return sys.effects().getEnemyEffects(enemy.id).hasEffect(
-                    EffectType::Wound);
+                    EffectType::Poison);
               });
           player.infusionCounter[MOBILITY] = std::min(poisoned, 8);
         }

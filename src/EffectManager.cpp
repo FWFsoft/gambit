@@ -61,6 +61,7 @@ void EffectManager::update(float deltaTime,
         // Find Wound effect to credit the killer
         uint32_t killerId = 0;
         EffectInstance* woundEffect = effects.findEffect(EffectType::Wound);
+        if (!woundEffect) woundEffect = effects.findEffect(EffectType::Poison);
         if (woundEffect) {
           killerId = woundEffect->sourceId;
         }
@@ -350,7 +351,8 @@ void EffectManager::updateEntityEffects(uint32_t entityId, bool isEnemy,
     }
 
     // Apply Wound/Mend DoT/HoT
-    if (effect.type == EffectType::Wound || effect.type == EffectType::Mend) {
+    if (effect.type == EffectType::Wound || effect.type == EffectType::Mend ||
+        effect.type == EffectType::Poison) {
       float applied =
           tickWoundMend(effect, deltaTime, health, maxHealth, entityX, entityY);
       if (applied > 0.0f && dotCallback) {
@@ -471,7 +473,8 @@ float EffectManager::tickWoundMend(EffectInstance& instance, float deltaTime,
     float valuePerStack = def.baseIntensity;
     float totalValue = valuePerStack * instance.stacks;
 
-    if (instance.type == EffectType::Wound) {
+    if (instance.type == EffectType::Wound ||
+        instance.type == EffectType::Poison) {
       applied = std::min(health, totalValue);
       health -= totalValue;
       health = std::max(0.0f, health);

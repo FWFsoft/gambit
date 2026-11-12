@@ -59,10 +59,14 @@ enum class EffectType : uint8_t {
   Freed = 27,
 
   // Special (28)
-  Resonance = 28
+  Resonance = 28,
+
+  // Damage over time, continued (29). Venoxarid venom: its own effect so it
+  // can look and combine differently from Wound (bleeding).
+  Poison = 29
 };
 
-constexpr uint8_t EFFECT_TYPE_COUNT = 29;
+constexpr uint8_t EFFECT_TYPE_COUNT = 30;
 
 // Secondary effect definition (effects that are auto-applied)
 struct SecondaryEffect {

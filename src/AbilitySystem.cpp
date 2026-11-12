@@ -470,6 +470,7 @@ float AbilitySystem::damageEnemy(uint32_t attackerId, Enemy& enemy,
 
 float AbilitySystem::damagePlayer(Player& player, float amount,
                                   uint32_t sourceEnemyId, uint32_t flags) {
+  if (player.trainingDummy) return 0.0f;
   if (player.isDead() || player.godMode || amount <= 0.0f) return 0.0f;
 
   float damage = amount;
@@ -604,6 +605,198 @@ void AbilitySystem::applyToPlayer(Player& player, EffectType type, int stacks,
        type == EffectType::Stealth)) {
     fxEffectText(player.x, player.y - 60.0f, type);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Effect verbs
+// ---------------------------------------------------------------------------
+
+namespace {
+float entityX(AbilitySystem& sys, uint32_t id, bool isEnemy, float* y) {
+  if (isEnemy) {
+    if (Enemy* e = sys.findEnemy(id)) {
+      *y = e->y;
+      return e->x;
+    }
+  } else if (Player* p = sys.findPlayer(id)) {
+    *y = p->y;
+    return p->x;
+  }
+  *y = 0.0f;
+  return 0.0f;
+}
+}  // namespace
+
+int AbilitySystem::amplifyEffect(uint32_t targetId, bool isEnemy,
+                                 EffectType type, float factor) {
+  ActiveEffects& fx = effectManager->mutableEffects(targetId, isEnemy);
+  EffectInstance* effect = fx.findEffect(type);
+  if (!effect) return 0;
+  const EffectDefinition& def = EffectRegistry::get(type);
+  int before = effect->stacks;
+  int after = static_cast<int>(std::ceil(before * factor));
+  if (def.maxStacks > 0) after = std::min<int>(after, def.maxStacks);
+  after = std::min(after, 255);
+  effect->stacks = static_cast<uint8_t>(after);
+  effect->remainingDuration = std::max(effect->remainingDuration,
+                                       def.baseDuration);
+  float y = 0.0f;
+  float x = entityX(*this, targetId, isEnemy, &y);
+  fxEffectVerb(EffectVerb::Amplify, type, targetId, isEnemy, x, y,
+               static_cast<float>(before), static_cast<float>(after));
+  return after - before;
+}
+
+int AbilitySystem::spreadEffect(Enemy& from, EffectType type, float radius,
+                                float fraction) {
+  const EffectInstance* effect =
+      effectManager->getEnemyEffects(from.id).findEffect(type);
+  if (!effect) return 0;
+  int give = std::max(1, static_cast<int>(effect->stacks * fraction));
+  uint32_t sourceId = effect->sourceId;
+  uint32_t fromId = from.id;
+  float fx = from.x, fy = from.y;
+  int reached = 0;
+  enemiesInCircle(fx, fy, radius, [&](Enemy& other) {
+    if (other.id == fromId) return;
+    int before = effectManager->getEnemyEffects(other.id).getStacks(type);
+    applyToEnemy(other, type, give, sourceId);
+    Enemy* still = findEnemy(other.id);
+    if (!still) return;
+    int after = effectManager->getEnemyEffects(other.id).getStacks(type);
+    if (after <= before) return;  // immune, or already at the cap
+    fxEffectVerb(EffectVerb::Spread, type, other.id, true, still->x,
+                 still->y, static_cast<float>(before),
+                 static_cast<float>(after), fromId, fx, fy);
+    reached++;
+  });
+  return reached;
+}
+
+int AbilitySystem::spreadEffectToAllies(Player& from, EffectType type,
+                                        float radius, float fraction) {
+  const EffectInstance* effect =
+      effectManager->getPlayerEffects(from.id).findEffect(type);
+  if (!effect) return 0;
+  int give = std::max(1, static_cast<int>(effect->stacks * fraction));
+  int reached = 0;
+  playersInCircle(from.x, from.y, radius, [&](Player& ally) {
+    if (ally.id == from.id || ally.isDead()) return;
+    int before = effectManager->getPlayerEffects(ally.id).getStacks(type);
+    applyToPlayer(ally, type, give, from.id);
+    int after = effectManager->getPlayerEffects(ally.id).getStacks(type);
+    if (after <= before) return;
+    fxEffectVerb(EffectVerb::Spread, type, ally.id, false, ally.x, ally.y,
+                 static_cast<float>(before), static_cast<float>(after),
+                 from.id, from.x, from.y);
+    reached++;
+  });
+  return reached;
+}
+
+int AbilitySystem::detonateEffect(uint32_t attackerId, Enemy& on,
+                                  EffectType type, float damagePerStack) {
+  ActiveEffects& fx = effectManager->mutableEffects(on.id, true);
+  const EffectInstance* effect = fx.findEffect(type);
+  if (!effect) return 0;
+  int stacks = effect->stacks;
+  fx.removeEffect(type);
+  float radius = 60.0f + std::min(stacks, 40) * 5.0f;
+  float damage = stacks * damagePerStack;
+  float x = on.x, y = on.y;
+  uint32_t onId = on.id;
+  fxEffectVerb(EffectVerb::Detonate, type, onId, true, x, y,
+               static_cast<float>(stacks), radius);
+  enemiesInCircle(x, y, radius, [&](Enemy& enemy) {
+    // The carrier takes the full blast, the crowd a little less.
+    float scale = enemy.id == onId ? 1.0f : 0.7f;
+    damageEnemy(attackerId, enemy, damage * scale, DamageFlag::Explosion);
+  });
+  return stacks;
+}
+
+namespace {
+// Flip every effect of one category that has a mirror into that mirror.
+int flipEffects(AbilitySystem& sys, EffectManager& manager, uint32_t sourceId,
+                uint32_t targetId, bool isEnemy, EffectCategory from,
+                EffectVerb verb) {
+  struct Flip {
+    EffectType was, becomes;
+    int stacks;
+  };
+  std::vector<Flip> flips;
+  for (const EffectInstance& effect :
+       manager.mutableEffects(targetId, isEnemy).effects) {
+    const EffectDefinition& def = EffectRegistry::get(effect.type);
+    if (def.category != from || !def.hasOpposite) continue;
+    EffectType mirror = def.oppositeEffect;
+    if (EffectRegistry::getCategory(mirror) == from) continue;
+    flips.push_back({effect.type, mirror, effect.stacks});
+  }
+  int flipped = 0;
+  for (const Flip& flip : flips) {
+    manager.removeEffect(targetId, isEnemy, flip.was);
+    float x = 0.0f, y = 0.0f;
+    int after = 0;
+    if (isEnemy) {
+      Enemy* enemy = sys.findEnemy(targetId);
+      if (!enemy) break;
+      sys.applyToEnemy(*enemy, flip.becomes, flip.stacks, sourceId);
+      x = enemy->x;
+      y = enemy->y;
+      after = manager.getEnemyEffects(targetId).getStacks(flip.becomes);
+    } else {
+      Player* player = sys.findPlayer(targetId);
+      if (!player) break;
+      sys.applyToPlayer(*player, flip.becomes, flip.stacks, sourceId);
+      x = player->x;
+      y = player->y;
+      after = manager.getPlayerEffects(targetId).getStacks(flip.becomes);
+    }
+    sys.fxEffectVerb(verb, flip.becomes, targetId, isEnemy, x, y,
+                     static_cast<float>(flip.stacks),
+                     static_cast<float>(after),
+                     static_cast<uint32_t>(flip.was));
+    flipped += flip.stacks;
+  }
+  return flipped;
+}
+}  // namespace
+
+int AbilitySystem::corruptBuffs(uint32_t sourceId, uint32_t targetId,
+                                bool isEnemy) {
+  return flipEffects(*this, *effectManager, sourceId, targetId, isEnemy,
+                     EffectCategory::Buff, EffectVerb::Corrupt);
+}
+
+int AbilitySystem::purifyDebuffs(uint32_t sourceId, uint32_t targetId,
+                                 bool isEnemy) {
+  return flipEffects(*this, *effectManager, sourceId, targetId, isEnemy,
+                     EffectCategory::Debuff, EffectVerb::Purify);
+}
+
+void AbilitySystem::applyFrom(const Player& caster, Enemy& enemy,
+                              EffectType type, int stacks) {
+  int before = effectManager->getEnemyEffects(enemy.id).getStacks(type);
+  applyToEnemy(enemy, type, stacks, caster.id);
+  Enemy* still = findEnemy(enemy.id);
+  if (!still) return;
+  int after = effectManager->getEnemyEffects(enemy.id).getStacks(type);
+  if (after == before) return;
+  fxEffectVerb(EffectVerb::Apply, type, enemy.id, true, still->x, still->y,
+               static_cast<float>(before), static_cast<float>(after),
+               caster.id, caster.x, caster.y);
+}
+
+void AbilitySystem::applyFrom(const Player& caster, Player& ally,
+                              EffectType type, int stacks) {
+  int before = effectManager->getPlayerEffects(ally.id).getStacks(type);
+  applyToPlayer(ally, type, stacks, caster.id);
+  int after = effectManager->getPlayerEffects(ally.id).getStacks(type);
+  if (after == before) return;
+  fxEffectVerb(EffectVerb::Apply, type, ally.id, false, ally.x, ally.y,
+               static_cast<float>(before), static_cast<float>(after),
+               caster.id, caster.x, caster.y);
 }
 
 void AbilitySystem::grantShield(Player& player, float amount,
@@ -1198,6 +1391,26 @@ void AbilitySystem::fxEffectText(float x, float y, EffectType type) {
   p.x = x;
   p.y = y;
   p.param = static_cast<uint8_t>(type);
+  emit(p);
+}
+
+void AbilitySystem::fxEffectVerb(EffectVerb verb, EffectType type,
+                                 uint32_t targetId, bool isEnemy, float x,
+                                 float y, float before, float after,
+                                 uint32_t extraId, float x2, float y2) {
+  GameEventPacket p;
+  p.kind = GameEventKind::EffectVerb;
+  p.sourceId = targetId;
+  p.sourceIsEnemy = isEnemy;
+  p.x = x;
+  p.y = y;
+  p.x2 = x2;
+  p.y2 = y2;
+  p.value = before;
+  p.value2 = after;
+  p.param = static_cast<uint8_t>(verb);
+  p.param2 = static_cast<uint8_t>(type);
+  p.extraId = extraId;
   emit(p);
 }
 
