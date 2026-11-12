@@ -38,6 +38,9 @@ class Build:
     arm_length: float = 1.0
     leg_length: float = 1.0
     neck: float = 0.085
+    deltoid: float = 2.3          # shoulder cap size, x the biceps radius
+    pecs: float = 1.0             # chest muscle size
+    square: float = 0.0           # clavicle bar radius: squares the shoulder line
 
     # Joint heights at leg_length = 1 (scaled from there).
     def z(self, base):
@@ -65,7 +68,7 @@ def skeleton(m: Model, b: Build):
         hx = b.hip_width * x
         m.joint(f"hip_{side}", "hips", (hx, 0, hip_z))
         m.joint(f"knee_{side}", f"hip_{side}", (hx + 0.01 * x, 0, 0.53 * L))
-        m.joint(f"ankle_{side}", f"knee_{side}", (hx + 0.01 * x, 0, 0.10))
+        m.joint(f"ankle_{side}", f"knee_{side}", (hx + 0.01 * x, 0, 0.10 * L))
     return {"hip_z": hip_z, "shoulder_z": sh_z, "upper": upper, "fore": fore}
 
 
@@ -79,10 +82,17 @@ def torso(m: Model, b: Build, mat, waist_mat=None):
            segments=16, rings=10, smooth=True)
     m.blob("chest", mat, (0, 0.02, hz + 0.40), (cw, cd, ch), segments=18,
            rings=12, smooth=True)
+    if b.square > 0:
+        # A bar from shoulder to shoulder: a square, trapezoid top instead of
+        # a round barrel.
+        m.tube("chest", mat, [(-b.shoulders * 0.95, 0.0, hz + 0.52),
+                              (0, -0.02, hz + 0.53),
+                              (b.shoulders * 0.95, 0.0, hz + 0.52)],
+               [b.square * 0.8, b.square, b.square * 0.8], sides=12)
     for x in (1, -1):
         m.blob("chest", mat, (0.10 * x * cw / 0.6, -cd * 0.33, hz + 0.43),
-               (cw * 0.36, cd * 0.32, ch * 0.45), segments=12, rings=8,
-               smooth=True)                                        # pecs
+               (cw * 0.36 * b.pecs, cd * 0.32 * b.pecs, ch * 0.45 * b.pecs),
+               segments=12, rings=8, smooth=True)                  # pecs
         m.tube("chest", mat, [(0.07 * x, 0.03, hz + 0.58),
                               (b.shoulders * 0.62 * x, 0.04, hz + 0.57),
                               (b.shoulders * 0.95 * x, 0.02, hz + 0.53)],
@@ -110,8 +120,9 @@ def arms(m: Model, b: Build, upper_mat, fore_mat, hand_mat, sides=("L", "R")):
         sh, el, wr = f"shoulder_{side}", f"elbow_{side}", f"wrist_{side}"
         s, e, w = (m.rest_world(sh), m.rest_world(el), m.rest_world(wr))
         r0, r1, r2 = b.upper_arm
+        d = b.deltoid
         m.blob(sh, upper_mat, (s[0], s[1], s[2] - 0.01),
-               (r1 * 2.3, r1 * 2.2, r1 * 2.1), segments=14, rings=10,
+               (r1 * d, r1 * d * 0.95, r1 * d * 0.92), segments=14, rings=10,
                smooth=True)                                         # deltoid
         m.tube(sh, upper_mat, [s, ((s[0] + e[0]) / 2, -0.015, (s[2] + e[2]) / 2), e],
                [r0, r1, r2])

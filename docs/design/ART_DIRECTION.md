@@ -60,6 +60,22 @@ Twists add up down the spine. Keep the sum of hips + abdomen + chest
 rotations about a move's real twist (about ±30° for a punch), or the
 torso spins sideways.
 
+**Proportion target: 3rd Strike, not DBZ.** Think Ken:
+- **Height:** about seven heads tall, with long legs (about half his
+  height) in a wide stance, knees bent out.
+- **Torso:** squared, capped shoulders spreading past the hips over a
+  real waist; a trapezoid, not a barrel, and not balloon muscle.
+- **Arms:** long, with solid upper arms; fists that read but are not
+  oversized mitts.
+- **Posture:** upright and proud, chest out, fists in front of the chest.
+
+In the body kit that means a modest `deltoid` and `pecs`, a `square`
+clavicle bar, longer `arm_length` / `leg_length`, and a flatter
+`chest` depth. Our camera sits 30° above, so legs read a little shorter
+and heads a little bigger than in a side-on fighter; build slightly long
+in the legs to compensate.
+
+![Wade against the 3rd Strike Ken reference](../prototype/wade_vs_ken_proportions.png)
 ![Wade: before and after](../prototype/wade_motion_before_after.png)
 
 ## Rules for every in-game asset

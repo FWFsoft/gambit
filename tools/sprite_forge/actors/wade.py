@@ -32,11 +32,15 @@ SASH = (98, 56, 34)
 WRAP = (240, 234, 214)
 INK = (58, 30, 26)
 
+# 3rd Strike proportions (think Ken, a little heavier and older): about
+# seven heads tall, long legs in a wide stance, squared athletic shoulders
+# and a real waist, long arms with fists that read but are not mitts.
 BUILD = _body.Build(
-    head=0.26, shoulders=0.31, chest=(0.66, 0.33, 0.35), waist=0.24,
-    hip_width=0.13, upper_arm=(0.10, 0.13, 0.085), forearm=(0.09, 0.125, 0.08),
-    hand=0.22, thigh=(0.18, 0.20, 0.16), calf=(0.16, 0.15, 0.09),
-    foot=(0.12, 0.27, 0.08), arm_length=1.05)
+    head=0.29, shoulders=0.33, chest=(0.66, 0.27, 0.33), waist=0.29,
+    hip_width=0.14, upper_arm=(0.10, 0.125, 0.08), forearm=(0.085, 0.108, 0.075),
+    hand=0.16, thigh=(0.17, 0.19, 0.17), calf=(0.16, 0.17, 0.12),
+    foot=(0.11, 0.26, 0.08), arm_length=1.12, leg_length=1.10, neck=0.08,
+    deltoid=2.2, pecs=0.85, square=0.11)
 
 # Secondary motion: joint -> (drive joint, gain, stiffness, damping, drag)
 FOLLOW = {
@@ -101,7 +105,7 @@ def build():
     for side in ("L", "R"):
         w = m.rest_world(f"wrist_{side}")
         m.tube(f"elbow_{side}", wrap, [(w[0], 0, w[2] + 0.07), (w[0], 0, w[2] - 0.01)],
-               [0.085, 0.09], sides=10)
+               [0.072, 0.076], sides=10)
         a = m.rest_world(f"ankle_{side}")
         m.tube(f"knee_{side}", wrap, [(a[0], 0, a[2] + 0.10), (a[0], 0, a[2] + 0.02)],
                [0.095, 0.085], sides=10)
@@ -122,23 +126,24 @@ def build():
 # ---------------------------------------------------------------------------
 
 def guard(bounce=0.0, roll=0.0):
-    """The Old Head's guard: bladed, chin tucked, shoulders rolled forward,
-    mitts up by the jaw, weight sitting low. `bounce` 0..1 bends the knees,
+    """A 3rd Strike fighting stance: upright and proud, chest out, feet
+    planted wide with the knees bent out, fists held in front of the chest
+    (lead fist higher and forward). `bounce` 0..1 sinks into the knees,
     `roll` -1..1 rolls the shoulders (the idle's rhythm)."""
     return {
-        "hips": (0, 0, 16 + 3 * roll),
-        "abdomen": (6 + 2 * bounce, 0, -4),
-        "chest": (9 + 3 * bounce, 0, -8 - 4 * roll),
-        "neck": (2, 0, -2),
-        "head": (8, 0, -2 + 3 * roll),
-        "shoulder_L": (-58 - 4 * roll, -20, -8), "elbow_L": (-116, 0, 0),
-        "wrist_L": (-12, 0, 0),
-        "shoulder_R": (-48 + 4 * roll, 18, 10), "elbow_R": (-132, 0, 0),
-        "wrist_R": (-12, 0, 0),
-        "hip_L": (-16 - 6 * bounce, -4, -8), "knee_L": (18 + 14 * bounce, 0, 0),
-        "ankle_L": (-2 - 8 * bounce, 0, 0),
-        "hip_R": (12 - 6 * bounce, 4, 12), "knee_R": (22 + 14 * bounce, 0, 0),
-        "ankle_R": (-12 - 8 * bounce, 0, 0),
+        "hips": (0, 0, 18 + 3 * roll),
+        "abdomen": (2 + 2 * bounce, 0, -4),
+        "chest": (-2 + 3 * bounce, 0, -8 - 4 * roll),
+        "neck": (0, 0, -4),
+        "head": (2, 0, -4 + 3 * roll),
+        "shoulder_L": (-62 - 4 * roll, -8, -16), "elbow_L": (-92, 0, 0),
+        "wrist_L": (-8, 0, 0),
+        "shoulder_R": (-34 + 4 * roll, 12, 14), "elbow_R": (-118, 0, 0),
+        "wrist_R": (-8, 0, 0),
+        "hip_L": (-24 - 6 * bounce, -16, -6), "knee_L": (22 + 16 * bounce, 0, 0),
+        "ankle_L": (-4 - 8 * bounce, 14, 0),
+        "hip_R": (18 - 6 * bounce, 14, 10), "knee_R": (26 + 16 * bounce, 0, 0),
+        "ankle_R": (-14 - 8 * bounce, -12, 0),
         "hair": (0, 0, 0), "sash": (0, 0, 0),
     }
 

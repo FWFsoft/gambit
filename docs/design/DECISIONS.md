@@ -21,6 +21,21 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-12: Proportions retuned to 3rd Strike, not DBZ
+- **Decision:** Wade is retuned from bodybuilder to martial-artist
+  proportions, using a 3rd Strike Ken reference from the human:
+  - longer legs and arms,
+  - squared capped shoulders (a new `square` clavicle bar in the body
+    kit) over a real waist,
+  - smaller deltoids and pecs, normal-sized fists,
+  - an upright wide-stance guard with the fists in front of the chest.
+- **Pillars:** Clarity: a familiar fighting-game silhouette. It is also
+  the target look.
+- **Why:** The first body-kit pass read as "muscly DBZ".
+- **Status:** Accepted (requested by a human); the exact values are
+  Built, needs review
+- **Where:** `tools/sprite_forge/actors/_body.py`, `tools/sprite_forge/actors/wade.py`
+
 ## 2026-11-12: Heroic body kit and fighting-game motion; Wade rebuilt
 - **Decision:** Characters build on a shared heroic body kit: a spine
   chain, curved muscle and proportion parameters. The forge gains:
