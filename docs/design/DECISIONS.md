@@ -21,6 +21,22 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-12: Wade's boxer guard and likeness restored
+- **Decision:**
+  - **Guard:** a boxer's guard, not Ken's stance. Chin tucked behind high,
+    tight fists, elbows in, shoulders hunched, slight lean.
+  - **Likeness:** a tight short white crop instead of spiked hair, a full
+    dark beard and hard brows, bold tiger stripes on the left arm (on the
+    skin, not floating), and forearm hand-wraps, a brown belt and bandaged
+    lower legs, all from the splash art.
+- **Pillars:** Clarity: a recognisable character at a glance. It is also
+  the character's identity.
+- **Why:** Human feedback: the stance was too stiff and upright for a
+  boxer, and the likeness had drifted.
+- **Status:** Accepted (requested by a human); the exact pose values are
+  Built, needs review
+- **Where:** `tools/sprite_forge/actors/wade.py`
+
 ## 2026-11-12: Proportions retuned to 3rd Strike, not DBZ
 - **Decision:** Wade is retuned from bodybuilder to martial-artist
   proportions, using a 3rd Strike Ken reference from the human:

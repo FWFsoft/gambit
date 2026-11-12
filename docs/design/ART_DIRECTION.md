@@ -67,7 +67,9 @@ torso spins sideways.
   real waist; a trapezoid, not a barrel, and not balloon muscle.
 - **Arms:** long, with solid upper arms; fists that read but are not
   oversized mitts.
-- **Posture:** upright and proud, chest out, fists in front of the chest.
+- **Posture:** per character. Ken is upright and proud; a boxer like Wade
+  tucks in behind his guard. Take the proportions from the reference, not
+  the stance.
 
 In the body kit that means a modest `deltoid` and `pecs`, a `square`
 clavicle bar, longer `arm_length` / `leg_length`, and a flatter
@@ -119,11 +121,14 @@ and body. From behind, the flag cape is a
 solid banner.
 
 **Wade: the Old Head's guard.**
-Lean and narrow-waisted. Two oversized white wrapped mitts up by his jaw:
-bright blobs that read at any size. Swept-back white hair streams behind
-his head in side views. He is a veteran who is set in his ways, so his
-guard is compact and unbothered: bladed but not lunging, chin tucked,
-shoulders rolled, weight on the back foot.
+A no-nonsense veteran boxer: a tight, short white crop (never spiked),
+a full dark beard and hard brows, and bold black tiger stripes from his
+left shoulder down to the wrist. White wraps run up his forearms, he wears
+a brown belt over baggy khakis, and his lower legs are bandaged. His guard
+is a boxer's, not a karateka's:
+- chin tucked behind high, tight fists, with elbows in to guard the ribs;
+- shoulders hunched and rolled forward, with a slight lean in;
+- bladed feet about shoulder width, rear heel light.
 
 **Suds: the barrel and the cooler.**
 A wide barrel of a torso in a blue Hawaiian shirt, on red armoured legs. A

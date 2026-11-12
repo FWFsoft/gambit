@@ -1,6 +1,6 @@
 """Wade, the Old Head. Built on the heroic body kit (_body.py).
 
-White swept-back hair and grey stubble, orange skin, a tiger-stripe tattoo
+A tight, short white crop and a full dark beard, orange skin, a tiger-stripe tattoo
 sleeve on his left arm, big wrapped fists, baggy khaki trousers with a dark
 sash. A boxer who lives in his guard.
 
@@ -24,13 +24,15 @@ RIM = (255, 176, 72)          # tiger orange
 PIXEL_SCALE = 1.0
 CELL = (176, 156, 128)
 
-SKIN = (222, 124, 62)
-HAIR = (236, 232, 224)
-STUBBLE = (150, 140, 132)
-PANTS = (196, 166, 112)
-SASH = (98, 56, 34)
+SKIN = (214, 112, 52)
+HAIR = (238, 234, 226)
+BEARD = (44, 30, 26)
+PANTS = (200, 166, 104)
+SASH = (150, 80, 38)
+WAIST = (40, 34, 36)
 WRAP = (240, 234, 214)
-INK = (58, 30, 26)
+LEGWRAP = (150, 146, 112)
+INK = (24, 16, 18)
 
 # 3rd Strike proportions (think Ken, a little heavier and older): about
 # seven heads tall, long legs in a wide stance, squared athletic shoulders
@@ -44,7 +46,6 @@ BUILD = _body.Build(
 
 # Secondary motion: joint -> (drive joint, gain, stiffness, damping, drag)
 FOLLOW = {
-    "hair": ("head", 0.9, 150.0, 11.0, 0.7),
     "sash": ("hips", 1.0, 80.0, 7.0, 1.0),
 }
 
@@ -54,9 +55,11 @@ def build():
     m = Model("Wade")
     skin = m.material("skin", SKIN)
     hair = m.material("hair", HAIR)
-    stubble = m.material("stubble", STUBBLE)
+    beard = m.material("beard", BEARD)
     pants = m.material("pants", PANTS)
     sash = m.material("sash", SASH)
+    waist = m.material("waist", WAIST)
+    legwrap = m.material("legwrap", LEGWRAP)
     wrap = m.material("wrap", WRAP)
     ink = m.material("ink", INK)
 
@@ -71,50 +74,94 @@ def build():
     _body.arms(m, b, skin, skin, wrap)
     _body.legs(m, b, pants, pants, skin)
 
-    # ---- face: stubble, moustache, brows, ears -----------------------------
-    m.blob("head", stubble, (0, -0.10, hz + 0.72), (0.19, 0.12, 0.10),
-           segments=12, rings=8, smooth=True)
-    m.tube("head", stubble, [(-0.06, -0.135, hz + 0.765), (0, -0.145, hz + 0.775),
-                             (0.06, -0.135, hz + 0.765)], [0.018, 0.022, 0.018],
-           sides=6)
+    # ---- face: a short, full beard and a stern brow ---------------------------
+    w = b.head
+    # Features sit on the face surface (the skull's front is about y=-0.17).
+    m.blob("head", beard, (0, -0.105, hz + 0.70), (w * 0.84, w * 0.62, w * 0.52),
+           segments=14, rings=8, smooth=True)                        # full beard
     for x in (1, -1):
-        m.box("head", ink, (0.055 * x, -0.135, hz + 0.815), (0.045, 0.02, 0.028))
-        m.tube("head", hair, [(0.02 * x, -0.135, hz + 0.85), (0.09 * x, -0.12, hz + 0.86)],
-               [0.016, 0.012], sides=6)
-        m.blob("head", skin, (0.13 * x, -0.01, hz + 0.80), (0.05, 0.07, 0.09),
-               segments=8, rings=6, smooth=True)
+        m.tube("head", beard, [(0.12 * x, -0.06, hz + 0.80), (0.11 * x, -0.12, hz + 0.72)],
+               [0.03, 0.04], sides=6)                                # sideburns
+    m.tube("head", beard, [(-0.07, -0.178, hz + 0.765), (0, -0.19, hz + 0.772),
+                           (0.07, -0.178, hz + 0.765)], [0.022, 0.026, 0.022],
+           sides=6)                                                  # moustache
+    for x in (1, -1):
+        m.box("head", ink, (0.06 * x, -0.17, hz + 0.818),
+              (0.055, 0.02, 0.026))                                  # eyes
+        m.tube("head", beard, [(0.02 * x, -0.18, hz + 0.84), (0.11 * x, -0.16, hz + 0.856)],
+               [0.024, 0.016], sides=6)                              # hard brows
+        m.blob("head", skin, (0.14 * x, -0.01, hz + 0.80), (0.05, 0.07, 0.09),
+               segments=8, rings=6, smooth=True)                     # ears
 
-    # ---- hair: a swept-back white crest that streams behind him --------------
-    m.blob("head", hair, (0, 0.04, hz + 0.90), (0.27, 0.27, 0.12), segments=14,
-           rings=8, smooth=True)
-    for x, lift in ((0.0, 0.04), (0.08, 0.0), (-0.08, 0.0)):
-        m.tube("hair", hair, [(x, -0.06, hz + 0.91), (x * 1.2, 0.12, hz + 0.90 + lift),
-                              (x * 1.5, 0.30, hz + 0.78 + lift)],
-               [0.075, 0.06, 0.012], sides=8)
+    # ---- hair: a tight, short white crop, swept back -------------------------
+    # Sits on the crown and back of the skull; the hairline starts well
+    # above the brow so the face and beard read.
+    m.blob("head", hair, (0, 0.045, hz + 0.905), (w * 0.98, w * 0.98, w * 0.46),
+           segments=16, rings=10, smooth=True)
+    m.blob("head", hair, (0, -0.035, hz + 0.945), (w * 0.70, w * 0.34, w * 0.22),
+           segments=12, rings=8, smooth=True)                        # short front lift
 
-    # ---- tattoo sleeve on the left arm ---------------------------------------
-    s = m.rest_world("shoulder_L")
-    e = m.rest_world("elbow_L")
-    for i, k in enumerate((0.25, 0.45, 0.65)):
-        z = s[2] + (e[2] - s[2]) * k
-        x = s[0] + (e[0] - s[0]) * k
-        m.tube("shoulder_L", ink, [(x, 0, z + 0.012), (x, 0, z - 0.012)],
-               [0.128 - i * 0.004, 0.128 - i * 0.004], sides=12, cap=False)
+    # ---- tiger-stripe sleeve: shoulder to wrist on the left arm ---------------
+    def stripes(joint, a, bpt, radius, count, phase):
+        """Bold, tapering stripes that wrap part way round a limb segment."""
+        for k in range(count):
+            u = (k + 0.5) / count
+            cx = a[0] + (bpt[0] - a[0]) * u
+            cz = a[2] + (bpt[2] - a[2]) * u
+            r = radius(u) + 0.004
+            start = phase + k * 1.3
+            span = 3.6 + 0.8 * ((k * 7) % 3) / 2.0
+            pts = []
+            for t in range(7):
+                ang = start + span * t / 6
+                # A diagonal sweep, like the splash art's stripes.
+                pts.append((cx + math.cos(ang) * r, math.sin(ang) * r,
+                            cz + 0.07 * (t - 3) / 3))
+            m.tube(joint, ink, pts, [0.004, 0.017, 0.023, 0.025, 0.023, 0.017, 0.004],
+                   sides=6, steps=3)
+
+    s_ = m.rest_world("shoulder_L")
+    e_ = m.rest_world("elbow_L")
+    w_ = m.rest_world("wrist_L")
+    r0, r1, r2 = b.upper_arm
+    # Below the shoulder cap...
+    stripes("shoulder_L", (s_[0], 0, s_[2] - 0.10), e_,
+            lambda u: r1 - (r1 - r2) * max(0.0, u - 0.5), 4, 0.3)
+    stripes("elbow_L", e_, (w_[0], 0, w_[2] + 0.15),
+            lambda u: b.forearm[1], 3, 2.4)
+    # ...and over it, wrapping the deltoid.
+    cap = r1 * b.deltoid * 0.5
+    stripes("shoulder_L", (s_[0], 0, s_[2] + 0.06), (s_[0], 0, s_[2] - 0.08),
+            lambda u: cap * (0.85 + 0.15 * (1 - abs(u - 0.5) * 2)), 3, 2.0)
+    for k, (x, z, ang) in enumerate(((0.20, hz + 0.53, 0.6), (0.24, hz + 0.47, 0.9),
+                                     (0.16, hz + 0.46, 0.3))):
+        m.tube("chest", ink, [(x - 0.06, -0.15, z + 0.03), (x, -0.17, z),
+                              (x + 0.07, -0.14, z - 0.03 * ang)],
+               [0.004, 0.018, 0.004], sides=5, steps=3)              # onto the pec
 
     # ---- wraps at the wrists and ankles ------------------------------------------
     for side in ("L", "R"):
         w = m.rest_world(f"wrist_{side}")
-        m.tube(f"elbow_{side}", wrap, [(w[0], 0, w[2] + 0.07), (w[0], 0, w[2] - 0.01)],
-               [0.072, 0.076], sides=10)
+        # Hand wraps run from the fist well up the forearm.
+        m.tube(f"elbow_{side}", wrap, [(w[0], 0, w[2] + 0.13), (w[0], 0, w[2] - 0.01)],
+               [0.084, 0.082], sides=10)
         a = m.rest_world(f"ankle_{side}")
-        m.tube(f"knee_{side}", wrap, [(a[0], 0, a[2] + 0.10), (a[0], 0, a[2] + 0.02)],
-               [0.095, 0.085], sides=10)
+        # Bandaged lower legs over the trouser cuffs.
+        m.tube(f"knee_{side}", legwrap, [(a[0], 0, a[2] + 0.24), (a[0], 0, a[2] + 0.12),
+                                         (a[0], 0, a[2] + 0.02)],
+               [0.13, 0.11, 0.09], sides=10)
 
     # ---- sash: tied at the waist, a tail that swings ------------------------------
-    m.tube("hips", sash, [(-0.24, 0.0, hz + 0.06), (0, -0.17, hz + 0.07),
-                          (0.24, 0.0, hz + 0.06), (0, 0.17, hz + 0.07),
-                          (-0.24, 0.0, hz + 0.06)], [0.05, 0.05, 0.05, 0.05, 0.05],
-           sides=6)
+    m.tube("hips", waist, [(-0.25, 0.0, hz + 0.10), (0, -0.18, hz + 0.11),
+                           (0.25, 0.0, hz + 0.10), (0, 0.18, hz + 0.11),
+                           (-0.25, 0.0, hz + 0.10)], [0.05, 0.05, 0.05, 0.05, 0.05],
+           sides=6)                                                  # dark waistband
+    m.tube("hips", sash, [(-0.25, 0.0, hz + 0.04), (0, -0.18, hz + 0.05),
+                          (0.25, 0.0, hz + 0.04), (0, 0.18, hz + 0.05),
+                          (-0.25, 0.0, hz + 0.04)], [0.045, 0.045, 0.045, 0.045, 0.045],
+           sides=6)                                                  # brown belt
+    m.blob("hips", sash, (0.06, -0.18, hz + 0.04), (0.08, 0.05, 0.07),
+           segments=8, rings=6, smooth=True)                         # knot
     m.tube("sash", sash, [(0.08, -0.16, hz + 0.04), (0.10, -0.18, hz - 0.12),
                           (0.11, -0.17, hz - 0.30)], [0.05, 0.045, 0.02], sides=6)
 
@@ -126,24 +173,24 @@ def build():
 # ---------------------------------------------------------------------------
 
 def guard(bounce=0.0, roll=0.0):
-    """A 3rd Strike fighting stance: upright and proud, chest out, feet
-    planted wide with the knees bent out, fists held in front of the chest
-    (lead fist higher and forward). `bounce` 0..1 sinks into the knees,
-    `roll` -1..1 rolls the shoulders (the idle's rhythm)."""
+    """A boxer's guard: chin tucked down behind high, tight fists, elbows in
+    to protect the ribs, shoulders hunched and rolled forward, a slight lean
+    in, bladed feet about shoulder width with the rear heel light.
+    `bounce` 0..1 sinks into the knees, `roll` -1..1 rolls the shoulders."""
     return {
-        "hips": (0, 0, 18 + 3 * roll),
-        "abdomen": (2 + 2 * bounce, 0, -4),
-        "chest": (-2 + 3 * bounce, 0, -8 - 4 * roll),
-        "neck": (0, 0, -4),
+        "hips": (0, 0, 16 + 3 * roll),
+        "abdomen": (8 + 2 * bounce, 0, -4),
+        "chest": (10 + 3 * bounce, 0, -8 - 4 * roll),
+        "neck": (4, 0, -4),
         "head": (2, 0, -4 + 3 * roll),
-        "shoulder_L": (-62 - 4 * roll, -8, -16), "elbow_L": (-92, 0, 0),
-        "wrist_L": (-8, 0, 0),
-        "shoulder_R": (-34 + 4 * roll, 12, 14), "elbow_R": (-118, 0, 0),
-        "wrist_R": (-8, 0, 0),
-        "hip_L": (-24 - 6 * bounce, -16, -6), "knee_L": (22 + 16 * bounce, 0, 0),
-        "ankle_L": (-4 - 8 * bounce, 14, 0),
-        "hip_R": (18 - 6 * bounce, 14, 10), "knee_R": (26 + 16 * bounce, 0, 0),
-        "ankle_R": (-14 - 8 * bounce, -12, 0),
+        "shoulder_L": (-54 - 3 * roll, 10, -16), "elbow_L": (-136, 0, 0),
+        "wrist_L": (-14, 0, 0),
+        "shoulder_R": (-44 + 3 * roll, -12, 16), "elbow_R": (-146, 0, 0),
+        "wrist_R": (-14, 0, 0),
+        "hip_L": (-20 - 6 * bounce, -6, -6), "knee_L": (18 + 14 * bounce, 0, 0),
+        "ankle_L": (-2 - 8 * bounce, 6, 0),
+        "hip_R": (14 - 6 * bounce, 6, 10), "knee_R": (24 + 14 * bounce, 0, 0),
+        "ankle_R": (-18 - 8 * bounce, -6, 0),
         "hair": (0, 0, 0), "sash": (0, 0, 0),
     }
 
