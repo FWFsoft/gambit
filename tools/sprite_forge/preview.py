@@ -23,11 +23,14 @@ def main():
     mod = importlib.import_module(actor)
     bpy.ops.wm.read_factory_settings(use_empty=True)
     model, base = mod.build()
-    cell = getattr(mod, "CELL", (128, 112, 98))
-    r = forge.Renderer(*cell)
+    k = getattr(mod, "PIXEL_SCALE", 1.0)
+    if len(sys.argv) > 5:
+        k = float(sys.argv[5])
+    cell = [round(v / k) for v in getattr(mod, "CELL", (128, 112, 98))]
+    r = forge.Renderer(*cell, forge.PIXEL_SIZE * k)
     clip = next(c for c in mod.clips() if c.name == clip_name)
     frames = frames or list(range(clip.frames))
-    scale = 3
+    scale = max(1, round(3 * k))
     sheet = Image.new("RGBA", (cell[0] * 8 * scale, cell[1] * len(frames) * scale),
                       (78, 96, 66, 255))
     for fi, f in enumerate(frames):

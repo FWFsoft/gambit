@@ -21,6 +21,28 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-12: Silhouette-first art direction; Presidente and Wade reshaped
+- **Decision:** Every in-game asset must pass the "who's that?" silhouette
+  test from the art on-ramp. `tools/sprite_forge/silhouette.py` checks it.
+  - Presidente is now an inverted triangle: boulder shoulders, small legs
+    planted wide, a tall striped crest, and a fists-on-hips idle.
+  - Wade is a lean lunge: a long bladed stance, oversized white wrapped
+    mitts by his face, and swept-back hair.
+  - Both render with chunkier pixels (`PIXEL_SCALE` 1.35), at the same size
+    on screen, putting Wade near the 64 px target in DD-AA-007.
+- **Pillars:** Clarity serves: the heroes now read as different shapes.
+  It does not fix finding yourself in a swarm, because enemy bodies cover
+  any outline; that needs a player rim or outline (not built).
+- **Why:** The forge actors had shared one skeleton and posture, and their
+  identity lived inside the outline. A cape flare was tried on Presidente
+  and removed because it read as debris. The chunkier pixels look almost
+  the same as standard pixels at play size, so they were kept for
+  consistency with DD-AA-007.
+- **Status:** Accepted (requested by a human); the specific shapes are
+  Built, needs review
+- **Where:** `tools/sprite_forge/actors/`, `tools/sprite_forge/silhouette.py`,
+  `docs/design/ART_DIRECTION.md`
+
 ## 2026-11-12: Effect visual language and effect verbs
 - **Decision:** Every effect gets its own colour, motion and icon. Stacks
   drive the size of its aura, its particles and the body tint. Six verbs

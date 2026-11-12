@@ -134,7 +134,8 @@ Everyone must run the same build.
   8-direction pixel art with real animation frames for every move. The
   other six are still a single pose cut from their concept art, mirrored,
   with procedural animation (bob, lean, lunge, squash, hit flash) until
-  they get a forge actor.
+  they get a forge actor. New art follows the silhouette rules in
+  `docs/design/ART_DIRECTION.md`.
 - **Enemies:** Toxlith is a forge actor; the rest are the alien-arena sprite sheets (idle / run / die),
   with the per-genus stats from the Unity project. The boss reuses the
   Synaptogon body, tinted.

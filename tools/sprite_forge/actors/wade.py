@@ -9,6 +9,8 @@ import math
 
 from forge import Clip, Key, Model
 
+PIXEL_SCALE = 1.35  # chunkier art pixels, same size on screen (see forge.ActorSpec)
+
 SKIN = (222, 122, 58)
 HAIR = (232, 228, 220)
 STUBBLE = (150, 140, 132)
@@ -43,7 +45,7 @@ def build():
         m.joint(f"ankle_{side}", f"knee_{side}", (0.13 * x, 0, 0.11))
 
     # ---- pelvis + sash --------------------------------------------------
-    m.box("hips", pants, (0, 0, 0.92), (0.42, 0.28, 0.22), taper=1.05)
+    m.box("hips", pants, (0, 0, 0.92), (0.36, 0.26, 0.22), taper=1.05)
     m.box("hips", sash, (0, 0, 1.04), (0.40, 0.27, 0.09))
     m.box("hips", sash, (0.06, -0.15, 1.01), (0.09, 0.05, 0.07))
     m.box("hips", sash, (0.08, -0.15, 0.91), (0.05, 0.03, 0.16), rot=(0, 10, 0))
@@ -51,7 +53,7 @@ def build():
 
     # ---- torso: V-shaped and heavy through the chest --------------------
     # Faceted blobs rather than boxes: the flat facets shade like muscle.
-    m.blob("chest", skin, (0, -0.01, 1.16), (0.31, 0.22, 0.24), segments=8,
+    m.blob("chest", skin, (0, -0.01, 1.16), (0.25, 0.20, 0.24), segments=8,
            rings=6)                                                  # abdomen
     m.blob("chest", skin, (0, 0.015, 1.345), (0.47, 0.27, 0.30), segments=10,
            rings=7)                                                  # rib cage
@@ -73,6 +75,10 @@ def build():
     m.blob("neck", hair, (0, 0.04, 1.785), (0.22, 0.24, 0.10), rot=(-12, 0, 0))
     m.blob("neck", hair, (0, 0.085, 1.715), (0.225, 0.13, 0.17))
     m.box("neck", hair, (0, -0.07, 1.775), (0.17, 0.08, 0.04), rot=(-20, 0, 0))
+    # The swept-back crest of white hair: his outline's signature from the
+    # side and above.
+    m.blob("neck", hair, (0, 0.15, 1.74), (0.25, 0.30, 0.09), rot=(-14, 0, 0))
+    m.blob("neck", hair, (0, 0.30, 1.75), (0.16, 0.20, 0.06), rot=(-20, 0, 0))
     for x in (1, -1):
         m.box("neck", eye, (0.052 * x, -0.128, 1.692), (0.05, 0.02, 0.032))
         m.box("neck", hair, (0.058 * x, -0.13, 1.727), (0.075, 0.025, 0.022))
@@ -85,8 +91,9 @@ def build():
         m.limb(sh, skin, (0.28 * x, 0, 1.42), (0.30 * x, 0, 1.17), 0.088, 0.072)
         m.limb(el, skin, (0.30 * x, 0, 1.17), (0.31 * x, 0, 0.95), 0.072, 0.060)
         m.limb(el, wrap, (0.307 * x, 0, 1.02), (0.31 * x, 0, 0.93), 0.068, 0.066)
-        m.box(wr, skin, (0.31 * x, -0.005, 0.865), (0.12, 0.13, 0.12), bevel=0.02)
-        m.box(wr, wrap, (0.31 * x, -0.06, 0.865), (0.125, 0.03, 0.085))
+        # Oversized wrapped fists: two bright mitts that read at any size.
+        m.box(wr, wrap, (0.31 * x, -0.01, 0.85), (0.19, 0.20, 0.19), bevel=0.04)
+        m.box(wr, skin, (0.31 * x, -0.11, 0.82), (0.14, 0.02, 0.06))  # knuckles
         if side == "L":
             # Tiger-stripe tattoo sleeve: dark bands around the upper arm
             for i, z in enumerate((1.38, 1.31, 1.24)):
@@ -111,22 +118,23 @@ def build():
 # ---------------------------------------------------------------------------
 
 def guard(bounce=0.0):
-    """Orthodox boxing guard: left foot and left hand lead."""
+    """Peek-a-boo guard: fists up beside the face, elbows flared, leaning in
+    off a long bladed stance (left foot and left hand lead)."""
     return {
-        "hips": (0, 0, 12),
-        "chest": (8, 0, -10),
-        "neck": (2, 0, -2),
-        "shoulder_L": (-48, 8, -10),
-        "elbow_L": (-112, 0, 0),
+        "hips": (0, 0, 16),
+        "chest": (16, 0, -12),
+        "neck": (-6, 0, -2),
+        "shoulder_L": (-62, -30, -10),
+        "elbow_L": (-118, 0, 0),
         "wrist_L": (0, 0, 0),
-        "shoulder_R": (-38, -10, 10),
-        "elbow_R": (-128, 0, 0),
-        "hip_L": (-18 - bounce, 0, -8),
-        "knee_L": (22 + bounce * 2, 0, 0),
-        "ankle_L": (-4 - bounce, 0, 0),
-        "hip_R": (14 - bounce, 0, 10),
-        "knee_R": (24 + bounce * 2, 0, 0),
-        "ankle_R": (-14 - bounce, 0, 0),
+        "shoulder_R": (-52, 26, 10),
+        "elbow_R": (-130, 0, 0),
+        "hip_L": (-30 - bounce, -6, -8),
+        "knee_L": (26 + bounce * 2, 0, 0),
+        "ankle_L": (2 - bounce, 0, 0),
+        "hip_R": (26 - bounce, 6, 12),
+        "knee_R": (28 + bounce * 2, 0, 0),
+        "ankle_R": (-20 - bounce, 0, 0),
     }
 
 

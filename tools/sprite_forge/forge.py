@@ -322,7 +322,8 @@ def sample(clip: Clip, t: float, base: Dict[str, Sequence[float]]):
 # --------------------------------------------------------------------------
 
 class Renderer:
-    def __init__(self, cell_w: int, cell_h: int, pivot_y: int):
+    def __init__(self, cell_w: int, cell_h: int, pivot_y: int,
+                 pixel_size: float = PIXEL_SIZE):
         self.cell_w, self.cell_h, self.pivot_y = cell_w, cell_h, pivot_y
         sc = bpy.context.scene
         sc.render.engine = "CYCLES"
@@ -353,7 +354,7 @@ class Renderer:
         cam = bpy.data.cameras.new("forge_cam")
         cam.type = "ORTHO"
         size = max(cell_w, cell_h)
-        cam.ortho_scale = size * PIXEL_SIZE
+        cam.ortho_scale = size * pixel_size
         cam.clip_start = 0.1
         cam.clip_end = 100.0
         # Put the ground origin at (cell_w/2, pivot_y) in the image.
@@ -490,6 +491,10 @@ class ActorSpec:
     cell_w: int = 128
     cell_h: int = 112
     pivot_y: int = 98     # feet line in the cell
+    # Bigger art pixels: render at PIXEL_SIZE * pixel_scale and let the game
+    # draw the sheet pixel_scale times larger, so the character keeps its
+    # size on screen but is built from fewer, chunkier pixels.
+    pixel_scale: float = 1.0
     # Optional carry socket: (joint_a, joint_b). Their midpoint is exported
     # per frame so the game can pin a carried thing (a grappled foe) to the
     # hands. A pseudo-joint "carry" in the pose sets the carried thing's
@@ -529,7 +534,8 @@ def render_actor(spec: ActorSpec, out_png: str, rel_png: str, log=print):
     """
     bpy.ops.wm.read_factory_settings(use_empty=True)
     model, base = spec.build()
-    renderer = Renderer(spec.cell_w, spec.cell_h, spec.pivot_y)
+    renderer = Renderer(spec.cell_w, spec.cell_h, spec.pivot_y,
+                        PIXEL_SIZE * spec.pixel_scale)
     total = sum(c.frames for c in spec.clips) * len(DIRECTIONS)
     # Roughly square sheets stay inside GPU texture limits for big casts.
     cols = max(SHEET_COLUMNS,
@@ -540,7 +546,8 @@ def render_actor(spec: ActorSpec, out_png: str, rel_png: str, log=print):
     sheet = Image.new("RGBA", (cols * spec.cell_w, rows * spec.cell_h),
                       (0, 0, 0, 0))
     lines = [f"actor {spec.name} {rel_png} {spec.cell_w} {spec.cell_h} "
-             f"{spec.cell_w // 2} {spec.pivot_y} {cols}"]
+             f"{spec.cell_w // 2} {spec.pivot_y} {cols}"
+             + (f" {spec.pixel_scale:g}" if spec.pixel_scale != 1.0 else "")]
     cell = 0
     sockets = []
     for clip in spec.clips:

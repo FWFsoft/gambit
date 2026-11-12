@@ -42,6 +42,10 @@ of the design.
      PLAY, Controls/HUD, Genera and Infusion System): say so explicitly.
 
 5. Check the claims you can check:
+   - **Art** (any new or changed sprite, enemy, effect or obstacle): run
+     `python3 tools/sprite_forge/silhouette.py --legacy`, look at the
+     lineup and follow `docs/design/ART_DIRECTION.md`. A flagged look-alike
+     weakens Clarity.
    - **Balance:** run `./build/ArenaSim` with the affected characters.
    - **Clarity:** run `/visual-test` or record frames and look at them.
    Mention the results.

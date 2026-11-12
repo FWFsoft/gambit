@@ -72,6 +72,7 @@ class ArenaView {
   struct ActorSheet {
     Texture* texture = nullptr;
     int cellW = 0, cellH = 0, pivotX = 0, pivotY = 0, columns = 1;
+    float scale = 1.0f;  // drawn this much larger (chunkier art pixels)
     std::unordered_map<std::string, ActorAnim> anims;
     const ActorAnim* find(const std::string& name) const {
       auto it = anims.find(name);

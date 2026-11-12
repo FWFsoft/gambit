@@ -45,12 +45,29 @@ python3 tools/sprite_forge/showcase.py /tmp/all.gif Wade:1 Toxlith:7
 
 ## Adding an actor
 
-Copy `actors/toxlith.py` (creature) or `actors/wade.py` (character):
+Write a shape brief first (`docs/design/ART_DIRECTION.md`): the dominant
+shape, the signature piece that breaks the outline, the idle pose. Then
+copy `actors/toxlith.py` (creature) or `actors/wade.py` (character) and
+give it its own proportions:
 
 - `build()` returns `(Model, rest_pose)`
 - `clips()` returns `Clip`s; each clip is a list of `Key(t, pose, root_offset,
   root_rotation)`
-- optional `CELL = (width, height, feet_line)` in pixels
+- optional `CELL = (width, height, feet_line)` in standard pixels
+- optional `PIXEL_SCALE` (characters use 1.35): chunkier art pixels at
+  the same on-screen size; the sheet is rendered smaller and the game draws
+  it larger
+- preview at a given pixel scale:
+  `/opt/forge/bin/python tools/sprite_forge/preview.py wade idle out.png 0 1.35`
+
+After baking, run the silhouette check: the "who's that?" test from the
+art on-ramp. It writes a lineup of black silhouettes at in-game size and
+flags pairs that are too alike:
+
+```bash
+python3 tools/sprite_forge/silhouette.py            # forge actors
+python3 tools/sprite_forge/silhouette.py --legacy   # plus the old cut-outs
+```
 
 Clip names the game looks for: `idle`, `run`, `hit`, `death`, and
 `attack` for enemies. Character abilities map to clips in `actionClip()`

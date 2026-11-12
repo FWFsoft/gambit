@@ -184,6 +184,7 @@ void ArenaView::loadManifest() {
       std::string path;
       in >> path >> sheet.cellW >> sheet.cellH >> sheet.pivotX >> sheet.pivotY >>
           sheet.columns;
+      if (!(in >> sheet.scale)) sheet.scale = 1.0f;
       sheet.texture = TextureManager::instance().get(path);
       if (sheet.texture) {
         auto anims = std::move(actorSheets[name].anims);
@@ -284,6 +285,7 @@ void ArenaView::drawActorFrame(ImDrawList* dl, const ActorSheet& sheet,
                                ImU32 tint, bool hold, int forcedFrame,
                                float rotation) {
   int frame = actorFrameIndex(anim, elapsed, hold, forcedFrame);
+  scale *= sheet.scale;
   int cell = anim.start + direction * anim.frames + frame;
   int col = cell % sheet.columns;
   int row = cell / sheet.columns;
@@ -794,8 +796,8 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
           CarryPoint& point = carryPoints[state.playerId];
           point.worldX = worldX;
           point.worldY = worldY;
-          point.screenX = feet.x + socket.x;
-          point.screenY = feet.y + socket.y;
+          point.screenX = feet.x + socket.x * actor->scale;
+          point.screenY = feet.y + socket.y * actor->scale;
           point.rollDeg = socket.rollDeg;
           point.front = socket.front;
           point.faceLeft = anim.direction >= 5;
@@ -928,8 +930,8 @@ void ArenaView::drawEnemy(ImDrawList* dl, const ArenaClient::EnemyView& view) {
                    (carrier->faceLeft ? -1.0f : 1.0f);
     // Put the foe's middle on his hands. Sprites rotate about the bottom
     // of their cell, which sits `drop` pixels below their feet.
-    float drop = actor ? (actor->cellH - actor->pivotY) * scale : 0.0f;
-    float half = actor ? actor->pivotY * 0.3f * scale
+    float drop = actor ? (actor->cellH - actor->pivotY) * scale * actor->scale : 0.0f;
+    float half = actor ? actor->pivotY * 0.3f * scale * actor->scale
                        : (sprite ? sprite->cellH * 0.3f * scale : 16.0f);
     float reach = drop + half;
     ImVec2 base(carrier->screenX - reach * std::sin(liftRotation),
@@ -1390,7 +1392,7 @@ void ArenaView::drawOverhead(ImDrawList* dl) {
     bool elite = (view.state.flags & EnemyFlags::Elite) != 0;
     const ActorSheet* enemyActor =
         kind == Arena::EnemyKind::Boss ? nullptr : actorFor(def.name);
-    float spriteHeight = enemyActor ? enemyActor->pivotY * 0.72f
+    float spriteHeight = enemyActor ? enemyActor->pivotY * enemyActor->scale * 0.72f
                                     : (sprite ? sprite->cellH : 40);
     float height = spriteHeight * def.drawScale * (elite ? 1.22f : 1.0f) *
                    camera->zoom;
