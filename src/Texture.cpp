@@ -87,4 +87,13 @@ bool Texture::createWhitePixel() {
 
 void Texture::bind() const { glBindTexture(GL_TEXTURE_2D, textureID); }
 
+void Texture::setSmooth(bool smooth) {
+  if (textureID == 0) return;
+  GLint filter = smooth ? GL_LINEAR : GL_NEAREST;
+  glBindTexture(GL_TEXTURE_2D, textureID);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
+  glBindTexture(GL_TEXTURE_2D, 0);
+}
+
 void Texture::unbind() { glBindTexture(GL_TEXTURE_2D, 0); }

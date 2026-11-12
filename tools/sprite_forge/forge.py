@@ -241,6 +241,65 @@ class Model:
         bmesh.ops.transform(bm, matrix=m, verts=bm.verts)
         return self._attach(bm, joint, material)
 
+    def tube(self, joint, material, points, radii, sides=10, steps=5,
+             cap=True, smooth=True):
+        """A smooth tube through `points` (world rest positions), its radius
+        easing through `radii` (one per point). Curved, tapering forms:
+        limbs with bulging muscle, hair strands, tails, horns, cloth tails.
+        """
+        pts = [Vector(p) for p in points]
+        assert len(pts) >= 2 and len(radii) == len(pts)
+
+        def catmull(i, t):
+            p0 = pts[max(i - 1, 0)]
+            p1, p2 = pts[i], pts[i + 1]
+            p3 = pts[min(i + 2, len(pts) - 1)]
+            t2, t3 = t * t, t * t * t
+            return 0.5 * ((2 * p1) + (-p0 + p2) * t +
+                          (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
+                          (-p0 + 3 * p1 - 3 * p2 + p3) * t3)
+
+        samples, rads = [], []
+        for i in range(len(pts) - 1):
+            for k in range(steps):
+                t = k / steps
+                samples.append(catmull(i, t))
+                u = t * t * (3 - 2 * t)
+                rads.append(radii[i] + (radii[i + 1] - radii[i]) * u)
+        samples.append(pts[-1])
+        rads.append(radii[-1])
+
+        bm = bmesh.new()
+        rings = []
+        normal = None
+        for j, c in enumerate(samples):
+            a = samples[max(j - 1, 0)]
+            b = samples[min(j + 1, len(samples) - 1)]
+            tangent = (b - a).normalized()
+            if normal is None:
+                ref = Vector((0, 0, 1)) if abs(tangent.z) < 0.9 else Vector((1, 0, 0))
+                normal = tangent.cross(ref).normalized()
+            else:  # parallel transport keeps the rings from twisting
+                normal = (normal - tangent * normal.dot(tangent)).normalized()
+            binormal = tangent.cross(normal)
+            ring = []
+            for k in range(sides):
+                ang = 2 * math.pi * k / sides
+                offset = (normal * math.cos(ang) + binormal * math.sin(ang)) * rads[j]
+                ring.append(bm.verts.new(c + offset))
+            rings.append(ring)
+        for j in range(len(rings) - 1):
+            for k in range(sides):
+                k2 = (k + 1) % sides
+                bm.faces.new((rings[j][k], rings[j][k2], rings[j + 1][k2],
+                              rings[j + 1][k]))
+        if cap:
+            for ring, flip in ((rings[0], True), (rings[-1], False)):
+                if min(rads[0], rads[-1]) >= 0 and ring:
+                    face = bm.faces.new(ring[::-1] if flip else ring)
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        return self._attach(bm, joint, material, smooth)
+
     # ---- posing --------------------------------------------------------
     def pose(self, pose: Dict[str, Sequence[float]], root_offset=(0, 0, 0),
              root_rot=(0, 0, 0), yaw_deg=0.0):
@@ -338,7 +397,13 @@ def sample(clip: Clip, t: float, base: Dict[str, Sequence[float]]):
 
 class Renderer:
     def __init__(self, cell_w: int, cell_h: int, pivot_y: int,
-                 pixel_size: float = PIXEL_SIZE):
+                 pixel_size: float = PIXEL_SIZE, supersample: int = 1):
+        # Supersampling renders at n times the cell size; the toon shader
+        # draws its lines there and averages down, for smooth edges.
+        self.supersample = supersample
+        cell_w, cell_h, pivot_y = (cell_w * supersample, cell_h * supersample,
+                                   pivot_y * supersample)
+        pixel_size = pixel_size / supersample
         self.cell_w, self.cell_h, self.pivot_y = cell_w, cell_h, pivot_y
         sc = bpy.context.scene
         sc.render.engine = "CYCLES"
@@ -430,10 +495,13 @@ class Renderer:
         # 16-bit PNG -> 0..1
         return img / 65535.0 if img.max() > 255 else img / 255.0
 
-    def frame(self, model: Model) -> Image.Image:
+    def frame(self, model: Model, style: str = "pixel",
+              rim_rgb=None) -> Image.Image:
         idp = self._render(None, "id")
         nrm = self._render(self.normal_mat, "normal")
         dep = self._render(self.depth_mat, "depth")
+        if style == "toon":
+            return shade_toon(model, idp, nrm, dep, self.supersample, rim_rgb)
         return shade(model, idp, nrm, dep)
 
 
@@ -494,6 +562,106 @@ def shade(model: Model, idp, nrm, dep) -> Image.Image:
     return Image.fromarray(out, "RGBA")
 
 
+# The toon style (Hades / BattleRite / Risk of Rain 2 / 3rd Strike):
+# smooth edges, flat cel bands, bold ink, a coloured rim light.
+INK_RGB = (22, 14, 30)
+TOON_OUTLINE = 3.0      # outer ink width in final pixels
+TOON_LINE = 1.0         # interior ink width in final pixels
+RIM_LIGHT = Vector((0.55, 0.45, 0.70)).normalized()   # from behind-right-above
+CREASE_DEG = 55.0       # normal change that draws an interior crease line
+
+
+def _dilate(mask, radius):
+    """Grow a boolean mask by `radius` pixels (round brush)."""
+    r = int(math.ceil(radius))
+    out = mask.copy()
+    h, w = mask.shape
+    for dy in range(-r, r + 1):
+        for dx in range(-r, r + 1):
+            if dx * dx + dy * dy > radius * radius + 0.25 or (dx == 0 and dy == 0):
+                continue
+            ys = slice(max(dy, 0), h + min(dy, 0))
+            xs = slice(max(dx, 0), w + min(dx, 0))
+            yd = slice(max(-dy, 0), h + min(-dy, 0))
+            xd = slice(max(-dx, 0), w + min(-dx, 0))
+            out[yd, xd] |= mask[ys, xs]
+    return out
+
+
+def shade_toon(model: Model, idp, nrm, dep, ss=2, rim_rgb=None) -> Image.Image:
+    """Cel-shaded, ink-outlined, anti-aliased sprite from the three passes."""
+    h, w = idp.shape[:2]
+    alpha = idp[..., 3] > 0.5
+    mat_index = np.rint(idp[..., 0] * 255).astype(int)
+    normal = nrm[..., :3] * 2.0 - 1.0
+    depth = dep[..., 0] * 40.0
+    depth[~alpha] = 1e9
+
+    key = normal @ np.array(KEY_LIGHT)
+    fill = normal @ np.array(FILL_LIGHT)
+    light = np.clip(key, -1, 1) * 0.85 + np.clip(fill, 0, 1) * 0.25
+    light += np.clip(normal[..., 2], 0, 1) * 0.12
+    # Three flat bands and a thin specular pop: clean, poster-like shading.
+    band = np.full((h, w), 2)
+    band[light < 0.22] = 1
+    band[light >= 0.86] = 3
+
+    rgb = np.zeros((h, w, 3), dtype=np.float32)
+    by_index = {m.index: m for m in model.materials.values()}
+    for idx, m in by_index.items():
+        sel = alpha & (mat_index == idx)
+        if not sel.any():
+            continue
+        ramp = np.array(m.ramp, dtype=np.float32)
+        rgb[sel] = ramp[band[sel]]
+
+    # Rim light: a band of the hero's signature colour along edges that face
+    # away from the camera and toward the rim light (Hades' backlight).
+    if rim_rgb is not None:
+        el = math.radians(CAMERA_ELEVATION_DEG)
+        view = np.array((0.0, -math.cos(el), math.sin(el)))
+        facing = np.clip(normal @ view, 0, 1)
+        fres = (1.0 - facing) ** 2.2
+        toward = np.clip(normal @ np.array(RIM_LIGHT), 0, 1)
+        rim = alpha & (fres > 0.34) & (toward > 0.15)
+        rgb[rim] = rgb[rim] * 0.35 + np.array(rim_rgb, np.float32) * 0.65
+
+    # Interior ink: depth breaks (overlaps) and sharp creases.
+    edge = np.zeros((h, w), dtype=bool)
+    cos_crease = math.cos(math.radians(CREASE_DEG))
+    for dy, dx in ((0, 1), (1, 0)):
+        ys = slice(0, h - dy)
+        xs = slice(0, w - dx)
+        ys2 = slice(dy, h)
+        xs2 = slice(dx, w)
+        d0, d1 = depth[ys, xs], depth[ys2, xs2]
+        both = alpha[ys, xs] & alpha[ys2, xs2]
+        jump = both & (np.abs(d0 - d1) > DEPTH_EDGE)
+        dot = np.sum(normal[ys, xs] * normal[ys2, xs2], axis=-1)
+        crease = both & (dot < cos_crease)
+        other = both & (mat_index[ys, xs] != mat_index[ys2, xs2]) & \
+            (np.abs(d0 - d1) > DEPTH_EDGE * 0.4)
+        e = jump | crease | other
+        edge[ys, xs] |= e
+    edge = _dilate(edge, max(0.0, TOON_LINE * ss * 0.5 - 0.5)) & alpha
+    rgb[edge] = np.array(INK_RGB, np.float32)
+
+    # Outer ink: a thick contour around the whole figure.
+    outer = _dilate(alpha, TOON_OUTLINE * ss) & ~alpha
+    rgb[outer] = np.array(INK_RGB, np.float32)
+    a = (alpha | outer).astype(np.float32)
+
+    # Average down (premultiplied) for anti-aliased edges.
+    if ss > 1:
+        H, W = h // ss, w // ss
+        prem = rgb[:H * ss, :W * ss] * a[:H * ss, :W * ss, None]
+        prem = prem.reshape(H, ss, W, ss, 3).mean(axis=(1, 3))
+        a = a[:H * ss, :W * ss].reshape(H, ss, W, ss).mean(axis=(1, 3))
+        rgb = np.where(a[..., None] > 1e-4, prem / np.maximum(a[..., None], 1e-4), 0)
+    out = np.dstack([np.clip(rgb, 0, 255), a * 255.0]).astype(np.uint8)
+    return Image.fromarray(out, "RGBA")
+
+
 # --------------------------------------------------------------------------
 # Sheets
 # --------------------------------------------------------------------------
@@ -515,6 +683,10 @@ class ActorSpec:
     # hands. A pseudo-joint "carry" in the pose sets the carried thing's
     # roll in degrees (its rx).
     socket: Optional[Tuple[str, str]] = None
+    # "pixel" (cel-shaded pixel art) or "toon" (smooth cel shading, ink and
+    # a rim light in rim_rgb, rendered supersampled and drawn smoothed).
+    style: str = "pixel"
+    rim_rgb: Optional[Tuple[int, int, int]] = None
 
 
 SHEET_COLUMNS = 16   # minimum cells per sheet row
@@ -550,7 +722,8 @@ def render_actor(spec: ActorSpec, out_png: str, rel_png: str, log=print):
     bpy.ops.wm.read_factory_settings(use_empty=True)
     model, base = spec.build()
     renderer = Renderer(spec.cell_w, spec.cell_h, spec.pivot_y,
-                        PIXEL_SIZE * spec.pixel_scale)
+                        PIXEL_SIZE * spec.pixel_scale,
+                        supersample=2 if spec.style == "toon" else 1)
     total = sum(c.frames for c in spec.clips) * len(DIRECTIONS)
     # Roughly square sheets stay inside GPU texture limits for big casts.
     cols = max(SHEET_COLUMNS,
@@ -562,7 +735,9 @@ def render_actor(spec: ActorSpec, out_png: str, rel_png: str, log=print):
                       (0, 0, 0, 0))
     lines = [f"actor {spec.name} {rel_png} {spec.cell_w} {spec.cell_h} "
              f"{spec.cell_w // 2} {spec.pivot_y} {cols}"
-             + (f" {spec.pixel_scale:g}" if spec.pixel_scale != 1.0 else "")]
+             + (f" {spec.pixel_scale:g}" if spec.pixel_scale != 1.0
+                or spec.style == "toon" else "")
+             + (" smooth" if spec.style == "toon" else "")]
     cell = 0
     sockets = []
     for clip in spec.clips:
@@ -573,7 +748,7 @@ def render_actor(spec: ActorSpec, out_png: str, rel_png: str, log=print):
                 denom = clip.frames if clip.loop else max(1, clip.frames - 1)
                 pose, offset, rot = sample(clip, f / denom, base)
                 model.pose(pose, offset, rot, yaw)
-                img = renderer.frame(model)
+                img = renderer.frame(model, spec.style, spec.rim_rgb)
                 if spec.socket:
                     sockets.append(_socket_sample(model, renderer, spec, pose))
                 sheet.alpha_composite(img, ((cell % cols) * spec.cell_w,

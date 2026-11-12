@@ -27,7 +27,9 @@ def main():
     if len(sys.argv) > 5:
         k = float(sys.argv[5])
     cell = [round(v / k) for v in getattr(mod, "CELL", (128, 112, 98))]
-    r = forge.Renderer(*cell, forge.PIXEL_SIZE * k)
+    style = getattr(mod, "STYLE", "pixel")
+    r = forge.Renderer(*cell, forge.PIXEL_SIZE * k,
+                       supersample=2 if style == "toon" else 1)
     clip = next(c for c in mod.clips() if c.name == clip_name)
     frames = frames or list(range(clip.frames))
     scale = max(1, round(3 * k))
@@ -38,7 +40,7 @@ def main():
         pose, off, rot = forge.sample(clip, f / denom, base)
         for d in range(8):
             model.pose(pose, off, rot, d * 45.0)
-            img = r.frame(model).resize((cell[0] * scale, cell[1] * scale),
+            img = r.frame(model, style, getattr(mod, "RIM", None)).resize((cell[0] * scale, cell[1] * scale),
                                         Image.NEAREST)
             sheet.alpha_composite(img, (d * cell[0] * scale,
                                         fi * cell[1] * scale))

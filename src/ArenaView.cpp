@@ -185,7 +185,11 @@ void ArenaView::loadManifest() {
       in >> path >> sheet.cellW >> sheet.cellH >> sheet.pivotX >> sheet.pivotY >>
           sheet.columns;
       if (!(in >> sheet.scale)) sheet.scale = 1.0f;
+      std::string filter;
+      bool smooth = (in >> filter) && filter == "smooth";
       sheet.texture = TextureManager::instance().get(path);
+      // Toon-style sheets are smooth art: filter them linearly.
+      if (sheet.texture && smooth) sheet.texture->setSmooth(true);
       if (sheet.texture) {
         auto anims = std::move(actorSheets[name].anims);
         actorSheets[name] = sheet;

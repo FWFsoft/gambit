@@ -79,6 +79,25 @@ Clip names the game looks for: `idle`, `run`, `hit`, `death`, and
 in `src/ArenaView.cpp` (Wade: `jab` / `cross` on LMB, `uppercut_R` /
 `uppercut_L` on RMB, `slip` on Q, `roll` on Shift).
 
+## Toon style
+
+Set `STYLE = "toon"` and a signature `RIM = (r, g, b)` in an actor module
+to render smooth art instead of pixel art. It renders at twice the
+resolution, then averages down. The shading is:
+- three cel bands,
+- ink on the outer contour (`TOON_OUTLINE`), on overlaps and on creases
+  (`CREASE_DEG`),
+- a rim light from behind (`RIM_LIGHT`).
+
+The sheet is marked `smooth` in the manifest, so the game filters it
+linearly. Use `PIXEL_SCALE` below 1 (Gravon uses 0.75) so the sheet is
+drawn close to 1:1 on screen.
+
+For organic shapes, use `m.tube(joint, material, points, radii)`: a smooth
+tube through control points, with the radius easing through `radii`. Use
+it for muscles, hair spikes, tails, horns and cloth flaps. For smooth bodies,
+use `blob(..., smooth=True)` with more segments.
+
 ## Style knobs (`forge.py`)
 
 `PIXEL_SIZE` (overall sprite scale), `KEY_LIGHT` / `FILL_LIGHT`,

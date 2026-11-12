@@ -17,7 +17,9 @@ import math
 
 from forge import Clip, Key, Model
 
-PIXEL_SCALE = 1.35  # chunkier art pixels, same size on screen (see forge.ActorSpec)
+STYLE = "toon"       # smooth cel shading, ink and a rim light (forge.shade_toon)
+RIM = (176, 92, 255)  # his signature violet, the glow of the blade's will
+PIXEL_SCALE = 0.75    # finer than standard pixels: drawn smoothed at near 1:1
 NAME = "Gravon"
 CELL = (220, 256, 200)
 
@@ -65,56 +67,82 @@ def build():
     m.joint("sword", "wrist_R", (-0.31, -0.02, 0.86))
     m.joint("back", "chest", (0, 0.20, 1.40))
 
-    # ---- torso: lean, V-shaped, bare ------------------------------------------
-    m.blob("chest", skin, (0, 0, 1.18), (0.26, 0.20, 0.22), segments=8, rings=6)
-    m.blob("chest", skin, (0, 0.01, 1.37), (0.44, 0.25, 0.26), segments=10,
-           rings=7)
+    # ---- torso: a hard V, broad lats over a narrow waist -----------------------
+    m.blob("chest", skin, (0, 0.0, 1.17), (0.30, 0.22, 0.24), segments=14,
+           rings=10, smooth=True)                                     # waist
+    m.blob("chest", skin, (0, 0.02, 1.38), (0.60, 0.30, 0.30), segments=16,
+           rings=12, smooth=True)                                     # ribs/lats
     for x in (1, -1):
-        m.blob("chest", skin, (0.09 * x, -0.10, 1.40), (0.18, 0.08, 0.13),
-               segments=8, rings=5)
-        m.blob("chest", skin, (0.14 * x, 0.04, 1.50), (0.16, 0.14, 0.09))
+        m.blob("chest", skin, (0.10 * x, -0.11, 1.41), (0.22, 0.10, 0.15),
+               segments=12, rings=8, smooth=True)                     # pecs
+        m.tube("chest", skin, [(0.08 * x, 0.02, 1.58), (0.20 * x, 0.04, 1.56),
+                               (0.30 * x, 0.02, 1.52)],
+               [0.07, 0.09, 0.06], sides=10)                          # traps
 
-    # ---- head: wild hair, a face lit from within -----------------------------------
-    m.limb("neck", skin, (0, 0, 1.52), (0, -0.01, 1.62), 0.07, 0.065)
-    m.blob("neck", skin, (0, -0.02, 1.72), (0.21, 0.22, 0.25), segments=9,
-           rings=7)
-    m.box("neck", face, (0, -0.115, 1.72), (0.15, 0.03, 0.16))
-    for i, (x, y, z, rx, rz) in enumerate(((0, 0.02, 1.86, -10, 0),
-                                           (0.10, 0.06, 1.83, -30, -30),
-                                           (-0.10, 0.06, 1.83, -30, 30),
-                                           (0, 0.12, 1.78, -60, 0),
-                                           (0.06, -0.08, 1.84, 20, -20))):
-        m.limb("neck", hair, (x, y, z - 0.06), (x * 1.8, y * 1.8 + 0.04,
-                                                 z + 0.12),
-               0.07, 0.01, sides=5)
-    m.blob("neck", hair, (0, 0.03, 1.80), (0.23, 0.24, 0.12))
+    # ---- head: big enough to read, wild hair, a face lit from within -------------
+    m.tube("neck", skin, [(0, 0, 1.52), (0, -0.01, 1.64)], [0.085, 0.08])
+    m.blob("neck", skin, (0, -0.02, 1.76), (0.27, 0.28, 0.31), segments=16,
+           rings=12, smooth=True)
+    m.blob("neck", face, (0, -0.125, 1.75), (0.19, 0.06, 0.18), segments=12,
+           rings=8, smooth=True)
+    m.blob("neck", hair, (0, 0.04, 1.86), (0.30, 0.30, 0.16), segments=14,
+           rings=8, smooth=True)
+    # Chunky swept-back spikes, each a curved, tapering tube.
+    spikes = ((0.00, -0.10, 1.92, 0.00, 0.30, 2.10),
+              (0.10, -0.06, 1.90, 0.24, 0.24, 2.02),
+              (-0.10, -0.06, 1.90, -0.24, 0.24, 2.02),
+              (0.14, 0.04, 1.84, 0.30, 0.34, 1.86),
+              (-0.14, 0.04, 1.84, -0.30, 0.34, 1.86),
+              (0.05, 0.10, 1.80, 0.10, 0.42, 1.70),
+              (-0.05, 0.10, 1.80, -0.10, 0.42, 1.70))
+    for x0, y0, z0, x1, y1, z1 in spikes:
+        mid = ((x0 + x1) / 2, (y0 + y1) / 2, max(z0, z1) + 0.06)
+        m.tube("neck", hair, [(x0, y0, z0), mid, (x1, y1, z1)],
+               [0.075, 0.05, 0.008], sides=7)
 
-    # ---- arms: bandaged forearms, spiked bracers --------------------------------------
+    # ---- arms: heavy, curved, bandaged, spiked ---------------------------------------
     for side, x in (("L", 1), ("R", -1)):
         sh, el, wr = f"shoulder_{side}", f"elbow_{side}", f"wrist_{side}"
-        m.blob(sh, skin, (0.27 * x, 0, 1.49), (0.17, 0.17, 0.16))
-        m.limb(sh, skin, (0.28 * x, 0, 1.46), (0.30 * x, 0, 1.20), 0.085, 0.07)
-        m.limb(el, wrap, (0.30 * x, 0, 1.20), (0.31 * x, 0, 0.96), 0.075, 0.065)
-        m.limb(el, spike, (0.305 * x, 0, 1.06), (0.31 * x, 0, 0.98), 0.085,
-               0.085)
+        m.blob(sh, skin, (0.28 * x, 0, 1.49), (0.24, 0.24, 0.22), segments=14,
+               rings=10, smooth=True)                                 # deltoid
+        m.tube(sh, skin, [(0.28 * x, 0, 1.46), (0.30 * x, -0.02, 1.34),
+                          (0.30 * x, 0, 1.20)], [0.10, 0.115, 0.08])  # biceps
+        m.tube(el, wrap, [(0.30 * x, 0, 1.20), (0.31 * x, -0.01, 1.08),
+                          (0.31 * x, 0, 0.96)], [0.085, 0.10, 0.08])  # forearm
+        m.tube(el, spike, [(0.305 * x, 0, 1.07), (0.31 * x, 0, 0.99)],
+               [0.11, 0.11], sides=8)                                 # bracer
         for a in range(4):
             ang = a * math.pi / 2 + 0.4
-            m.limb(el, spike, (0.31 * x + 0.06 * math.cos(ang), 0.06 *
-                               math.sin(ang), 1.02),
-                   (0.31 * x + 0.14 * math.cos(ang), 0.14 * math.sin(ang), 1.03),
-                   0.025, 0.004, sides=4)
-        m.box(wr, skin, (0.31 * x, -0.005, 0.87), (0.11, 0.12, 0.11), bevel=0.02)
+            m.tube(el, spike, [(0.31 * x + 0.08 * math.cos(ang), 0.08 * math.sin(ang),
+                                1.03),
+                               (0.31 * x + 0.20 * math.cos(ang), 0.20 * math.sin(ang),
+                                1.05)],
+                   [0.035, 0.004], sides=5)
+        m.blob(wr, skin, (0.31 * x, -0.01, 0.87), (0.16, 0.17, 0.17), segments=12,
+               rings=8, smooth=True)                                  # big fist
 
-    # ---- legs: baggy, torn navy trousers, bare feet ---------------------------------------
-    m.box("hips", pants, (0, 0, 0.96), (0.36, 0.26, 0.20))
-    m.box("hips", rags, (0, -0.13, 1.02), (0.30, 0.03, 0.05))
+    # ---- legs: huge flared, torn trousers over small bare feet ----------------------------
+    m.blob("hips", pants, (0, 0, 0.98), (0.40, 0.30, 0.22), segments=12, rings=8,
+           smooth=True)
+    m.tube("hips", rags, [(-0.20, -0.10, 1.04), (0, -0.15, 1.03),
+                          (0.20, -0.10, 1.04)], [0.03, 0.035, 0.03], sides=6)
     for side, x in (("L", 1), ("R", -1)):
         hp, kn, an = f"hip_{side}", f"knee_{side}", f"ankle_{side}"
-        m.limb(hp, pants, (0.12 * x, 0, 0.96), (0.13 * x, 0, 0.53), 0.15, 0.15)
-        m.limb(kn, pants, (0.13 * x, 0, 0.55), (0.13 * x, 0, 0.22), 0.16, 0.18)
-        m.limb(kn, rags, (0.13 * x, 0, 0.26), (0.13 * x, 0, 0.17), 0.185, 0.19,
-               cap=False)
-        m.box(an, skin, (0.13 * x, -0.05, 0.04), (0.11, 0.24, 0.07), bevel=0.02)
+        m.tube(hp, pants, [(0.12 * x, 0, 0.98), (0.14 * x, -0.01, 0.75),
+                           (0.13 * x, 0, 0.53)], [0.15, 0.17, 0.15])
+        m.tube(kn, pants, [(0.13 * x, 0, 0.55), (0.14 * x, 0, 0.36),
+                           (0.13 * x, 0, 0.18)], [0.15, 0.20, 0.25])
+        # Torn hem: ragged flaps hanging off the flare.
+        for k in range(6):
+            ang = k * math.pi / 3 + 0.3
+            r = 0.23 + (0.04 if k % 2 else 0.0)
+            m.tube(kn, rags, [(0.13 * x + math.cos(ang) * 0.20, math.sin(ang) * 0.20,
+                               0.20),
+                              (0.13 * x + math.cos(ang) * r, math.sin(ang) * r,
+                               0.10 - (0.04 if k % 2 else 0.0))],
+                   [0.05, 0.01], sides=5)
+        m.blob(an, skin, (0.13 * x, -0.06, 0.04), (0.10, 0.20, 0.07), segments=10,
+               rings=6, smooth=True)
 
     # ---- the sword: along -Y from the fist in the rest pose -----------------------------
     m.limb("sword", iron, (-0.31, 0.16, 0.86), (-0.31, -0.06, 0.86), 0.035,

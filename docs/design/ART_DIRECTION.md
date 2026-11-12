@@ -8,6 +8,33 @@ the wrong one because you didn't know what you were looking at.
 
 ![Silhouettes before and after the shape pass](../prototype/silhouettes_before_after.png)
 
+## Style target
+
+Inspirations: **Street Fighter III: 3rd Strike / Marvel vs Capcom 2**,
+**Hades**, **Risk of Rain 2**, **Battlerite**. What we take from each:
+
+| From | We take |
+| --- | --- |
+| 3rd Strike / MvC2 | heroic exaggeration: huge hands and forearms, broad shoulders, narrow waists, tapered limbs; expressive poses with anticipation and follow-through |
+| Hades | bold dark ink outlines, high-contrast cel shading, saturated colour, a coloured rim light that pops characters off the ground |
+| Risk of Rain 2 | simple, bold forms and clean colour blocks; every survivor has their own body plan and reads from far away |
+| Battlerite | top-down readability: chunky proportions, oversized weapons and heads, clear colour coding |
+
+**No pixel art.** Characters are 3D models rendered in the forge's "toon"
+style (`STYLE = "toon"` in an actor module):
+- anti-aliased edges;
+- three flat cel bands;
+- bold ink outlines and creases;
+- a rim light in the hero's signature colour (`RIM`).
+
+Models use curved, tapering `tube`s and smooth blobs, not boxes.
+
+![Gravon before and after](../prototype/gravon_style_before_after.png)
+
+**Still open:** pre-rendered sprites versus real-time 3D. At full
+resolution a pre-rendered hero costs a lot of texture memory (Gravon's
+sheet is about 200 MB of GPU memory). See `DECISIONS.md`.
+
 ## Rules for every in-game asset
 
 1. **Shape before detail.** What identifies a character must be in the

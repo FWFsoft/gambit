@@ -21,6 +21,36 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-12: Art style moves from pixel art to toon-shaded 3D
+- **Decision:**
+  - **Pixel art is dropped.** The forge gains a toon render: anti-aliased
+    cel shading, ink outlines and creases, and a signature rim light.
+  - **Organic shapes:** a `tube` primitive gives curved, tapering forms.
+  - **Gravon rebuilt as the test case:** heroic proportions, smooth
+    muscle, flared torn trousers, chunky hair, and the blade on his
+    spine.
+  - **Inspirations:** 3rd Strike / MvC2, Hades, Risk of Rain 2,
+    Battlerite.
+- **Pillars:** Clarity serves: bolder shapes, outlines and rim light. It
+  also gives the game a visual identity.
+- **Why:** Human direction. Blocky primitives at about 60 px could not
+  give 30+ characters distinct, appealing shapes.
+- **Open question (needs a human):** pre-rendered sprites or real-time
+  3D?
+  - At this resolution, Gravon's sheet is about 200 MB of GPU memory,
+    with eight directions and 63 frames. That doesn't scale to four heroes
+    in a match plus enemies, or to the WASM build.
+  - Options:
+    (a) keep pre-rendering, but mirror to five directions, trim frames and
+    compress textures;
+    (b) render these same jointed models in real time in Gambit with a
+    toon shader. That is the Battlerite / Risk of Rain 2 approach: tiny
+    memory, smooth turning at any angle, and dynamic light. It is engine
+    work.
+- **Status:** Proposed
+- **Where:** `tools/sprite_forge/forge.py`, `tools/sprite_forge/actors/gravon.py`,
+  `src/Texture.cpp`, `src/ArenaView.cpp`
+
 ## 2026-11-12: Poses carry personality; Gravon's silhouette is a sword
 - **Decision:**
   - **Gravon:** the sword runs down his spine at rest (pommel above the

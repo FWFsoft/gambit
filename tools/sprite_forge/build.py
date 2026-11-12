@@ -56,7 +56,9 @@ def main():
         name = getattr(mod, "NAME", name)
         spec = forge.ActorSpec(name, mod.build, mod.clips(), w, h, feet,
                                pixel_scale=k,
-                               socket=getattr(mod, "SOCKET", None))
+                               socket=getattr(mod, "SOCKET", None),
+                               style=getattr(mod, "STYLE", "pixel"),
+                               rim_rgb=getattr(mod, "RIM", None))
         rel = f"assets/sprites/actors/{name}.png"
         start = time.time()
         print(f"{name}:")
