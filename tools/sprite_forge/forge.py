@@ -246,7 +246,11 @@ class Model:
              root_rot=(0, 0, 0), yaw_deg=0.0):
         for name, obj in self.joints.items():
             r = pose.get(name, (0, 0, 0))
-            obj.rotation_euler = Euler([math.radians(a) for a in r], "XYZ")
+            obj.rotation_euler = Euler([math.radians(a) for a in r[:3]], "XYZ")
+            # Optional 4th value: scale. 0 hides the joint and everything on
+            # it (a sword that moves from the back to the hand).
+            k = r[3] if len(r) > 3 else 1.0
+            obj.scale = (max(k, 1e-4),) * 3
             obj.location = self.rest[name]
         # Root: yaw for direction, then the animation's own root motion.
         yaw = Matrix.Rotation(math.radians(yaw_deg), 4, "Z")
@@ -288,6 +292,17 @@ def _ease(kind, u):
     return u * u * (3 - 2 * u)
 
 
+def _lerp_joint(a, b, u):
+    """Rotation (and optional scale, default 1) between two keys. Scale steps
+    instead of blending, so a hidden part never shows half-size."""
+    rot = tuple(a[i] + (b[i] - a[i]) * u for i in range(3))
+    if len(a) > 3 or len(b) > 3:
+        sa = a[3] if len(a) > 3 else 1.0
+        sb = b[3] if len(b) > 3 else 1.0
+        return rot + ((sb if u >= 0.5 else sa),)
+    return rot
+
+
 def _lerp3(a, b, u):
     return tuple(a[i] + (b[i] - a[i]) * u for i in range(3))
 
@@ -313,7 +328,7 @@ def sample(clip: Clip, t: float, base: Dict[str, Sequence[float]]):
     for n in names:
         a = k0.pose.get(n, base.get(n, (0, 0, 0)))
         b = k1.pose.get(n, base.get(n, (0, 0, 0)))
-        pose[n] = _lerp3(a, b, u)
+        pose[n] = _lerp_joint(a, b, u)
     return pose, _lerp3(k0.offset, k1.offset, u), _lerp3(k0.rot, k1.rot, u)
 
 

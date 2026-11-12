@@ -161,8 +161,8 @@ def build():
     m.box("hips", pants, (0, 0, 0.94), (0.52, 0.34, 0.22), taper=1.04)
     for side, x in (("L", 1), ("R", -1)):
         hp, kn, an = f"hip_{side}", f"knee_{side}", f"ankle_{side}"
-        m.limb(hp, pants, (0.15 * x, 0, 1.00), (0.16 * x, 0, 0.55), 0.13, 0.10)
-        m.limb(kn, pants, (0.16 * x, 0, 0.57), (0.16 * x, 0, 0.30), 0.10, 0.085)
+        m.limb(hp, pants, (0.15 * x, 0, 1.00), (0.16 * x, 0, 0.55), 0.16, 0.13)
+        m.limb(kn, pants, (0.16 * x, 0, 0.57), (0.16 * x, 0, 0.30), 0.13, 0.11)
         m.limb(kn, boot, (0.16 * x, 0, 0.33), (0.16 * x, 0, 0.08), 0.10, 0.10)
         m.box(kn, gold, (0.16 * x, -0.10, 0.22), (0.035, 0.02, 0.20))  # laces
         m.box(an, boot, (0.16 * x, -0.06, 0.05), (0.15, 0.30, 0.10), bevel=0.025)
@@ -181,8 +181,8 @@ def stance(sway=0.0):
     return {
         "carry": (0, 0, 0),   # roll of a held foe: 0 upright, 90 lying across
         "hips": (0, 0, 0),
-        "chest": (6 + sway, 0, 0),
-        "neck": (-4, 0, 0),
+        "chest": (-8 + sway, 0, 0),
+        "neck": (-16, 0, 0),
         "cape": (4 - sway * 2, 0, 0),
         "cape_low": (6 - sway * 3, 0, 0),
         "shoulder_L": (-8, -44, 0), "elbow_L": (-10, 105, 0),

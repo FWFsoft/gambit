@@ -21,6 +21,26 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-12: Poses carry personality; Gravon's silhouette is a sword
+- **Decision:**
+  - **Gravon:** the sword runs down his spine at rest (pommel above the
+    head, crossguard at the shoulders), so his silhouette reads as a sword.
+    The host slumps underneath. He draws the sword only to attack, using
+    the new per-joint show/hide in the forge.
+  - **Suds:** idles with a toast.
+  - **Wade:** a compact, unbothered guard instead of a lunge.
+  - **Presidente:** chest out and chin up, on sturdier legs.
+- **Pillars:** Clarity: each character is still distinct, and now also
+  in character. Presidente and Suds side-on sit exactly at the
+  look-alike line (0.72): two heavy bruisers from the side are both thick
+  columns. Front, back and three-quarter views are clearly different.
+- **Why:** Human feedback: the silhouettes were distinct but did not show
+  personality, and the postures looked odd. The sword silhouette was the
+  human's idea, and it fits the Soulblade passive in Character Concepts.
+- **Status:** Accepted (requested by a human); the specific poses are
+  Built, needs review
+- **Where:** `tools/sprite_forge/actors/`, `tools/sprite_forge/forge.py`
+
 ## 2026-11-12: Suds and Gravon get forge art; Toxlith restyled
 - **Decision:**
   - **Suds** is "the barrel and the cooler": a cooler at his hip and a can

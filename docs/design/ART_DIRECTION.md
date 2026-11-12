@@ -19,15 +19,20 @@ the wrong one because you didn't know what you were looking at.
    disappears.
 3. **No shared skeletons by default.** Proportions are identity. Start from
    the character's own shape, not from another actor scaled up.
-4. **Pose with attitude.** Idle and run poses must be asymmetric and
-   characterful. Arms hanging at the sides is the most generic outline
-   there is.
-5. **Size is a cue, not the only cue.** Two characters with the same shape
+4. **Pose with personality, not just attitude.** Read the character's
+   entry in the Character Concepts doc and pose who they are: weight on one
+   leg, head angle, where the hands rest. A pose built only to break the
+   outline (an arm stuck up like a torch, a lunge held forever) reads as
+   distinct but weird.
+5. **Let the silhouette tell the lore** where it can. Gravon *is* the
+   sword (Soulblade: the blade and its host have separate health), so at
+   rest his whole outline reads as a sword.
+6. **Size is a cue, not the only cue.** Two characters with the same shape
    at different sizes still read alike in a fight.
-6. **Detail level:** about 64 art pixels for an average character
+7. **Detail level:** about 64 art pixels for an average character
    (DD-AA-007). Forge actors use `PIXEL_SCALE = 1.35`: chunkier pixels,
    same size on screen.
-7. **Check it.** Run `python3 tools/sprite_forge/silhouette.py` after every
+8. **Check it.** Run `python3 tools/sprite_forge/silhouette.py` after every
    bake and look at the lineup. The `/design-review` skill asks for it on
    art changes.
 
@@ -36,29 +41,35 @@ the wrong one because you didn't know what you were looking at.
 Write one before modelling a character. Keep it to a few lines.
 
 **El Presidente: the inverted triangle.**
-Boulder shoulders and a trapezius that buries his neck. Small legs planted
-wide. A tall red-and-white crest on the mask is the top of his outline from
-every side. His idle is a power pose (fists on hips, elbows flared), so
-there are gaps between arms and body. From behind, the flag cape is a
+Boulder shoulders and a trapezius that buries his neck, on sturdy legs
+planted wide. A tall red-and-white crest on the mask is the top of his
+outline from every side. The showman: his idle is a power pose, chest out,
+chin up, fists on hips and elbows flared, so there are gaps between arms
+and body. From behind, the flag cape is a
 solid banner.
 
-**Wade: the lunge.**
-Lean, narrow-waisted, always leaning in off a long bladed stance. Two
-oversized white wrapped mitts held up beside his face: bright blobs that
-read at any size. Swept-back white hair streams behind his head in side
-views.
+**Wade: the Old Head's guard.**
+Lean and narrow-waisted. Two oversized white wrapped mitts up by his jaw:
+bright blobs that read at any size. Swept-back white hair streams behind
+his head in side views. He is a veteran who is set in his ways, so his
+guard is compact and unbothered: bladed but not lunging, chin tucked,
+shoulders rolled, weight on the back foot.
 
 **Suds: the barrel and the cooler.**
 A wide barrel of a torso in a blue Hawaiian shirt, on red armoured legs. A
-big white cooler juts out at his left hip, and a brew can is raised high in
-his right hand, so his outline is lopsided from every side. His moves
-(toss, belch, a volley of brews, chug-and-flex) all come from the can arm.
+big white cooler juts out at his left hip. The life of the party: his idle
+is a toast ("Round's on me!"), can raised beside his grin, belly out,
+leaning back with his weight on one leg. His moves (toss, belch, a volley
+of brews, chug-and-flex) all come from the can arm.
 
 **Gravon: the blade.**
-A slim, shirtless body under a slab of a sword longer than he is tall. At
-rest it lies back over his right shoulder, angled across his back, so it is
-the top of his outline from every side, behind him included. In a fight it
-sweeps level, rises straight up, or drives into the ground.
+Gravon is the sword; the man is its host. At rest the blade runs straight
+down his spine: pommel and grip above his head, crossguard across his
+shoulders, blade tapering past his legs. From the front his whole outline
+reads as a sword; from behind, the runed blade covers him. The host slumps
+under it, head bowed and arms hanging, like a vessel the sword is wearing.
+He draws it only to swing (slashes, the overhead smash, Fury, the lunge),
+then it returns to his back.
 
 **Toxlith: the warty toad.**
 Squat and wide: lumpy acid-green skin, a crest of magenta spines with

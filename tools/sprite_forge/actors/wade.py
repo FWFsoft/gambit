@@ -118,23 +118,24 @@ def build():
 # ---------------------------------------------------------------------------
 
 def guard(bounce=0.0):
-    """Peek-a-boo guard: fists up beside the face, elbows flared, leaning in
-    off a long bladed stance (left foot and left hand lead)."""
+    """The Old Head's guard: compact and unbothered. Bladed but not lunging,
+    chin tucked, shoulders rolled forward, mitts up by the jaw, weight
+    sitting on the back foot. Nothing wasted."""
     return {
-        "hips": (0, 0, 16),
-        "chest": (16, 0, -12),
-        "neck": (-6, 0, -2),
-        "shoulder_L": (-62, -30, -10),
+        "hips": (0, 0, 14),
+        "chest": (10, 0, -10),
+        "neck": (10, 0, -4),
+        "shoulder_L": (-58, -22, -10),
         "elbow_L": (-118, 0, 0),
         "wrist_L": (0, 0, 0),
-        "shoulder_R": (-52, 26, 10),
-        "elbow_R": (-130, 0, 0),
-        "hip_L": (-30 - bounce, -6, -8),
-        "knee_L": (26 + bounce * 2, 0, 0),
-        "ankle_L": (2 - bounce, 0, 0),
-        "hip_R": (26 - bounce, 6, 12),
-        "knee_R": (28 + bounce * 2, 0, 0),
-        "ankle_R": (-20 - bounce, 0, 0),
+        "shoulder_R": (-48, 20, 10),
+        "elbow_R": (-132, 0, 0),
+        "hip_L": (-16 - bounce, -4, -8),
+        "knee_L": (18 + bounce * 2, 0, 0),
+        "ankle_L": (-2 - bounce, 0, 0),
+        "hip_R": (14 - bounce, 4, 12),
+        "knee_R": (24 + bounce * 2, 0, 0),
+        "ankle_R": (-14 - bounce, 0, 0),
     }
 
 

@@ -5,9 +5,12 @@ within, baggy torn navy trousers, bare feet, bandaged forearms with spiked
 bracers, and a cleaver of a sword longer than he is tall: dark iron, a
 blocky crossguard around a red eye, glowing red runes down the flat.
 
-Shape brief: the blade. A slim body under a huge slab of sword. At rest the
-blade sits on his right shoulder rising up and behind his head, the top of
-his outline from every side; in a fight it sweeps far past his reach.
+Shape brief: the blade. Gravon *is* the sword; the man is only its host.
+At rest the blade runs straight down his spine: pommel and grip above his
+head, crossguard across his shoulders, the blade tapering past his legs, so
+his whole silhouette reads as a sword. The host slumps beneath it, head
+bowed, arms hanging: a vessel the blade is wearing. It is drawn only to
+swing.
 """
 
 import math
@@ -56,8 +59,11 @@ def build():
         m.joint(f"hip_{side}", "hips", (0.12 * x, 0, 0.96))
         m.joint(f"knee_{side}", f"hip_{side}", (0.13 * x, 0, 0.53))
         m.joint(f"ankle_{side}", f"knee_{side}", (0.13 * x, 0, 0.10))
-    # The sword has its own joint in the right fist, so poses can aim it.
+    # The sword has its own joint in the right fist, so poses can aim it,
+    # and a twin worn down his spine. Poses show one and hide the other
+    # (a fourth value of 0 scales a joint away).
     m.joint("sword", "wrist_R", (-0.31, -0.02, 0.86))
+    m.joint("back", "chest", (0, 0.20, 1.40))
 
     # ---- torso: lean, V-shaped, bare ------------------------------------------
     m.blob("chest", skin, (0, 0, 1.18), (0.26, 0.20, 0.22), segments=8, rings=6)
@@ -130,6 +136,24 @@ def build():
             m.box("sword", rune, (-0.31 + x, y, 0.88 + (0.05 if i % 2 else -0.04)),
                   (0.012, 0.16, 0.05))
 
+    # ---- the same sword worn on his back, point down along the spine ----------
+    # The flat faces backward, so from behind (and above his shoulders from the
+    # front) it shows its full width.
+    by = 0.24
+    m.box("back", iron, (0, by, 2.30), (0.07, 0.07, 0.07))            # pommel
+    m.limb("back", iron, (0, by, 2.27), (0, by, 1.94), 0.04, 0.04, sides=6)
+    m.box("back", iron, (0, by, 1.90), (0.64, 0.12, 0.10))            # guard
+    for x in (1, -1):
+        m.box("back", iron, (0.30 * x, by, 1.90), (0.08, 0.14, 0.20))  # lugs
+    m.blob("back", core, (0, by + 0.07, 1.90), (0.08, 0.06, 0.08), smooth=True)
+    m.box("back", iron, (0, by, 1.00), (0.32, 0.06, 1.76))            # blade
+    m.box("back", edge, (-0.155, by, 1.00), (0.03, 0.04, 1.76))
+    m.box("back", iron, (0.06, by, 0.07), (0.20, 0.06, 0.14), rot=(0, 30, 0))
+    for i in range(5):
+        z = 1.70 - i * 0.30
+        m.box("back", rune, ((0.05 if i % 2 else -0.04), by + 0.032, z),
+              (0.05, 0.012, 0.16))
+
     return m, stance()
 
 
@@ -138,20 +162,28 @@ def build():
 # ---------------------------------------------------------------------------
 
 def stance(sway=0.0):
-    """The sword rests on his right shoulder, blade rising up and back;
-    left fist loose, weight on the back foot."""
+    """The host at rest: slumped under the blade on his back, head bowed,
+    arms hanging, feet close together. The sword is the one standing tall."""
     return {
-        "hips": (0, 0, 8),
-        "chest": (4 + sway, 0, -6),
-        "neck": (2, 0, 4),
-        "shoulder_R": (-70, 26, 0), "elbow_R": (-110, 0, 0),
-        # Blade direction = shoulder + elbow + sword x rotation: 0 points
-        # forward, -90 up, -180 back. -160 lays it back over the shoulder.
-        "sword": (20 + sway * 2, 0, -38),
-        "shoulder_L": (-6, -10, 0), "elbow_L": (-16, 0, 0),
-        "hip_L": (-14, -6, -6), "knee_L": (14, 0, 0), "ankle_L": (-4, 0, 0),
-        "hip_R": (8, 6, 6), "knee_R": (16, 0, 0), "ankle_R": (-12, 0, 0),
+        "hips": (0, 0, 4),
+        "chest": (12 + sway, 0, -3),
+        "neck": (24 + sway, 0, 6),
+        "back": (-12 - sway, 0, 0, 1),
+        "sword": (0, 0, 0, 0),
+        "shoulder_R": (-4, 6, 0), "elbow_R": (-12, 0, 0),
+        "shoulder_L": (-4, -6, 0), "elbow_L": (-14, 0, 0),
+        "hip_L": (-6, -2, -4), "knee_L": (10, 0, 0), "ankle_L": (-4, 0, 0),
+        "hip_R": (2, 2, 4), "knee_R": (12, 0, 0), "ankle_R": (-8, 0, 0),
     }
+
+
+def armed(pose):
+    """Sword in hand, back empty."""
+    p = dict(pose)
+    p["back"] = (0, 0, 0, 0)
+    sword = p.get("sword", (0, 0, 0))
+    p["sword"] = tuple(sword[:3]) + (1,)
+    return p
 
 
 def with_(base, **changes):
@@ -166,7 +198,9 @@ def run_pose(phase):
     p.update({
         "hips": (0, 0, 8 * s),
         "chest": (14, 0, -8 * s),
+        "neck": (10, 0, 0),
         "shoulder_L": (-20 - 35 * s, -10, 0), "elbow_L": (-60, 0, 0),
+        "shoulder_R": (-20 + 35 * s, 10, 0), "elbow_R": (-60, 0, 0),
         "hip_L": (34 * s - 8, -4, 0), "knee_L": (18 + max(0.0, s) * 70, 0, 0),
         "ankle_L": (-10, 0, 0),
         "hip_R": (-34 * s - 8, 4, 0), "knee_R": (18 + max(0.0, -s) * 70, 0, 0),
@@ -218,17 +252,21 @@ def clips():
                   shoulder_L=(10, -30, 0), elbow_L=(-20, 0, 0),
                   hip_L=(-70, -4, 0), knee_L=(70, 0, 0), ankle_L=(-10, 0, 0),
                   hip_R=(40, 4, 0), knee_R=(10, 0, 0), ankle_R=(-30, 0, 0))
+    wind_a, cut_a, wind_b, cut_b = (armed(wind_a), armed(cut_a), armed(wind_b),
+                                    armed(cut_b))
+    raise_, smash, fury, lunge = (armed(raise_), armed(smash), armed(fury),
+                                  armed(lunge))
     hurt = with_(s, chest=(-18, -6, 10), neck=(-20, 0, 0),
                  shoulder_L=(-20, -50, 0), elbow_L=(-30, 0, 0))
     kneel = with_(s, chest=(30, 0, 0), neck=(30, 0, 0),
-                  shoulder_R=(-40, 20, 0), elbow_R=(-20, 0, 0), sword=(80, 0, 0),
+                  shoulder_R=(-40, 20, 0), elbow_R=(-20, 0, 0),
                   shoulder_L=(-10, -20, 0), elbow_L=(-30, 0, 0),
                   hip_L=(-80, -6, 0), knee_L=(120, 0, 0), ankle_L=(-40, 0, 0),
                   hip_R=(-80, 6, 0), knee_R=(120, 0, 0), ankle_R=(-40, 0, 0))
     lying = {"hips": (0, 0, 0), "chest": (-4, 0, 6), "neck": (-10, 0, 14),
              "shoulder_L": (-150, -60, 0), "elbow_L": (-20, 0, 0),
              "shoulder_R": (-40, 70, 0), "elbow_R": (-30, 0, 0),
-             "sword": (20, 0, 40),
+             "sword": (0, 0, 0, 0), "back": (0, 0, 0, 1),
              "hip_L": (-40, -14, 0), "knee_L": (60, 0, 0),
              "hip_R": (-20, 14, 0), "knee_R": (30, 0, 0)}
 

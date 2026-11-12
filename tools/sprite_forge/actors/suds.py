@@ -142,16 +142,17 @@ def build():
 # ---------------------------------------------------------------------------
 
 def stance(sway=0.0):
-    """Cheers: can raised high in the right hand, left hand on the cooler,
-    leaning back on wide-planted boots."""
+    """"Round's on me!": a toast with the can raised beside his grin, belly
+    out, leaning back with his weight on one leg, left hand resting on the
+    cooler. The life of the party, not a statue."""
     return {
-        "hips": (0, 0, 0),
-        "chest": (-6 + sway, 0, 0),
-        "neck": (-4, 0, 0),
-        "shoulder_R": (-150 - sway * 2, 22, 0), "elbow_R": (-40, 0, 0),
-        "shoulder_L": (-6, -14, 0), "elbow_L": (-24, 0, 0),
-        "hip_L": (-4, -14, 0), "knee_L": (10, 0, 0), "ankle_L": (-6, 10, 0),
-        "hip_R": (-4, 14, 0), "knee_R": (10, 0, 0), "ankle_R": (-6, -10, 0),
+        "hips": (0, 0, 6),
+        "chest": (-12 + sway, 0, -4),
+        "neck": (-8, 0, 8),
+        "shoulder_R": (-58 - sway, 58, 0), "elbow_R": (0, 100 + sway * 2, 0),
+        "shoulder_L": (-4, -12, 0), "elbow_L": (-20, 0, 0),
+        "hip_L": (-2, -10, 0), "knee_L": (6, 0, 0), "ankle_L": (-4, 8, 0),
+        "hip_R": (-12, 16, 6), "knee_R": (22, 0, 0), "ankle_R": (-10, -10, 0),
     }
 
 

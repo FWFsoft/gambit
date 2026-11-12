@@ -69,6 +69,11 @@ python3 tools/sprite_forge/silhouette.py            # forge actors
 python3 tools/sprite_forge/silhouette.py --legacy   # plus the old cut-outs
 ```
 
+A pose value may carry a fourth number, a scale: `"sword": (0, 0, 0, 0)`
+hides the joint and everything on it. Gravon uses this to wear his sword
+on his back and draw it into his hand only for attacks. Scale steps between
+keys rather than blending.
+
 Clip names the game looks for: `idle`, `run`, `hit`, `death`, and
 `attack` for enemies. Character abilities map to clips in `actionClip()`
 in `src/ArenaView.cpp` (Wade: `jab` / `cross` on LMB, `uppercut_R` /
