@@ -35,9 +35,9 @@ def main():
     scale = max(1, round(3 * k))
     sheet = Image.new("RGBA", (cell[0] * 8 * scale, cell[1] * len(frames) * scale),
                       (78, 96, 66, 255))
+    poses = forge.clip_frames(clip, base, model, getattr(mod, "FOLLOW", None))
     for fi, f in enumerate(frames):
-        denom = clip.frames if clip.loop else max(1, clip.frames - 1)
-        pose, off, rot = forge.sample(clip, f / denom, base)
+        pose, off, rot = poses[f]
         for d in range(8):
             model.pose(pose, off, rot, d * 45.0)
             img = r.frame(model, style, getattr(mod, "RIM", None)).resize((cell[0] * scale, cell[1] * scale),

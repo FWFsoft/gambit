@@ -21,6 +21,27 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-12: Heroic body kit and fighting-game motion; Wade rebuilt
+- **Decision:** Characters build on a shared heroic body kit: a spine
+  chain, curved muscle and proportion parameters. The forge gains:
+  - overlapping action,
+  - spring-driven secondary motion,
+  - squash and stretch.
+
+  Wade is rebuilt as the test, in the toon style: a broad, heavy-handed
+  veteran with oversized wrapped mitts. His idle is a boxer's bounce. His
+  punches have anticipation, a stretched smear, a held impact and a
+  recoil. His hair and sash swing on springs.
+- **Pillars:** Clarity: strikes read as strikes (the stretch and hold show
+  the hit). It also gives the cast its feel.
+- **Why:** Human feedback: proportions and rigid movement were what kept
+  the characters from feeling like 3rd Strike / MvC2. The human ruled
+  out image-to-3D tools.
+- **Status:** Accepted (requested by a human); Wade's specific look and
+  timing are Built, needs review
+- **Where:** `tools/sprite_forge/actors/_body.py`, `tools/sprite_forge/actors/wade.py`,
+  `tools/sprite_forge/forge.py` (`clip_frames`)
+
 ## 2026-11-12: Art style moves from pixel art to toon-shaded 3D
 - **Decision:**
   - **Pixel art is dropped.** The forge gains a toon render: anti-aliased

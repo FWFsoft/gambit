@@ -58,7 +58,8 @@ def main():
                                pixel_scale=k,
                                socket=getattr(mod, "SOCKET", None),
                                style=getattr(mod, "STYLE", "pixel"),
-                               rim_rgb=getattr(mod, "RIM", None))
+                               rim_rgb=getattr(mod, "RIM", None),
+                               follow=getattr(mod, "FOLLOW", None))
         rel = f"assets/sprites/actors/{name}.png"
         start = time.time()
         print(f"{name}:")

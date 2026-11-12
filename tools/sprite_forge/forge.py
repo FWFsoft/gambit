@@ -135,6 +135,8 @@ class Model:
         self.materials: Dict[str, Material] = {}
         self.joints: Dict[str, object] = {}
         self.rest: Dict[str, Vector] = {}
+        self.parent_of: Dict[str, Optional[str]] = {}
+        self.world_rest: Dict[str, Tuple[float, float, float]] = {}
         self.root = self._empty("root", None, (0, 0, 0))
 
     # ---- materials -----------------------------------------------------
@@ -173,8 +175,30 @@ class Model:
         p = self.root if parent is None else self.joints[parent]
         obj = self._empty(name, p, location)
         self.joints[name] = obj
+        self.parent_of[name] = parent
+        self.world_rest[name] = tuple(location)
         self.rest[name] = obj.location.copy()
         return name
+
+    def rest_world(self, name):
+        """A joint's rest position in world space."""
+        return self.world_rest[name]
+
+    def depth(self, name):
+        """How many joints up to the root (hips = 0)."""
+        d = 0
+        while self.parent_of.get(name) is not None:
+            name = self.parent_of[name]
+            d += 1
+        return d
+
+    def chain(self, name):
+        """The joint and its ancestors, nearest first."""
+        out = []
+        while name is not None:
+            out.append(name)
+            name = self.parent_of.get(name)
+        return out
 
     # ---- parts ---------------------------------------------------------
     def _attach(self, bm, joint, material, smooth=False):
@@ -308,8 +332,13 @@ class Model:
             obj.rotation_euler = Euler([math.radians(a) for a in r[:3]], "XYZ")
             # Optional 4th value: scale. 0 hides the joint and everything on
             # it (a sword that moves from the back to the hand).
-            k = r[3] if len(r) > 3 else 1.0
-            obj.scale = (max(k, 1e-4),) * 3
+            # Six values: non-uniform scale (sx, sy, sz) in the joint's rest
+            # axes, for squash and stretch (a fist that lengthens on impact).
+            if len(r) >= 6:
+                obj.scale = tuple(max(v, 1e-4) for v in r[3:6])
+            else:
+                k = r[3] if len(r) > 3 else 1.0
+                obj.scale = (max(k, 1e-4),) * 3
             obj.location = self.rest[name]
         # Root: yaw for direction, then the animation's own root motion.
         yaw = Matrix.Rotation(math.radians(yaw_deg), 4, "Z")
@@ -339,6 +368,10 @@ class Clip:
     fps: int
     loop: bool
     keys: List[Key]
+    # Overlapping action: each joint runs this many seconds behind its
+    # parent, so motion ripples out from the hips (hips -> chest -> shoulder
+    # -> fist) instead of every part arriving at once.
+    overlap: float = 0.0
 
 
 def _ease(kind, u):
@@ -355,6 +388,10 @@ def _lerp_joint(a, b, u):
     """Rotation (and optional scale, default 1) between two keys. Scale steps
     instead of blending, so a hidden part never shows half-size."""
     rot = tuple(a[i] + (b[i] - a[i]) * u for i in range(3))
+    if len(a) >= 6 or len(b) >= 6:
+        sa = tuple(a[3:6]) if len(a) >= 6 else ((a[3],) * 3 if len(a) > 3 else (1.0,) * 3)
+        sb = tuple(b[3:6]) if len(b) >= 6 else ((b[3],) * 3 if len(b) > 3 else (1.0,) * 3)
+        return rot + tuple(sa[i] + (sb[i] - sa[i]) * u for i in range(3))
     if len(a) > 3 or len(b) > 3:
         sa = a[3] if len(a) > 3 else 1.0
         sb = b[3] if len(b) > 3 else 1.0
@@ -389,6 +426,99 @@ def sample(clip: Clip, t: float, base: Dict[str, Sequence[float]]):
         b = k1.pose.get(n, base.get(n, (0, 0, 0)))
         pose[n] = _lerp_joint(a, b, u)
     return pose, _lerp3(k0.offset, k1.offset, u), _lerp3(k0.rot, k1.rot, u)
+
+
+def _sample_overlapped(clip, t, base, model):
+    if clip.overlap <= 0.0 or model is None:
+        return sample(clip, t, base)
+    duration = clip.frames / float(clip.fps)
+    pose, offset, rot = sample(clip, t, base)
+    cache = {}
+    for name in model.joints:
+        d = model.depth(name)
+        if d == 0:
+            continue
+        tj = t - clip.overlap * d / duration
+        tj = tj % 1.0 if clip.loop else max(0.0, tj)
+        key = round(tj, 5)
+        if key not in cache:
+            cache[key] = sample(clip, tj, base)[0]
+        pose[name] = cache[key].get(name, pose.get(name, (0, 0, 0)))
+    return pose, offset, rot
+
+
+def clip_frames(clip, base, model=None, follow=None):
+    """Every frame's (pose, root offset, root rotation) for a clip, with
+    overlapping action and spring-driven secondary motion applied.
+
+    follow: {joint: (drive_joint, gain, stiffness, damping, speed_gain)}.
+    The follower's orientation is a damped spring chasing its drive joint's
+    accumulated rotation, so it lags behind fast moves, overshoots and
+    settles (hair whipping after a punch, a sash swinging). Root motion
+    adds drag: moving forward streams it back.
+    """
+    denom = clip.frames if clip.loop else max(1, clip.frames - 1)
+    times = [f / denom for f in range(clip.frames)]
+    frames = [_sample_overlapped(clip, t, base, model) for t in times]
+    if not follow or model is None:
+        return frames
+
+    duration = clip.frames / float(clip.fps)
+    steps = 6                                  # sub-steps per frame
+    n = clip.frames * steps
+    dt = duration / n if clip.loop else duration / max(1, (clip.frames - 1) * steps)
+
+    def drive_angle(pose, offset_prev, offset, rot, drive, speed_gain):
+        acc = [0.0, 0.0, 0.0]
+        for j in model.chain(drive):
+            r = pose.get(j, (0, 0, 0))
+            for i in range(3):
+                acc[i] += r[i]
+        for i in range(3):
+            acc[i] += rot[i]
+        # Drag: forward (-y) speed tips it back, vertical speed lifts it.
+        vy = (offset[1] - offset_prev[1]) / dt
+        vz = (offset[2] - offset_prev[2]) / dt
+        acc[0] += speed_gain * (vy * 40.0 + vz * 60.0)
+        return acc
+
+    total = n * (3 if clip.loop else 1)
+    state = {j: None for j in follow}
+    vel = {j: [0.0, 0.0, 0.0] for j in follow}
+    out_extra = [dict() for _ in range(clip.frames)]
+    prev_off = None
+    for step in range(total + 1):
+        if clip.loop:
+            t = (step % n) / n
+        else:
+            t = min(1.0, step / max(1, n - steps))
+        pose, off, rot = _sample_overlapped(clip, t, base, model)
+        if prev_off is None:
+            prev_off = off
+        for j, (drive, gain, k, c, speed_gain) in follow.items():
+            p = drive_angle(pose, prev_off, off, rot, drive, speed_gain)
+            if state[j] is None:
+                state[j] = list(p)
+            w, v = state[j], vel[j]
+            for i in range(3):
+                acc = k * (p[i] - w[i]) - c * v[i]
+                v[i] += acc * dt
+                w[i] += v[i] * dt
+            # Record on frame boundaries (the last cycle for loops).
+            last_cycle = (not clip.loop) or step >= total - n
+            if last_cycle and step % steps == 0:
+                f = (step % n) // steps if clip.loop else step // steps
+                if f < clip.frames:
+                    out_extra[f][j] = tuple(gain * (w[i] - p[i]) for i in range(3))
+        prev_off = off
+    result = []
+    for f, (pose, off, rot) in enumerate(frames):
+        pose = dict(pose)
+        for j, extra in out_extra[f].items():
+            r = pose.get(j, (0, 0, 0))
+            pose[j] = tuple(r[i] + extra[i] for i in range(3)) + tuple(r[3:])
+        result.append((pose, off, rot))
+    return result
 
 
 # --------------------------------------------------------------------------
@@ -687,6 +817,8 @@ class ActorSpec:
     # a rim light in rim_rgb, rendered supersampled and drawn smoothed).
     style: str = "pixel"
     rim_rgb: Optional[Tuple[int, int, int]] = None
+    # Spring-driven secondary motion (see clip_frames).
+    follow: Optional[Dict[str, Tuple]] = None
 
 
 SHEET_COLUMNS = 16   # minimum cells per sheet row
@@ -742,11 +874,11 @@ def render_actor(spec: ActorSpec, out_png: str, rel_png: str, log=print):
     sockets = []
     for clip in spec.clips:
         start = cell
+        poses = clip_frames(clip, base, model, spec.follow)
         for di, _ in enumerate(DIRECTIONS):
             yaw = di * 45.0
             for f in range(clip.frames):
-                denom = clip.frames if clip.loop else max(1, clip.frames - 1)
-                pose, offset, rot = sample(clip, f / denom, base)
+                pose, offset, rot = poses[f]
                 model.pose(pose, offset, rot, yaw)
                 img = renderer.frame(model, spec.style, spec.rim_rgb)
                 if spec.socket:

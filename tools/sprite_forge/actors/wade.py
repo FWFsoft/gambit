@@ -1,27 +1,52 @@
-"""Wade, the Old Head. Modelled from assets/turnarounds/Wade.png.
+"""Wade, the Old Head. Built on the heroic body kit (_body.py).
 
 White swept-back hair and grey stubble, orange skin, a tiger-stripe tattoo
-sleeve on his left arm, wrapped fists and ankles, baggy khaki trousers with
-a dark sash. A boxer: he lives in his guard.
+sleeve on his left arm, big wrapped fists, baggy khaki trousers with a dark
+sash. A boxer who lives in his guard.
+
+Proportions: a veteran heavyweight in the 3rd Strike mould: broad, sloping
+shoulders and a deep chest over a narrow waist, heavy forearms and
+oversized wrapped mitts, baggy trousers on planted legs.
+
+Motion: fighting-game timing. Every punch has an anticipation, a snappy
+extension where the forearm stretches and the fist swells (a smear), a held
+impact and a recoil. The hips lead and the fist arrives last (overlap), and
+his hair and sash tail swing on springs (FOLLOW).
 """
 
 import math
 
 from forge import Clip, Key, Model
+import _body
 
-PIXEL_SCALE = 1.35  # chunkier art pixels, same size on screen (see forge.ActorSpec)
+STYLE = "toon"
+RIM = (255, 176, 72)          # tiger orange
+PIXEL_SCALE = 1.0
+CELL = (176, 156, 128)
 
-SKIN = (222, 122, 58)
-HAIR = (232, 228, 220)
+SKIN = (222, 124, 62)
+HAIR = (236, 232, 224)
 STUBBLE = (150, 140, 132)
-PANTS = (190, 160, 108)
-SASH = (104, 66, 38)
-WRAP = (236, 228, 206)
+PANTS = (196, 166, 112)
+SASH = (98, 56, 34)
+WRAP = (240, 234, 214)
 INK = (58, 30, 26)
-EYE = (34, 22, 24)
+
+BUILD = _body.Build(
+    head=0.26, shoulders=0.31, chest=(0.66, 0.33, 0.35), waist=0.24,
+    hip_width=0.13, upper_arm=(0.10, 0.13, 0.085), forearm=(0.09, 0.125, 0.08),
+    hand=0.22, thigh=(0.18, 0.20, 0.16), calf=(0.16, 0.15, 0.09),
+    foot=(0.12, 0.27, 0.08), arm_length=1.05)
+
+# Secondary motion: joint -> (drive joint, gain, stiffness, damping, drag)
+FOLLOW = {
+    "hair": ("head", 0.9, 150.0, 11.0, 0.7),
+    "sash": ("hips", 1.0, 80.0, 7.0, 1.0),
+}
 
 
 def build():
+    b = BUILD
     m = Model("Wade")
     skin = m.material("skin", SKIN)
     hair = m.material("hair", HAIR)
@@ -30,125 +55,92 @@ def build():
     sash = m.material("sash", SASH)
     wrap = m.material("wrap", WRAP)
     ink = m.material("ink", INK)
-    eye = m.material("eye", EYE)
 
-    # ---- skeleton -------------------------------------------------------
-    m.joint("hips", None, (0, 0, 0.98))
-    m.joint("chest", "hips", (0, 0, 1.10))
-    m.joint("neck", "chest", (0, 0, 1.50))
-    for side, x in (("L", 1), ("R", -1)):
-        m.joint(f"shoulder_{side}", "chest", (0.27 * x, 0, 1.45))
-        m.joint(f"elbow_{side}", f"shoulder_{side}", (0.30 * x, 0, 1.17))
-        m.joint(f"wrist_{side}", f"elbow_{side}", (0.31 * x, 0, 0.93))
-        m.joint(f"hip_{side}", "hips", (0.12 * x, 0, 0.94))
-        m.joint(f"knee_{side}", f"hip_{side}", (0.13 * x, 0, 0.53))
-        m.joint(f"ankle_{side}", f"knee_{side}", (0.13 * x, 0, 0.11))
+    _body.skeleton(m, b)
+    hz = _body.skeleton_heights(m)["hips"]
+    m.joint("hair", "head", (0, 0.06, hz + 0.88))
+    m.joint("sash", "hips", (0.08, -0.15, hz - 0.02))
 
-    # ---- pelvis + sash --------------------------------------------------
-    m.box("hips", pants, (0, 0, 0.92), (0.36, 0.26, 0.22), taper=1.05)
-    m.box("hips", sash, (0, 0, 1.04), (0.40, 0.27, 0.09))
-    m.box("hips", sash, (0.06, -0.15, 1.01), (0.09, 0.05, 0.07))
-    m.box("hips", sash, (0.08, -0.15, 0.91), (0.05, 0.03, 0.16), rot=(0, 10, 0))
-    m.box("hips", sash, (0.03, -0.15, 0.92), (0.04, 0.03, 0.14), rot=(0, -8, 0))
+    # ---- body ----------------------------------------------------------
+    _body.torso(m, b, skin)
+    _body.head(m, b, skin)
+    _body.arms(m, b, skin, skin, wrap)
+    _body.legs(m, b, pants, pants, skin)
 
-    # ---- torso: V-shaped and heavy through the chest --------------------
-    # Faceted blobs rather than boxes: the flat facets shade like muscle.
-    m.blob("chest", skin, (0, -0.01, 1.16), (0.25, 0.20, 0.24), segments=8,
-           rings=6)                                                  # abdomen
-    m.blob("chest", skin, (0, 0.015, 1.345), (0.47, 0.27, 0.30), segments=10,
-           rings=7)                                                  # rib cage
+    # ---- face: stubble, moustache, brows, ears -----------------------------
+    m.blob("head", stubble, (0, -0.10, hz + 0.72), (0.19, 0.12, 0.10),
+           segments=12, rings=8, smooth=True)
+    m.tube("head", stubble, [(-0.06, -0.135, hz + 0.765), (0, -0.145, hz + 0.775),
+                             (0.06, -0.135, hz + 0.765)], [0.018, 0.022, 0.018],
+           sides=6)
     for x in (1, -1):
-        m.blob("chest", skin, (0.10 * x, -0.105, 1.375), (0.21, 0.09, 0.15),
-               segments=8, rings=5)                                  # pecs
-        m.blob("chest", skin, (0.15 * x, 0.04, 1.47), (0.19, 0.17, 0.10))  # traps
-        m.box("chest", ink, (0.05 * x, -0.118, 1.18), (0.035, 0.012, 0.03))  # abs
-    m.box("chest", ink, (0, -0.125, 1.29), (0.012, 0.012, 0.11))
-    m.limb("neck", skin, (0, 0, 1.47), (0, -0.01, 1.60), 0.075, 0.07)
+        m.box("head", ink, (0.055 * x, -0.135, hz + 0.815), (0.045, 0.02, 0.028))
+        m.tube("head", hair, [(0.02 * x, -0.135, hz + 0.85), (0.09 * x, -0.12, hz + 0.86)],
+               [0.016, 0.012], sides=6)
+        m.blob("head", skin, (0.13 * x, -0.01, hz + 0.80), (0.05, 0.07, 0.09),
+               segments=8, rings=6, smooth=True)
 
-    # ---- head -----------------------------------------------------------
-    m.blob("neck", skin, (0, -0.02, 1.685), (0.23, 0.24, 0.27), segments=10,
-           rings=8)
-    m.box("neck", skin, (0, -0.04, 1.60), (0.19, 0.18, 0.09), taper=1.15)
-    m.box("neck", stubble, (0, -0.10, 1.585), (0.15, 0.06, 0.07), taper=1.2)
-    m.box("neck", stubble, (0, -0.125, 1.625), (0.10, 0.03, 0.025))  # moustache
-    # Swept-back white hair: low at the brow, fuller at the crown and back.
-    m.blob("neck", hair, (0, 0.04, 1.785), (0.22, 0.24, 0.10), rot=(-12, 0, 0))
-    m.blob("neck", hair, (0, 0.085, 1.715), (0.225, 0.13, 0.17))
-    m.box("neck", hair, (0, -0.07, 1.775), (0.17, 0.08, 0.04), rot=(-20, 0, 0))
-    # The swept-back crest of white hair: his outline's signature from the
-    # side and above.
-    m.blob("neck", hair, (0, 0.15, 1.74), (0.25, 0.30, 0.09), rot=(-14, 0, 0))
-    m.blob("neck", hair, (0, 0.30, 1.75), (0.16, 0.20, 0.06), rot=(-20, 0, 0))
-    for x in (1, -1):
-        m.box("neck", eye, (0.052 * x, -0.128, 1.692), (0.05, 0.02, 0.032))
-        m.box("neck", hair, (0.058 * x, -0.13, 1.727), (0.075, 0.025, 0.022))
-        m.blob("neck", skin, (0.118 * x, -0.01, 1.68), (0.04, 0.06, 0.08))  # ears
+    # ---- hair: a swept-back white crest that streams behind him --------------
+    m.blob("head", hair, (0, 0.04, hz + 0.90), (0.27, 0.27, 0.12), segments=14,
+           rings=8, smooth=True)
+    for x, lift in ((0.0, 0.04), (0.08, 0.0), (-0.08, 0.0)):
+        m.tube("hair", hair, [(x, -0.06, hz + 0.91), (x * 1.2, 0.12, hz + 0.90 + lift),
+                              (x * 1.5, 0.30, hz + 0.78 + lift)],
+               [0.075, 0.06, 0.012], sides=8)
 
-    # ---- arms -----------------------------------------------------------
-    for side, x in (("L", 1), ("R", -1)):
-        sh, el, wr = f"shoulder_{side}", f"elbow_{side}", f"wrist_{side}"
-        m.blob(sh, skin, (0.27 * x, 0, 1.44), (0.19, 0.19, 0.18))  # deltoid
-        m.limb(sh, skin, (0.28 * x, 0, 1.42), (0.30 * x, 0, 1.17), 0.088, 0.072)
-        m.limb(el, skin, (0.30 * x, 0, 1.17), (0.31 * x, 0, 0.95), 0.072, 0.060)
-        m.limb(el, wrap, (0.307 * x, 0, 1.02), (0.31 * x, 0, 0.93), 0.068, 0.066)
-        # Oversized wrapped fists: two bright mitts that read at any size.
-        m.box(wr, wrap, (0.31 * x, -0.01, 0.85), (0.19, 0.20, 0.19), bevel=0.04)
-        m.box(wr, skin, (0.31 * x, -0.11, 0.82), (0.14, 0.02, 0.06))  # knuckles
-        if side == "L":
-            # Tiger-stripe tattoo sleeve: dark bands around the upper arm
-            for i, z in enumerate((1.38, 1.31, 1.24)):
-                m.limb(sh, ink, (0.285 * x, 0, z), (0.29 * x, 0, z - 0.025),
-                       0.091 - i * 0.004, 0.090 - i * 0.004, cap=False)
-            m.blob(sh, ink, (0.29 * x, -0.02, 1.47), (0.16, 0.12, 0.08))
+    # ---- tattoo sleeve on the left arm ---------------------------------------
+    s = m.rest_world("shoulder_L")
+    e = m.rest_world("elbow_L")
+    for i, k in enumerate((0.25, 0.45, 0.65)):
+        z = s[2] + (e[2] - s[2]) * k
+        x = s[0] + (e[0] - s[0]) * k
+        m.tube("shoulder_L", ink, [(x, 0, z + 0.012), (x, 0, z - 0.012)],
+               [0.128 - i * 0.004, 0.128 - i * 0.004], sides=12, cap=False)
 
-    # ---- legs: baggy trousers tied at the ankle --------------------------
-    for side, x in (("L", 1), ("R", -1)):
-        hp, kn, an = f"hip_{side}", f"knee_{side}", f"ankle_{side}"
-        m.limb(hp, pants, (0.12 * x, 0, 0.96), (0.13 * x, 0, 0.53), 0.14, 0.12)
-        m.limb(kn, pants, (0.13 * x, 0, 0.55), (0.13 * x, 0, 0.17), 0.125, 0.085)
-        m.limb(kn, wrap, (0.13 * x, 0, 0.19), (0.13 * x, 0, 0.09), 0.07, 0.065)
-        m.box(an, skin, (0.13 * x, -0.05, 0.04), (0.11, 0.23, 0.08), bevel=0.02)
+    # ---- wraps at the wrists and ankles ------------------------------------------
+    for side in ("L", "R"):
+        w = m.rest_world(f"wrist_{side}")
+        m.tube(f"elbow_{side}", wrap, [(w[0], 0, w[2] + 0.07), (w[0], 0, w[2] - 0.01)],
+               [0.085, 0.09], sides=10)
+        a = m.rest_world(f"ankle_{side}")
+        m.tube(f"knee_{side}", wrap, [(a[0], 0, a[2] + 0.10), (a[0], 0, a[2] + 0.02)],
+               [0.095, 0.085], sides=10)
 
-    base = guard()
-    return m, base
+    # ---- sash: tied at the waist, a tail that swings ------------------------------
+    m.tube("hips", sash, [(-0.24, 0.0, hz + 0.06), (0, -0.17, hz + 0.07),
+                          (0.24, 0.0, hz + 0.06), (0, 0.17, hz + 0.07),
+                          (-0.24, 0.0, hz + 0.06)], [0.05, 0.05, 0.05, 0.05, 0.05],
+           sides=6)
+    m.tube("sash", sash, [(0.08, -0.16, hz + 0.04), (0.10, -0.18, hz - 0.12),
+                          (0.11, -0.17, hz - 0.30)], [0.05, 0.045, 0.02], sides=6)
+
+    return m, guard()
 
 
 # ---------------------------------------------------------------------------
 # Poses
 # ---------------------------------------------------------------------------
 
-def guard(bounce=0.0):
-    """The Old Head's guard: compact and unbothered. Bladed but not lunging,
-    chin tucked, shoulders rolled forward, mitts up by the jaw, weight
-    sitting on the back foot. Nothing wasted."""
+def guard(bounce=0.0, roll=0.0):
+    """The Old Head's guard: bladed, chin tucked, shoulders rolled forward,
+    mitts up by the jaw, weight sitting low. `bounce` 0..1 bends the knees,
+    `roll` -1..1 rolls the shoulders (the idle's rhythm)."""
     return {
-        "hips": (0, 0, 14),
-        "chest": (10, 0, -10),
-        "neck": (10, 0, -4),
-        "shoulder_L": (-58, -22, -10),
-        "elbow_L": (-118, 0, 0),
-        "wrist_L": (0, 0, 0),
-        "shoulder_R": (-48, 20, 10),
-        "elbow_R": (-132, 0, 0),
-        "hip_L": (-16 - bounce, -4, -8),
-        "knee_L": (18 + bounce * 2, 0, 0),
-        "ankle_L": (-2 - bounce, 0, 0),
-        "hip_R": (14 - bounce, 4, 12),
-        "knee_R": (24 + bounce * 2, 0, 0),
-        "ankle_R": (-14 - bounce, 0, 0),
+        "hips": (0, 0, 16 + 3 * roll),
+        "abdomen": (6 + 2 * bounce, 0, -4),
+        "chest": (9 + 3 * bounce, 0, -8 - 4 * roll),
+        "neck": (2, 0, -2),
+        "head": (8, 0, -2 + 3 * roll),
+        "shoulder_L": (-58 - 4 * roll, -20, -8), "elbow_L": (-116, 0, 0),
+        "wrist_L": (-12, 0, 0),
+        "shoulder_R": (-48 + 4 * roll, 18, 10), "elbow_R": (-132, 0, 0),
+        "wrist_R": (-12, 0, 0),
+        "hip_L": (-16 - 6 * bounce, -4, -8), "knee_L": (18 + 14 * bounce, 0, 0),
+        "ankle_L": (-2 - 8 * bounce, 0, 0),
+        "hip_R": (12 - 6 * bounce, 4, 12), "knee_R": (22 + 14 * bounce, 0, 0),
+        "ankle_R": (-12 - 8 * bounce, 0, 0),
+        "hair": (0, 0, 0), "sash": (0, 0, 0),
     }
-
-
-def mirror(pose):
-    """Swap left / right: lets one authored punch serve both hands."""
-    out = {}
-    for name, (rx, ry, rz) in pose.items():
-        if name.endswith("_L"):
-            name = name[:-2] + "_R"
-        elif name.endswith("_R"):
-            name = name[:-2] + "_L"
-        out[name] = (rx, -ry, -rz)
-    return out
 
 
 def with_(base, **changes):
@@ -157,171 +149,190 @@ def with_(base, **changes):
     return pose
 
 
-def run_pose(phase):
-    """Jog with the guard held high. phase 0..1."""
-    s = math.sin(phase * 2 * math.pi)
-    c = math.cos(phase * 2 * math.pi)
+def mirror(pose):
+    """Swap left / right: one authored punch serves both hands."""
+    out = {}
+    for name, r in pose.items():
+        if name.endswith("_L"):
+            name = name[:-2] + "_R"
+        elif name.endswith("_R"):
+            name = name[:-2] + "_L"
+        out[name] = (r[0], -r[1], -r[2]) + tuple(r[3:])
+    return out
+
+
+def stretch(along=1.35, fist=1.25):
+    """Smear frame helpers: a forearm that lengthens and a fist that swells."""
+    return (0, 0, 0, 1.0, 1.0, along), (0, 0, 0, fist, fist, fist)
+
+
+def run_pose(p):
+    s = math.sin(p * 2 * math.pi)
 
     def leg(sign):
-        swing = 34 * s * sign                       # + = leg back
-        lift = max(0.0, -c * sign) * 0              # unused, kept simple
-        knee = 18 + max(0.0, s * sign) * 62         # back leg folds
-        return (swing - 8, 0, 0), (knee + lift, 0, 0), (-10 - 8 * s * sign, 0, 0)
+        swing = -36 * s * sign - 4          # negative = forward
+        fold = 12 + 78 * max(0.0, s * sign * -1)
+        return (swing, 0, 0), (fold, 0, 0), (-8 - 10 * s * sign, 0, 0)
 
     hl, kl, al = leg(1)
     hr, kr, ar = leg(-1)
     return {
-        "hips": (0, 0, 6 * s),
-        "chest": (16, 0, -8 * s),
-        "neck": (-8, 0, 4 * s),
-        "shoulder_L": (-40 - 14 * s, 10, -8),
-        "elbow_L": (-118, 0, 0),
-        "shoulder_R": (-40 + 14 * s, -10, 8),
-        "elbow_R": (-118, 0, 0),
+        "hips": (0, 0, 10 * s),
+        "abdomen": (10, 0, -4 * s),
+        "chest": (14, 0, -12 * s),
+        "neck": (-2, 0, 4 * s),
+        "head": (-4, 0, 6 * s),
+        "shoulder_L": (-48 - 28 * s, -18, -8), "elbow_L": (-110, 0, 0),
+        "wrist_L": (-10, 0, 0),
+        "shoulder_R": (-48 + 28 * s, 18, 10), "elbow_R": (-120, 0, 0),
+        "wrist_R": (-10, 0, 0),
         "hip_L": hl, "knee_L": kl, "ankle_L": al,
         "hip_R": hr, "knee_R": kr, "ankle_R": ar,
+        "hair": (0, 0, 0), "sash": (0, 0, 0),
     }
-
-
-def jab_poses():
-    g = guard()
-    load = with_(g, chest=(8, 0, -4), shoulder_L=(-52, 8, -6),
-                 elbow_L=(-120, 0, 0))
-    hit = with_(g, chest=(10, 0, -30), hips=(0, 0, 4), neck=(2, 0, 20),
-                shoulder_L=(-92, 0, -14), elbow_L=(-4, 0, 0),
-                hip_L=(-24, 0, -8), knee_L=(16, 0, 0))
-    return g, load, hit
-
-
-def cross_poses():
-    g = guard()
-    load = with_(g, chest=(6, 0, -18), hips=(0, 0, 18))
-    hit = with_(g, chest=(12, 0, 34), hips=(0, 0, -12), neck=(2, 0, -30),
-                shoulder_R=(-94, 0, 16), elbow_R=(-3, 0, 0),
-                shoulder_L=(-30, 12, -12), elbow_L=(-130, 0, 0),
-                hip_R=(6, 0, -10), knee_R=(14, 0, 0), ankle_R=(-30, 0, 0))
-    return g, load, hit
-
-
-def uppercut_poses():
-    """Right uppercut. The left one is the mirror image."""
-    g = guard()
-    dip = with_(g, chest=(18, -10, 14), hips=(0, 0, 10),
-                shoulder_R=(-10, -12, 10), elbow_R=(-95, 0, 0),
-                hip_L=(-28, 0, -8), knee_L=(44, 0, 0), ankle_L=(-14, 0, 0),
-                hip_R=(4, 0, 10), knee_R=(48, 0, 0), ankle_R=(-30, 0, 0))
-    rise = with_(g, chest=(-12, 8, 26), hips=(0, 0, -6), neck=(-14, 0, -10),
-                 shoulder_R=(-150, -4, 22), elbow_R=(-62, 0, 0),
-                 hip_L=(-14, 0, -8), knee_L=(10, 0, 0),
-                 hip_R=(10, 0, 10), knee_R=(8, 0, 0), ankle_R=(-6, 0, 0))
-    return g, dip, rise
-
-
-def slip_poses():
-    g = guard()
-    duck = with_(g, chest=(30, 26, -18), neck=(-10, 10, 0),
-                 hip_L=(-36, 0, -10), knee_L=(62, 0, 0), ankle_L=(-24, 0, 0),
-                 hip_R=(-4, 0, 14), knee_R=(58, 0, 0), ankle_R=(-46, 0, 0))
-    return g, duck
-
-
-def tuck():
-    return {
-        "hips": (0, 0, 0),
-        "chest": (52, 0, 0),
-        "neck": (30, 0, 0),
-        "shoulder_L": (-70, 20, 0), "elbow_L": (-130, 0, 0),
-        "shoulder_R": (-70, -20, 0), "elbow_R": (-130, 0, 0),
-        "hip_L": (-110, 0, 0), "knee_L": (135, 0, 0), "ankle_L": (-20, 0, 0),
-        "hip_R": (-104, 0, 0), "knee_R": (130, 0, 0), "ankle_R": (-20, 0, 0),
-    }
-
-
-def roll_keys(frames):
-    """Forward roll in place (the server moves him; the sprite only spins).
-    Each frame rotates the tucked body about its own centre."""
-    keys = []
-    centre = 0.88       # model-space height of the tucked body's centre
-    rolling_height = 0.56  # where that centre should sit while rolling
-    for f in range(frames + 1):
-        t = f / frames
-        angle = 360.0 * t
-        # Rotate about the body's centre, not the feet: R(a) maps the centre
-        # (0, 0, c) to (0, -c sin a, c cos a); offset it back into place.
-        a = math.radians(angle)
-        tucked = 0.08 < t < 0.92
-        target = rolling_height if tucked else centre - 0.05
-        off = (0.0, centre * math.sin(a), target - centre * math.cos(a))
-        pose = tuck() if tucked else with_(guard(), chest=(30, 0, 0))
-        keys.append(Key(t, pose, off, (angle, 0, 0), "linear"))
-    return keys
 
 
 def clips():
     g = guard()
-    j0, j1, j2 = jab_poses()
-    c0, c1, c2 = cross_poses()
-    u0, u1, u2 = uppercut_poses()
-    s0, s1 = slip_poses()
-    stance = (0, 0, -0.05)
-    lunge = (0, -0.06, -0.06)
+    low = (0, 0, -0.03)
 
-    idle_keys = []
-    for f in range(9):
-        b = 4 * math.sin(f / 8 * 2 * math.pi)
-        idle_keys.append(Key(f / 8, guard(b), (0, 0, -0.05 - 0.008 * b)))
+    # Idle: the boxer's bounce, two beats a second, shoulders rolling.
+    idle = []
+    for f in range(13):
+        t = f / 12
+        bounce = 0.5 - 0.5 * math.cos(2 * 2 * math.pi * t)
+        roll = math.sin(2 * math.pi * t)
+        idle.append(Key(t, guard(bounce, roll), (0, 0, -0.02 - 0.045 * bounce),
+                        ease="linear"))
 
-    run_keys = []
-    for f in range(9):
-        p = f / 8
-        bounce = 0.035 * abs(math.cos(p * 2 * math.pi))
-        run_keys.append(Key(p, run_pose(p), (0, -0.02, -0.04 + bounce),
-                            ease="linear"))
+    run = []
+    for f in range(11):
+        p = f / 10
+        s = math.sin(p * 2 * math.pi)
+        run.append(Key(p, run_pose(p), (0, -0.03, -0.04 + 0.06 * (1 - abs(s))),
+                       ease="linear"))
 
-    hit_back = with_(g, chest=(-16, -6, 14), neck=(-22, 0, 10),
-                     shoulder_L=(-20, 30, -10), elbow_L=(-60, 0, 0),
-                     shoulder_R=(-20, -30, 10), elbow_R=(-70, 0, 0))
+    # ---- jab (lead hand) ------------------------------------------------------
+    stretch_el, swell = stretch(1.35, 1.28)
+    hold_el, hold_fist = stretch(1.12, 1.12)
+    j_load = with_(g, hips=(0, 0, 22), chest=(6, 0, 2),
+                   shoulder_L=(-44, -24, -6), elbow_L=(-124, 0, 0))
+    j_hit = with_(g, hips=(0, 0, 4), abdomen=(8, 0, -10), chest=(12, 0, -26),
+                  head=(10, 0, 12), shoulder_L=(-92, -2, -14),
+                  elbow_L=(-4,) + stretch_el[1:], wrist_L=swell,
+                  hip_L=(-26, -4, -8), knee_L=(14, 0, 0))
+    j_hold = with_(j_hit, elbow_L=(-6,) + hold_el[1:], wrist_L=hold_fist)
+    j_back = with_(g, shoulder_L=(-64, -20, -8), elbow_L=(-106, 0, 0))
 
-    kneel = with_(g, chest=(26, 0, 0), neck=(30, 0, 0),
-                  shoulder_L=(-10, 20, 0), elbow_L=(-30, 0, 0),
-                  shoulder_R=(-10, -20, 0), elbow_R=(-30, 0, 0),
+    # ---- cross (rear hand): the hips whip, the heel turns ---------------------
+    # Rear-hand power: the torso turns toward his left (+z) to bring the
+    # right shoulder through; the load winds the other way first. Twists
+    # add up down the spine (hips + abdomen + chest), so keep the sum near
+    # -25 for the load and +35 for the hit.
+    c_load = with_(g, hips=(0, 0, -4), abdomen=(4, 0, -8), chest=(6, 0, -12),
+                   shoulder_R=(-40, 22, 12), elbow_R=(-136, 0, 0),
+                   knee_R=(30, 0, 0))
+    c_hit = with_(g, hips=(0, 0, 18), abdomen=(8, 0, 8), chest=(14, 0, 10),
+                  head=(8, 0, -10), shoulder_R=(-94, 4, 10),
+                  elbow_R=(-4, 0, 0, 1.0, 1.0, 1.42), wrist_R=(0, 0, 0, 1.32, 1.32, 1.32),
+                  shoulder_L=(-50, -28, -6), elbow_L=(-132, 0, 0),
+                  hip_R=(6, 4, -12), knee_R=(16, 0, 0), ankle_R=(-36, 0, 0),
+                  hip_L=(-24, -4, -8), knee_L=(22, 0, 0))
+    c_hold = with_(c_hit, elbow_R=(-6, 0, 0, 1.0, 1.0, 1.15),
+                   wrist_R=(0, 0, 0, 1.12, 1.12, 1.12))
+
+    # ---- uppercut (rear hand): sink, then explode upward ---------------------
+    u_dip = with_(g, hips=(0, 0, -6), abdomen=(18, -6, -8), chest=(22, -10, -12),
+                  head=(10, 0, 6), shoulder_R=(-12, 10, 12), elbow_R=(-96, 0, 0),
+                  hip_L=(-34, -4, -8), knee_L=(56, 0, 0), ankle_L=(-18, 0, 0),
+                  hip_R=(-2, 4, 12), knee_R=(54, 0, 0), ankle_R=(-30, 0, 0))
+    u_rise = with_(g, hips=(0, 0, 16), abdomen=(-6, 6, 10), chest=(-16, 8, 12),
+                   head=(-14, 0, -6), shoulder_R=(-136, -4, 24),
+                   elbow_R=(-74, 0, 0, 1.0, 1.0, 1.28), wrist_R=(0, 0, 0, 1.3, 1.3, 1.3),
+                   hip_L=(-12, -4, -8), knee_L=(6, 0, 0),
+                   hip_R=(8, 4, 12), knee_R=(6, 0, 0), ankle_R=(-22, 0, 0))
+    u_hold = with_(u_rise, elbow_R=(-76, 0, 0, 1.0, 1.0, 1.1),
+                   wrist_R=(0, 0, 0, 1.12, 1.12, 1.12))
+
+    # ---- slip: bob and weave off the line -------------------------------------
+    s_duck = with_(g, abdomen=(14, 12, 0), chest=(30, 22, -18), head=(-8, 10, 0),
+                   hip_L=(-36, -4, -10), knee_L=(62, 0, 0), ankle_L=(-24, 0, 0),
+                   hip_R=(-4, 4, 14), knee_R=(58, 0, 0), ankle_R=(-44, 0, 0))
+
+    # ---- getting hit: the head snaps, the rest follows -------------------------
+    hurt = with_(g, abdomen=(-8, 0, 6), chest=(-22, -6, 14), neck=(-12, 0, 6),
+                 head=(-30, 0, 16), shoulder_L=(-24, -40, -6), elbow_L=(-60, 0, 0),
+                 shoulder_R=(-20, 42, 8), elbow_R=(-70, 0, 0))
+    stagger = with_(hurt, chest=(-30, -10, 24), head=(-20, 0, 20),
+                    hip_L=(-30, -4, -8), knee_L=(40, 0, 0))
+    kneel = with_(g, abdomen=(16, 0, 0), chest=(24, 0, 0), head=(30, 0, 0),
+                  shoulder_L=(-10, -20, 0), elbow_L=(-30, 0, 0),
+                  shoulder_R=(-10, 20, 0), elbow_R=(-30, 0, 0),
                   hip_L=(-70, 0, -6), knee_L=(120, 0, 0), ankle_L=(-40, 0, 0),
                   hip_R=(-80, 0, 8), knee_R=(130, 0, 0), ankle_R=(-40, 0, 0))
-    lying = {
-        "hips": (0, 0, 0), "chest": (-6, 0, 8), "neck": (-10, 0, 20),
-        "shoulder_L": (-150, 50, 0), "elbow_L": (-20, 0, 0),
-        "shoulder_R": (-40, -70, 0), "elbow_R": (-30, 0, 0),
-        "hip_L": (-50, 0, -10), "knee_L": (80, 0, 0), "ankle_L": (-20, 0, 0),
-        "hip_R": (-20, 0, 14), "knee_R": (30, 0, 0), "ankle_R": (-10, 0, 0),
-    }
+    lying = with_(g, hips=(0, 0, 0), abdomen=(-4, 0, 0), chest=(-6, 0, 8),
+                  head=(-10, 0, 20), shoulder_L=(-150, 50, 0), elbow_L=(-20, 0, 0),
+                  shoulder_R=(-40, -70, 0), elbow_R=(-30, 0, 0),
+                  hip_L=(-50, 0, -10), knee_L=(80, 0, 0), ankle_L=(-20, 0, 0),
+                  hip_R=(-20, 0, 14), knee_R=(30, 0, 0), ankle_R=(-10, 0, 0))
+
+    tuck = with_(g, hips=(0, 0, 0), abdomen=(30, 0, 0), chest=(40, 0, 0),
+                 head=(30, 0, 0), shoulder_L=(-70, -20, 0), elbow_L=(-130, 0, 0),
+                 shoulder_R=(-70, 20, 0), elbow_R=(-130, 0, 0),
+                 hip_L=(-110, 0, 0), knee_L=(135, 0, 0), ankle_L=(-20, 0, 0),
+                 hip_R=(-104, 0, 0), knee_R=(130, 0, 0), ankle_R=(-20, 0, 0))
+
+    def roll_keys(frames):
+        keys = []
+        centre, rolling = 0.92, 0.58
+        for f in range(frames + 1):
+            t = f / frames
+            a = math.radians(360.0 * t)
+            tucked = 0.08 < t < 0.92
+            target = rolling if tucked else centre - 0.05
+            off = (0.0, centre * math.sin(a), target - centre * math.cos(a))
+            keys.append(Key(t, tuck if tucked else with_(g, chest=(30, 0, 0)),
+                            off, (360.0 * t, 0, 0), "linear"))
+        return keys
 
     return [
-        Clip("idle", 8, 8, True, idle_keys),
-        Clip("run", 8, 13, True, run_keys),
-        Clip("jab", 5, 20, False, [
-            Key(0.0, j0, stance), Key(0.25, j1, stance),
-            Key(0.5, j2, lunge, ease="out"), Key(1.0, j0, stance)]),
-        Clip("cross", 6, 20, False, [
-            Key(0.0, c0, stance), Key(0.2, c1, stance),
-            Key(0.45, c2, lunge, ease="out"), Key(0.7, c2, lunge),
-            Key(1.0, c0, stance)]),
-        Clip("uppercut_R", 6, 22, False, [
-            Key(0.0, u0, stance), Key(0.3, u1, (0, -0.02, -0.12)),
-            Key(0.6, u2, (0, -0.04, 0.0), ease="out"), Key(1.0, u0, stance)]),
-        Clip("uppercut_L", 6, 22, False, [
-            Key(0.0, u0, stance), Key(0.3, mirror(u1), (0, -0.02, -0.12)),
-            Key(0.6, mirror(u2), (0, -0.04, 0.0), ease="out"),
-            Key(1.0, u0, stance)]),
-        Clip("slip", 6, 16, False, [
-            Key(0.0, s0, stance), Key(0.3, s1, (0.10, 0.04, -0.16), ease="out"),
-            Key(0.75, s1, (0.10, 0.04, -0.16)), Key(1.0, s0, stance)]),
-        Clip("roll", 8, 18, False, roll_keys(8)),
-        Clip("hit", 4, 16, False, [
-            Key(0.0, g, stance), Key(0.3, hit_back, (0, 0.07, -0.03), ease="out"),
-            Key(1.0, g, stance)]),
-        Clip("death", 9, 12, False, [
-            Key(0.0, hit_back, (0, 0.04, -0.03)),
-            Key(0.35, kneel, (0, 0.06, -0.40)),
-            Key(0.7, lying, (0, 0.10, 0.12), rot=(-88, 0, 0), ease="in"),
-            Key(1.0, lying, (0, 0.10, 0.12), rot=(-90, 0, 0))]),
+        Clip("idle", 12, 12, True, idle, overlap=0.035),
+        Clip("run", 10, 15, True, run, overlap=0.02),
+        Clip("jab", 8, 24, False, [
+            Key(0.0, g, low), Key(0.14, j_load, (0, 0.02, -0.04), ease="out"),
+            Key(0.32, j_hit, (0, -0.12, -0.04), ease="out"),
+            Key(0.52, j_hold, (0, -0.11, -0.04)),
+            Key(0.78, j_back, (0, -0.04, -0.03)), Key(1.0, g, low)],
+            overlap=0.008),
+        Clip("cross", 9, 24, False, [
+            Key(0.0, g, low), Key(0.16, c_load, (0, 0.03, -0.05), ease="out"),
+            Key(0.36, c_hit, (0, -0.15, -0.05), ease="out"),
+            Key(0.56, c_hold, (0, -0.14, -0.05)),
+            Key(0.8, with_(g, chest=(10, 0, 10)), (0, -0.05, -0.03)),
+            Key(1.0, g, low)], overlap=0.008),
+        Clip("uppercut_R", 10, 24, False, [
+            Key(0.0, g, low), Key(0.24, u_dip, (0, 0.0, -0.16), ease="out"),
+            Key(0.44, u_rise, (0, -0.06, 0.06), ease="out"),
+            Key(0.62, u_hold, (0, -0.06, 0.05)),
+            Key(1.0, g, low)], overlap=0.01),
+        Clip("uppercut_L", 10, 24, False, [
+            Key(0.0, g, low), Key(0.24, mirror(u_dip), (0, 0.0, -0.16), ease="out"),
+            Key(0.44, mirror(u_rise), (0, -0.06, 0.06), ease="out"),
+            Key(0.62, mirror(u_hold), (0, -0.06, 0.05)),
+            Key(1.0, g, low)], overlap=0.01),
+        Clip("slip", 8, 20, False, [
+            Key(0.0, g, low), Key(0.3, s_duck, (0.10, 0.04, -0.17), ease="out"),
+            Key(0.7, s_duck, (0.10, 0.04, -0.17)), Key(1.0, g, low)],
+            overlap=0.015),
+        Clip("roll", 10, 20, False, roll_keys(10)),
+        Clip("hit", 6, 20, False, [
+            Key(0.0, g, low), Key(0.22, hurt, (0, 0.09, -0.02), ease="out"),
+            Key(0.55, with_(hurt, head=(-16, 0, 8)), (0, 0.07, -0.03)),
+            Key(1.0, g, low)], overlap=0.025),
+        Clip("death", 12, 14, False, [
+            Key(0.0, hurt, (0, 0.04, -0.02)),
+            Key(0.2, stagger, (0, 0.14, -0.06), ease="out"),
+            Key(0.45, kneel, (0, 0.10, -0.42)),
+            Key(0.75, lying, (0, 0.10, 0.16), rot=(-88, 0, 0), ease="in"),
+            Key(1.0, lying, (0, 0.10, 0.16), rot=(-90, 0, 0))], overlap=0.02),
     ]

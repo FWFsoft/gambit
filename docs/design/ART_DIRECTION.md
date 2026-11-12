@@ -35,6 +35,33 @@ Models use curved, tapering `tube`s and smooth blobs, not boxes.
 resolution a pre-rendered hero costs a lot of texture memory (Gravon's
 sheet is about 200 MB of GPU memory). See `DECISIONS.md`.
 
+## Proportions and motion: what "feel" is made of
+
+The 3rd Strike / MvC2 feel lives in proportions and movement more than
+in rendering detail. Every hero is built on the **heroic body kit**
+(`tools/sprite_forge/actors/_body.py`):
+- a real spine (hips, abdomen, chest, neck, head),
+- curved muscle,
+- proportion parameters: head, shoulders, waist, forearms, hands, legs,
+  feet.
+
+Animation follows fighting-game principles. The forge supports each of
+them directly:
+
+| Principle | How |
+| --- | --- |
+| Anticipation, snap, hold, recoil | key poses with `ease="out"` into the strike and a held impact key |
+| Overlapping action (hips lead, fist arrives last) | `Clip(..., overlap=seconds per joint depth)` |
+| Smear / squash and stretch | six-value joint poses scale a limb: `(rx, ry, rz, sx, sy, sz)` |
+| Secondary motion (hair, sashes, capes) | `FOLLOW = {joint: (drive, gain, stiffness, damping, drag)}` springs |
+| Weight and rhythm in idles | knee bend, bounce and shoulder roll driven together |
+
+Twists add up down the spine. Keep the sum of hips + abdomen + chest
+rotations about a move's real twist (about ±30° for a punch), or the
+torso spins sideways.
+
+![Wade: before and after](../prototype/wade_motion_before_after.png)
+
 ## Rules for every in-game asset
 
 1. **Shape before detail.** What identifies a character must be in the

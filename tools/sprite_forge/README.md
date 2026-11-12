@@ -79,6 +79,20 @@ Clip names the game looks for: `idle`, `run`, `hit`, `death`, and
 in `src/ArenaView.cpp` (Wade: `jab` / `cross` on LMB, `uppercut_R` /
 `uppercut_L` on RMB, `slip` on Q, `roll` on Shift).
 
+## Body kit and motion
+
+Characters start from `actors/_body.py`. A `Build` sets their proportions;
+`skeleton`, `torso`, `head`, `arms` and `legs` build the body, and the
+character adds costume and props. See Wade.
+
+Motion tools, all in `forge.py`:
+- **Overlapping action:** `Clip(..., overlap=0.01)` delays each joint by
+  that many seconds per level below the hips, so motion ripples outward.
+- **Secondary motion:** `FOLLOW = {"hair": ("head", gain, stiffness,
+  damping, drag)}` in an actor module springs a joint after its driver.
+- **Squash and stretch:** a six-value pose `(rx, ry, rz, sx, sy, sz)`
+  scales a joint in its rest axes (a forearm that stretches on a punch).
+
 ## Toon style
 
 Set `STYLE = "toon"` and a signature `RIM = (r, g, b)` in an actor module
