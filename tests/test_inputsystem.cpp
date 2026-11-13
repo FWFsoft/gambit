@@ -1,5 +1,6 @@
 #include <SDL2/SDL.h>
 
+#include "Camera.h"
 #include "GameStateManager.h"
 #include "InputSystem.h"
 #include "Logger.h"
@@ -79,12 +80,42 @@ TEST(InputSystem_SequenceIncrement) {
   assert(sequences[2] == sequences[1] + 1);
 }
 
+// Space attacks while the camera is locked; once it is unlocked (Y) Space
+// brings the camera back to the hero instead.
+TEST(InputSystem_SpaceFollowsCameraMode) {
+  resetEventBus();
+  GameStateManager::instance().transitionTo(GameState::Playing);
+
+  Camera camera(Config::Screen::WIDTH, Config::Screen::HEIGHT);
+  camera.setMode(Camera::Mode::Locked);
+  InputSystem inputSystem(nullptr);
+  inputSystem.setCamera(&camera);
+
+  LocalInputEvent event = publishKeyAndUpdate(inputSystem, SDLK_SPACE, true);
+  assert((event.buttons & InputButtons::Primary) != 0);
+  assert(!camera.recentreHeld);
+  event = publishKeyAndUpdate(inputSystem, SDLK_SPACE, false);
+  assert((event.buttons & InputButtons::Primary) == 0);
+
+  publishKeyAndUpdate(inputSystem, SDLK_y, true);
+  assert(!camera.isLocked());
+  event = publishKeyAndUpdate(inputSystem, SDLK_SPACE, true);
+  assert((event.buttons & InputButtons::Primary) == 0);
+  assert(camera.recentreHeld && camera.isFollowing());
+  publishKeyAndUpdate(inputSystem, SDLK_SPACE, false);
+  assert(!camera.recentreHeld && !camera.isFollowing());
+
+  publishKeyAndUpdate(inputSystem, SDLK_y, true);
+  assert(camera.isLocked());
+}
+
 int main() {
   Logger::init();
 
   test_InputSystem_KeyBindings();
   test_InputSystem_AllDirections();
   test_InputSystem_SequenceIncrement();
+  test_InputSystem_SpaceFollowsCameraMode();
 
   return 0;
 }

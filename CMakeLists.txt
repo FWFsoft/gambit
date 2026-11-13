@@ -237,6 +237,7 @@ add_executable(Client
     src/MatchDirector.cpp
     src/ArenaClient.cpp
     src/ArenaView.cpp
+    src/FogOfWar.cpp
     src/EffectVisuals.cpp
     src/ArenaHud.cpp
 )
@@ -453,6 +454,12 @@ target_include_directories(test_collision SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
 target_include_directories(test_collision PRIVATE include tests)
 target_link_libraries(test_collision PRIVATE spdlog::spdlog SDL2::SDL2)
 
+add_executable(test_camera_fog
+    tests/test_camera_fog.cpp
+    src/FogOfWar.cpp
+)
+target_include_directories(test_camera_fog PRIVATE include tests)
+
 add_executable(test_music_zone
     tests/test_music_zone.cpp
     src/Logger.cpp
@@ -560,6 +567,7 @@ add_test(NAME InputSystem COMMAND test_inputsystem)
 add_test(NAME RemotePlayerInterpolation COMMAND test_remote_player_interpolation)
 add_test(NAME ClientPrediction COMMAND test_client_prediction)
 add_test(NAME CollisionSystem COMMAND test_collision)
+add_test(NAME CameraAndFogOfWar COMMAND test_camera_fog)
 add_test(NAME MusicZone COMMAND test_music_zone)
 add_test(NAME MusicSystem COMMAND test_music_system)
 add_test(NAME AnimationController COMMAND test_animation_controller)
@@ -738,6 +746,7 @@ set(WASM_CLIENT_SOURCES
     src/MatchDirector.cpp
     src/ArenaClient.cpp
     src/ArenaView.cpp
+    src/FogOfWar.cpp
     src/EffectVisuals.cpp
     src/ArenaHud.cpp
 )

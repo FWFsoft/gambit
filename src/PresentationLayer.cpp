@@ -352,7 +352,7 @@ void PresentationLayer::renderLightMap(const Camera& camera) {
     const float cx = (pool.x - camera.x) * camera.zoom + screenW * 0.5f;
     const float cy = (pool.y - camera.y) * camera.zoom + screenH * 0.5f;
     const float rx = pool.radius * camera.zoom;
-    const float ry = rx * Look::LIGHT_POOL_SQUASH;
+    const float ry = rx * pool.squash;
     if (cx + rx < 0.0f || cx - rx > screenW || cy + ry < 0.0f ||
         cy - ry > screenH) {
       continue;

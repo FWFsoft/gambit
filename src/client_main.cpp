@@ -135,6 +135,8 @@ int main(int argc, char* argv[]) {
 
   InputSystem inputSystem(&clientPrediction, &collisionDebugRenderer,
                           &musicZoneDebugRenderer, &objectiveDebugRenderer);
+  inputSystem.setCamera(&camera);
+  clientPrediction.setCamera(&camera);
 
   // Initialize animation system first
   AnimationSystem animationSystem;

@@ -2,6 +2,7 @@
 
 #include <cmath>
 
+#include "Camera.h"
 #include "CharacterRegistry.h"
 #include "CharacterSelectionState.h"
 #include "DamageNumberSystem.h"
@@ -59,12 +60,21 @@ void ClientPrediction::sendToServer(const std::vector<uint8_t>& data) {
 }
 
 void ClientPrediction::onLocalInput(const LocalInputEvent& e) {
-  // The camera follows the local player, so the cursor's world position is
-  // its offset from the screen centre.
-  const float zoom = Config::Screen::WORLD_ZOOM;
-  aimX = localPlayer.x + (e.mouseX - Config::Screen::WIDTH / 2.0f) / zoom;
-  aimY = localPlayer.y + (e.mouseY - Config::Screen::HEIGHT / 2.0f) / zoom +
-         AIM_HEIGHT;
+  // The cursor's world position is its offset from whatever the screen is
+  // centred on: the local player while the camera follows them (exact, even
+  // between rendered frames), the camera itself once it has been unlocked.
+  float zoom = Config::Screen::WORLD_ZOOM;
+  float viewX = localPlayer.x;
+  float viewY = localPlayer.y;
+  if (camera) {
+    zoom = camera->zoom;
+    if (!camera->isFollowing()) {
+      viewX = camera->x;
+      viewY = camera->y;
+    }
+  }
+  aimX = viewX + (e.mouseX - Config::Screen::WIDTH / 2.0f) / zoom;
+  aimY = viewY + (e.mouseY - Config::Screen::HEIGHT / 2.0f) / zoom + AIM_HEIGHT;
   localPlayer.aimX = aimX;
   localPlayer.aimY = aimY;
 
@@ -73,9 +83,8 @@ void ClientPrediction::onLocalInput(const LocalInputEvent& e) {
 
   // Predict movement only when the server would also move us: alive, in the
   // match, and not mid-dash.
-  bool canPredict =
-      localPlayer.isAlive() && localPlayer.characterId != 0 &&
-      (localPlayer.stateFlags & PlayerFlags::MoveLocked) == 0;
+  bool canPredict = localPlayer.isAlive() && localPlayer.characterId != 0 &&
+                    (localPlayer.stateFlags & PlayerFlags::MoveLocked) == 0;
   if (canPredict) {
     MovementInput input(e.moveLeft, e.moveRight, e.moveUp, e.moveDown, 16.67f,
                         worldWidth, worldHeight, collisionSystem);

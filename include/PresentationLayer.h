@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "Camera.h"
+#include "config/LookConfig.h"
 
 // The presentation layer of the art direction ("inked heroes on a dark
 // world", docs/design/ART_DIRECTION.md): the world is drawn into an
@@ -37,6 +38,9 @@ class PresentationLayer {
     float x, y, radius;
     float r, g, b;
     float strength;
+    // Height / width on screen. Light on the isometric floor is squashed
+    // 2:1; sight (a circle in world space) is not.
+    float squash = Config::Look::LIGHT_POOL_SQUASH;
   };
   using LightProvider = std::function<void(std::vector<LightPool>&)>;
 
