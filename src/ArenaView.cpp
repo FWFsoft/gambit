@@ -410,7 +410,7 @@ namespace {
 
 // Which clip an ability plays. Characters alternate hands on repeat casts.
 std::string actionClip(const std::string& character, int slot,
-                       uint32_t castCount, bool alt) {
+                       uint32_t castCount, bool alt, uint8_t variant) {
   bool odd = (castCount % 2) == 1;
   if (character == "Presidente") {
     // alt = cast while holding a foe: the Resonance forms.
@@ -428,13 +428,18 @@ std::string actionClip(const std::string& character, int slot,
     }
   }
   if (character == "Wade") {
+    // The server picks the punch (Arena::WadeForm); play what it threw.
     switch (slot) {
-      case 0:
-        return odd ? "jab" : "cross";
+      case 0: {
+        static const char* PUNCHES[Arena::WadeForm::PunchCount] = {
+            "jab", "cross", "hook_L", "hook_R", "cross_body", "hook_body"};
+        return PUNCHES[variant < Arena::WadeForm::PunchCount ? variant : 0];
+      }
       case 1:
-        return odd ? "uppercut_R" : "uppercut_L";
+        return variant == Arena::WadeForm::RearUppercut ? "uppercut_R"
+                                                        : "uppercut_L";
       case 2:
-        return "slip";
+        return variant == Arena::WadeForm::Haymaker ? "haymaker" : "slip";
       case 3:
         return "roll";
       default:
@@ -1193,7 +1198,7 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
     if (view.castCount != anim.castCount) {
       anim.castCount = view.castCount;
       anim.clip = actionClip(definition->name, view.castSlot, view.castCount,
-                             view.castAlt);
+                             view.castAlt, view.castVariant);
       anim.startSeconds = timeSeconds;
     }
     const ActorAnim* clip = nullptr;

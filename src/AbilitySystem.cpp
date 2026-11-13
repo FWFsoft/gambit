@@ -327,8 +327,12 @@ void AbilitySystem::updateAbilityInput(Player& player, float dtMs) {
             cast.y2 = player.aimY;
             cast.value = 120.0f;
             cast.param = static_cast<uint8_t>(slot);
-            emit(cast);
+            // The kit picks the form (which hand) while casting, so the
+            // event goes out after it.
+            player.castVariant = 0;
             kit->cast(ctx, slot);
+            cast.extraId = player.castVariant;
+            emit(cast);
           }
         } else {
           player.chargeSlot = -1;
@@ -362,14 +366,17 @@ void AbilitySystem::fire(Player& player, int slot, float charge) {
   cast.y2 = player.aimY;
   cast.value = slot == 0 ? 180.0f : 280.0f;
   cast.param = static_cast<uint8_t>(slot);
-  emit(cast);
 
   AbilityContext ctx = makeContext(player, charge);
+  player.castVariant = 0;
   if (isCore) {
     Infusions::castCore(ctx);
   } else {
     kit->cast(ctx, slot);
   }
+  // Sent after the cast so it can carry the form the kit chose.
+  cast.extraId = player.castVariant;
+  emit(cast);
 }
 
 void AbilitySystem::updateForcedMotion(Player& player, float dtMs) {

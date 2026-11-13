@@ -47,29 +47,43 @@ class Build:
         return base
 
 
-def skeleton(m: Model, b: Build):
-    """Joints for the body. Returns key heights for costume building."""
+def joint_table(b: Build):
+    """The body's joints as [(name, parent, rest position)], parents first.
+    Pure numbers, so pose tools (_rig.py) can work without a Model."""
     L = b.leg_length
     hip_z = 0.97 * L
-    m.joint("hips", None, (0, 0, hip_z + 0.03))
-    m.joint("abdomen", "hips", (0, 0, hip_z + 0.17))
-    m.joint("chest", "abdomen", (0, 0, hip_z + 0.35))
-    m.joint("neck", "chest", (0, 0, hip_z + 0.60))
-    m.joint("head", "neck", (0, -0.01, hip_z + 0.70))
+    table = [
+        ("hips", None, (0, 0, hip_z + 0.03)),
+        ("abdomen", "hips", (0, 0, hip_z + 0.17)),
+        ("chest", "abdomen", (0, 0, hip_z + 0.35)),
+        ("neck", "chest", (0, 0, hip_z + 0.60)),
+        ("head", "neck", (0, -0.01, hip_z + 0.70)),
+    ]
     sh_z = hip_z + 0.53
     upper = 0.28 * b.arm_length
     fore = 0.26 * b.arm_length
     for side, x in (("L", 1), ("R", -1)):
         sx = b.shoulders * x
-        m.joint(f"shoulder_{side}", "chest", (sx, 0, sh_z))
-        m.joint(f"elbow_{side}", f"shoulder_{side}", (sx + 0.02 * x, 0, sh_z - upper))
-        m.joint(f"wrist_{side}", f"elbow_{side}",
-                (sx + 0.03 * x, 0, sh_z - upper - fore))
+        table.append((f"shoulder_{side}", "chest", (sx, 0, sh_z)))
+        table.append((f"elbow_{side}", f"shoulder_{side}",
+                      (sx + 0.02 * x, 0, sh_z - upper)))
+        table.append((f"wrist_{side}", f"elbow_{side}",
+                      (sx + 0.03 * x, 0, sh_z - upper - fore)))
         hx = b.hip_width * x
-        m.joint(f"hip_{side}", "hips", (hx, 0, hip_z))
-        m.joint(f"knee_{side}", f"hip_{side}", (hx + 0.01 * x, 0, 0.53 * L))
-        m.joint(f"ankle_{side}", f"knee_{side}", (hx + 0.01 * x, 0, 0.10 * L))
-    return {"hip_z": hip_z, "shoulder_z": sh_z, "upper": upper, "fore": fore}
+        table.append((f"hip_{side}", "hips", (hx, 0, hip_z)))
+        table.append((f"knee_{side}", f"hip_{side}", (hx + 0.01 * x, 0, 0.53 * L)))
+        table.append((f"ankle_{side}", f"knee_{side}", (hx + 0.01 * x, 0, 0.10 * L)))
+    return table
+
+
+def skeleton(m: Model, b: Build):
+    """Joints for the body. Returns key heights for costume building."""
+    for name, parent, pos in joint_table(b):
+        m.joint(name, parent, pos)
+    L = b.leg_length
+    hip_z = 0.97 * L
+    return {"hip_z": hip_z, "shoulder_z": hip_z + 0.53,
+            "upper": 0.28 * b.arm_length, "fore": 0.26 * b.arm_length}
 
 
 def torso(m: Model, b: Build, mat, waist_mat=None):

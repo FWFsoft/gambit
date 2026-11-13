@@ -78,7 +78,7 @@ as concept-only.
 | Zephyr | Playmaker | Piercing wind slashes, a vortex that clusters and stuns, a shield that blows enemies away |
 | Mina | Striker | Exploding bomb balls, a charged lob, an artillery barrage |
 | Volgore | Defender | Drags enemies in, snares and dooms them, goes Berserk to become a wall |
-| Wade | Striker | Fast punches, held uppercuts, Slip to counter-punch, Roll |
+| Wade | Striker | Three-punch boxing combinations, planted uppercuts while held, Slip to chamber a haymaker counter, a boxing Roll |
 | El Presidente | Playmaker | Grappler: grab a foe and carry it overhead, then every button changes: Látigo spin-throw, Bomba leaping sit-out powerbomb, Abrazo bear hug, Grande Rana Bomba belly splash |
 
 Every hit goes through the effects system from the spec (Guard, Wound,

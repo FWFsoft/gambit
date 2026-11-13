@@ -69,6 +69,10 @@ struct Player : public Animatable {
   float kitTimer[4] = {0, 0, 0, 0};
   int kitCounter[4] = {0, 0, 0, 0};
   uint32_t kitTarget = 0;
+  // Which form of the ability the kit just threw (which punch, which hand).
+  // Set by Kit::cast and sent with the AbilityCast event so every client
+  // plays the same animation. 0 = the default form.
+  uint8_t castVariant = 0;
   bool godMode = false;
   // Effect-lab training ally: takes effects but never takes damage.
   bool trainingDummy = false;

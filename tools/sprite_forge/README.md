@@ -84,8 +84,10 @@ keys rather than blending.
 
 Clip names the game looks for: `idle`, `run`, `hit`, `death`, and
 `attack` for enemies. Character abilities map to clips in `actionClip()`
-in `src/ArenaView.cpp` (Wade: `jab` / `cross` on LMB, `uppercut_R` /
-`uppercut_L` on RMB, `slip` on Q, `roll` on Shift).
+in `src/ArenaView.cpp`. Wade's are picked by the server per cast
+(`Arena::WadeForm`): `jab`, `cross`, `hook_L`, `hook_R`, `cross_body`,
+`hook_body` on LMB; `uppercut_L` / `uppercut_R` on RMB; `slip` on Q and
+`haymaker` when the slip is hit; `roll` on Shift.
 
 ## Body kit and motion
 
@@ -100,6 +102,25 @@ Motion tools, all in `forge.py`:
   damping, drag)}` in an actor module springs a joint after its driver.
 - **Squash and stretch:** a six-value pose `(rx, ry, rz, sx, sy, sz)`
   scales a joint in its rest axes (a forearm that stretches on a punch).
+
+## Posing by position (`actors/_rig.py`)
+
+Joint angles are fine for a guard or a run cycle, and hopeless for
+matching a reference ("the fist ends here, the rear heel is up, the feet
+do not slide"). `_rig.py` lets a clip be written as where the hips, fists
+and feet are and how the spine turns. It samples those keys once per
+frame and solves each frame into an ordinary pose, so planted feet stay
+planted and hands travel the path that was authored.
+
+```python
+RIG = _rig.Rig(_body.joint_table(BUILD))
+RIG.clip("jab", 8, 24, [(0, G), (2, stance(..., L=dict(at=(0.05, -1.7, 1.6))), "snap"), (7, G)])
+```
+
+Wade's punches, slip and roll are built this way (`stance()` and
+`boxing_clips()` in `actors/wade.py`). A hand target past arm's reach
+means "straight at that point". These clips set no `overlap`: the lead
+of the hips over the fist is authored in the keys.
 
 ## Generated models (`skin.py`)
 
