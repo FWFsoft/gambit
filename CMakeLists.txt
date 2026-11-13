@@ -193,6 +193,7 @@ add_executable(Client
     src/RenderSystem.cpp
     src/TiledMap.cpp
     src/TileRenderer.cpp
+    src/PresentationLayer.cpp
     src/CollisionSystem.cpp
     src/CollisionDebugRenderer.cpp
     src/OpenGLUtils.cpp
@@ -694,6 +695,7 @@ set(WASM_CLIENT_SOURCES
     src/RenderSystem.cpp
     src/TiledMap.cpp
     src/TileRenderer.cpp
+    src/PresentationLayer.cpp
     src/CollisionSystem.cpp
     src/CollisionDebugRenderer.cpp
     src/OpenGLUtils.cpp

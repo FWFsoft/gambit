@@ -5,7 +5,9 @@
 #include "Logger.h"
 #include "OpenGLUtils.h"
 #include "ShaderCompat.h"
+#include "PresentationLayer.h"
 #include "TextureManager.h"
+#include "config/LookConfig.h"
 #include "config/ScreenConfig.h"
 #include "config/TileConfig.h"
 
@@ -35,18 +37,42 @@ void main() {
 }
 )";
 
-// Batch tile fragment shader
+// Batch tile fragment shader.
+// World values (docs/design/ART_DIRECTION.md, "The look"): the floor is
+// pushed dark, cool and low in contrast here, so every tileset is covered,
+// then lit by the light map. Strengths: include/config/LookConfig.h.
 const char* batchTileFragmentShader =
     GAMBIT_GLSL_VERSION
-    GAMBIT_GLSL_PRECISION
+    GAMBIT_GLSL_PRECISION_HIGH
     R"(
 in vec2 TexCoord;
 out vec4 FragColor;
 
 uniform sampler2D image;
+uniform sampler2D lightMap;
+uniform float look;         // 0 = tiles as painted, 1 = the look
+uniform vec2 viewportSize;  // framebuffer pixels
+uniform vec3 floorTint;
+uniform vec3 floorValue;    // min, range, saturation
+uniform vec3 floorLight;    // range, knee, add
+uniform vec3 floorVignette; // amount, start, power
 
 void main() {
-    FragColor = texture(image, TexCoord);
+    vec4 tile = texture(image, TexCoord);
+    float lum = dot(tile.rgb, vec3(0.299, 0.587, 0.114));
+    vec3 base = mix(vec3(lum), tile.rgb, floorValue.z);
+    base = (floorValue.x + base * floorValue.y) * floorTint;
+
+    vec2 screenUv = gl_FragCoord.xy / viewportSize;
+    vec3 light = texture(lightMap, screenUv).rgb * floorLight.x;
+    light = light / (1.0 + light * floorLight.y);
+    vec3 lit = base * (1.0 + light) + light * floorLight.z;
+
+    float edge = length((screenUv - 0.5) * 2.0);
+    lit *= 1.0 - floorVignette.x *
+           pow(clamp(edge - floorVignette.y, 0.0, 1.0), floorVignette.z);
+
+    FragColor = vec4(mix(tile.rgb, lit, look), tile.a);
 }
 )";
 
@@ -78,6 +104,25 @@ void TileRenderer::initBatchRenderer() {
   uniformCameraPos = glGetUniformLocation(shaderProgram, "cameraPos");
   uniformScreenCenter = glGetUniformLocation(shaderProgram, "screenCenter");
   uniformZoom = glGetUniformLocation(shaderProgram, "zoom");
+  uniformLook = glGetUniformLocation(shaderProgram, "look");
+  uniformViewportSize = glGetUniformLocation(shaderProgram, "viewportSize");
+
+  // The look's strengths are compile-time constants: set them once.
+  namespace Look = Config::Look;
+  glUseProgram(shaderProgram);
+  glUniform1i(glGetUniformLocation(shaderProgram, "image"), 0);
+  glUniform1i(glGetUniformLocation(shaderProgram, "lightMap"), 1);
+  glUniform3f(glGetUniformLocation(shaderProgram, "floorTint"),
+              Look::FLOOR_TINT_R, Look::FLOOR_TINT_G, Look::FLOOR_TINT_B);
+  glUniform3f(glGetUniformLocation(shaderProgram, "floorValue"),
+              Look::FLOOR_VALUE_MIN, Look::FLOOR_VALUE_RANGE,
+              Look::FLOOR_SATURATION);
+  glUniform3f(glGetUniformLocation(shaderProgram, "floorLight"),
+              Look::LIGHT_RANGE, Look::LIGHT_KNEE, Look::LIGHT_ADD);
+  glUniform3f(glGetUniformLocation(shaderProgram, "floorVignette"),
+              Look::FLOOR_VIGNETTE, Look::FLOOR_VIGNETTE_START,
+              Look::FLOOR_VIGNETTE_POWER);
+  glUseProgram(0);
 
   // Create VAO/VBO for dynamic batched rendering
   glGenVertexArrays(1, &VAO);
@@ -261,6 +306,18 @@ void TileRenderer::renderBatch() {
   glUniform1f(uniformZoom, camera->zoom);
   glUniform2f(uniformScreenCenter, camera->screenWidth / 2.0f,
               camera->screenHeight / 2.0f);
+
+  // The look: dark floor lit by the light map, when a scene is open.
+  bool lookOn = presentation && presentation->sceneOpen();
+  glUniform1f(uniformLook, lookOn ? 1.0f : 0.0f);
+  if (presentation) {
+    glUniform2f(uniformViewportSize, presentation->targetWidth(),
+                presentation->targetHeight());
+    presentation->bindLightMap(1);
+  } else {
+    glUniform2f(uniformViewportSize, static_cast<float>(camera->screenWidth),
+                static_cast<float>(camera->screenHeight));
+  }
 
   // Bind texture
   glActiveTexture(GL_TEXTURE0);

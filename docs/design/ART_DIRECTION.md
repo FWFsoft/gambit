@@ -33,9 +33,18 @@ it is wrong. This serves **Clarity** before anything else: at a glance you
 see who is where and what is about to hurt you.
 
 **Built so far:** the character layer's shading (the forge's `ink`
-style). **Not built:** the world and effects layers in the engine (dark
-floor, light pools, cast shadows, bloom, colour grade). The style frame
-and its script are the reference for that work.
+style), and the world and effects layers in the engine: dark floor, light
+pools, cast shadows, bloom and a colour grade. Every strength is a named
+constant in `include/config/LookConfig.h`; F4 switches the look off and
+on in game.
+
+![The game with the look off and on, beside the style frame](../prototype/look_before_after.png)
+
+*Real frames from the WASM client (A to C) and the style frame (D).*
+
+**Not built:** a rim light or outline on enemies, seams and leaking genus
+glow in the floor (the tileset is flat colour), and true additive effects.
+`DECISIONS.md` has the full list.
 
 ### Where the drawing comes from
 

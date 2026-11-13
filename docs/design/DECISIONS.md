@@ -29,19 +29,71 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
   - **Characters:** the brightest, most saturated things on screen, with
     solid ink shadows, a thick contour and a signature rim light.
   - **Effects:** additive light with bloom that lights the ground.
+- **Built 2026-11-13 (the world and effects layers, in the engine):**
+  - **World values:** the floor shader pushes every tileset dark and cool
+    (texel value 0.045 to 0.245, slate tint), with a floor-only vignette.
+    80% of the tile's hue is kept, not the mock-up's near-grey, so the
+    map's genus regions still read on the floor (see Why).
+  - **Grounding:** a soft contact shadow and a sheared silhouette shadow
+    under every player and enemy, from the forge's `KEY_LIGHT`. All
+    shadows are drawn under all bodies.
+  - **Light pools:** a warm pool around each player; a faint genus-colour
+    pool under each enemy that turns danger red as it winds up a hit;
+    hits, bursts, swings, beams, projectiles, zones, telegraphs and
+    infusion pickups light the floor. Pools add up in a quarter-size
+    light map and roll off, so a swarm cannot white out the ground.
+  - **Bloom and grade:** the world is drawn offscreen; only what is drawn
+    as light (effects, telegraphs, auras) blooms, sprites do not. A mild
+    grade and a weak whole-scene vignette (0.12) follow. Health bars,
+    names, numbers and the HUD are drawn after it, untouched.
+  - **F4** switches the look off and on in game, to compare.
+  - Every strength is a named constant in `include/config/LookConfig.h`.
 - **Pillars:** Clarity decided it: value separates floor, fighters and
   danger at a glance. It trades nothing against the other pillars. One
   risk for Clarity: a dark floor can hide dark enemies, so enemies need
-  the same rim and ink treatment as heroes.
+  the same rim and ink treatment as heroes. Choices made while building,
+  all decided by Clarity:
+  - Floor hue kept at 80% (above), against the art direction's "never
+    bright floor tiles" taken to its limit: the regions are gameplay
+    information.
+  - Bloom is weighted by coverage squared and telegraph pools were
+    halved: at first a filled telegraph circle bloomed into an opaque
+    blob over the fight. Readability beats spectacle.
+  - The strong vignette is on the floor only, so enemies entering from
+    the screen edge are not dimmed.
+  - Shadows fall up and to the right, as `KEY_LIGHT` says. The mock-up
+    flipped them toward the viewer; that would disagree with the light
+    baked into the sprites.
 - **Why:** The splash art promises comic inking on black with neon
   accents; the game showed smooth clay figures on a flat brown floor. A
   mock-up with the game's own sprites showed the presentation layer
   alone closes much of the gap (`docs/prototype/styleframe_target.png`).
-- **Status:** Proposed. Only the characters' ink shading exists (see the
-  next entry). The world and effects layers are **not built**; the
-  mock-up is Python, not the engine.
+  Real frames, look off and on, beside the mock-up:
+  `docs/prototype/look_before_after.png`.
+- **Not achieved / open:**
+  - No rim light or outline on enemies. In the frames looked at (Toxlith
+    and the old recoloured enemy sheets, on all four floor regions) they
+    stayed readable thanks to their pools, so it was left out; a dark
+    enemy on a dark floor is still the risk to watch. A rim needs a
+    sprite shader (ImGui can only multiply a sprite's colour).
+  - The boss (a dark purple body) was seen once, at the screen edge, and
+    read as a dark mass on the dark floor. Its pool was then raised
+    (`BOSS_POOL_STRENGTH`), but the boss was not seen on screen again
+    after that: **unverified**, and the first thing to check.
+  - The floor has no seams, cracks or leaking genus glow: the tileset is
+    flat colour, and that detail is art, not code.
+  - Effects are still alpha-blended shapes that bloom, not true additive
+    light; hit flashes still tint red, not white.
+  - The Blue Zone ring and the white ring under the local player are
+    fainter against the graded world than before; not retuned.
+  - Effect "verb" moments (detonate, spread) do not cast pools yet.
+  - Looked at only in the WASM client (Edge, one map, Wade, about 20
+    enemies). Not measured for frame time; not seen on the native client.
+- **Status:** Built, needs review.
 - **Where:** `docs/design/ART_DIRECTION.md` ("The look"),
-  `tools/sprite_forge/styleframe.py`
+  `tools/sprite_forge/styleframe.py`, `include/config/LookConfig.h`,
+  `src/PresentationLayer.cpp`, `src/TileRenderer.cpp`,
+  `src/ArenaView.cpp`, `src/RenderSystem.cpp`, `src/UISystem.cpp`
 
 ## 2026-11-12: Character bodies come from generated models; ink style
 - **Decision:**

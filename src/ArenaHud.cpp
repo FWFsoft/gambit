@@ -125,6 +125,11 @@ void ArenaView::handleHotkeys() {
   }
   if (ImGui::IsKeyPressed(ImGuiKey_B, false)) suitScreenOpen = !suitScreenOpen;
 
+  // F4: the look on / off, to compare with the plain render.
+  if (ImGui::IsKeyPressed(ImGuiKey_F4, false) && presentation) {
+    presentation->toggle();
+  }
+
   // Playtest shortcuts
   if (ImGui::IsKeyPressed(ImGuiKey_F5, false)) debug(DebugCommandKind::SkipPhase);
   if (ImGui::IsKeyPressed(ImGuiKey_F6, false)) debug(DebugCommandKind::GiveInfusions);

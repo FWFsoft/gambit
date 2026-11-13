@@ -19,6 +19,7 @@ class Texture;
 class DamageNumberSystem;
 class EffectTracker;
 class ArenaView;
+class PresentationLayer;
 struct ItemDefinition;
 
 // UISystem manages ImGui frame lifecycle and rendering
@@ -38,6 +39,11 @@ class UISystem {
   // When set, the arena view draws the world and in-game HUD while playing
   // (replacing the old placeholder HUD).
   void setArenaView(ArenaView* view) { arenaView = view; }
+
+  // The look's scene target is resolved to the screen inside the ImGui
+  // pass. ArenaView queues that; UISystem does it when ArenaView did not
+  // draw (menus over the world).
+  void setPresentation(PresentationLayer* layer) { presentation = layer; }
 
  private:
   void onRender(const RenderEvent& e);
@@ -94,6 +100,7 @@ class UISystem {
   EnemyInterpolation* enemyInterpolation;
   Camera* camera;
   ArenaView* arenaView = nullptr;
+  PresentationLayer* presentation = nullptr;  // not owned; may be null
   // State shown on the last rendered frame. A key press that changes state
   // (title -> character select) must not also act on the new screen.
   GameState lastRenderedState = GameState::TitleScreen;

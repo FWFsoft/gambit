@@ -17,10 +17,14 @@
 #include "GameStateManager.h"
 #include "Logger.h"
 #include "OpenGLUtils.h"
+#include "PresentationLayer.h"
 #include "Texture.h"
 #include "TextureManager.h"
+#include "config/LookConfig.h"
 #include "config/PlayerConfig.h"
 #include "config/ScreenConfig.h"
+
+RenderSystem::~RenderSystem() = default;
 
 RenderSystem::RenderSystem(Window* window, ClientPrediction* clientPrediction,
                            RemotePlayerInterpolation* remoteInterpolation,
@@ -60,6 +64,10 @@ RenderSystem::RenderSystem(Window* window, ClientPrediction* clientPrediction,
   tileRenderer = std::make_unique<TileRenderer>(camera, spriteRenderer.get(),
                                                 whitePixelTexture.get());
 
+  // The look: offscreen scene, light map, bloom and grade.
+  presentation = std::make_unique<PresentationLayer>();
+  tileRenderer->setPresentation(presentation.get());
+
   // Try to load animated player sprite sheet (fallback to colored rectangle if
   // not found)
   playerTexture = TextureManager::instance().get("assets/player_animated.png");
@@ -95,9 +103,17 @@ void RenderSystem::onRender(const RenderEvent& e) {
   const Player& localPlayer = clientPrediction->getLocalPlayer();
   camera->follow(localPlayer.x, localPlayer.y);
 
-  // Clear the screen with OpenGL
-  glClearColor(0.03f, 0.03f, 0.06f, 1.0f);  // Night sky beyond the map
+  // With the look on, the world goes to the presentation layer's scene
+  // target and reaches the screen when ArenaView / UISystem resolve it.
+  const bool lookOn = presentation->beginScene(*camera);
+
+  // Night sky beyond the map. The scene's alpha is its emissive mask (what
+  // blooms), so it starts at 0 and the floor must not write to it.
+  glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+  glClearColor(Config::Look::VOID_R, Config::Look::VOID_G,
+               Config::Look::VOID_B, lookOn ? 0.0f : 1.0f);
   glClear(GL_COLOR_BUFFER_BIT);
+  if (lookOn) glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_FALSE);
 
   if (!legacyEntities) {
     // Arena mode: ground only. Everything standing on it is drawn by
@@ -112,6 +128,7 @@ void RenderSystem::onRender(const RenderEvent& e) {
       }
     }
     if (objectiveDebugRenderer) objectiveDebugRenderer->render();
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
     OpenGLUtils::checkGLError("RenderSystem::onRender");
     return;
   }
@@ -273,6 +290,7 @@ void RenderSystem::onRender(const RenderEvent& e) {
   }
 
   // NOTE: Buffer swap moved to GameLoop to ensure UI renders after game world
+  glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
   OpenGLUtils::checkGLError("RenderSystem::onRender");
 }
 
