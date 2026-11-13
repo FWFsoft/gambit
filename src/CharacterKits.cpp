@@ -7,6 +7,7 @@
 // kit documents how it uses them.
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <functional>
 #include <memory>
@@ -724,79 +725,176 @@ class VolgoreKit : public Kit {
 
 // ===========================================================================
 // Wade, the Old Head (Striker)
-//   kitCounter[0]  punches thrown toward the next Haste
+//   kitCounter[0]  punches thrown in the current combination (0-2); the
+//                  third grants Haste
 //   kitCounter[1]  alternates the uppercut hand
-//   kitTimer[0]    Slip window
+//   kitCounter[2]  which combination he is throwing, plus 1 (0 = none yet)
+//   kitTimer[0]    Slip window: struck while it runs, he counters
+// Every cast sets Player::castVariant (Arena::WadeForm) so clients play the
+// punch the server threw.
 // ===========================================================================
 class WadeKit : public Kit {
- public:
-  void cast(AbilityContext& ctx, int slot) override {
-    AbilitySystem& sys = ctx.sys;
-    Player& self = ctx.self;
+public:
+  // Three-punch boxing combinations. Hands alternate, or the lead hand
+  // doubles up (1-1-2, body hook into head hook); the rear hand never
+  // throws twice in a row. The third punch is the one that grants Haste.
+  static constexpr int COMBO_LENGTH = 3;
+  static constexpr int COMBO_COUNT = 10;
+  static constexpr uint8_t COMBOS[COMBO_COUNT][COMBO_LENGTH] = {
+      {Arena::WadeForm::Jab, Arena::WadeForm::Cross,
+       Arena::WadeForm::LeadHook}, // 1-2-3
+      {Arena::WadeForm::Jab, Arena::WadeForm::Jab,
+       Arena::WadeForm::Cross}, // 1-1-2
+      {Arena::WadeForm::Jab, Arena::WadeForm::Cross,
+       Arena::WadeForm::HookBody}, // 1-2-3b
+      {Arena::WadeForm::Jab, Arena::WadeForm::CrossBody,
+       Arena::WadeForm::LeadHook}, // 1-2b-3
+      {Arena::WadeForm::Jab, Arena::WadeForm::LeadHook,
+       Arena::WadeForm::Cross}, // 1-3-2
+      {Arena::WadeForm::Jab, Arena::WadeForm::RearHook,
+       Arena::WadeForm::LeadHook}, // 1-4-3
+      {Arena::WadeForm::Cross, Arena::WadeForm::LeadHook,
+       Arena::WadeForm::Cross}, // 2-3-2
+      {Arena::WadeForm::Cross, Arena::WadeForm::LeadHook,
+       Arena::WadeForm::RearHook}, // 2-3-4
+      {Arena::WadeForm::LeadHook, Arena::WadeForm::Cross,
+       Arena::WadeForm::LeadHook}, // 3-2-3
+      {Arena::WadeForm::HookBody, Arena::WadeForm::LeadHook,
+       Arena::WadeForm::Cross}, // 3b-3-2
+  };
+
+  static constexpr float SLIP_MS = 500.0f;
+  // The haymaker lands this long after the slipped hit: long enough to
+  // see him load it, short enough that it is still the answer to that hit.
+  // Matches the impact frame of the forge's "haymaker" clip.
+  static constexpr float HAYMAKER_WINDUP_MS = 210.0f;
+  static constexpr float HAYMAKER_RANGE = 270.0f;
+  static constexpr float ROLL_DISTANCE = 190.0f;
+  static constexpr float ROLL_MS = 200.0f;
+  static constexpr float RESONANCE_ROLL_DISTANCE = 430.0f;
+  static constexpr float RESONANCE_ROLL_MS = 300.0f;
+
+  void cast(AbilityContext &ctx, int slot) override {
+    AbilitySystem &sys = ctx.sys;
+    Player &self = ctx.self;
     uint32_t selfId = self.id;
 
     if (slot == 0) {
-      // Simple Punches
+      // Simple Punches: the next punch of a combination picked at random.
+      int step = self.kitCounter[0];
+      assert(step >= 0 && step < COMBO_LENGTH);
+      if (step == 0) {
+        // Never the same combination twice in a row.
+        int last = self.kitCounter[2] - 1; // -1 before his first punch
+        int pick = static_cast<int>(sys.random01() * COMBO_COUNT);
+        pick = std::max(0, std::min(COMBO_COUNT - 1, pick));
+        if (pick == last)
+          pick = (pick + 1) % COMBO_COUNT;
+        self.kitCounter[2] = pick + 1;
+      }
+      int combo = self.kitCounter[2] - 1;
+      assert(combo >= 0 && combo < COMBO_COUNT);
+      uint8_t punch = COMBOS[combo][step];
+      self.castVariant = punch;
+
+      // Every punch hits the same; only the picture differs. Straights
+      // draw a tight thrust, hooks a wide arc from that hand's side.
       const float range = 88.0f;
-      sys.fxSlash(self.x, self.y, ctx.dirX, ctx.dirY, range, 70.0f,
+      bool hook = punch == Arena::WadeForm::LeadHook ||
+                  punch == Arena::WadeForm::RearHook ||
+                  punch == Arena::WadeForm::HookBody;
+      float side = 0.0f;
+      if (hook)
+        side = punch == Arena::WadeForm::RearHook ? 0.35f : -0.35f;
+      float dx = ctx.dirX - ctx.dirY * side;
+      float dy = ctx.dirY + ctx.dirX * side;
+      float d = std::sqrt(dx * dx + dy * dy);
+      sys.fxSlash(self.x, self.y, dx / d, dy / d, range, hook ? 110.0f : 50.0f,
                   VfxTheme::Steel);
-      sys.enemiesInCone(self.x, self.y, ctx.dirX, ctx.dirY, range, 45.0f,
-                        [&](Enemy& enemy) {
-                          sys.damageEnemy(selfId, enemy, 15.0f,
-                                          DamageFlag::Basic | DamageFlag::Melee);
-                        });
-      if (++self.kitCounter[0] >= 3) {
+      sys.enemiesInCone(
+          self.x, self.y, ctx.dirX, ctx.dirY, range, 45.0f, [&](Enemy &enemy) {
+            sys.damageEnemy(selfId, enemy, 15.0f,
+                            DamageFlag::Basic | DamageFlag::Melee);
+          });
+      if (++self.kitCounter[0] >= COMBO_LENGTH) {
         self.kitCounter[0] = 0;
         sys.applyToPlayer(self, EffectType::Haste, 1, selfId);
         self.cooldownMs[3] = 0.0f;
       }
     } else if (slot == 1) {
-      // Uppercuts (channel)
+      // Uppercuts (channel): 5, 6, 5, 6... The lead hand opens.
       const float range = 92.0f;
+      bool rear = self.kitCounter[1] != 0;
       self.kitCounter[1] ^= 1;
-      // Alternate hands: nudge the swing left / right of the aim line.
-      float side = self.kitCounter[1] ? 0.25f : -0.25f;
+      self.castVariant =
+          rear ? Arena::WadeForm::RearUppercut : Arena::WadeForm::LeadUppercut;
+      // Nudge the swing to the side of the hand that threw it.
+      float side = rear ? 0.25f : -0.25f;
       float dx = ctx.dirX - ctx.dirY * side;
       float dy = ctx.dirY + ctx.dirX * side;
       float d = std::sqrt(dx * dx + dy * dy);
       sys.fxSlash(self.x, self.y, dx / d, dy / d, range, 60.0f,
                   VfxTheme::Steel);
-      sys.enemiesInCone(self.x, self.y, ctx.dirX, ctx.dirY, range, 42.0f,
-                        [&](Enemy& enemy) {
-                          sys.damageEnemy(selfId, enemy, 13.0f,
-                                          DamageFlag::Melee);
-                        });
+      sys.enemiesInCone(
+          self.x, self.y, ctx.dirX, ctx.dirY, range, 42.0f, [&](Enemy &enemy) {
+            sys.damageEnemy(selfId, enemy, 13.0f, DamageFlag::Melee);
+          });
     } else if (slot == 2) {
-      // Slip
-      self.kitTimer[0] = 500.0f;
-      self.intangibleMs = std::max(self.intangibleMs, 500.0f);
+      // Slip: off the line with the rear hand chambered.
+      self.castVariant = Arena::WadeForm::SlipChamber;
+      self.kitTimer[0] = SLIP_MS;
+      self.intangibleMs = std::max(self.intangibleMs, SLIP_MS);
       sys.fxRing(self.x, self.y, 46.0f, VfxTheme::Steel);
     } else if (slot == 3) {
       // Roll
       sys.effects().removeEffect(selfId, false, EffectType::Slow);
       sys.effects().removeEffect(selfId, false, EffectType::Snared);
       sys.effects().removeEffect(selfId, false, EffectType::Stunned);
-      const float distance = 190.0f;
+      float distance = ROLL_DISTANCE;
+      float durationMs = ROLL_MS;
+      if (sys.effects().getPlayerEffects(selfId).hasEffect(
+              EffectType::Resonance)) {
+        // Discharge Resonance into the roll.
+        sys.effects().removeEffect(selfId, false, EffectType::Resonance);
+        distance = RESONANCE_ROLL_DISTANCE;
+        durationMs = RESONANCE_ROLL_MS;
+        self.castVariant = Arena::WadeForm::ResonanceRoll;
+        sys.fxBurst(self.x, self.y, 70.0f, VfxTheme::Steel);
+      }
       sys.fxDashTrail(self.x, self.y, self.x + ctx.dirX * distance,
                       self.y + ctx.dirY * distance, VfxTheme::Steel);
-      sys.dashPlayer(self, ctx.dirX, ctx.dirY, distance, 200.0f, true);
+      sys.dashPlayer(self, ctx.dirX, ctx.dirY, distance, durationMs, true);
     }
   }
 
-  void tick(AbilitySystem&, Player& self, float dtMs) override {
+  // Uppercuts: a new hold always opens with the lead hand.
+  void channelEnd(AbilitySystem &, Player &self, int slot) override {
+    if (slot == 1)
+      self.kitCounter[1] = 0;
+  }
+
+  // "Plants his feet": no walking while the uppercuts are going.
+  float speedMultiplier(const Player &self) const override {
+    return self.chargeSlot == 1 ? 0.0f : 1.0f;
+  }
+
+  void tick(AbilitySystem &, Player &self, float dtMs) override {
     self.kitTimer[0] = std::max(0.0f, self.kitTimer[0] - dtMs);
     self.resource = static_cast<uint8_t>(self.kitCounter[0] * 85);
   }
 
-  // Slip: get hit during the window and answer with a haymaker.
-  float onTakeDamage(AbilitySystem& sys, Player& self, float damage,
+  // Slip: struck during the window, he slips it and answers with a haymaker
+  // toward whoever threw it. The punch takes a beat to land; he stays
+  // planted and untouchable until it does.
+  float onTakeDamage(AbilitySystem &sys, Player &self, float damage,
                      uint32_t sourceEnemyId) override {
-    if (self.kitTimer[0] <= 0.0f) return damage;
+    if (self.kitTimer[0] <= 0.0f)
+      return damage;
     self.kitTimer[0] = 0.0f;
     self.cooldownMs[2] = 0.0f;
 
     float dirX = 1.0f, dirY = 0.0f;
-    if (Enemy* attacker = sys.findEnemy(sourceEnemyId)) {
+    if (Enemy *attacker = sys.findEnemy(sourceEnemyId)) {
       float d = dist(self.x, self.y, attacker->x, attacker->y);
       if (d > 0.001f) {
         dirX = (attacker->x - self.x) / d;
@@ -809,16 +907,43 @@ class WadeKit : public Kit {
         dirY = (self.aimY - self.y) / d;
       }
     }
-    const float range = 270.0f;
+
+    self.intangibleMs = std::max(self.intangibleMs, HAYMAKER_WINDUP_MS + 60.0f);
+    self.chargeSlot = -1;
+    self.forcedVx = self.forcedVy = 0.0f;
+    self.forcedGhost = false;
+    self.forcedMs = HAYMAKER_WINDUP_MS;
+
+    // Tell clients: the slip landed, here comes the haymaker, that way.
+    sys.fxRing(self.x, self.y, 30.0f, VfxTheme::Steel);
+    GameEventPacket cast;
+    cast.kind = GameEventKind::AbilityCast;
+    cast.sourceId = self.id;
+    cast.x = self.x;
+    cast.y = self.y;
+    cast.x2 = self.x + dirX * 100.0f;
+    cast.y2 = self.y + dirY * 100.0f;
+    cast.value = HAYMAKER_WINDUP_MS + 200.0f;
+    cast.param = 2;
+    cast.extraId = Arena::WadeForm::Haymaker;
+    sys.emit(cast);
+
     uint32_t selfId = self.id;
-    sys.fxCone(self.x, self.y, dirX, dirY, range, 60.0f, VfxTheme::Steel);
-    sys.fxBeam(self.x, self.y, self.x + dirX * range, self.y + dirY * range,
-               26.0f, 220.0f, VfxTheme::Steel);
-    sys.enemiesInCone(self.x, self.y, dirX, dirY, range, 30.0f,
-                      [&](Enemy& enemy) {
-                        sys.knockbackEnemy(enemy, self.x, self.y, 120.0f);
-                        sys.damageEnemy(selfId, enemy, 70.0f, DamageFlag::Melee);
-                      });
+    AbilitySystem *s = &sys;
+    s->schedule(HAYMAKER_WINDUP_MS, [s, selfId, dirX, dirY]() {
+      Player *wade = s->findPlayer(selfId);
+      if (!wade || !wade->isAlive())
+        return;
+      float x = wade->x, y = wade->y;
+      s->fxCone(x, y, dirX, dirY, HAYMAKER_RANGE, 60.0f, VfxTheme::Steel);
+      s->fxBeam(x, y, x + dirX * HAYMAKER_RANGE, y + dirY * HAYMAKER_RANGE,
+                26.0f, 220.0f, VfxTheme::Steel);
+      s->enemiesInCone(
+          x, y, dirX, dirY, HAYMAKER_RANGE, 30.0f, [&](Enemy &enemy) {
+            s->knockbackEnemy(enemy, x, y, 120.0f);
+            s->damageEnemy(selfId, enemy, 70.0f, DamageFlag::Melee);
+          });
+    });
     return 0.0f;
   }
 };

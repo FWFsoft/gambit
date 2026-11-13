@@ -277,8 +277,8 @@ static const KitInfo KITS[] = {
      "good enough.",
      {
          {"Simple Punches",
-          "A 1, 2, 3 or 4. Every third punch grants +1 Haste and resets "
-          "Roll.",
+          "A 1, 2, 3 or 4, to the head or the body, in three-punch "
+          "combinations. The third punch grants +1 Haste and resets Roll.",
           380.0f, AbilityMode::Tap, 0.0f},
          {"Uppercuts",
           "Hold: plant your feet and throw alternating 5s and 6s. Faster "
@@ -288,7 +288,9 @@ static const KitInfo KITS[] = {
           "Go intangible for 0.5s. If struck, counter with a haymaker "
           "shockwave and refresh Slip.",
           7000.0f, AbilityMode::Tap, 0.0f},
-         {"Roll", "Cleanse Slow, Snare and Stun, then roll toward the cursor.",
+         {"Roll",
+          "Cleanse Slow, Snare and Stun, then roll under and toward the "
+          "cursor. With Resonance: discharge it to roll much farther.",
           5000.0f, AbilityMode::Tap, 0.0f},
      }},
 };

@@ -21,6 +21,69 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-13: Wade's kit rebuilt on real boxing
+- **Decision:** (requested by a human, with wireframe references for each
+  move; the numbers and the points marked *agent's call* are mine.)
+  - **Simple Punches (LMB):** the server picks the punch. He throws
+    three-punch combinations chosen at random from ten (1-2-3, 1-1-2,
+    1-2-3b, 1-2b-3, 1-3-2, 1-4-3, 2-3-2, 2-3-4, 3-2-3, 3b-3-2; b = to the
+    body), never the same one twice running. Each of the six punches (jab,
+    cross, lead hook, rear hook, cross to the body, lead hook to the body)
+    has its own animation. Damage, range and cooldown are unchanged and
+    identical for all six; the third punch still grants +1 Haste and
+    resets Roll. *Agent's call:* the punches differ only in picture.
+  - **Uppercuts (hold RMB):** alternating 5s and 6s, lead hand first, as a
+    loop that stays low between punches. He is now planted: move speed is
+    0 while the channel runs (was 55%).
+  - **Slip (Q):** he slips to the rear side with the rear hand chambered
+    and holds it for the 0.5 s window. Struck in the window, he throws a
+    haymaker at the attacker. It now takes 210 ms to land (was instant);
+    he is locked in place and cannot be hit until it does. Damage, range
+    and the cooldown refresh are unchanged.
+  - **Roll (Shift):** a boxing roll (slip, duck, under, up the other side)
+    instead of a tumble. New, from the kit doc: with Resonance, Roll spends
+    it to travel 430 instead of 190.
+- **Pillars:**
+  - Clarity, the pillar that decided most of this: you can read which punch
+    was thrown; the chamber shows the Slip window is open; the haymaker's
+    damage lands on the frame the fist does.
+  - Crunch: planted Uppercuts and the haymaker's lock are commitments.
+  - Creative Builds: combinations vary run to run; Roll gains a Resonance
+    hook.
+  - Comradery: neutral.
+- **Why:**
+  - The old kit alternated jab/cross, had no hooks or body shots, a duck
+    for Slip and a forward tumble for Roll, and did not match the kit doc
+    in three places (not planted, no Resonance roll, counter with no
+    visible punch).
+  - Combinations are fixed threes because the Haste trigger is every third
+    punch: the finisher of each combination is the punch that pays out.
+  - Rejected: per-punch damage or reach (head vs body, straight vs hook).
+    The kit doc gives them one effect, and six sets of numbers would hide
+    a dominant punch the player cannot choose anyway.
+  - Rejected: an instant haymaker. A punch with no travel cannot be seen.
+- **Known gaps:**
+  - Nothing in the game gives Wade Resonance yet (only El Presidente gains
+    it, from his own grab), so the long Roll cannot happen in play. It is
+    covered by a test only.
+  - Bots: over 6 seeds with Wade + Suds + Gravon + Isaac the team got as
+    far as before (rounds 2 to 3), but the Wade bot scored lower in most.
+    The bots hold Uppercuts while being hit and spam Slip; whether planted
+    Uppercuts are too punishing for people needs a playtest.
+  - Not seen in the running game: the client could not be built on the
+    machine this was made on. Server logic is covered by
+    `tests/test_wade_kit.cpp`; the art was checked in forge previews and
+    on the baked sheet.
+  - The sheet grew to 5984 x 5772 (15 clips), over the 4096 guideline but
+    under the forge's 8192 limit and smaller than Gravon's.
+
+  ![Wade's boxing clips](../prototype/wade_boxing_clips.png)
+- **Status:** Built, needs review.
+- **Where:** `src/CharacterKits.cpp` (WadeKit), `include/ArenaData.h`
+  (`Arena::WadeForm`), `src/AbilitySystem.cpp` (cast events carry the
+  form), `src/ArenaView.cpp` (`actionClip`), `tools/sprite_forge/actors/wade.py`,
+  `tools/sprite_forge/actors/_rig.py`, `tests/test_wade_kit.cpp`
+
 ## 2026-11-13: Fog of war with shared crew sight
 - **Decision:** The crew shares sight. Every living hero sees 640 world
   pixels around themselves, a downed hero 260 (enough to see the revive),

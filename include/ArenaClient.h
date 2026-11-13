@@ -30,6 +30,7 @@ class ArenaClient {
     float castDirX = 1, castDirY = 0;
     int castSlot = 0;
     uint32_t castCount = 0;  // increments on every cast (alternating anims)
+    uint8_t castVariant = 0;  // which form the server threw (Wade's punches)
     bool castAlt = false;    // cast while holding (resource maxed): alt form
     float deadMs = 0;        // time spent down (death animation)
     float hitMs = 1e9f;      // time since the last hit taken (hit animation)

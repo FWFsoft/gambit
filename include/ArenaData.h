@@ -130,6 +130,30 @@ constexpr uint32_t Wade = 19;
 constexpr uint32_t Zephyr = 20;
 }  // namespace CharacterId
 
+// Wade's ability forms. The server picks one per cast (Player::castVariant)
+// and sends it with the AbilityCast event; the client maps it to a clip.
+// Boxing numbers: 1 jab, 2 cross, 3 lead hook, 4 rear hook, 5 lead
+// uppercut, 6 rear uppercut. "Body" is the same punch thrown downstairs.
+namespace WadeForm {
+// Simple Punches (slot 0)
+constexpr uint8_t Jab = 0;        // 1
+constexpr uint8_t Cross = 1;      // 2
+constexpr uint8_t LeadHook = 2;   // 3
+constexpr uint8_t RearHook = 3;   // 4
+constexpr uint8_t CrossBody = 4;  // 2 to the body
+constexpr uint8_t HookBody = 5;   // 3 to the body
+constexpr uint8_t PunchCount = 6;
+// Uppercuts (slot 1)
+constexpr uint8_t LeadUppercut = 0;  // 5
+constexpr uint8_t RearUppercut = 1;  // 6
+// Slip (slot 2)
+constexpr uint8_t SlipChamber = 0;
+constexpr uint8_t Haymaker = 1;  // the counter
+// Roll (slot 3)
+constexpr uint8_t Roll = 0;
+constexpr uint8_t ResonanceRoll = 1;
+}  // namespace WadeForm
+
 // ---------------------------------------------------------------------------
 // Infusions
 // ---------------------------------------------------------------------------

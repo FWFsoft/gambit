@@ -52,14 +52,19 @@ anim Toxlith run 48 6 14 1
 anim Toxlith attack 96 7 14 0
 anim Toxlith hit 152 3 16 0
 anim Toxlith death 176 7 12 0
-actor Wade assets/sprites/actors/Wade.png 176 156 88 128 26 1 smooth
+actor Wade assets/sprites/actors/Wade.png 176 156 88 128 34 1 smooth
 anim Wade idle 0 12 12 1
 anim Wade run 96 10 15 1
 anim Wade jab 176 8 24 0
 anim Wade cross 240 9 24 0
-anim Wade uppercut_R 312 10 24 0
-anim Wade uppercut_L 392 10 24 0
-anim Wade slip 472 8 20 0
-anim Wade roll 536 10 20 0
-anim Wade hit 616 6 20 0
-anim Wade death 664 12 14 0
+anim Wade hook_L 312 9 24 0
+anim Wade hook_R 384 10 24 0
+anim Wade cross_body 464 9 24 0
+anim Wade hook_body 536 9 24 0
+anim Wade uppercut_L 608 12 24 0
+anim Wade uppercut_R 704 12 24 0
+anim Wade slip 800 13 20 0
+anim Wade haymaker 904 15 24 0
+anim Wade roll 1024 10 20 0
+anim Wade hit 1104 6 20 0
+anim Wade death 1152 12 14 0
