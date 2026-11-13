@@ -4,7 +4,10 @@
 #define GAMBIT_GLSL_VERSION "#version 300 es\n"
 #define GAMBIT_GLSL_PRECISION "precision mediump float;\n"
 #define GAMBIT_GLSL_VERSION_IMGUI "#version 300 es"
+// For shaders that do screen-space maths (gl_FragCoord, small texel steps).
+#define GAMBIT_GLSL_PRECISION_HIGH "precision highp float;\n"
 #else
+#define GAMBIT_GLSL_PRECISION_HIGH ""
 #define GAMBIT_GLSL_VERSION "#version 330 core\n"
 #define GAMBIT_GLSL_PRECISION ""
 #define GAMBIT_GLSL_VERSION_IMGUI "#version 330"

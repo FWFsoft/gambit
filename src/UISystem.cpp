@@ -202,6 +202,20 @@ void UISystem::render() {
 
   lastRenderedState = currentState;
 
+  // A scene RenderSystem opened must reach the screen this frame, under
+  // every window, even when the arena view did not draw.
+  if (presentation && presentation->sceneOpen() &&
+      !presentation->resolveQueued()) {
+    ImDrawList* background = ImGui::GetBackgroundDrawList();
+    background->AddCallback(
+        [](const ImDrawList*, const ImDrawCmd* cmd) {
+          static_cast<PresentationLayer*>(cmd->UserCallbackData)->resolve();
+        },
+        presentation);
+    background->AddCallback(ImDrawCallback_ResetRenderState, nullptr);
+    presentation->markResolveQueued();
+  }
+
   // Render ImGui
   ImGui::Render();
   ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

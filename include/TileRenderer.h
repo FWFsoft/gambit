@@ -15,6 +15,8 @@
 #include "Texture.h"
 #include "TiledMap.h"
 
+class PresentationLayer;
+
 using PlayerRenderCallback =
     std::function<void(float minDepth, float maxDepth)>;
 
@@ -25,11 +27,16 @@ class TileRenderer {
   ~TileRenderer();
   void render(const TiledMap& map, PlayerRenderCallback playerCallback);
 
+  // With a presentation layer the floor takes the look's world values and
+  // is lit by its light map whenever a scene is open.
+  void setPresentation(const PresentationLayer* layer) { presentation = layer; }
+
  private:
   Camera* camera;
   SpriteRenderer* spriteRenderer;
   Texture* whitePixel;
   Texture* tilesetTexture;  // Managed by TextureManager, not owned
+  const PresentationLayer* presentation = nullptr;  // not owned
 
   // Batched rendering
   GLuint shaderProgram;
@@ -38,6 +45,8 @@ class TileRenderer {
   GLint uniformCameraPos;
   GLint uniformScreenCenter;
   GLint uniformZoom;
+  GLint uniformLook;
+  GLint uniformViewportSize;
   std::vector<float> batchVertices;
   bool batchBuilt;        // Cache flag - tiles are static
   bool verticesUploaded;  // Cache flag - vertices uploaded to GPU

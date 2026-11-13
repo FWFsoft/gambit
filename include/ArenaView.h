@@ -3,10 +3,12 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "ArenaClient.h"
 #include "Camera.h"
 #include "EffectVisuals.h"
+#include "PresentationLayer.h"
 
 class ClientPrediction;
 class EffectTracker;
@@ -30,6 +32,11 @@ class ArenaView {
   // World layer + HUD for the Playing state.
   void render();
 
+  // The look (docs/design/ART_DIRECTION.md): with a presentation layer the
+  // world is drawn into its scene target, actors cast shadows, effects
+  // light the ground and bloom, and the HUD is drawn after the resolve.
+  void setPresentation(PresentationLayer* layer);
+
   // Sprite lookup shared with the character select screen.
   struct CharacterSprite {
     Texture* texture = nullptr;
@@ -44,6 +51,11 @@ class ArenaView {
   EffectTracker* effects;
   EffectVisuals effectFx;  // how effects look (EffectVisuals.h)
   Camera* camera;
+  PresentationLayer* presentation = nullptr;  // not owned; may be null
+
+  // Pools of light on the ground for this frame: players, enemies, effects,
+  // telegraphs. Called by the presentation layer before the floor is drawn.
+  void collectLights(std::vector<PresentationLayer::LightPool>& out) const;
 
   struct EnemySprite {
     Texture* texture = nullptr;
@@ -107,7 +119,8 @@ class ArenaView {
   void drawActorFrame(ImDrawList* dl, const ActorSheet& sheet,
                       const ActorAnim& anim, int direction, float elapsed,
                       ImVec2 feet, float scale, unsigned int tint, bool hold = true,
-                      int forcedFrame = -1, float rotation = 0.0f);
+                      int forcedFrame = -1, float rotation = 0.0f,
+                      bool castShadow = false);
 
   bool manifestLoaded = false;
   std::unordered_map<std::string, CharacterSprite> characterSprites;

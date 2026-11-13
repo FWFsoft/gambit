@@ -172,6 +172,9 @@ int main(int argc, char* argv[]) {
   ArenaClient arenaClient;
   ArenaView arenaView(&arenaClient, &clientPrediction, &effectTracker, &camera);
   uiSystem.setArenaView(&arenaView);
+  // The look: dark world, light pools, cast shadows, bloom and grade.
+  arenaView.setPresentation(renderSystem.getPresentation());
+  uiSystem.setPresentation(renderSystem.getPresentation());
   renderSystem.setLegacyEntityRendering(false);
 
   // Load local player animations

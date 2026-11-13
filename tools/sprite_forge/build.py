@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """Bake forge actors into game sprite sheets.
 
-Needs Blender's Python module (bpy). One-time setup:
+Needs Blender's Python module (bpy 5.3, which needs Python 3.13). One-time
+setup, from the repo root:
 
-    python3 -m venv /opt/forge
-    /opt/forge/bin/pip install bpy numpy pillow
+    uv venv --python 3.13 tools/sprite_forge/.venv
+    uv pip install --python tools/sprite_forge/.venv/Scripts/python.exe bpy numpy pillow
+    (on Linux / macOS the interpreter is tools/sprite_forge/.venv/bin/python)
 
-Then, from the repo root:
+Then, with that interpreter:
 
-    /opt/forge/bin/python tools/sprite_forge/build.py            # every actor
-    /opt/forge/bin/python tools/sprite_forge/build.py wade       # just Wade
+    tools/sprite_forge/.venv/Scripts/python.exe tools/sprite_forge/build.py        # every actor
+    tools/sprite_forge/.venv/Scripts/python.exe tools/sprite_forge/build.py wade   # just Wade
 
 Writes assets/sprites/actors/<Name>.png and assets/sprites/actors/manifest.txt.
 An actor is a module in tools/sprite_forge/actors/ with build() -> (Model,

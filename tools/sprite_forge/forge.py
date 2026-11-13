@@ -117,6 +117,9 @@ class Material:
     index: int = 0
     ramp: List[Tuple[int, int, int]] = field(default_factory=list)
     bmat: Optional[object] = None
+    # A skinned mesh that brings its own texture (see skin.py): its colour
+    # comes from the albedo pass, not from `base`.
+    textured: bool = False
 
 
 class Model:
@@ -137,6 +140,8 @@ class Model:
         self.rest: Dict[str, Vector] = {}
         self.parent_of: Dict[str, Optional[str]] = {}
         self.world_rest: Dict[str, Tuple[float, float, float]] = {}
+        self.parts: List[object] = []     # rigid code-built parts
+        self.skins: List[object] = []     # skinned meshes (skin.attach)
         self.root = self._empty("root", None, (0, 0, 0))
 
     # ---- materials -----------------------------------------------------
@@ -216,6 +221,7 @@ class Model:
         obj.parent = parent
         obj.matrix_parent_inverse = parent.matrix_world.inverted()
         obj.matrix_world = world
+        self.parts.append(obj)
         return obj
 
     @staticmethod
@@ -346,6 +352,8 @@ class Model:
                  Euler([math.radians(a) for a in root_rot], "XYZ").to_matrix().to_4x4())
         self.root.matrix_world = yaw @ local
         bpy.context.view_layer.update()
+        for skin in self.skins:
+            skin.deform(self)
 
 
 # --------------------------------------------------------------------------
@@ -625,11 +633,39 @@ class Renderer:
         # 16-bit PNG -> 0..1
         return img / 65535.0 if img.max() > 255 else img / 255.0
 
+    def _render_albedo(self, model):
+        """The skinned meshes' own textures, unlit. Rendered with several
+        filtered samples per pixel: a 1k texture on a 100 px sprite is
+        heavily minified and Cycles has no mip-maps."""
+        sc = bpy.context.scene
+        for part in model.parts:
+            part.hide_render = True
+        for skin in model.skins:
+            skin.show_albedo(True)
+        samples, width = sc.cycles.samples, sc.cycles.filter_width
+        sc.cycles.samples, sc.cycles.filter_width = ALBEDO_SAMPLES, 1.5
+        try:
+            img = self._render(None, "albedo")
+        finally:
+            sc.cycles.samples, sc.cycles.filter_width = samples, width
+            for skin in model.skins:
+                skin.show_albedo(False)
+            for part in model.parts:
+                part.hide_render = False
+        # Raw output is scene-linear; the sprite is sRGB.
+        lin = np.clip(img[..., :3], 0.0, 1.0)
+        return np.where(lin <= 0.0031308, lin * 12.92,
+                        1.055 * np.power(lin, 1 / 2.4) - 0.055) * 255.0
+
     def frame(self, model: Model, style: str = "pixel",
               rim_rgb=None) -> Image.Image:
         idp = self._render(None, "id")
         nrm = self._render(self.normal_mat, "normal")
         dep = self._render(self.depth_mat, "depth")
+        alb = self._render_albedo(model) if model.skins else None
+        if style == "ink":
+            return shade_ink(model, idp, nrm, dep, alb, self.supersample, rim_rgb)
+        assert alb is None, 'skinned meshes need STYLE = "ink"'
         if style == "toon":
             return shade_toon(model, idp, nrm, dep, self.supersample, rim_rgb)
         return shade(model, idp, nrm, dep)
@@ -756,6 +792,14 @@ def shade_toon(model: Model, idp, nrm, dep, ss=2, rim_rgb=None) -> Image.Image:
         rim = alpha & (fres > 0.34) & (toward > 0.15)
         rgb[rim] = rgb[rim] * 0.35 + np.array(rim_rgb, np.float32) * 0.65
 
+    return _ink_and_resolve(rgb, alpha, mat_index, normal, depth, ss)
+
+
+def _ink_and_resolve(rgb, alpha, mat_index, normal, depth, ss, crease_ok=None):
+    """Draw the ink (interior lines, then the outer contour) and average the
+    supersampled image down. crease_ok masks where normal creases may draw a
+    line: off for scanned or generated meshes, whose normals are bumpy."""
+    h, w = alpha.shape
     # Interior ink: depth breaks (overlaps) and sharp creases.
     edge = np.zeros((h, w), dtype=bool)
     cos_crease = math.cos(math.radians(CREASE_DEG))
@@ -769,6 +813,8 @@ def shade_toon(model: Model, idp, nrm, dep, ss=2, rim_rgb=None) -> Image.Image:
         jump = both & (np.abs(d0 - d1) > DEPTH_EDGE)
         dot = np.sum(normal[ys, xs] * normal[ys2, xs2], axis=-1)
         crease = both & (dot < cos_crease)
+        if crease_ok is not None:
+            crease &= crease_ok[ys, xs] & crease_ok[ys2, xs2]
         other = both & (mat_index[ys, xs] != mat_index[ys2, xs2]) & \
             (np.abs(d0 - d1) > DEPTH_EDGE * 0.4)
         e = jump | crease | other
@@ -792,6 +838,81 @@ def shade_toon(model: Model, idp, nrm, dep, ss=2, rim_rgb=None) -> Image.Image:
     return Image.fromarray(out, "RGBA")
 
 
+# The ink style: the splash art's comic inking, for in-game sprites. Two
+# tones and solid blacks instead of soft gradients: a lit tone, a cool
+# shadow tone, and shadow cores filled with ink ("spot blacks"). Works on
+# code-built parts (flat colour) and on textured meshes (skin.py) alike, so
+# a generated body and a hand-built prop sit in the same drawing.
+INK_SHADOW_AT = 0.20                 # light below this is shadow
+INK_BLACK_AT = -0.28                 # light below this is solid ink
+INK_SHADOW_TINT = (0.56, 0.46, 0.70)  # shadows go cool and dark
+INK_BLACK_MIX = 0.86
+INK_HIGHLIGHT_AT = 0.90              # a thin hot edge on the key-light side
+INK_HIGHLIGHT = 1.16
+INK_CONTRAST = 1.10                  # textures arrive flatter than the splash art
+INK_SATURATION = 1.15
+ALBEDO_SAMPLES = 12
+
+
+def shade_ink(model: Model, idp, nrm, dep, alb, ss=2, rim_rgb=None) -> Image.Image:
+    """Comic-ink sprite from the passes. `alb` is the albedo pass (sRGB
+    0..255) for textured meshes, or None."""
+    h, w = idp.shape[:2]
+    alpha = idp[..., 3] > 0.5
+    mat_index = np.rint(idp[..., 0] * 255).astype(int)
+    normal = nrm[..., :3] * 2.0 - 1.0
+    depth = dep[..., 0] * 40.0
+    depth[~alpha] = 1e9
+
+    base = np.zeros((h, w, 3), dtype=np.float32)
+    glow = np.zeros((h, w), dtype=bool)
+    textured = np.zeros((h, w), dtype=bool)
+    for m in model.materials.values():
+        sel = alpha & (mat_index == m.index)
+        if not sel.any():
+            continue
+        if m.textured:
+            assert alb is not None, f"{m.name}: textured material, no albedo pass"
+            base[sel] = alb[sel]
+            textured |= sel
+        else:
+            base[sel] = np.array(m.base, np.float32)
+            if m.glow:
+                glow |= sel
+    # Punch: generated textures are flatter and greyer than the concept art.
+    if textured.any():
+        t = base[textured]
+        lum = t @ np.array((0.299, 0.587, 0.114), np.float32)
+        t = lum[:, None] + (t - lum[:, None]) * INK_SATURATION
+        base[textured] = np.clip((t - 128.0) * INK_CONTRAST + 128.0, 0, 255)
+
+    key = normal @ np.array(KEY_LIGHT)
+    fill = normal @ np.array(FILL_LIGHT)
+    light = np.clip(key, -1, 1) * 0.85 + np.clip(fill, 0, 1) * 0.25
+    light += np.clip(normal[..., 2], 0, 1) * 0.12
+
+    rgb = base.copy()
+    shadow = alpha & ~glow & (light < INK_SHADOW_AT)
+    black = alpha & ~glow & (light < INK_BLACK_AT)
+    high = alpha & ~glow & (light >= INK_HIGHLIGHT_AT)
+    rgb[shadow] = base[shadow] * np.array(INK_SHADOW_TINT, np.float32)
+    rgb[black] = rgb[black] * (1 - INK_BLACK_MIX) + \
+        np.array(INK_RGB, np.float32) * INK_BLACK_MIX
+    rgb[high] = np.clip(base[high] * INK_HIGHLIGHT + 8.0, 0, 255)
+
+    if rim_rgb is not None:
+        el = math.radians(CAMERA_ELEVATION_DEG)
+        view = np.array((0.0, -math.cos(el), math.sin(el)))
+        facing = np.clip(normal @ view, 0, 1)
+        fres = (1.0 - facing) ** 2.2
+        toward = np.clip(normal @ np.array(RIM_LIGHT), 0, 1)
+        rim = alpha & (fres > 0.34) & (toward > 0.15)
+        rgb[rim] = rgb[rim] * 0.35 + np.array(rim_rgb, np.float32) * 0.65
+
+    return _ink_and_resolve(rgb, alpha, mat_index, normal, depth, ss,
+                            crease_ok=~textured)
+
+
 # --------------------------------------------------------------------------
 # Sheets
 # --------------------------------------------------------------------------
@@ -813,8 +934,9 @@ class ActorSpec:
     # hands. A pseudo-joint "carry" in the pose sets the carried thing's
     # roll in degrees (its rx).
     socket: Optional[Tuple[str, str]] = None
-    # "pixel" (cel-shaded pixel art) or "toon" (smooth cel shading, ink and
-    # a rim light in rim_rgb, rendered supersampled and drawn smoothed).
+    # "pixel" (cel-shaded pixel art), "toon" (smooth cel shading, ink and a
+    # rim light in rim_rgb, rendered supersampled and drawn smoothed) or
+    # "ink" (the splash art's comic inking; needed for skinned meshes).
     style: str = "pixel"
     rim_rgb: Optional[Tuple[int, int, int]] = None
     # Spring-driven secondary motion (see clip_frames).
@@ -855,7 +977,7 @@ def render_actor(spec: ActorSpec, out_png: str, rel_png: str, log=print):
     model, base = spec.build()
     renderer = Renderer(spec.cell_w, spec.cell_h, spec.pivot_y,
                         PIXEL_SIZE * spec.pixel_scale,
-                        supersample=2 if spec.style == "toon" else 1)
+                        supersample=1 if spec.style == "pixel" else 2)
     total = sum(c.frames for c in spec.clips) * len(DIRECTIONS)
     # Roughly square sheets stay inside GPU texture limits for big casts.
     cols = max(SHEET_COLUMNS,
@@ -868,8 +990,8 @@ def render_actor(spec: ActorSpec, out_png: str, rel_png: str, log=print):
     lines = [f"actor {spec.name} {rel_png} {spec.cell_w} {spec.cell_h} "
              f"{spec.cell_w // 2} {spec.pivot_y} {cols}"
              + (f" {spec.pixel_scale:g}" if spec.pixel_scale != 1.0
-                or spec.style == "toon" else "")
-             + (" smooth" if spec.style == "toon" else "")]
+                or spec.style != "pixel" else "")
+             + (" smooth" if spec.style != "pixel" else "")]
     cell = 0
     sockets = []
     for clip in spec.clips:

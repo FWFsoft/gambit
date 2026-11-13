@@ -1,28 +1,36 @@
 # Sprite forge
 
-In-game character and creature art, built by Claude as code.
+In-game character and creature sprites, baked from 3D models by code.
 
-Each actor in `actors/` is a Python file that builds a low-poly 3D model
-from simple parts (blobs, tapered limbs, boxes), hangs it on a small
-joint skeleton, and defines animation clips as keyframed poses.
-`build.py` renders every clip in all 8 directions from the game camera and
-turns the renders into pixel art with one shared set of rules (light
-direction, colour ramps, outlines, pixel size) in `forge.py`. Those shared
-rules are what keep every character and creature looking like part of one
-game.
+Each actor in `actors/` is a Python file that puts a 3D model on a small
+joint skeleton and defines animation clips as keyframed poses. `build.py`
+renders every clip in all 8 directions from the game camera and shades
+the renders with one shared set of rules (light direction, ink, outlines,
+size) in `forge.py`. Those shared rules are what keep every character and
+creature looking like part of one game.
 
-No image model draws anything. Your concept art and turnarounds are the
-reference Claude models from.
+Where the model comes from:
+
+- **A generated model** (the way forward): an image-to-3D GLB made from
+  the character's concept art, in `art/models/`. Its shape and texture
+  carry the drawing. See "Generated models" below and the
+  `/character-art` skill.
+- **Code-built parts** (blobs, tapered limbs, boxes, tubes): for props,
+  springy cloth and simple creatures, and for the five older actors that
+  do not have a model yet.
 
 ## Setup (once)
 
+From the repo root. `bpy` is Blender as a Python module; bpy 5.3 needs
+Python 3.13, which `uv` fetches.
+
 ```bash
-python3 -m venv /opt/forge
-/opt/forge/bin/pip install bpy numpy pillow
+uv venv --python 3.13 tools/sprite_forge/.venv
+uv pip install --python tools/sprite_forge/.venv/Scripts/python.exe bpy numpy pillow
 ```
 
-`bpy` is Blender as a Python module; it needs the Python version its wheel
-was built for (3.13 for bpy 5.3).
+On Linux and macOS the interpreter is `tools/sprite_forge/.venv/bin/python`.
+Below, `/opt/forge/bin/python` stands for that interpreter.
 
 ## Use
 
@@ -92,6 +100,48 @@ Motion tools, all in `forge.py`:
   damping, drag)}` in an actor module springs a joint after its driver.
 - **Squash and stretch:** a six-value pose `(rx, ry, rz, sx, sy, sz)`
   scales a joint in its rest axes (a forearm that stretches on a punch).
+
+## Generated models (`skin.py`)
+
+```python
+import skin
+m = Model("Wade")
+skin.attach(m, "art/models/Wade.glb", height=1.95, fit=FIT)
+```
+
+`attach` imports the file, stands it on the ground at `height`, places
+the body-kit joints from `fit`, computes skin weights, re-poses the mesh
+into the forge rest pose (arms and legs straight down, so body-kit poses
+mean the same thing) and creates the joints. After that `Model.pose()`
+deforms the mesh, and props can be added to its joints as usual. Start
+from `actors/_mesh_template.py`.
+
+- **Fit.** `fit.py <model or actor> out.png` draws the joints on the
+  model, shows which joint owns each part of the surface and the re-posed
+  result, and prints a starting `FIT`. Correct it by eye.
+
+  ![The fit view](../../docs/prototype/mesh_fit_view.png)
+- **Weights** use Blender's automatic weights on a watertight voxel copy
+  of the mesh, so messy generated meshes work. They are cached next to
+  the model (`*.weights.npz`, not committed).
+- **Colour** comes from the model's own texture through an extra albedo
+  pass. Skinned meshes need `STYLE = "ink"`.
+- **Self-test.** `selftest_skin.py` builds its own GLB from the code-built
+  Wade and runs it through the whole path. Run it after changing
+  `skin.py` or the shading.
+
+  ![The self-test bake](../../docs/prototype/mesh_pipeline_selftest.png)
+
+Non-humanoids: pass your own `skeleton=[(joint, parent), ...]`, `tails`,
+`down={}` and `level=()` to `attach`, and give every joint in `fit`.
+
+## Ink style
+
+`STYLE = "ink"` is the splash art's comic inking: a lit tone, a cool
+shadow tone, and shadow cores filled with solid ink, under the same
+outlines and rim light as the toon style. It works on textured meshes and
+on code-built parts, so a generated body and a hand-built prop sit in one
+drawing. The knobs are the `INK_*` constants in `forge.py`.
 
 ## Toon style
 

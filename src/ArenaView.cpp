@@ -6,6 +6,7 @@
 #include <imgui.h>
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <cstdio>
 #include <fstream>
@@ -19,8 +20,10 @@
 #include "Effect.h"
 #include "EffectTracker.h"
 #include "Logger.h"
+#include "PresentationLayer.h"
 #include "Texture.h"
 #include "TextureManager.h"
+#include "config/LookConfig.h"
 #include "config/ScreenConfig.h"
 
 using namespace ArenaDraw;
@@ -33,6 +36,55 @@ constexpr float SHIP_DRAW_SIZE = 192.0f;
 ImTextureID textureId(const Texture* texture) {
   return (ImTextureID)(intptr_t)texture->getID();
 }
+
+// --- The look ---------------------------------------------------------------
+// While renderWorld draws into the presentation layer's scene target, the
+// scene's alpha channel is an emissive mask: what is drawn "glow" (ImGui's
+// normal blend) blooms, what is drawn "matte" (sprites, shadows) does not
+// and hides the glow behind it. See PresentationLayer.h.
+struct LookState {
+  PresentationLayer* layer = nullptr;  // null: the look is off this frame
+  bool shadowChannel = false;  // entity pass: shadows have a channel of their own
+};
+LookState look;
+
+void glowCallback(const ImDrawList*, const ImDrawCmd*) {
+  PresentationLayer::blendGlow();
+}
+void matteCallback(const ImDrawList*, const ImDrawCmd*) {
+  PresentationLayer::blendMatte();
+}
+void resolveCallback(const ImDrawList*, const ImDrawCmd* cmd) {
+  static_cast<PresentationLayer*>(cmd->UserCallbackData)->resolve();
+}
+void beginMatte(ImDrawList* dl) {
+  if (look.layer) dl->AddCallback(matteCallback, nullptr);
+}
+void endMatte(ImDrawList* dl) {
+  if (look.layer) dl->AddCallback(glowCallback, nullptr);
+}
+
+// Shadows are matte. In the entity pass they go to draw channel 0, which is
+// emitted before every entity, so no shadow is ever painted over a body.
+struct ShadowScope {
+  ImDrawList* dl;
+  explicit ShadowScope(ImDrawList* list) : dl(list) {
+    if (look.shadowChannel) {
+      dl->ChannelsSetCurrent(0);
+    } else {
+      beginMatte(dl);
+    }
+  }
+  ~ShadowScope() {
+    if (look.shadowChannel) {
+      dl->ChannelsSetCurrent(1);
+    } else {
+      endMatte(dl);
+    }
+  }
+  ShadowScope(const ShadowScope&) = delete;
+  ShadowScope& operator=(const ShadowScope&) = delete;
+};
 
 // Draw a sprite cell standing on `feet`. The quad is scaled and rotated
 // around the feet so characters can lean, squash and fall over.
@@ -60,9 +112,44 @@ void drawSprite(ImDrawList* dl, const Texture* texture, int srcX, int srcY,
   float v1 = (srcY + srcH) / texH;
   if (flipX) std::swap(u0, u1);
 
+  beginMatte(dl);
   dl->AddImageQuad(textureId(texture), topLeft, topRight, bottomRight,
                    bottomLeft, ImVec2(u0, v0), ImVec2(u1, v0), ImVec2(u1, v1),
                    ImVec2(u0, v1), color);
+  endMatte(dl);
+}
+
+// The sprite's own silhouette, laid on the ground away from the key light
+// (the same light the forge bakes into the sprites). `base` is the bottom
+// centre of the cell and `feetLift` how far above it the feet line is.
+void drawCastShadow(ImDrawList* dl, const Texture* texture, int srcX, int srcY,
+                    int srcW, int srcH, ImVec2 base, float feetLift,
+                    float scaleX, float scaleY, bool flipX) {
+  if (!look.layer) return;
+  ShadowScope scope(dl);
+  float w = srcW * scaleX;
+  float h = srcH * scaleY;
+  float groundY = base.y - feetLift;
+  // `up` is measured from the cell's bottom edge; the shadow of a point is
+  // sheared by its height above the ground.
+  auto corner = [&](float lx, float up) {
+    float height = up - feetLift;
+    return ImVec2(base.x + lx + height * Config::Look::SHADOW_SHEAR_X,
+                  groundY + height * Config::Look::SHADOW_SHEAR_Y);
+  };
+  float texW = static_cast<float>(texture->getWidth());
+  float texH = static_cast<float>(texture->getHeight());
+  float u0 = srcX / texW;
+  float u1 = (srcX + srcW) / texW;
+  float v0 = srcY / texH;
+  float v1 = (srcY + srcH) / texH;
+  if (flipX) std::swap(u0, u1);
+  dl->AddImageQuad(
+      textureId(texture), corner(-w * 0.5f, h), corner(w * 0.5f, h),
+      corner(w * 0.5f, 0.0f), corner(-w * 0.5f, 0.0f), ImVec2(u0, v0),
+      ImVec2(u1, v0), ImVec2(u1, v1), ImVec2(u0, v1),
+      IM_COL32(0, 0, 0,
+               static_cast<int>(255 * Config::Look::CAST_SHADOW_ALPHA)));
 }
 
 ImU32 multiplyColor(ImU32 a, ImU32 b) {
@@ -73,10 +160,23 @@ ImU32 multiplyColor(ImU32 a, ImU32 b) {
                   ch(a, IM_COL32_A_SHIFT) * ch(b, IM_COL32_A_SHIFT) / 255);
 }
 
+// Contact shadow. `alpha` is relative: 0.35 is a body standing on the ground.
 void drawShadow(ImDrawList* dl, ImVec2 feet, float radius, float alpha = 0.35f) {
-  dl->AddEllipseFilled(feet, ImVec2(radius, radius * 0.38f),
-                       IM_COL32(0, 0, 0, static_cast<int>(255 * alpha)), 0.0f,
-                       20);
+  if (!look.layer) {
+    dl->AddEllipseFilled(feet, ImVec2(radius, radius * 0.38f),
+                         IM_COL32(0, 0, 0, static_cast<int>(255 * alpha)), 0.0f,
+                         20);
+    return;
+  }
+  // The look: a soft blob that is darkest right under the feet.
+  ShadowScope scope(dl);
+  float w = radius * Config::Look::CONTACT_SHADOW_WIDTH;
+  float h = w * Config::Look::CONTACT_SHADOW_SQUASH;
+  float a = std::min(1.0f, alpha / 0.35f * Config::Look::CONTACT_SHADOW_ALPHA);
+  dl->AddImage((ImTextureID)(intptr_t)look.layer->softBlobTexture(),
+               ImVec2(feet.x - w, feet.y - h), ImVec2(feet.x + w, feet.y + h),
+               ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f),
+               IM_COL32(0, 0, 0, static_cast<int>(255 * a)));
 }
 
 // Short tag for an effect, used above enemies where space is tight.
@@ -287,7 +387,7 @@ void ArenaView::drawActorFrame(ImDrawList* dl, const ActorSheet& sheet,
                                const ActorAnim& anim, int direction,
                                float elapsed, ImVec2 feet, float scale,
                                ImU32 tint, bool hold, int forcedFrame,
-                               float rotation) {
+                               float rotation, bool castShadow) {
   int frame = actorFrameIndex(anim, elapsed, hold, forcedFrame);
   scale *= sheet.scale;
   int cell = anim.start + direction * anim.frames + frame;
@@ -296,6 +396,11 @@ void ArenaView::drawActorFrame(ImDrawList* dl, const ActorSheet& sheet,
   // drawSprite stands the quad on `feet`; the cell's feet line is
   // (cellH - pivotY) pixels above its bottom edge.
   ImVec2 base(feet.x, feet.y + (sheet.cellH - sheet.pivotY) * scale);
+  if (castShadow) {
+    drawCastShadow(dl, sheet.texture, col * sheet.cellW, row * sheet.cellH,
+                   sheet.cellW, sheet.cellH, base,
+                   (sheet.cellH - sheet.pivotY) * scale, scale, scale, false);
+  }
   drawSprite(dl, sheet.texture, col * sheet.cellW, row * sheet.cellH,
              sheet.cellW, sheet.cellH, base, scale, scale, rotation, false,
              tint);
@@ -419,6 +524,11 @@ void ArenaView::render() {
 }
 
 void ArenaView::renderWorld(ImDrawList* dl) {
+  // The look is on when RenderSystem opened a scene for this frame.
+  look.layer =
+      presentation && presentation->sceneOpen() ? presentation : nullptr;
+  look.shadowChannel = false;
+
   // Lay the world out at 1x, then magnify every vertex around the screen
   // centre. One place applies the zoom, and no drawing code has to care.
   int firstVertex = dl->VtxBuffer.Size;
@@ -444,7 +554,179 @@ void ArenaView::renderWorld(ImDrawList* dl) {
       dl->VtxBuffer[i].pos.y += shake.y;
     }
   }
+  if (look.layer) {
+    // The world is complete: bloom and grade it onto the screen. Everything
+    // drawn after this (health bars, names, numbers, the HUD) lands on the
+    // screen itself, crisp and ungraded.
+    assert(!look.layer->resolveQueued());
+    dl->AddCallback(resolveCallback, look.layer);
+    dl->AddCallback(ImDrawCallback_ResetRenderState, nullptr);
+    look.layer->markResolveQueued();
+    look.layer = nullptr;
+  }
   drawOverhead(dl);
+}
+
+void ArenaView::setPresentation(PresentationLayer* layer) {
+  presentation = layer;
+  if (presentation) {
+    presentation->setLightProvider(
+        [this](std::vector<PresentationLayer::LightPool>& out) {
+          collectLights(out);
+        });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Light pools: what lights the ground this frame
+// ---------------------------------------------------------------------------
+
+void ArenaView::collectLights(
+    std::vector<PresentationLayer::LightPool>& out) const {
+  namespace L = Config::Look;
+  const float halfW = Config::Screen::WIDTH * 0.5f / camera->zoom;
+  const float halfH = Config::Screen::HEIGHT * 0.5f / camera->zoom;
+  // Most important first: once the list is full the rest is dropped.
+  auto add = [&](float x, float y, float radius, Rgb c, float strength) {
+    if (strength <= 0.02f || radius < 1.0f) return;
+    if (std::abs(x - camera->x) > halfW + radius ||
+        std::abs(y - camera->y) > halfH + radius) {
+      return;
+    }
+    if (out.size() >= static_cast<size_t>(L::MAX_LIGHT_POOLS)) return;
+    out.push_back({x, y, radius, c.r, c.g, c.b, strength});
+  };
+
+  // A warm pool around every player: where the heroes are is where the
+  // light is.
+  const Rgb warm{L::PLAYER_POOL_R, L::PLAYER_POOL_G, L::PLAYER_POOL_B};
+  uint32_t me = localId();
+  const Player& local = prediction->getLocalPlayer();
+  for (const auto& [id, view] : arena->players()) {
+    const PlayerState& state = view.state;
+    if (state.characterId == 0) continue;
+    if ((state.flags & PlayerFlags::Dead) != 0 || state.health <= 0.0f) continue;
+    bool hidden = (state.flags & PlayerFlags::Hidden) != 0;
+    add(id == me ? local.x : view.x, id == me ? local.y : view.y,
+        L::PLAYER_POOL_RADIUS, warm,
+        L::PLAYER_POOL_STRENGTH * (hidden ? L::HIDDEN_POOL_SCALE : 1.0f));
+  }
+
+  // Telegraphs and one-shot effects.
+  for (const ArenaClient::Fx& f : arena->effects()) {
+    float t = std::max(0.0f, std::min(1.0f, f.ageMs / f.lifeMs));
+    float fade = 1.0f - t;
+    Rgb c = themeRgb(f.theme);
+    float dirLen = std::sqrt(f.x2 * f.x2 + f.y2 * f.y2);
+    float dirX = dirLen > 0.001f ? f.x2 / dirLen : 0.0f;
+    float dirY = dirLen > 0.001f ? f.y2 / dirLen : 0.0f;
+    switch (f.kind) {
+      case GameEventKind::TelegraphCircle:
+        // Brightens as the attack is about to land.
+        add(f.x, f.y, f.value * L::TELEGRAPH_POOL_RADIUS_SCALE, c,
+            L::TELEGRAPH_POOL_STRENGTH_START +
+                (L::TELEGRAPH_POOL_STRENGTH_END -
+                 L::TELEGRAPH_POOL_STRENGTH_START) * t);
+        break;
+      case GameEventKind::TelegraphCone:
+        add(f.x + dirX * f.value * 0.55f, f.y + dirY * f.value * 0.55f,
+            f.value * 0.8f, c,
+            L::TELEGRAPH_POOL_STRENGTH_START +
+                (L::TELEGRAPH_POOL_STRENGTH_END -
+                 L::TELEGRAPH_POOL_STRENGTH_START) * t);
+        break;
+      case GameEventKind::Slash:
+      case GameEventKind::Cone:
+        add(f.x + dirX * f.value * 0.6f, f.y + dirY * f.value * 0.6f,
+            f.value * 1.3f, c, L::FX_SWING_STRENGTH * fade);
+        break;
+      case GameEventKind::Burst:
+        add(f.x, f.y, f.value * L::FX_BURST_RADIUS_SCALE, c,
+            L::FX_BURST_STRENGTH * fade);
+        break;
+      case GameEventKind::Ring:
+        add(f.x, f.y, f.value * (0.25f + 0.75f * ease(t)) * 1.3f, c,
+            L::FX_RING_STRENGTH * fade);
+        break;
+      case GameEventKind::Beam: {
+        float radius = std::max(L::FX_TRAIL_RADIUS, f.value * 6.0f);
+        add(f.x, f.y, radius, c, L::FX_BEAM_STRENGTH * fade);
+        add((f.x + f.x2) * 0.5f, (f.y + f.y2) * 0.5f, radius, c,
+            L::FX_BEAM_STRENGTH * fade);
+        add(f.x2, f.y2, radius, c, L::FX_BEAM_STRENGTH * fade);
+        break;
+      }
+      case GameEventKind::Lob:
+        add(f.x + (f.x2 - f.x) * t, f.y + (f.y2 - f.y) * t,
+            L::FX_TRAIL_RADIUS, c, L::FX_TRAIL_STRENGTH);
+        break;
+      case GameEventKind::DashTrail:
+        add(f.x, f.y, L::FX_TRAIL_RADIUS, c, L::FX_TRAIL_STRENGTH * fade);
+        add(f.x2, f.y2, L::FX_TRAIL_RADIUS, c, L::FX_TRAIL_STRENGTH * fade);
+        break;
+      case GameEventKind::Tether:
+        add(f.x2, f.y2, L::FX_TRAIL_RADIUS, c, L::FX_TRAIL_STRENGTH * fade);
+        break;
+      case GameEventKind::HitSpark:
+        add(f.x, f.y, std::max(L::FX_HIT_RADIUS_MIN, f.value * 4.0f), c,
+            L::FX_HIT_STRENGTH * fade);
+        break;
+      case GameEventKind::SpawnPuff:
+        add(f.x, f.y, L::FX_TRAIL_RADIUS, c, L::FX_TRAIL_STRENGTH * fade);
+        break;
+      default:
+        break;
+    }
+  }
+
+  // Ground zones: genus colour arrives as light, not as bright tiles.
+  for (const ArenaClient::Zone& zone : arena->zones()) {
+    float fadeIn = std::min(1.0f, zone.ageMs / 200.0f);
+    float fadeOut = std::min(1.0f, (zone.lifeMs - zone.ageMs) / 400.0f);
+    float alpha = std::max(0.0f, std::min(fadeIn, fadeOut));
+    add(zone.x, zone.y, zone.radius * L::ZONE_POOL_RADIUS_SCALE,
+        themeRgb(zone.fromEnemy ? VfxTheme::Danger : zone.theme),
+        L::ZONE_POOL_STRENGTH * alpha);
+  }
+
+  for (const ArenaClient::Projectile& shot : arena->projectiles()) {
+    if (shot.ageMs > shot.lifeMs) continue;
+    add(shot.x, shot.y, shot.radius * L::PROJECTILE_POOL_RADIUS_SCALE,
+        themeRgb(shot.fromEnemy ? VfxTheme::Danger : shot.theme),
+        L::PROJECTILE_POOL_STRENGTH);
+  }
+
+  for (const auto& [id, item] : prediction->getWorldItems()) {
+    if (!Arena::PickupId::isInfusion(item.itemId)) continue;
+    add(item.x, item.y, L::PICKUP_POOL_RADIUS,
+        themeRgb(genusTheme(Arena::PickupId::infusionGenus(item.itemId))),
+        L::PICKUP_POOL_STRENGTH);
+  }
+
+  // Enemies stand in a faint pool of their genus colour, and it turns to
+  // danger red as they wind up a hit.
+  for (const auto& [id, view] : arena->enemies()) {
+    if (view.dying) continue;
+    Arena::EnemyKind kind = static_cast<Arena::EnemyKind>(view.state.type);
+    if (static_cast<int>(kind) >= static_cast<int>(Arena::EnemyKind::Count)) {
+      continue;
+    }
+    const Arena::EnemyKindDef& def = Arena::enemyDef(kind);
+    bool elite = (view.state.flags & EnemyFlags::Elite) != 0;
+    bool boss = kind == Arena::EnemyKind::Boss;
+    float radius = std::max(L::ENEMY_POOL_RADIUS_MIN,
+                            def.radius * L::ENEMY_POOL_RADIUS_SCALE);
+    if (boss) radius *= L::BOSS_POOL_RADIUS_SCALE;
+    add(view.x, view.y, radius,
+        themeRgb(boss ? VfxTheme::Shadow : genusTheme(def.genus)),
+        boss ? L::BOSS_POOL_STRENGTH
+             : elite ? L::ELITE_POOL_STRENGTH : L::ENEMY_POOL_STRENGTH);
+    if (view.attackMs > 0.0f && view.attackTotalMs > 0.0f) {
+      float windup = 1.0f - view.attackMs / view.attackTotalMs;
+      add(view.x, view.y, radius, themeRgb(VfxTheme::Danger),
+          L::ENEMY_WINDUP_POOL_STRENGTH * windup);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -818,7 +1100,7 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
     }
     if (clip) {
       drawActorFrame(dl, *actor, *clip, anim.direction, elapsed, feet, 1.0f,
-                     tint);
+                     tint, true, -1, 0.0f, !dead && !hidden);
       // Carriers (Presidente) publish where their hands are this frame.
       if (!clip->sockets.empty() && state.resource >= 200 && !dead) {
         int frame = actorFrameIndex(*clip, elapsed, true, -1);
@@ -845,6 +1127,11 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
     } else {
       // Placeholder art has a single pose: mirror it for left / right.
       flip = faceX < 0.0f;
+    }
+    if (!dead && !hidden) {
+      drawCastShadow(dl, sprite->texture, frame * sprite->cellW, 0,
+                     sprite->cellW, sprite->cellH, at, 0.0f, scaleX, scaleY,
+                     flip);
     }
     drawSprite(dl, sprite->texture, frame * sprite->cellW, 0, sprite->cellW,
                sprite->cellH, at, scaleX, scaleY, rotation, flip, tint);
@@ -1027,10 +1314,16 @@ void ArenaView::drawEnemy(ImDrawList* dl, const ArenaClient::EnemyView& view) {
       }
       if (clip) {
         drawActorFrame(dl, *actor, *clip, anim.direction, elapsed, feet, scale,
-                       actorTint, true, forced, liftRotation);
+                       actorTint, true, forced, liftRotation,
+                       !view.dying && !lifted);
       }
     }
   } else if (sprite && sprite->texture) {
+    if (!view.dying && !lifted) {
+      drawCastShadow(dl, sprite->texture, frame * sprite->cellW,
+                     row * sprite->cellH, sprite->cellW, sprite->cellH, at, 0.0f,
+                     scaleX, scaleY, view.faceLeft);
+    }
     drawSprite(dl, sprite->texture, frame * sprite->cellW, row * sprite->cellH,
                sprite->cellW, sprite->cellH, at, scaleX, scaleY,
                rotation + liftRotation, view.faceLeft, tint);
@@ -1085,6 +1378,17 @@ void ArenaView::drawEntities(ImDrawList* dl) {
   std::sort(items.begin(), items.end(),
             [](const Item& a, const Item& b) { return a.depth < b.depth; });
 
+  // The look: every entity's shadow lies under every entity. Shadows go to
+  // draw channel 0 (matte), bodies and their effects to channel 1.
+  const bool shadowPass = look.layer != nullptr;
+  if (shadowPass) {
+    dl->AddCallback(matteCallback, nullptr);
+    dl->ChannelsSplit(2);
+    dl->ChannelsSetCurrent(1);
+    dl->AddCallback(glowCallback, nullptr);
+    look.shadowChannel = true;
+  }
+
   for (const Item& item : items) {
     switch (item.kind) {
       case 0:
@@ -1101,6 +1405,11 @@ void ArenaView::drawEntities(ImDrawList* dl) {
         drawShip(dl);
         break;
     }
+  }
+
+  if (shadowPass) {
+    look.shadowChannel = false;
+    dl->ChannelsMerge();
   }
 }
 

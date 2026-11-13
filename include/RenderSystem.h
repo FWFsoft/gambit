@@ -18,6 +18,8 @@
 #include "Window.h"
 #include "config/PlayerConfig.h"
 
+class PresentationLayer;
+
 class RenderSystem {
  public:
   RenderSystem(Window* window, ClientPrediction* clientPrediction,
@@ -28,7 +30,11 @@ class RenderSystem {
                MusicZoneDebugRenderer* musicZoneDebugRenderer,
                ObjectiveDebugRenderer* objectiveDebugRenderer);
 
-  ~RenderSystem() = default;
+  ~RenderSystem();
+
+  // The look (dark world, light pools, bloom, grade). ArenaView and
+  // UISystem need it to mark what glows and to resolve the scene.
+  PresentationLayer* getPresentation() { return presentation.get(); }
 
   // Access to sprite renderer for other systems
   SpriteRenderer* getSpriteRenderer() { return spriteRenderer.get(); }
@@ -53,6 +59,7 @@ class RenderSystem {
   std::unique_ptr<SpriteRenderer> spriteRenderer;
   std::unique_ptr<Texture> whitePixelTexture;
   std::unique_ptr<TileRenderer> tileRenderer;
+  std::unique_ptr<PresentationLayer> presentation;
   Texture* playerTexture;  // Managed by TextureManager, not owned
   Texture* shipTexture;    // Managed by TextureManager, not owned
   bool legacyEntities = true;
