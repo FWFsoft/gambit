@@ -1,5 +1,6 @@
 #include "InputSystem.h"
 
+#include "Camera.h"
 #include "ClientPrediction.h"
 #include "GameStateManager.h"
 #include "Logger.h"
@@ -61,6 +62,7 @@ void InputSystem::onKeyDown(const KeyDownEvent& e) {
       // Clear movement state and reset animation to idle when pausing
       moveLeft = moveRight = moveUp = moveDown = false;
       buttons = 0;
+      if (camera) camera->recentreHeld = false;
       if (clientPrediction) {
         Player& localPlayer = clientPrediction->getLocalPlayerMutable();
         localPlayer.getAnimationController()->updateAnimationState(0.0f, 0.0f);
@@ -81,6 +83,7 @@ void InputSystem::onKeyDown(const KeyDownEvent& e) {
       // Clear movement state and reset animation to idle when opening inventory
       moveLeft = moveRight = moveUp = moveDown = false;
       buttons = 0;
+      if (camera) camera->recentreHeld = false;
       if (clientPrediction) {
         Player& localPlayer = clientPrediction->getLocalPlayerMutable();
         localPlayer.getAnimationController()->updateAnimationState(0.0f, 0.0f);
@@ -122,12 +125,28 @@ void InputSystem::onKeyDown(const KeyDownEvent& e) {
     return;
   }
 
+  // Y: lock / unlock the camera.
+  if (e.key == SDLK_y && camera) {
+    camera->toggleMode();
+    buttons &= ~InputButtons::Primary;  // Space may have been attacking
+    Logger::info(std::string("Camera: ") +
+                 (camera->isLocked() ? "locked" : "unlocked"));
+  }
+
   // Abilities: LMB / RMB come from the mouse; these are the keyboard ones.
-  // Space doubles as the basic attack for trackpads.
   if (e.key == SDLK_q) buttons |= InputButtons::Special;
   if (e.key == SDLK_LSHIFT) buttons |= InputButtons::Mobility;
   if (e.key == SDLK_e) buttons |= InputButtons::Core;
-  if (e.key == SDLK_SPACE) buttons |= InputButtons::Primary;
+  // Space: with the camera locked it doubles as the basic attack (for
+  // trackpads); with the camera unlocked it brings the camera back to your
+  // hero for as long as it is held (Controls/HUD doc).
+  if (e.key == SDLK_SPACE) {
+    if (camera && !camera->isLocked()) {
+      camera->recentreHeld = true;
+    } else {
+      buttons |= InputButtons::Primary;
+    }
+  }
 
   // Interact input (F key) - for objectives
   if (e.key == SDLK_f) {
@@ -157,7 +176,10 @@ void InputSystem::onKeyUp(const KeyUpEvent& e) {
   if (e.key == SDLK_q) buttons &= ~InputButtons::Special;
   if (e.key == SDLK_LSHIFT) buttons &= ~InputButtons::Mobility;
   if (e.key == SDLK_e) buttons &= ~InputButtons::Core;
-  if (e.key == SDLK_SPACE) buttons &= ~InputButtons::Primary;
+  if (e.key == SDLK_SPACE) {
+    buttons &= ~InputButtons::Primary;
+    if (camera) camera->recentreHeld = false;
+  }
 }
 
 void InputSystem::onMouseMove(const MouseMoveEvent& e) {
@@ -186,6 +208,12 @@ void InputSystem::onUpdate(const UpdateEvent& e) {
   // Only publish input during Playing state
   if (GameStateManager::instance().getCurrentState() != GameState::Playing) {
     return;
+  }
+
+  // Unlocked camera: the cursor pans it from the screen edges. Not while
+  // the cursor is outside the window, or the view would drift on its own.
+  if (camera && SDL_GetMouseFocus() != nullptr) {
+    camera->pan(mouseX, mouseY, e.deltaTime / 1000.0f);
   }
 
   // Publish input state every frame

@@ -77,6 +77,7 @@ void ArenaView::renderHud() {
   drawScoreboard(ImGui::IsKeyDown(ImGuiKey_Tab));
   drawAbilityBar();
   drawPrompts();
+  drawCameraHud();
   drawEffectLabPanel();
   drawBanners();
 
@@ -125,6 +126,8 @@ void ArenaView::handleHotkeys() {
   }
   if (ImGui::IsKeyPressed(ImGuiKey_B, false)) suitScreenOpen = !suitScreenOpen;
 
+  // F3: fog of war on / off, to compare.
+  if (ImGui::IsKeyPressed(ImGuiKey_F3, false)) fogEnabled = !fogEnabled;
   // F4: the look on / off, to compare with the plain render.
   if (ImGui::IsKeyPressed(ImGuiKey_F4, false) && presentation) {
     presentation->toggle();
@@ -469,7 +472,9 @@ void ArenaView::drawStatusBar() {
     ImVec2 shipScreen = toZoomedScreen(match.shipX, match.shipY);
     if (shipScreen.x < 0 || shipScreen.x > SCREEN_W || shipScreen.y < 0 ||
         shipScreen.y > SCREEN_H) {
-      float angle = std::atan2(dy, dx);
+      // From what the screen is centred on, which is not always the hero.
+      float angle =
+          std::atan2(match.shipY - camera->y, match.shipX - camera->x);
       ImVec2 centre(SCREEN_W * 0.5f, SCREEN_H * 0.5f);
       float rx = SCREEN_W * 0.5f - 60.0f, ry = SCREEN_H * 0.5f - 110.0f;
       ImVec2 tip(centre.x + std::cos(angle) * rx, centre.y + std::sin(angle) * ry);
@@ -694,6 +699,7 @@ void ArenaView::drawMinimap() {
 
   // Pickups
   for (const auto& [id, item] : prediction->getWorldItems()) {
+    if (!wasSeen(item.x, item.y)) continue;
     ImVec2 p = toMap(item.x, item.y, false);
     if (!inside(p)) continue;
     ImU32 colour = IM_COL32(220, 220, 230, 255);
@@ -707,6 +713,7 @@ void ArenaView::drawMinimap() {
   // Enemies
   for (const auto& [id, view] : arena->enemies()) {
     if (view.dying) continue;
+    if (!inSight(view.x, view.y)) continue;  // fog of war
     ImVec2 p = toMap(view.x, view.y, false);
     if (!inside(p)) continue;
     bool boss = static_cast<Arena::EnemyKind>(view.state.type) ==
@@ -748,6 +755,45 @@ void ArenaView::drawMinimap() {
        themeHot(VfxTheme::Poison, 0.9f), 10.0f, "POISON");
   text(dl, ImVec2(centre.x - radius + 24.0f, centre.y - 5.0f),
        themeHot(VfxTheme::Psychic, 0.9f), 10.0f, "PSYCHIC");
+}
+
+// ---------------------------------------------------------------------------
+// Camera: which mode it is in, and where you are when it has left you
+// ---------------------------------------------------------------------------
+
+void ArenaView::drawCameraHud() {
+  ImDrawList* dl = ImGui::GetBackgroundDrawList();
+  const bool locked = camera->isLocked();
+  text(dl, ImVec2(16.0f, SCREEN_H - 22.0f),
+       locked ? IM_COL32(150, 160, 180, 200) : IM_COL32(255, 228, 130, 255),
+       12.0f,
+       locked ? "[Y] camera: locked"
+              : "[Y] camera: free   edges pan   hold [SPACE] to recentre",
+       false);
+
+  // You never lose your hero: when the free camera has left them behind,
+  // an arrow at the screen edge points back.
+  float px, py;
+  localPosition(px, py);
+  ImVec2 hero = toZoomedScreen(px, py);
+  if (hero.x >= 0 && hero.x <= SCREEN_W && hero.y >= 0 && hero.y <= SCREEN_H) {
+    return;
+  }
+  float angle = std::atan2(py - camera->y, px - camera->x);
+  ImVec2 centre(SCREEN_W * 0.5f, SCREEN_H * 0.5f);
+  // Inside the ship arrow's ring, so the two never sit on top of each other.
+  float rx = SCREEN_W * 0.5f - 110.0f, ry = SCREEN_H * 0.5f - 160.0f;
+  ImVec2 tip(centre.x + std::cos(angle) * rx, centre.y + std::sin(angle) * ry);
+  ImVec2 left(tip.x + std::cos(angle + 2.6f) * 20.0f,
+              tip.y + std::sin(angle + 2.6f) * 20.0f);
+  ImVec2 right(tip.x + std::cos(angle - 2.6f) * 20.0f,
+               tip.y + std::sin(angle - 2.6f) * 20.0f);
+  dl->AddTriangleFilled(tip, left, right, IM_COL32(255, 255, 255, 240));
+  dl->AddTriangle(tip, left, right, IM_COL32(10, 20, 40, 255), 2.0f);
+  text(dl,
+       ImVec2(tip.x - std::cos(angle) * 36.0f,
+              tip.y - std::sin(angle) * 36.0f - 7.0f),
+       IM_COL32(255, 255, 255, 255), 12.0f, "YOU");
 }
 
 // ---------------------------------------------------------------------------

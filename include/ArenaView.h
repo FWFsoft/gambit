@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -8,6 +9,7 @@
 #include "ArenaClient.h"
 #include "Camera.h"
 #include "EffectVisuals.h"
+#include "FogOfWar.h"
 #include "PresentationLayer.h"
 
 class ClientPrediction;
@@ -122,6 +124,22 @@ class ArenaView {
                       int forcedFrame = -1, float rotation = 0.0f,
                       bool castShadow = false);
 
+  // Fog of war (FogOfWar.h): shared crew sight. The model is rebuilt each
+  // frame; drawFog lays it over the finished world.
+  std::unique_ptr<FogOfWar> fog;
+  unsigned int fogTexture = 0;
+  bool fogEnabled = true;    // F3 turns it off, for comparisons
+  bool fogWasInLobby = false;
+  void collectSight(std::vector<FogOfWar::Source>& out) const;
+  void updateFog();
+  void drawFog(ImDrawList* dl);
+  // Whether something standing here is drawn (always true with fog off).
+  // `reach` is the thing's size: an attack is shown as soon as any of it
+  // enters sight, so nothing that can hurt you lands unannounced.
+  bool inSight(float worldX, float worldY, float reach = 0.0f) const;
+  // Things that do not move (pickups) stay drawn where the crew has been.
+  bool wasSeen(float worldX, float worldY) const;
+
   bool manifestLoaded = false;
   std::unordered_map<std::string, CharacterSprite> characterSprites;
   std::unordered_map<std::string, EnemySprite> enemySprites;
@@ -162,6 +180,7 @@ class ArenaView {
   void drawEndScreen();
   void drawDownedOverlay();
   void drawPrompts();
+  void drawCameraHud();
   void handleHotkeys();
 
   // Helpers
@@ -171,6 +190,10 @@ class ArenaView {
   // stay crisp.
   ImVec2 toScreen(float worldX, float worldY) const;
   ImVec2 toZoomedScreen(float worldX, float worldY) const;
+  // Culling for world layers: is a 1x layout position (toScreen) inside the
+  // view once magnified, with this much room around it (layout pixels)?
+  bool inView(ImVec2 layout, float left, float top, float right,
+              float bottom) const;
   bool localPosition(float& x, float& y) const;
   uint32_t localId() const;
 };

@@ -26,6 +26,7 @@ struct ClientObjective {
 
 class NetworkClient;
 class CollisionSystem;
+struct Camera;
 
 class ClientPrediction {
  public:
@@ -51,7 +52,8 @@ class ClientPrediction {
   // Update an objective from network packet
   void updateObjective(const ObjectiveStatePacket& packet);
 
-  // Set up objective event handlers (InteractInputEvent + ObjectiveState packets)
+  // Set up objective event handlers (InteractInputEvent + ObjectiveState
+  // packets)
   void setupObjectiveEventHandlers();
 
   // Reset character selection state (for returning to character select)
@@ -61,6 +63,9 @@ class ClientPrediction {
   // Cursor position in world space as last sent to the server.
   float getAimX() const { return aimX; }
   float getAimY() const { return aimY; }
+  // The view the cursor is aimed through. Without one (tests, headless) the
+  // view is assumed to be centred on the local player.
+  void setCamera(const Camera* camera) { this->camera = camera; }
   // Send any packet to the server (HUD actions: ready, infusions, debug).
   void sendToServer(const std::vector<uint8_t>& data);
 
@@ -90,6 +95,7 @@ class ClientPrediction {
   float shipY = 0.0f;
   bool hasShip = false;
 
+  const Camera* camera = nullptr;  // not owned; may be null
   float aimX = 0.0f;
   float aimY = 0.0f;
 

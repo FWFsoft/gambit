@@ -21,6 +21,85 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-13: Fog of war with shared crew sight
+- **Decision:** The crew shares sight. Every living hero sees 640 world
+  pixels around themselves, a downed hero 260 (enough to see the revive),
+  the ship 520. Ground is in one of three states: seen now (clear, and
+  lifted by a faint cool light), explored (dimmed; enemies, shots and
+  their light are hidden) or unexplored (solid fog). Hidden with the fog:
+  enemies and their health bars, enemy shots, damage numbers, enemy dots
+  on the minimap. Always shown: teammates, the ship, objectives, the zone
+  ring, and pickups anywhere the crew has been. An attack or telegraph is
+  shown as soon as any part of it reaches into sight. F3 turns the fog off
+  for comparison. A new match starts unexplored.
+- **Pillars:** Crunch (what you know is now scarce: scouting and where you
+  stand are decisions). Comradery (a teammate's sight is yours, so
+  spreading out helps everyone: "when I win, we win"). Clarity is traded
+  against on purpose, since fog hides state; the cost is kept small by
+  never hiding objectives, the ship, teammates or an attack that can reach
+  you.
+- **Why:** Requested by a human together with the unlocked camera: a free
+  camera with no fog would show the whole map for free. Choices made here
+  that were **not** specified and need review:
+  - Sight is a plain circle. **Walls do not block it yet**; the arena map
+    has one collision shape, so it would change little today.
+  - The fog is drawn by the client. The server still sends every enemy, so
+    this is presentation, not an anti-cheat boundary (fine for co-op PvE).
+  - The minimap hides enemies out of sight but does not draw the explored
+    area yet.
+  - Before this, the minimap showed every enemy in range. It no longer
+    does.
+  - All radii are first guesses (`include/config/CameraConfig.h`).
+- **Status:** Built, needs review (the feature was requested by a human;
+  the rules and numbers above were not)
+- **Where:** `include/FogOfWar.h`, `src/FogOfWar.cpp`, `src/ArenaView.cpp`,
+  `src/ArenaHud.cpp`, `include/config/CameraConfig.h`,
+  `docs/prototype/camera_fog_of_war.png`
+
+## 2026-11-13: Locked and unlocked camera
+- **Decision:** Y switches the camera between locked (centred on your hero,
+  the default) and unlocked (it stays where you leave it; the cursor within
+  28px of a screen edge pans it at up to 1600 world pixels a second, and it
+  cannot leave the map). While unlocked, holding Space brings the camera
+  back to your hero. A white "YOU" arrow at the screen edge points to your
+  hero whenever they are off screen, and the HUD says which mode you are
+  in. Aiming follows the camera, so the cursor always aims where it points.
+- **Pillars:** Crunch (looking away from your hero to scout is a choice
+  with a cost). Clarity (the arrow and the mode label mean you never lose
+  your hero or wonder why the view stopped following).
+- **Why:** Requested by a human, and it brings the game in line with the
+  Controls/HUD doc (unlocked, edge-panning camera, Space to re-centre),
+  which the 2026-11-11 entry below departed from. One conflict to flag:
+  **Space now means two things.** Locked, it is still the basic attack
+  (kept for trackpads); unlocked, it re-centres and does not attack, as the
+  doc says. A key that changes meaning with a mode costs some Clarity; the
+  alternative (a different re-centre key) would go against the doc. The
+  mode is not saved between sessions, and there is no minimap click or
+  drag panning yet.
+- **Status:** Built, needs review (requested by a human; the Space rule and
+  the pan numbers were not specified)
+- **Where:** `include/Camera.h`, `src/InputSystem.cpp`,
+  `src/ClientPrediction.cpp`, `src/ArenaHud.cpp`
+
+## 2026-11-13: The camera is pulled back (world zoom 1.5 to 0.75)
+- **Decision:** The world is drawn at 0.75x instead of 1.5x. About 1700x960
+  world pixels are in view (four times the area), and a hero is about 8% of
+  the screen height instead of 15%, matched to the reference frame a human
+  supplied.
+- **Pillars:** Crunch and Clarity of the game state (you can read the room,
+  see a pack coming and plan a route, so less of a run is spent walking
+  blind). It trades against Clarity of the characters: sprites are half the
+  size on screen and are scaled down from their authored size, so fine
+  detail and small effects read less well. Health bars and text are drawn
+  at a fixed size and are unaffected.
+- **Why:** Requested by a human with a reference image. The window is a
+  fixed 1280x720; if it becomes resizable, zoom should scale with height so
+  the field of view stays the same. Art authored for the old zoom
+  (silhouettes, effect sizes, the 300px hero light pool, the floor
+  vignette) has not been re-tuned for the new one.
+- **Status:** Accepted (requested by a human); the exact value needs review
+- **Where:** `include/config/ScreenConfig.h`
+
 ## 2026-11-12: The look: inked heroes on a dark world
 - **Decision:** The in-game look is set as three layers:
   - **World:** dark, cool, low contrast (floor values in the bottom fifth
@@ -358,7 +437,9 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 - **Why:** Simpler for the first prototype. This **differs from the
   Controls/HUD doc**, which has an unlocked, edge-panning camera and Space
   to re-centre it.
-- **Status:** Built, needs review
+- **Status:** Superseded in part by "Locked and unlocked camera"
+  (2026-11-13): the camera can now be unlocked, and Space re-centres it
+  while it is.
 - **Where:** `src/InputSystem.cpp`, `src/RenderSystem.cpp`
 
 ## 2026-11-11: Infusions give genus effects only, with no slot talents

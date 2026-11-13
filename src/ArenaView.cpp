@@ -501,6 +501,18 @@ ImVec2 ArenaView::toZoomedScreen(float worldX, float worldY) const {
       (worldY - camera->y) * camera->zoom + Config::Screen::HEIGHT / 2.0f);
 }
 
+bool ArenaView::inView(ImVec2 layout, float left, float top, float right,
+                       float bottom) const {
+  // The layout is magnified around the screen centre, so the part of it
+  // that ends up on screen is 1/zoom times the screen.
+  const float cx = Config::Screen::WIDTH / 2.0f;
+  const float cy = Config::Screen::HEIGHT / 2.0f;
+  const float halfW = cx / camera->zoom;
+  const float halfH = cy / camera->zoom;
+  return layout.x >= cx - halfW - left && layout.x <= cx + halfW + right &&
+         layout.y >= cy - halfH - top && layout.y <= cy + halfH + bottom;
+}
+
 uint32_t ArenaView::localId() const { return prediction->getLocalPlayerId(); }
 
 bool ArenaView::localPosition(float& x, float& y) const {
@@ -518,6 +530,7 @@ void ArenaView::render() {
   loadManifest();
   timeSeconds = arena->nowMs() / 1000.0f;
 
+  updateFog();
   // The background draw list sits under every ImGui window: the world.
   renderWorld(ImGui::GetBackgroundDrawList());
   renderHud();
@@ -536,6 +549,7 @@ void ArenaView::renderWorld(ImDrawList* dl) {
   drawGround(dl);
   drawEntities(dl);
   drawAir(dl);
+  drawFog(dl);
   const float zoom = camera->zoom;
   if (zoom != 1.0f) {
     const float cx = Config::Screen::WIDTH / 2.0f;
@@ -578,6 +592,94 @@ void ArenaView::setPresentation(PresentationLayer* layer) {
 }
 
 // ---------------------------------------------------------------------------
+// Fog of war: shared crew sight
+// ---------------------------------------------------------------------------
+
+void ArenaView::collectSight(std::vector<FogOfWar::Source>& out) const {
+  namespace C = Config::CameraView;
+  uint32_t me = localId();
+  const Player& local = prediction->getLocalPlayer();
+  for (const auto& [id, view] : arena->players()) {
+    const PlayerState& state = view.state;
+    if (state.characterId == 0) continue;
+    bool down = (state.flags & PlayerFlags::Dead) != 0 || state.health <= 0.0f;
+    out.push_back({id == me ? local.x : view.x, id == me ? local.y : view.y,
+                   down ? C::DOWNED_PLAYER_SIGHT : C::PLAYER_SIGHT});
+  }
+  if (arena->hasMatch()) {
+    out.push_back({arena->match().shipX, arena->match().shipY, C::SHIP_SIGHT});
+  }
+  if (out.empty()) {
+    // Before the match exists (connecting): at least see around yourself.
+    out.push_back({local.x, local.y, C::PLAYER_SIGHT});
+  }
+}
+
+void ArenaView::updateFog() {
+  if (!fog) {
+    fog = std::make_unique<FogOfWar>(camera->worldWidth, camera->worldHeight);
+  }
+  // A new match starts unexplored.
+  bool inLobby = arena->phase() == Arena::MatchPhase::Lobby;
+  if (inLobby && !fogWasInLobby) fog->reset();
+  fogWasInLobby = inLobby;
+
+  std::vector<FogOfWar::Source> sources;
+  collectSight(sources);
+  fog->update(sources);
+  if (!fogEnabled) return;
+
+  GLint previous = 0;
+  glGetIntegerv(GL_TEXTURE_BINDING_2D, &previous);
+  if (fogTexture == 0) {
+    glGenTextures(1, &fogTexture);
+    glBindTexture(GL_TEXTURE_2D, fogTexture);
+    // Linear, so the coarse grid becomes a soft edge on screen.
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, fog->gridWidth(),
+                 fog->gridHeight(), 0, GL_RGBA, GL_UNSIGNED_BYTE,
+                 fog->texels().data());
+  } else {
+    glBindTexture(GL_TEXTURE_2D, fogTexture);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, fog->gridWidth(),
+                    fog->gridHeight(), GL_RGBA, GL_UNSIGNED_BYTE,
+                    fog->texels().data());
+  }
+  glBindTexture(GL_TEXTURE_2D, static_cast<GLuint>(previous));
+}
+
+void ArenaView::drawFog(ImDrawList* dl) {
+  if (!fogEnabled || !fog || fogTexture == 0) return;
+  // One quad over everything in view (plus room for the camera shake), in
+  // world coordinates so it is magnified with the rest of the world.
+  const float halfW = Config::Screen::WIDTH * 0.5f / camera->zoom + 64.0f;
+  const float halfH = Config::Screen::HEIGHT * 0.5f / camera->zoom + 64.0f;
+  const float x0 = camera->x - halfW, x1 = camera->x + halfW;
+  const float y0 = camera->y - halfH, y1 = camera->y + halfH;
+  auto uv = [this](float x, float y) {
+    return ImVec2((x - fog->originX()) / fog->spanX(),
+                  (y - fog->originY()) / fog->spanY());
+  };
+  // Matte: fog also puts out the glow of whatever it covers.
+  beginMatte(dl);
+  dl->AddImage((ImTextureID)(intptr_t)fogTexture, toScreen(x0, y0),
+               toScreen(x1, y1), uv(x0, y0), uv(x1, y1));
+  endMatte(dl);
+}
+
+bool ArenaView::inSight(float worldX, float worldY, float reach) const {
+  return !fogEnabled || !fog ||
+         fog->reveals(worldX, worldY, std::max(0.0f, reach));
+}
+
+bool ArenaView::wasSeen(float worldX, float worldY) const {
+  return !fogEnabled || !fog || fog->explored(worldX, worldY) >= 0.5f;
+}
+
+// ---------------------------------------------------------------------------
 // Light pools: what lights the ground this frame
 // ---------------------------------------------------------------------------
 
@@ -612,8 +714,27 @@ void ArenaView::collectLights(
         L::PLAYER_POOL_STRENGTH * (hidden ? L::HIDDEN_POOL_SCALE : 1.0f));
   }
 
+  // What the crew can see is lifted out of the dark (fog of war): a wide,
+  // faint, cool light over each source of sight.
+  if (fogEnabled) {
+    namespace C = Config::CameraView;
+    std::vector<FogOfWar::Source> sight;
+    collectSight(sight);
+    for (const FogOfWar::Source& source : sight) {
+      const float radius = source.radius * C::SIGHT_LIGHT_RADIUS_SCALE;
+      if (std::abs(source.x - camera->x) > halfW + radius ||
+          std::abs(source.y - camera->y) > halfH + radius) {
+        continue;
+      }
+      out.push_back({source.x, source.y, radius, C::SIGHT_LIGHT_R,
+                     C::SIGHT_LIGHT_G, C::SIGHT_LIGHT_B,
+                     C::SIGHT_LIGHT_STRENGTH, 1.0f});
+    }
+  }
+
   // Telegraphs and one-shot effects.
   for (const ArenaClient::Fx& f : arena->effects()) {
+    if (!inSight(f.x, f.y, f.value)) continue;  // hidden by the fog
     float t = std::max(0.0f, std::min(1.0f, f.ageMs / f.lifeMs));
     float fade = 1.0f - t;
     Rgb c = themeRgb(f.theme);
@@ -689,8 +810,11 @@ void ArenaView::collectLights(
         L::ZONE_POOL_STRENGTH * alpha);
   }
 
+  // What the fog hides must not light the ground either, or its pool would
+  // give it away.
   for (const ArenaClient::Projectile& shot : arena->projectiles()) {
     if (shot.ageMs > shot.lifeMs) continue;
+    if (!inSight(shot.x, shot.y)) continue;
     add(shot.x, shot.y, shot.radius * L::PROJECTILE_POOL_RADIUS_SCALE,
         themeRgb(shot.fromEnemy ? VfxTheme::Danger : shot.theme),
         L::PROJECTILE_POOL_STRENGTH);
@@ -698,6 +822,7 @@ void ArenaView::collectLights(
 
   for (const auto& [id, item] : prediction->getWorldItems()) {
     if (!Arena::PickupId::isInfusion(item.itemId)) continue;
+    if (!wasSeen(item.x, item.y)) continue;
     add(item.x, item.y, L::PICKUP_POOL_RADIUS,
         themeRgb(genusTheme(Arena::PickupId::infusionGenus(item.itemId))),
         L::PICKUP_POOL_STRENGTH);
@@ -707,6 +832,7 @@ void ArenaView::collectLights(
   // danger red as they wind up a hit.
   for (const auto& [id, view] : arena->enemies()) {
     if (view.dying) continue;
+    if (!inSight(view.x, view.y)) continue;
     Arena::EnemyKind kind = static_cast<Arena::EnemyKind>(view.state.type);
     if (static_cast<int>(kind) >= static_cast<int>(Arena::EnemyKind::Count)) {
       continue;
@@ -767,10 +893,7 @@ void ArenaView::drawGround(ImDrawList* dl) {
   // Objectives
   for (const auto& [id, objective] : prediction->getObjectives()) {
     ImVec2 centre = toScreen(objective.x, objective.y);
-    if (centre.x < -200 || centre.x > Config::Screen::WIDTH + 200 ||
-        centre.y < -200 || centre.y > Config::Screen::HEIGHT + 200) {
-      continue;
-    }
+    if (!inView(centre, 200, 200, 200, 200)) continue;
     ImU32 colour = IM_COL32(255, 220, 90, 150);
     const char* label = "Objective";
     if (objective.state == ObjectiveState::InProgress) {
@@ -857,7 +980,9 @@ void ArenaView::drawGround(ImDrawList* dl) {
   }
 
   // Telegraphs: where an attack is about to land
+  // (Fog of war: shown as soon as any part of the attack reaches into sight.)
   for (const ArenaClient::Fx& f : arena->effects()) {
+    if (!inSight(f.x, f.y, f.value)) continue;
     float t = f.ageMs / f.lifeMs;
     if (f.kind == GameEventKind::TelegraphCircle) {
       ImVec2 centre = toScreen(f.x, f.y);
@@ -1162,10 +1287,7 @@ void ArenaView::drawEnemy(ImDrawList* dl, const ArenaClient::EnemyView& view) {
   const Arena::EnemyKindDef& def = Arena::enemyDef(kind);
   const EnemySprite* sprite = enemySprite(kind);
   ImVec2 feet = toScreen(view.x, view.y);
-  if (feet.x < -260 || feet.x > Config::Screen::WIDTH + 260 || feet.y < -120 ||
-      feet.y > Config::Screen::HEIGHT + 360) {
-    return;
-  }
+  if (!inView(feet, 260, 120, 260, 360)) return;
 
   bool elite = (view.state.flags & EnemyFlags::Elite) != 0;
   bool stunned = (view.state.flags & EnemyFlags::Stunned) != 0;
@@ -1358,6 +1480,7 @@ void ArenaView::drawEntities(ImDrawList* dl) {
     items.push_back({y, 0, &view, id, x, y});
   }
   for (const auto& [id, view] : arena->enemies()) {
+    if (!inSight(view.x, view.y)) continue;  // fog of war
     // Grappled foes are in their captor's arms: draw them just in front of
     // or behind him, as his animation says.
     const CarryPoint* carrier = (view.state.flags & EnemyFlags::Grappled)
@@ -1369,6 +1492,7 @@ void ArenaView::drawEntities(ImDrawList* dl) {
     items.push_back({depth, 1, &view, id, view.x, view.y});
   }
   for (const auto& [id, item] : prediction->getWorldItems()) {
+    if (!wasSeen(item.x, item.y)) continue;
     items.push_back({item.y - 1.0f, 2, nullptr, item.itemId, item.x, item.y});
   }
   if (arena->hasMatch()) {
@@ -1426,7 +1550,7 @@ void ArenaView::drawAir(ImDrawList* dl) {
           if (it == arena->enemies().end()) return false;
           x = it->second.x;
           y = it->second.y;
-          return true;
+          return inSight(x, y);
         }
         if (id == localId()) return localPosition(x, y);
         auto it = arena->players().find(id);
@@ -1436,6 +1560,7 @@ void ArenaView::drawAir(ImDrawList* dl) {
         return true;
       });
   for (const ArenaClient::Fx& f : arena->effects()) {
+    if (!inSight(f.x, f.y, f.value)) continue;  // hidden by the fog
     float t = std::min(1.0f, f.ageMs / f.lifeMs);
     float fade = 1.0f - t;
 
@@ -1634,6 +1759,7 @@ void ArenaView::drawAir(ImDrawList* dl) {
   // Projectiles
   for (const ArenaClient::Projectile& shot : arena->projectiles()) {
     if (shot.ageMs > shot.lifeMs) continue;
+    if (!inSight(shot.x, shot.y)) continue;
     ImVec2 ground = toScreen(shot.x, shot.y);
     ImVec2 pos(ground.x, ground.y - PROJECTILE_HEIGHT);
     float angle = std::atan2(shot.vy, shot.vx);
@@ -1719,6 +1845,7 @@ void ArenaView::drawOverhead(ImDrawList* dl) {
   // Enemies: health bar once hurt (always for elites and the boss)
   for (const auto& [id, view] : arena->enemies()) {
     if (view.dying) continue;
+    if (!inSight(view.x, view.y)) continue;
     Arena::EnemyKind kind = static_cast<Arena::EnemyKind>(view.state.type);
     if (static_cast<int>(kind) >= static_cast<int>(Arena::EnemyKind::Count)) {
       continue;
@@ -1824,6 +1951,7 @@ void ArenaView::drawOverhead(ImDrawList* dl) {
 
   // Floating numbers and status words
   for (const ArenaClient::FloatText& t : arena->floatTexts()) {
+    if (!inSight(t.x, t.y)) continue;
     float u = t.ageMs / t.lifeMs;
     ImVec2 pos = toZoomedScreen(t.x + t.driftX * u, t.y - 34.0f * ease(u));
     float alpha = u < 0.7f ? 1.0f : (1.0f - u) / 0.3f;

@@ -99,6 +99,8 @@ int main(int argc, char* argv[]) {
 
   InputSystem inputSystem(&clientPrediction, &collisionDebugRenderer,
                           &musicZoneDebugRenderer, &objectiveDebugRenderer);
+  inputSystem.setCamera(&camera);
+  clientPrediction.setCamera(&camera);
 
   AnimationSystem animationSystem;
   MusicSystem musicSystem(&clientPrediction, &map);

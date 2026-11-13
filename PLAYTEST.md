@@ -38,7 +38,10 @@ win, we win".
 | --- | --- |
 | WASD | Move |
 | Mouse | Aim (you always face the cursor) |
-| LMB / Space | Basic attack (hold to keep attacking) |
+| LMB / Space | Basic attack (hold to keep attacking). Space only attacks while the camera is locked |
+| Y | Lock / unlock the camera. Locked follows your hero |
+| Cursor at a screen edge | Pan the camera (unlocked only) |
+| Space (hold) | Bring the camera back to your hero (unlocked only) |
 | RMB | Charged ability (hold, release to fire) |
 | Q | Special |
 | Left Shift | Mobility |
@@ -48,6 +51,7 @@ win, we win".
 | R | Ready up (night / end screen) |
 | Tab (hold) | Full scoreboard |
 | Esc | Pause |
+| F3 | Fog of war on / off (for comparing) |
 
 Stand over a downed teammate for 3 seconds to revive them. Standing near
 the ship slowly heals you.

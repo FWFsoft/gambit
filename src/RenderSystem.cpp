@@ -101,7 +101,9 @@ void RenderSystem::onRender(const RenderEvent& e) {
   SDL_Window* sdlWindow = window->getWindow();
 
   const Player& localPlayer = clientPrediction->getLocalPlayer();
-  camera->follow(localPlayer.x, localPlayer.y);
+  // Locked (or Space held): centred on the hero as predicted this frame.
+  // Unlocked: the camera stays where InputSystem panned it.
+  if (camera->isFollowing()) camera->follow(localPlayer.x, localPlayer.y);
 
   // With the look on, the world goes to the presentation layer's scene
   // target and reaches the screen when ArenaView / UISystem resolve it.
