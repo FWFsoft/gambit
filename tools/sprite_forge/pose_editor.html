@@ -1,0 +1,779 @@
+<title>Pose Editor</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a workbench. The clip and its keys run across the top like a film
+   strip; under it three views of the same moment (front and side to edit,
+   the game camera to judge); a rail on the right for the selected joint.
+   One committed dark look, matched to the joint fit page. */
+:root {
+  color-scheme: dark;
+  --bg: #1b1d24;
+  --panel: #252832;
+  --stage: #3a3e4a;
+  --line: #3b3f4d;
+  --fg: #e9e7e1;
+  --dim: #a09fa8;
+  --joint: #ff5a4d;          /* centre line */
+  --left: #ffb048;           /* his left */
+  --right: #6fb7c9;          /* his right */
+  --ok: #7fd18b;
+  --warn: #ffcf5c;
+  --display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--body);
+  font-size: 14px; line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 16px 32px;
+}
+.wrap { max-width: 1500px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+h1 { font-family: var(--display); font-size: 22px; font-weight: 600; margin: 0; }
+h1 span.what { color: var(--dim); font-weight: 500; }
+.spacer { flex: 1 1 0; }
+#status { font-size: 13px; color: var(--dim); min-width: 0; }
+#status.dirty { color: var(--warn); }
+#status.saved { color: var(--ok); }
+#status.error { color: var(--joint); }
+button, select, input[type=number] {
+  font: 500 13px var(--body); color: var(--fg); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 6px; padding: 7px 11px;
+}
+button { cursor: pointer; }
+button:hover:not(:disabled) { border-color: var(--dim); }
+button:disabled { opacity: .45; cursor: default; }
+button:focus-visible, select:focus-visible, input:focus-visible, .stage:focus-visible { outline: 2px solid var(--left); outline-offset: 2px; }
+#save { background: var(--left); border-color: var(--left); color: #20160a; font-weight: 600; }
+h2 { font: 500 11px var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); margin: 0; }
+
+.strip { background: var(--panel); border-radius: 8px; padding: 10px 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.keys { display: flex; flex-wrap: wrap; gap: 6px; flex: 1 1 300px; min-width: 0; }
+.keys button { padding: 5px 9px; font: 500 12px var(--body); display: flex; flex-direction: column; align-items: flex-start; gap: 0; line-height: 1.25; }
+.keys button small { color: var(--dim); font: 400 10.5px var(--mono); }
+.keys button.on { border-color: var(--left); background: #3a2f1c; }
+
+.work { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
+.views { flex: 4 1 560px; min-width: 0; display: flex; flex-wrap: wrap; gap: 12px; }
+.view { flex: 1 1 230px; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.viewhead { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 28px; }
+.stage { position: relative; background: var(--stage); border-radius: 8px; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+.stage canvas { display: block; width: 100%; height: auto; }
+.stage svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.stage.locked { cursor: default; }
+.dirs { display: flex; gap: 3px; flex-wrap: wrap; }
+.dirs button { padding: 2px 6px; font: 500 11px var(--mono); }
+.dirs button.on { border-color: var(--left); color: var(--left); }
+.bone { stroke: #fff; stroke-opacity: .8; stroke-width: 2.5; fill: none; pointer-events: none; paint-order: stroke; filter: drop-shadow(0 0 1.5px #14151a); }
+.bone.tail { stroke-opacity: .4; stroke-dasharray: 5 5; }
+.ground { stroke: #fff; stroke-opacity: .18; stroke-width: 1.5; stroke-dasharray: 3 7; pointer-events: none; }
+.dot { stroke: #14151a; stroke-width: 2; }
+.dot.c { fill: var(--joint); } .dot.l { fill: var(--left); } .dot.r { fill: var(--right); }
+.dot.sel { stroke: #fff; stroke-width: 4; }
+.hit { fill: transparent; cursor: grab; }
+.label { font: 600 15px var(--body); fill: #fff; paint-order: stroke; stroke: #14151a; stroke-width: 4; pointer-events: none; }
+
+.rail { flex: 1 1 250px; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.card { background: var(--panel); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+#posename, #selname { font: 600 17px var(--display); }
+p { margin: 0; }
+[hidden] { display: none !important; }
+.dimtext { color: var(--dim); font-size: 12.5px; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.row label { font: 400 12px var(--mono); color: var(--dim); display: flex; align-items: center; gap: 4px; }
+input[type=number] { width: 76px; padding: 5px 6px; font: 400 12.5px var(--mono); }
+.pill { font: 500 11.5px var(--body); padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--dim); }
+.pill.warn { color: var(--warn); border-color: #6b5a2a; }
+.jl { display: flex; flex-wrap: wrap; gap: 4px; }
+.jl button { padding: 3px 7px; font: 400 11.5px var(--mono); }
+.jl button.on { border-color: var(--left); color: var(--left); }
+.key { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--dim); }
+.key i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+details summary { cursor: pointer; color: var(--dim); font-size: 13px; }
+textarea { width: 100%; box-sizing: border-box; height: 130px; margin-top: 8px; resize: vertical; background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; font: 400 11px var(--mono); padding: 8px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1><span id="charname"></span> <span class="what">poses</span></h1>
+    <div class="spacer"></div>
+    <div id="status" role="status">Loading…</div>
+    <button id="undo" type="button" disabled>Undo</button>
+    <button id="save" type="button">Save</button>
+  </header>
+
+  <div class="strip">
+    <label for="clip" class="dimtext">Clip</label>
+    <select id="clip"></select>
+    <button id="prev" type="button" aria-label="Previous key">◀</button>
+    <button id="next" type="button" aria-label="Next key">▶</button>
+    <button id="play" type="button">Play</button>
+    <div class="keys" id="keys"></div>
+  </div>
+
+  <div class="work">
+    <div class="views">
+      <div class="view">
+        <div class="viewhead"><h2>Front · drag to edit</h2></div>
+        <div class="stage" id="front" tabindex="0" aria-label="Front view"></div>
+      </div>
+      <div class="view">
+        <div class="viewhead"><h2>Side, facing left · drag to edit</h2></div>
+        <div class="stage" id="side" tabindex="0" aria-label="Side view"></div>
+      </div>
+      <div class="view">
+        <div class="viewhead"><h2>In game · look only</h2><div class="dirs" id="dirs"></div></div>
+        <div class="stage locked" id="game" aria-label="Game camera view"></div>
+      </div>
+    </div>
+
+    <div class="rail">
+      <div class="card">
+        <h2>This key</h2>
+        <div id="posename"></div>
+        <p class="dimtext" id="poseinfo"></p>
+        <div class="row">
+          <button id="solo" type="button" hidden>Change only this key</button>
+          <button id="resetpose" type="button">Put it back to how it started</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Selected joint</h2>
+        <div id="selname">Pick a dot</div>
+        <p class="dimtext" id="selinfo">Drag a hand or a foot and the limb follows. Drag the hips and the body moves over planted feet. Drag a spine dot or a shoulder and the body turns, hands with it. Arrow keys nudge; Shift for bigger steps.</p>
+        <div id="selcontrols" hidden>
+          <div class="row" style="margin-bottom:8px" id="numrow">
+            <label><span id="lx">x</span> <input type="number" id="rx" step="1"></label>
+            <label><span id="ly">y</span> <input type="number" id="ry" step="1"></label>
+            <label><span id="lz">z</span> <input type="number" id="rz" step="1"></label>
+          </div>
+          <div class="row" id="twrow">
+            <button id="twl" type="button">⟲ Twist</button>
+            <button id="twr" type="button">Twist ⟳</button>
+
+          </div>
+          <div class="row" style="margin-top:8px"><span class="pill warn" id="stretch" hidden></span></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Joints</h2>
+        <div class="jl" id="jl"></div>
+        <div class="key">
+          <span><i style="background:var(--joint)"></i>centre</span>
+          <span><i style="background:var(--left)"></i>his left</span>
+          <span><i style="background:var(--right)"></i>his right</span>
+        </div>
+        <p class="dimtext">Small dots are tips: they turn the head, a hand or a foot. Elbows and knees lean toward where you drag them.</p>
+      </div>
+      <details class="card">
+        <summary>Saving not working? Copy the animation instead</summary>
+        <textarea id="out" readonly aria-label="Animation as JSON"></textarea>
+        <button id="copy" type="button">Copy</button>
+      </details>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const DATA = /*POSE_DATA*/null;
+
+(function () {
+  const $ = (id) => document.getElementById(id);
+  if (!DATA || !window.THREE) { $("status").textContent = "This page could not load its model."; return; }
+  const T = THREE, SVG = "http://www.w3.org/2000/svg";
+  const DEG = Math.PI / 180;
+  const VW = 600, VH = 640;
+  const HALF = DATA.height * 0.70, ZC = DATA.height * 0.54, PS = 2 * HALF / VH;
+  const clone = (o) => JSON.parse(JSON.stringify(o));
+  const V = (a) => new T.Vector3(a[0], a[1], a[2]);
+  const arr = (v, d = 4) => [v.x, v.y, v.z].map((x) => +x.toFixed(d));
+  $("charname").textContent = DATA.name;
+
+  // ---- data -----------------------------------------------------------------
+  const start = clone(DATA.anim);
+  let anim = clone(DATA.anim);
+  let saved = null, clipIx = 0, keyIx = 0, selected = null, activeView = "front";
+  let yaw = 0, playing = false, playStart = 0, statusLocked = false;
+  const history = [];
+  const SPINE = ["hips", "abdomen", "chest", "neck", "head"];
+  const RIDES = ["hips", "abdomen", "chest"];        // turning these carries the hands
+  const HINT = 5.0;
+
+  const J = DATA.joints.map((j, i) => ({ ...j, i }));
+  const jix = Object.fromEntries(J.map((j) => [j.name, j.i]));
+  for (const j of J) {
+    j.p = j.parent === null ? -1 : jix[j.parent];
+    const pr = j.p < 0 ? [0, 0, 0] : J[j.p].rest;
+    j.local = new T.Vector3(j.rest[0] - pr[0], j.rest[1] - pr[1], j.rest[2] - pr[2]);
+    j.tip = DATA.tips[j.name] ? V(DATA.tips[j.name]).sub(V(j.rest)) : null;
+  }
+  const skinJ = DATA.mesh.skin_joints.map((n) => jix[n]);
+  const shown = new Set(skinJ);
+  const sideOf = (n) => (n.endsWith("_L") ? "l" : n.endsWith("_R") ? "r" : "c");
+  const S = (n) => n.slice(-1);                       // "L" or "R"
+  const part = (n) => n.replace(/_[LR]$/, "");
+  const clip = () => anim.clips[clipIx];
+  const key = () => clip().keys[keyIx];
+  const ctl = () => anim.controls[key().control];
+  const scaleOf = (r) => (r.length >= 6 ? [r[3], r[4], r[5]] : r.length > 3 ? [r[3], r[3], r[3]] : [1, 1, 1]);
+
+  // ---- forward kinematics (the forge's rules: rotate X, then Y, then Z) --------
+  const eul = new T.Euler(), m1 = new T.Matrix4(), m2 = new T.Matrix4(), q1 = new T.Quaternion();
+  const rotM = (r) => new T.Matrix4().makeRotationFromEuler(new T.Euler(r[0] * DEG, r[1] * DEG, r[2] * DEG, "ZYX"));
+  const angles = (m) => { const e = new T.Euler().setFromRotationMatrix(m, "ZYX"); return [e.x / DEG, e.y / DEG, e.z / DEG]; };
+  function fk(pose, offset, rot) {
+    const W = new Array(J.length);
+    const root = rotM(rot);
+    root.setPosition(offset[0], offset[1], offset[2]);
+    for (const j of J) {
+      const r = pose[j.name] || [0, 0, 0], s = scaleOf(r);
+      m1.makeRotationFromEuler(eul.set(r[0] * DEG, r[1] * DEG, r[2] * DEG, "ZYX"));
+      m1.scale(new T.Vector3(Math.max(s[0], 1e-4), Math.max(s[1], 1e-4), Math.max(s[2], 1e-4)));
+      m1.setPosition(j.local);
+      W[j.i] = new T.Matrix4().multiplyMatrices(j.p < 0 ? root : W[j.p], m1);
+    }
+    W.root = root;
+    return W;
+  }
+  const posOf = (W, i) => new T.Vector3().setFromMatrixPosition(W[i]);
+  const tipOf = (W, i) => J[i].tip.clone().applyMatrix4(W[i]);
+  const rotOf = (m) => new T.Matrix4().extractRotation(m);
+  const inv = (m) => m.clone().invert();
+
+  // ---- the rig: a control becomes a pose (a port of actors/_rig.py) -------------
+  function frame(axis, toward) {
+    const x = axis.clone().normalize();
+    let y = toward.clone().sub(x.clone().multiplyScalar(toward.dot(x)));
+    if (y.length() < 1e-6) {
+      y = new T.Vector3(0, 1, 0).sub(x.clone().multiplyScalar(x.y));
+      if (y.length() < 1e-6) y = new T.Vector3(1, 0, 0).sub(x.clone().multiplyScalar(x.x));
+    }
+    y.normalize();
+    return new T.Matrix4().makeBasis(x, y, new T.Vector3().crossVectors(x, y));
+  }
+  function twoBone(rp, origin, target, pole, u0, l0, sign) {
+    let t = target.clone().sub(origin);
+    const reach = u0.length() + l0.length();
+    const d = Math.max(0.12 * reach, Math.min(0.997 * reach, t.length()));
+    if (t.length() < 1e-6) t = new T.Vector3(0, -1, 0);
+    const tip = (th) => l0.clone().applyMatrix4(m2.makeRotationX(th)).add(u0);
+    let lo = 0, hi = 176 * DEG;
+    for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2; if (tip(sign * m).length() > d) lo = m; else hi = m; }
+    const theta = sign * (lo + hi) / 2;
+    const r = frame(t, pole.clone().sub(origin)).multiply(frame(tip(theta), u0).transpose());
+    return { ang: angles(inv(rp).multiply(r)), bend: theta / DEG, r };
+  }
+  const ZERO = [0, 0, 0];
+  function solve(c) {
+    const pose = {};
+    for (const n of SPINE) pose[n] = c[n];
+    const W = fk(pose, c.offset, ZERO);
+    for (const s of "LR") {
+      const sh = jix["shoulder_" + s], el = jix["elbow_" + s], wr = jix["wrist_" + s];
+      let tb = twoBone(rotOf(W[jix.chest]), posOf(W, sh), V(c["hand_" + s]), V(c["elbow_" + s]), J[el].local, J[wr].local, -1);
+      pose["shoulder_" + s] = tb.ang;
+      pose["elbow_" + s] = [tb.bend, 0, 0].concat(c["fore_" + s] || [1, 1, 1]);
+      pose["wrist_" + s] = c["wrist_" + s] || ZERO;
+      const hp = jix["hip_" + s], kn = jix["knee_" + s], an = jix["ankle_" + s];
+      tb = twoBone(rotOf(W[jix.hips]), posOf(W, hp), V(c["foot_" + s]), V(c["knee_" + s]), J[kn].local, J[an].local, 1);
+      pose["hip_" + s] = tb.ang;
+      pose["knee_" + s] = [tb.bend, 0, 0];
+      const shin = tb.r.clone().multiply(new T.Matrix4().makeRotationX(tb.bend * DEG));
+      pose["ankle_" + s] = angles(inv(shin).multiply(rotM(c["footrot_" + s])));
+    }
+    for (const k in c) if (k.startsWith("j:")) pose[k.slice(2)] = c[k];
+    return pose;
+  }
+  function hint(origin, mid, end) {
+    const axis = end.clone().sub(origin);
+    let out = mid.clone().sub(origin);
+    if (axis.length() > 1e-6) { axis.normalize(); out.sub(axis.multiplyScalar(out.dot(axis))); }
+    if (out.length() < 1e-4) out.set(0, 0, -1);
+    return arr(origin.clone().add(out.normalize().multiplyScalar(HINT)));
+  }
+
+  // ---- the mesh ------------------------------------------------------------------
+  const bin = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0)).buffer;
+  const N = DATA.mesh.count;
+  const rest = new Float32Array(bin(DATA.mesh.position));
+  const sIdx = new Uint8Array(bin(DATA.mesh.skin_index));
+  const sW = new Uint8Array(bin(DATA.mesh.skin_weight));
+  const posed = new Float32Array(rest.length);
+  const geo = new T.BufferGeometry();
+  geo.setAttribute("position", new T.BufferAttribute(posed, 3));
+  geo.setAttribute("uv", new T.BufferAttribute(new Float32Array(bin(DATA.mesh.uv)), 2));
+  geo.setIndex(new T.BufferAttribute(new Uint32Array(bin(DATA.mesh.index)), 1));
+  const mat = new T.MeshBasicMaterial({ color: 0xffffff, side: T.DoubleSide });
+  const mesh = new T.Mesh(geo, mat);
+  mesh.frustumCulled = false;
+  const scene = new T.Scene();
+  scene.add(mesh);
+  if (DATA.texture) {
+    const img = new Image();
+    img.onload = () => { const t = new T.Texture(img); t.needsUpdate = true; mat.map = t; mat.needsUpdate = true; dirty = true; };
+    img.src = DATA.texture;
+  }
+  const sm = new Float32Array(skinJ.length * 12);
+  function skin(W) {
+    const e = new T.Matrix4();
+    for (let k = 0; k < skinJ.length; k++) {
+      const r = DATA.mesh.skin_rest[k];
+      e.copy(W[skinJ[k]]).multiply(m2.makeTranslation(-r[0], -r[1], -r[2]));
+      const a = e.elements, o = k * 12;
+      sm[o] = a[0]; sm[o + 1] = a[4]; sm[o + 2] = a[8]; sm[o + 3] = a[12];
+      sm[o + 4] = a[1]; sm[o + 5] = a[5]; sm[o + 6] = a[9]; sm[o + 7] = a[13];
+      sm[o + 8] = a[2]; sm[o + 9] = a[6]; sm[o + 10] = a[10]; sm[o + 11] = a[14];
+    }
+    for (let v = 0; v < N; v++) {
+      const x = rest[v * 3], y = rest[v * 3 + 1], z = rest[v * 3 + 2];
+      let ox = 0, oy = 0, oz = 0, tw = 0;
+      for (let c = 0; c < 4; c++) {
+        const w = sW[v * 4 + c];
+        if (!w) continue;
+        const o = sIdx[v * 4 + c] * 12;
+        ox += w * (sm[o] * x + sm[o + 1] * y + sm[o + 2] * z + sm[o + 3]);
+        oy += w * (sm[o + 4] * x + sm[o + 5] * y + sm[o + 6] * z + sm[o + 7]);
+        oz += w * (sm[o + 8] * x + sm[o + 9] * y + sm[o + 10] * z + sm[o + 11]);
+        tw += w;
+      }
+      posed[v * 3] = ox / tw; posed[v * 3 + 1] = oy / tw; posed[v * 3 + 2] = oz / tw;
+    }
+    geo.attributes.position.needsUpdate = true;
+  }
+
+  // ---- three views, one renderer -------------------------------------------------
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const renderer = new T.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(dpr);
+  renderer.setSize(VW, VH, false);
+  renderer.setClearColor(0x000000, 0);
+  const cam = (pos, look) => {
+    const c = new T.OrthographicCamera(-VW * PS / 2, VW * PS / 2, HALF, -HALF, 0.1, 100);
+    c.up.set(0, 0, 1); c.position.set(...pos); c.lookAt(...look); c.updateMatrixWorld();
+    return c;
+  };
+  const el = DATA.elevation * DEG, GZ = DATA.height * 0.42;
+  const cams = {
+    front: cam([0, -20, ZC], [0, 0, ZC]),
+    side: cam([20, 0, ZC], [0, 0, ZC]),
+    game: cam([0, -20 * Math.cos(el), GZ + 20 * Math.sin(el)], [0, 0, GZ]),
+  };
+  const stages = {};
+  for (const id of ["front", "side", "game"]) {
+    const elx = $(id), cv = document.createElement("canvas");
+    cv.width = VW * dpr; cv.height = VH * dpr;
+    elx.append(cv);
+    const s = { el: elx, ctx: cv.getContext("2d"), id, side: id === "side" };
+    if (id !== "game") {
+      s.svg = document.createElementNS(SVG, "svg");
+      s.svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
+      elx.append(s.svg);
+      const g = document.createElementNS(SVG, "line");
+      g.setAttribute("class", "ground");
+      const gy = VH / 2 + ZC / PS;
+      g.setAttribute("x1", 0); g.setAttribute("x2", VW); g.setAttribute("y1", gy); g.setAttribute("y2", gy);
+      s.svg.append(g);
+      s.bones = []; s.dots = [];
+      for (const j of J) {
+        if (!shown.has(j.i)) continue;
+        for (const it of [j.p >= 0 ? { a: j.p, b: j.i, tip: false } : null, j.tip ? { a: j.i, b: j.i, tip: true } : null]) {
+          if (!it) continue;
+          const line = document.createElementNS(SVG, "line");
+          line.setAttribute("class", "bone" + (it.tip ? " tail" : ""));
+          s.svg.append(line); s.bones.push({ line, ...it });
+        }
+      }
+      const handles = [];
+      for (const j of J) if (shown.has(j.i)) { handles.push({ j: j.i, tip: false }); if (j.tip) handles.push({ j: j.i, tip: true }); }
+      for (const h of handles) {
+        const g2 = document.createElementNS(SVG, "g");
+        const hit = document.createElementNS(SVG, "circle"); hit.setAttribute("class", "hit"); hit.setAttribute("r", 15);
+        const c = document.createElementNS(SVG, "circle"); c.setAttribute("r", h.tip ? 4.5 : 7);
+        c.setAttribute("class", "dot " + sideOf(J[h.j].name));
+        const title = document.createElementNS(SVG, "title");
+        title.textContent = h.tip ? J[h.j].name + " tip: turns it" : J[h.j].name;
+        const text = document.createElementNS(SVG, "text"); text.setAttribute("class", "label"); text.setAttribute("x", 11); text.setAttribute("y", 5);
+        g2.append(hit, c, title, text); s.svg.append(g2);
+        g2.addEventListener("pointerdown", (e) => beginDrag(e, h, id));
+        s.dots.push({ g: g2, c, text, ...h });
+      }
+      elx.addEventListener("keydown", (e) => nudge(e, id));
+      elx.addEventListener("pointerdown", () => { activeView = id; });
+    }
+    stages[id] = s;
+  }
+  const toPx = (p, s) => [VW / 2 + (s ? p.y : p.x) / PS, VH / 2 - (p.z - ZC) / PS];
+  ["S", "SE", "E", "NE", "N", "NW", "W", "SW"].forEach((d, i) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = d; b.title = "Facing " + d;
+    b.addEventListener("click", () => { yaw = i * 45; drawPanel(); });
+    $("dirs").append(b);
+  });
+
+  // ---- what is on screen --------------------------------------------------------------
+  // W: joints as drawn (with the key's whole-body rotation). Wr: the same
+  // without it, which is the space the controls live in.
+  let dirty = true, W = null, Wr = null, rootRot = new T.Matrix4();
+  const ease = (kind, u) => (kind === "linear" ? u : kind === "in" ? u * u : kind === "out" ? 1 - (1 - u) * (1 - u)
+    : kind === "snap" ? 1 - Math.pow(1 - u, 3) : u * u * (3 - 2 * u));
+  function blend(a, b, u) {
+    const out = {};
+    for (const k in a) {
+      const va = a[k], vb = k in b ? b[k] : va;
+      out[k] = (va.length !== vb.length || k.startsWith("fore_") || k.startsWith("wrist_")) ? (u >= 0.5 ? vb : va)
+        : va.map((x, i) => x + (vb[i] - x) * u);
+    }
+    for (const k in b) if (!(k in a)) out[k] = b[k];
+    return out;
+  }
+  function sample(c, f) {
+    const ks = c.keys, last = ks[ks.length - 1], C = (k) => anim.controls[k.control], R = (k) => k.rot || ZERO;
+    if (f <= ks[0].frame) return [C(ks[0]), R(ks[0])];
+    if (f >= last.frame) return [C(last), R(last)];
+    for (let i = 0; i < ks.length - 1; i++) if (ks[i].frame <= f && f <= ks[i + 1].frame) {
+      const u = ease(ks[i + 1].ease, (f - ks[i].frame) / Math.max(1e-6, ks[i + 1].frame - ks[i].frame));
+      const r0 = R(ks[i]), r1 = R(ks[i + 1]);
+      return [blend(C(ks[i]), C(ks[i + 1]), u), r0.map((x, a) => x + (r1[a] - x) * u)];
+    }
+    return [C(last), R(last)];
+  }
+  function current() {
+    if (!playing) return [ctl(), key().rot || ZERO];
+    const c = clip();
+    let f = (performance.now() - playStart) / 1000 * c.fps;
+    f = c.loop ? f % c.frames : Math.min(c.frames - 1, f % (c.frames + c.fps * 0.5));   // one-shots hold the end briefly
+    return sample(c, f);
+  }
+  function pose() {
+    const [c, rot] = current(), p = solve(c);
+    W = fk(p, c.offset, rot); Wr = fk(p, c.offset, ZERO); rootRot = rotM(rot);
+  }
+  function render() {
+    pose();
+    skin(W);
+    for (const id of ["front", "side", "game"]) {
+      const s = stages[id];
+      mesh.rotation.set(0, 0, id === "game" ? yaw * DEG : 0);
+      mesh.updateMatrixWorld();
+      renderer.render(scene, cams[id]);
+      s.ctx.clearRect(0, 0, VW * dpr, VH * dpr);
+      s.ctx.drawImage(renderer.domElement, 0, 0);
+      if (!s.svg) continue;
+      s.svg.style.visibility = playing ? "hidden" : "visible";
+      for (const b of s.bones) {
+        const p = toPx(posOf(W, b.a), s.side), q = toPx(b.tip ? tipOf(W, b.b) : posOf(W, b.b), s.side);
+        b.line.setAttribute("x1", p[0]); b.line.setAttribute("y1", p[1]); b.line.setAttribute("x2", q[0]); b.line.setAttribute("y2", q[1]);
+      }
+      for (const d of s.dots) {
+        const p = toPx(d.tip ? tipOf(W, d.j) : posOf(W, d.j), s.side);
+        d.g.setAttribute("transform", `translate(${p[0]} ${p[1]})`);
+        const isSel = selected !== null && !d.tip && selected === d.j;
+        d.c.classList.toggle("sel", isSel);
+        d.text.textContent = isSel ? J[d.j].name : "";
+      }
+    }
+  }
+  function loop() {
+    if (dirty || playing) { dirty = false; render(); }
+    requestAnimationFrame(loop);
+  }
+
+  // ---- editing ---------------------------------------------------------------------------
+  function remember() { history.push(JSON.stringify(anim)); if (history.length > 120) history.shift(); }
+  function nearest(a, prev) {
+    // The same rotation has two sets of angles; take the one closest to what
+    // was there, so in-between frames do not spin the long way round.
+    let best = null, bd = 1e9;
+    for (const c of [a, [a[0] + 180, 180 - a[1], a[2] + 180]]) {
+      const w = c.map((v, i) => v - 360 * Math.round((v - prev[i]) / 360));
+      const d = w.reduce((s, v, i) => s + Math.abs(v - prev[i]), 0);
+      if (d < bd) { bd = d; best = w; }
+    }
+    return best.map((v) => Math.round(v * 10) / 10);
+  }
+  // Points and directions on screen -> the space the controls live in.
+  const toRigDir = (d) => d.clone().applyMatrix4(inv(rootRot));
+  const toRigPoint = (p) => { const o = V(ctl().offset); return p.clone().sub(o).applyMatrix4(inv(rootRot)).add(o); };
+  // Turn a spine joint by q (about its own position); hands ride with it.
+  function turnSpine(i, q) {
+    const c = ctl(), name = J[i].name, qm = new T.Matrix4().makeRotationFromQuaternion(q);
+    const parent = J[i].p < 0 ? new T.Matrix4() : rotOf(Wr[J[i].p]);
+    c[name] = nearest(angles(inv(parent).multiply(qm.clone().multiply(rotOf(Wr[i])))), c[name]);
+    if (RIDES.includes(name)) {
+      const pivot = posOf(Wr, i);
+      for (const k of ["hand_L", "hand_R", "elbow_L", "elbow_R"]) c[k] = arr(V(c[k]).sub(pivot).applyQuaternion(q).add(pivot));
+    }
+  }
+  function aim(h, view, sx, sy) {
+    const s = view === "side", i = h.j, name = J[i].name, c = ctl();
+    const tx = (sx - VW / 2) * PS, tz = ZC - (sy - VH / 2) * PS;
+    const now = h.tip ? tipOf(W, i) : posOf(W, i);
+    const want = s ? new T.Vector3(now.x, tx, tz) : new T.Vector3(tx, now.y, tz);   // the view's two axes; depth kept
+    const kind = part(name);
+    if (!h.tip && name === "hips") {                      // the body moves; the feet stay
+      const d = toRigDir(want.clone().sub(now));
+      c.offset = arr(V(c.offset).add(d));
+      for (const k of ["hand_L", "hand_R", "elbow_L", "elbow_R"]) c[k] = arr(V(c[k]).add(d));
+      return;
+    }
+    if (!h.tip && kind === "wrist") { c["hand_" + S(name)] = arr(toRigPoint(want)); return; }
+    if (!h.tip && kind === "ankle") { c["foot_" + S(name)] = arr(toRigPoint(want)); return; }
+    if (!h.tip && kind === "elbow") {
+      c["elbow_" + S(name)] = hint(posOf(Wr, jix["shoulder_" + S(name)]), toRigPoint(want), posOf(Wr, jix["wrist_" + S(name)])); return;
+    }
+    if (!h.tip && kind === "knee") {
+      c["knee_" + S(name)] = hint(posOf(Wr, jix["hip_" + S(name)]), toRigPoint(want), posOf(Wr, jix["ankle_" + S(name)])); return;
+    }
+    // Everything else swings a bone of fixed length about the joint above:
+    // the pointer sets two axes and the length gives the third.
+    const pivot = h.tip ? i : J[i].p;
+    const pP = posOf(W, pivot), L = now.distanceTo(pP);
+    if (L < 1e-5) return;
+    let u = tx - (s ? pP.y : pP.x), v = tz - pP.z;
+    const r = Math.hypot(u, v);
+    if (r > L) { u *= L / r; v *= L / r; }
+    const depthNow = s ? now.x - pP.x : now.y - pP.y;
+    const depth = (depthNow < 0 ? -1 : 1) * Math.sqrt(Math.max(0, L * L - u * u - v * v));
+    const dNew = toRigDir((s ? new T.Vector3(depth, u, v) : new T.Vector3(u, depth, v)).normalize());
+    const dOld = toRigDir(now.clone().sub(pP).normalize());
+    const q = new T.Quaternion().setFromUnitVectors(dOld, dNew);
+    turn(pivot, q);
+  }
+  // Turn joint i by q, whatever kind of joint it is.
+  function turn(i, q) {
+    const c = ctl(), name = J[i].name, kind = part(name), qm = new T.Matrix4().makeRotationFromQuaternion(q);
+    if (SPINE.includes(name)) return turnSpine(i, q);
+    const world = qm.multiply(rotOf(Wr[i]));
+    if (kind === "wrist") {
+      const k = "wrist_" + S(name), old = c[k] || ZERO;
+      c[k] = nearest(angles(inv(rotOf(Wr[J[i].p])).multiply(world)), old).concat(old.slice(3));
+    } else if (kind === "ankle") {
+      c["footrot_" + S(name)] = nearest(angles(world), c["footrot_" + S(name)]);
+    }
+  }
+  function beginDrag(e, h, view) {
+    if (playing) return;
+    e.preventDefault();
+    const s = stages[view];
+    selected = h.j; activeView = view;
+    s.el.focus({ preventScroll: true });
+    remember();
+    const rect = s.svg.getBoundingClientRect();
+    const p0 = toPx(h.tip ? tipOf(W, h.j) : posOf(W, h.j), s.side);
+    const ox = p0[0] - (e.clientX - rect.left) * VW / rect.width, oy = p0[1] - (e.clientY - rect.top) * VH / rect.height;
+    let moved = false;
+    const onMove = (ev) => {
+      const r = s.svg.getBoundingClientRect();
+      aim(h, view, (ev.clientX - r.left) * VW / r.width + ox, (ev.clientY - r.top) * VH / r.height + oy);
+      moved = true; pose(); dirty = true;
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      if (!moved) history.pop();
+      drawPanel();
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    drawPanel();
+  }
+  function nudge(e, view) {
+    const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+    if (!d || selected === null || playing) return;
+    e.preventDefault();
+    remember();
+    const step = e.shiftKey ? 8 : 2, p = toPx(posOf(W, selected), view === "side");
+    aim({ j: selected, tip: false }, view, p[0] + d[0] * step, p[1] + d[1] * step);
+    drawPanel();
+  }
+  const canTwist = (name) => SPINE.includes(name) || ["wrist", "ankle"].includes(part(name));
+  function twist(deg) {
+    if (selected === null || !canTwist(J[selected].name)) return;
+    const i = selected, name = J[i].name;
+    let axis;
+    if (part(name) === "ankle") axis = new T.Vector3(0, 0, 1);            // a foot turns on the floor
+    else {
+      const child = J.find((j) => j.p === i && SPINE.includes(j.name));
+      const end = J[i].tip ? tipOf(Wr, i) : child ? posOf(Wr, child.i) : null;
+      if (!end) return;
+      axis = end.sub(posOf(Wr, i)).normalize();
+    }
+    remember();
+    turn(i, new T.Quaternion().setFromAxisAngle(axis, deg * DEG));
+    drawPanel();
+  }
+
+  // ---- the panels ------------------------------------------------------------------------
+  function uses(name) {
+    let keys = 0; const clips = new Set();
+    for (const c of anim.clips) for (const k of c.keys) if (k.control === name) { keys++; clips.add(c.name); }
+    return { keys, clips: [...clips] };
+  }
+  // What the number boxes show for the selected joint: [key in the control, labels, step]
+  function numbers(name) {
+    if (SPINE.includes(name)) return [name, ["x°", "y°", "z°"], 1];
+    if (part(name) === "wrist") return ["hand_" + S(name), ["left", "back", "up"], 0.01];
+    if (part(name) === "ankle") return ["foot_" + S(name), ["left", "back", "up"], 0.01];
+    return null;
+  }
+  function drawPanel() {
+    dirty = true;
+    const c = clip(), k = key(), u = uses(k.control);
+    $("keys").innerHTML = c.keys.map((kk, i) =>
+      `<button type="button" data-i="${i}" class="${i === keyIx ? "on" : ""}">${kk.control}<small>frame ${kk.frame}</small></button>`).join("");
+    $("posename").textContent = k.control;
+    const bits = [`${c.frames} frames at ${c.fps} a second${c.loop ? ", looping" : ""}.`];
+    if (u.keys > 1) bits.push(`${u.keys} keys share this pose (in ${u.clips.join(", ")}), so a change here changes all of them.`);
+    else bits.push("Only this key uses this pose.");
+    if (k.rot) bits.push("The whole body is turned over on this key (a fall).");
+    $("poseinfo").textContent = bits.join(" ");
+    $("solo").hidden = u.keys < 2;
+    $("resetpose").disabled = !(k.control in start.controls);
+    [...$("dirs").children].forEach((b, i) => b.classList.toggle("on", yaw === i * 45));
+    $("jl").innerHTML = J.filter((j) => shown.has(j.i)).map((j) =>
+      `<button type="button" data-j="${j.i}" class="${selected === j.i ? "on" : ""}">${j.name}</button>`).join("");
+    const has = selected !== null;
+    $("selcontrols").hidden = !has;
+    if (has) {
+      const name = J[selected].name, kind = part(name), cc = ctl(), num = numbers(name);
+      $("selname").textContent = name;
+      $("selinfo").textContent = name === "hips" ? "Drag to move the body: the feet stay where they are and the hands come along. The angles turn the pelvis."
+        : SPINE.includes(name) ? "Drag to swing it about the joint below. Turning the abdomen or chest carries the hands."
+        : kind === "wrist" ? "Drag the hand where it should be; the arm follows. Past his reach, the arm points straight at it."
+        : kind === "ankle" ? "Drag the foot where it should be; the leg follows."
+        : kind === "elbow" || kind === "knee" ? "Drag toward where it should stick out. It cannot leave the arc the limb allows."
+        : "Drag to turn the body: this joint is carried by the spine.";
+      $("numrow").hidden = !num;
+      if (num) {
+        ["lx", "ly", "lz"].forEach((id, a) => { $(id).textContent = num[1][a]; });
+        ["rx", "ry", "rz"].forEach((id, a) => { $(id).step = num[2]; if (document.activeElement !== $(id)) $(id).value = +cc[num[0]][a].toFixed(3); });
+      }
+      $("twrow").hidden = !canTwist(name);
+      const sd = /_[LR]$/.test(name) ? S(name) : null;
+      const st = sd && (kind === "elbow" || kind === "wrist") ? (cc["fore_" + sd] || [1, 1, 1]).concat(scaleOf(cc["wrist_" + sd] || ZERO)) : [];
+      const stretched = st.some((v) => Math.abs(v - 1) > 1e-6);
+      $("stretch").hidden = !stretched;
+      if (stretched) $("stretch").textContent = "Stretched on this key (a smear frame): forearm " + st.slice(0, 3).map((v) => v.toFixed(2)).join(", ")
+        + ", fist " + st[3].toFixed(2) + ". Kept as it is.";
+    }
+    $("out").value = JSON.stringify({ name: DATA.name, model_id: DATA.model_id, anim });
+    $("undo").disabled = history.length === 0;
+    $("play").textContent = playing ? "Stop" : "Play";
+    if (statusLocked) return;
+    const text = JSON.stringify(anim);
+    if (saved === text) setStatus("Saved. Tell Claude the poses are saved.", "saved");
+    else if (saved !== null || text !== JSON.stringify(start)) setStatus("Unsaved changes", "dirty");
+    else setStatus("Nothing changed yet", "");
+  }
+  function setStatus(text, cls) { $("status").textContent = text; $("status").className = cls; }
+  function go(ci, ki) {
+    clipIx = Math.max(0, Math.min(anim.clips.length - 1, ci));
+    keyIx = Math.max(0, Math.min(anim.clips[clipIx].keys.length - 1, ki));
+    $("clip").value = clipIx;
+    drawPanel();
+  }
+  $("clip").innerHTML = anim.clips.map((c, i) => `<option value="${i}">${c.name}</option>`).join("");
+  $("clip").addEventListener("change", (e) => { playing = false; go(+e.target.value, 0); });
+  $("keys").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { playing = false; go(clipIx, +b.dataset.i); } });
+  $("prev").addEventListener("click", () => { playing = false; go(clipIx, keyIx - 1); });
+  $("next").addEventListener("click", () => { playing = false; go(clipIx, keyIx + 1); });
+  $("play").addEventListener("click", () => { playing = !playing; playStart = performance.now(); drawPanel(); });
+  $("jl").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { selected = +b.dataset.j; stages[activeView].el.focus({ preventScroll: true }); drawPanel(); } });
+  ["rx", "ry", "rz"].forEach((id, a) => $(id).addEventListener("change", () => {
+    const v = parseFloat($(id).value), num = selected === null ? null : numbers(J[selected].name);
+    if (!num || isNaN(v)) return;
+    remember();
+    const c = ctl();
+    if (SPINE.includes(num[0])) {
+      // Through turnSpine, so the hands ride as they do on a drag.
+      const want = c[num[0]].slice(0, 3); want[a] = v;
+      const parent = J[selected].p < 0 ? new T.Matrix4() : rotOf(Wr[J[selected].p]);
+      const delta = parent.clone().multiply(rotM(want)).multiply(inv(rotOf(Wr[selected])));
+      turnSpine(selected, new T.Quaternion().setFromRotationMatrix(delta));
+      c[num[0]] = want;
+    } else { c[num[0]] = c[num[0]].slice(); c[num[0]][a] = v; }
+    drawPanel();
+  }));
+  $("twl").addEventListener("click", () => twist(-5));
+  $("twr").addEventListener("click", () => twist(5));
+  $("solo").addEventListener("click", () => {
+    remember();
+    const k = key(), base = `${clip().name} ${k.frame}`;
+    let name = base, n = 2;
+    while (name in anim.controls) name = `${base} (${n++})`;
+    anim.controls[name] = clone(anim.controls[k.control]);
+    k.control = name;
+    drawPanel();
+  });
+  $("resetpose").addEventListener("click", () => {
+    const n = key().control;
+    if (!(n in start.controls)) return;
+    remember(); anim.controls[n] = clone(start.controls[n]); drawPanel();
+  });
+  const undo = () => { if (history.length) { anim = JSON.parse(history.pop()); go(clipIx, keyIx); } };
+  $("undo").addEventListener("click", undo);
+  window.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "z" && document.activeElement.tagName !== "INPUT") { e.preventDefault(); undo(); } });
+  $("copy").addEventListener("click", async () => {
+    const out = $("out");
+    try { await navigator.clipboard.writeText(out.value); $("copy").textContent = "Copied"; }
+    catch (err) { out.focus(); out.select(); $("copy").textContent = "Selected: press Ctrl/Cmd+C"; }
+  });
+
+  // ---- saving ---------------------------------------------------------------------------------
+  let db = null;
+  const docPath = "anims/" + DATA.name;
+  $("save").addEventListener("click", async () => {
+    if (!db) { statusLocked = true; setStatus("Saving is not available here. Open “Copy the animation instead” below and paste it to Claude.", "error"); return; }
+    statusLocked = true; $("save").disabled = true; setStatus("Saving…", "");
+    const text = JSON.stringify(anim);
+    try {
+      // Stored as text: the store has a limit on how deep a document nests.
+      await db.doc(docPath).set({ name: DATA.name, model_id: DATA.model_id, format: 2, anim_json: text, saved_at: new Date().toISOString() });
+      saved = text; statusLocked = false; drawPanel();
+    } catch (err) {
+      setStatus("Could not save (" + ((err && err.code) || "error") + "). Copy the animation below and paste it to Claude.", "error");
+    }
+    $("save").disabled = false;
+  });
+
+  // For checks: the page's solver against the forge's own answers.
+  window.__pose = {
+    get anim() { return anim; }, go, J, posOf, joints: () => W,
+    verify() {
+      let worst = 0, where = "";
+      for (const name in (DATA.check || {})) {
+        // The forge rig's own check ignores the smear stretch, so drop it here too.
+        const c = anim.controls[name], ps = solve(c);
+        for (const n in ps) ps[n] = ps[n].slice(0, 3);
+        const Wc = fk(ps, c.offset, ZERO);
+        for (const jn in DATA.check[name]) {
+          const d = posOf(Wc, jix[jn]).distanceTo(V(DATA.check[name][jn]));
+          if (d > worst) { worst = d; where = name + " / " + jn; }
+        }
+      }
+      return { controls: Object.keys(DATA.check || {}).length, worst, where };
+    },
+  };
+  go(0, 0);
+  loop();
+  (async () => {
+    try {
+      db = window.claude && window.claude.use ? await window.claude.use("db") : null;
+      if (!db) return;
+      const snap = await Promise.race([db.doc(docPath).get(), new Promise((_, no) => setTimeout(() => no(new Error("timeout")), 10000))]);
+      const d = snap.exists ? snap.data() : null;
+      // Pick up where the last save left off, if it was for this model and this kind of data.
+      if (d && d.model_id === DATA.model_id && d.format === 2 && d.anim_json && history.length === 0) {
+        const got = JSON.parse(d.anim_json);
+        if (got.controls && got.clips) { anim = got; saved = JSON.stringify(anim); go(0, 0); }
+      }
+    } catch (err) { /* the page works without the store; Save reports its own errors */ }
+  })();
+})();
+</script>

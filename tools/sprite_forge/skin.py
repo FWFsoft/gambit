@@ -239,6 +239,18 @@ def auto_fit(v, height):
     return {k: tuple(round(float(c), 3) for c in p) for k, p in fit.items()}
 
 
+def load_fit(model_path):
+    """The joint fit a human saved from the joint editor (fit.py --editor),
+    kept next to the model as <Name>.fit.json. Empty if there is none, which
+    means the automatic guess."""
+    path = os.path.splitext(model_path)[0] + ".fit.json"
+    if not os.path.exists(path):
+        return {}
+    import json
+    with open(path) as f:
+        return {k: tuple(p) for k, p in json.load(f)["fit"].items()}
+
+
 def complete_fit(fit, guess):
     """Fill in what the actor did not specify: the right side mirrors the
     left, and anything still missing comes from the automatic guess."""

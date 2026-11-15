@@ -23,12 +23,26 @@ and downloads Blender's Python module, about 400 MB: tell the user).
 
 ## 0. Is there a model?
 
-Look for `art/models/<Name>.glb`. If there is none, you cannot make one:
-you have no image-generation or image-to-3D tool. Ask the human for it and
-point them at `art/models/README.md`, which says exactly what to generate
-(A-pose, nothing in the hands, textured GLB). Meanwhile you can still do
-steps 1, 4 and 5 against the character's existing code-built actor, since
-poses and clips carry over.
+Look for `art/models/<Name>.glb`. If there is none, it has to be made from
+the concept art with an image-to-3D tool (`art/models/README.md` says what
+to generate: A-pose, nothing in the hands, textured GLB):
+
+- The human may already have made one on the Meshy website. Check with
+  `python tools/sprite_forge/meshy.py list` (free), download it with
+  `meshy.py fetch <Name> <task id>` (free), and if it is too heavy cut it
+  down with `<py> tools/sprite_forge/shrink.py` (free).
+- Otherwise `meshy.py generate <Name> <images>` makes one. **This spends
+  Meshy credits, which are money.** Run it without `--approve-credits`
+  first, tell the user the cost and the balance it prints, and wait for a
+  yes. One yes covers one run; never retry a paid command on your own.
+  The rules are in `art/models/README.md`, "Spending credits".
+- You cannot draw the input images. If there is no A-pose turnaround, ask
+  the human for one; a splash in a fighting stance makes a bad model.
+- No key or no network: ask the human for the model.
+
+Look at `art/models/<Name>.preview.png` before going on. Meanwhile you can
+still do steps 1, 4 and 5 against the character's existing code-built
+actor, since poses and clips carry over.
 
 ## 1. Shape brief
 
@@ -45,8 +59,28 @@ Look at the splash art yourself with the Read tool.
 
 Open the image. Four panels: front and side with joints, skin weights by
 joint, and the forge rest pose. The printed `FIT = {...}` is an automatic
-guess. It is usually close on hips, knees and ankles and wrong on the
-neck, head and shoulders. Correct it:
+guess. It is usually close on the arms below the shoulder, the knees and
+the ankles, and wrong on the spine (hips, abdomen, chest) and shoulders.
+
+**Let the human place the joints.** They see where a shoulder belongs
+faster than you can dial it in from a picture:
+
+1. Add `--editor <scratch>/<name>_fit.html` to the command above. It writes
+   a page with the front and side views and draggable joints.
+2. Publish that page with the Artifact tool, with
+   `capabilities: {"db": {}, "user": {}}`, and give the human the link. To
+   update a page you already published for this character, publish to the
+   same link.
+3. When they say they have saved, read the fit with the `ArtifactData`
+   tool (`action: "get"`, `collection: "fits"`, `doc_id: "<Name>"`) and
+   write its `name`, `model_id` and `fit` to
+   `art/models/<Name>.fit.json`. The actor picks it up through
+   `skin.load_fit()`.
+4. Run `fit.py <actor> out.png` again and look at panels 3 and 4, which
+   the page cannot show: the weights and the rest pose. If they are wrong,
+   say what you see and send the human back to the same link.
+
+What right looks like, for you and for them:
 
 - every joint sits inside the body at the real joint. Shoulders belong
   inside the deltoids, not on the neck; the neck at the base of the
@@ -97,9 +131,36 @@ limb, a held impact, recoil; hips lead and the fist arrives last
 Look at every preview with the Read tool. Check each clip from at least
 the front (column 1), the side (column 3) and the back (column 5).
 
-Clip names the game needs: `idle`, `run`, `hit`, `death`, `attack` for
-enemies, and one per ability, mapped in `actionClip()` in
-`src/ArenaView.cpp`.
+**Do not change the character's proportions to fix a pose.** The model and
+the fitted skeleton are the character. Scale on a joint is for the smear
+frames of a hit only (a forearm that stretches, a fist that swells), used
+sparingly; an idle or any held pose has none. If the face or the hands do
+not read, fix the pose, or say that the model needs regenerating.
+
+**Let the human pose the keys.** When a body changes (a new model, a new
+fit), poses that put a hand somewhere exact (a guard at the cheeks) land
+wrong. Get them close by measuring (`measure.py <actor> <pose function>`
+prints where the hands are from the head), then hand over the pose editor:
+
+1. The actor keeps its motion as data (`anim.py`): controls, which say
+   where the hips, hands and feet are, and the clips that use them. The
+   position rig (`actors/_rig.py`) turns a control into a pose, so the
+   same clip works on a body with different limbs. `actors/_wade_mesh.py`
+   is the example: it has `rig()` and `current()`, which returns the saved
+   animation or the starting point.
+2. `<py> tools/sprite_forge/pose_editor.py <actor> <scratch>/<name>_poses.html`
+   writes a page with the skinned model from the front, the side and the
+   game camera. The human steps through each clip's keys and drags: a hand
+   or foot goes where it is put, the hips move over planted feet, the
+   spine turns and carries the hands.
+3. Publish it with the Artifact tool, with
+   `capabilities: {"db": {}, "user": {}}`, and give the human the link.
+4. When they say they have saved, read it with `ArtifactData`
+   (`action: "get"`, `collection: "anims"`, `doc_id: "<Name>"`, with
+   `out_dir` since it is large) and write its `anim_json`, parsed, to
+   `art/models/<Name>.anim.json`. Then render every clip with the real ink
+   shading and look: the page shows the flat texture only, with no
+   follow-through or springs.
 
 ## 5. Bake and check
 
