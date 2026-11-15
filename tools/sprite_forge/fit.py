@@ -15,6 +15,13 @@ and prints the full joint fit, ready to paste into the actor as FIT and
 correct. Coordinates are in forge units after normalising: x is the
 character's left, -y is forward, z is up, feet at z = 0.
 
+With --editor page.html it also writes a small web page with the front and
+side views, where a human drags the joints into place and saves. An agent
+publishes that page as an Artifact, gives the human the link, then reads the
+saved fit back and writes it to art/models/<Name>.fit.json, which
+skin.load_fit() gives to the actor. The steps are in
+.claude/skills/character-art/SKILL.md, step 2.
+
 What to check:
   * every joint sits inside the body at the real joint (elbows at the
     elbows, knees at the knees, shoulders inside the deltoids);
@@ -24,7 +31,11 @@ What to check:
 """
 
 import argparse
+import base64
+import hashlib
 import importlib
+import io
+import json
 import math
 import os
 import sys
@@ -53,12 +64,13 @@ def joint_colours(n):
 
 
 class Views:
-    def __init__(self, height):
-        self.ps = height * 1.12 / PANEL_H
+    def __init__(self, height, scale=1):
+        self.w, self.h = PANEL_W * scale, PANEL_H * scale
+        self.ps = height * 1.12 / self.h
         self.zc = height / 2
-        self.r = forge.Renderer(PANEL_W, PANEL_H, PANEL_H // 2, self.ps)
+        self.r = forge.Renderer(self.w, self.h, self.h // 2, self.ps)
         self.r.camera.data.shift_y = 0.0
-        self.r.camera.data.ortho_scale = max(PANEL_W, PANEL_H) * self.ps
+        self.r.camera.data.ortho_scale = max(self.w, self.h) * self.ps
 
     def shoot(self, side, srgb):
         cam = self.r.camera
@@ -81,7 +93,7 @@ class Views:
 
     def project(self, p, side):
         u = p[1] if side else p[0]
-        return (PANEL_W / 2 + u / self.ps, PANEL_H / 2 - (p[2] - self.zc) / self.ps)
+        return (self.w / 2 + u / self.ps, self.h / 2 - (p[2] - self.zc) / self.ps)
 
 
 def draw_joints(img, views, positions, skeleton, side, tails=None):
@@ -102,6 +114,36 @@ def draw_joints(img, views, positions, skeleton, side, tails=None):
     return img
 
 
+def write_editor(out, path, height, fit):
+    """The joint editor: the front and side views with nothing drawn on
+    them, plus the numbers the page needs to turn pixels back into forge
+    coordinates. The mesh must already wear its unlit materials."""
+    views = Views(height, scale=2)
+    images = []
+    for side in (False, True):
+        buf = io.BytesIO()
+        views.shoot(side, True).save(buf, "JPEG", quality=88)
+        images.append("data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode())
+    with open(path, "rb") as f:
+        model_id = hashlib.sha1(f.read()).hexdigest()[:12]
+    name = os.path.splitext(os.path.basename(path))[0]
+    payload = {
+        "name": name, "model_id": model_id, "height": height,
+        "w": views.w, "h": views.h, "ps": views.ps, "zc": views.zc,
+        "front": images[0], "side": images[1],
+        "skeleton": skin.HUMANOID, "tails": skin.HUMANOID_TAILS,
+        "fit": {k: [round(c, 4) for c in p] for k, p in fit.items()},
+    }
+    with open(os.path.join(HERE, "fit_editor.html")) as f:
+        page = f.read()
+    assert "/*FIT_DATA*/null" in page, "fit_editor.html lost its data slot"
+    page = page.replace("/*FIT_DATA*/null", json.dumps(payload))
+    page = page.replace("<title>Joint Fit</title>", f"<title>{name} Joint Fit</title>")
+    with open(out, "w") as f:
+        f.write(page)
+    print("wrote", out)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("source", help="an actor module name or a model file")
@@ -109,6 +151,9 @@ def main():
     ap.add_argument("--height", type=float, default=None)
     ap.add_argument("--yaw", type=float, default=None)
     ap.add_argument("--no-cache", action="store_true")
+    ap.add_argument("--editor", metavar="HTML",
+                    help="also write a page where a human drags the joints "
+                         "into place (see the docstring)")
     args = ap.parse_args()
 
     fit, height, yaw, path = None, args.height, args.yaw, args.source
@@ -133,6 +178,11 @@ def main():
               for i, m in enumerate(originals)] or []
     for i, m in enumerate(albedo):
         mesh.materials[i] = m
+    if args.editor:
+        write_editor(args.editor, path, height, data["fit"])
+        for i, m in enumerate(albedo):      # write_editor rendered; restore
+            mesh.materials[i] = m
+        views = Views(height)
     front = draw_joints(views.shoot(False, True), views, data["fit"],
                         skin.HUMANOID, False, skin.HUMANOID_TAILS)
     side = draw_joints(views.shoot(True, True), views, data["fit"],

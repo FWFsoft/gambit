@@ -26,10 +26,12 @@ STYLE = "ink"                        # required for skinned meshes
 RIM = (255, 176, 72)                 # TODO: the character's signature colour
 CELL = (176, 156, 128)               # cell width, height, feet line (px)
 
-# Joint positions on the imported mesh. Run fit.py, paste what it prints,
-# then correct the joints that sit wrong. Only the left side and the centre
-# line are needed; the right side mirrors the left unless you give it.
-FIT = {}
+# Joint positions on the imported mesh: what a human saved from the joint
+# editor (fit.py --editor), kept as art/models/<Name>.fit.json. Empty means
+# the automatic guess. Only the left side and the centre line are stored;
+# the right side mirrors the left. To set a joint by hand instead, write
+# FIT = {"shoulder_L": (x, y, z), ...}.
+FIT = skin.load_fit(os.path.join(REPO, MODEL))
 
 
 def build():
