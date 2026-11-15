@@ -131,6 +131,33 @@ limb, a held impact, recoil; hips lead and the fist arrives last
 Look at every preview with the Read tool. Check each clip from at least
 the front (column 1), the side (column 3) and the back (column 5).
 
+**Do not change the character's proportions to fix a pose.** The model and
+the fitted skeleton are the character. Scale on a joint is for the smear
+frames of a hit only (a forearm that stretches, a fist that swells), used
+sparingly; an idle or any held pose has none. If the face or the hands do
+not read, fix the pose, or say that the model needs regenerating.
+
+**Let the human pose the keys.** When a body changes (a new model, a new
+fit), poses that put a hand somewhere exact (a guard at the cheeks) land
+wrong. Get them close by measuring (`measure.py <actor> <pose function>`
+prints where the hands are from the head), then hand over the pose editor:
+
+1. The actor keeps its motion as data: named poses and the clips that use
+   them (`anim.py`; `actors/_wade_mesh.py` is the example). It has
+   `current()`, which returns the saved animation or the starting point.
+2. `<py> tools/sprite_forge/pose_editor.py <actor> <scratch>/<name>_poses.html`
+   writes a page with the skinned model from the front, the side and the
+   game camera. The human steps through each clip's keys and drags joints;
+   bones keep their length.
+3. Publish it with the Artifact tool, with
+   `capabilities: {"db": {}, "user": {}}`, and give the human the link.
+4. When they say they have saved, read it with `ArtifactData`
+   (`action: "get"`, `collection: "anims"`, `doc_id: "<Name>"`, with
+   `out_dir` since it is large) and write its `anim` to
+   `art/models/<Name>.anim.json`. Then render previews with the real ink
+   shading and look at them: the page shows the flat texture only, with no
+   follow-through or springs.
+
 Clip names the game needs: `idle`, `run`, `hit`, `death`, `attack` for
 enemies, and one per ability, mapped in `actionClip()` in
 `src/ArenaView.cpp`.
