@@ -123,6 +123,11 @@ else()
         if(NOT TARGET zstd::libzstd_shared AND NOT TARGET zstd::libzstd_static AND NOT TARGET zstd::libzstd)
             message(FATAL_ERROR "zstd library not found for pkg-config tmxlite")
         endif()
+        # Keep compression libraries after tmxlite when linking static archives.
+        target_link_libraries(PkgConfig::TMXLITE INTERFACE
+            ZLIB::ZLIB
+            $<IF:$<TARGET_EXISTS:zstd::libzstd_shared>,zstd::libzstd_shared,$<IF:$<TARGET_EXISTS:zstd::libzstd_static>,zstd::libzstd_static,zstd::libzstd>>
+        )
     endif()
 
 endif()
@@ -171,8 +176,6 @@ if(tmxlite_FOUND)
 elseif(TARGET PkgConfig::TMXLITE)
     target_link_libraries(Server PRIVATE
         PkgConfig::TMXLITE
-        ZLIB::ZLIB
-        $<IF:$<TARGET_EXISTS:zstd::libzstd_shared>,zstd::libzstd_shared,zstd::libzstd_static>
     )
 endif()
 
@@ -261,8 +264,6 @@ if(tmxlite_FOUND)
 elseif(TARGET PkgConfig::TMXLITE)
     target_link_libraries(Client PRIVATE
         PkgConfig::TMXLITE
-        ZLIB::ZLIB
-        $<IF:$<TARGET_EXISTS:zstd::libzstd_shared>,zstd::libzstd_shared,zstd::libzstd_static>
     )
 endif()
 
@@ -313,8 +314,6 @@ if(tmxlite_FOUND)
 elseif(TARGET PkgConfig::TMXLITE)
     target_link_libraries(HeadlessClient PRIVATE
         PkgConfig::TMXLITE
-        ZLIB::ZLIB
-        $<IF:$<TARGET_EXISTS:zstd::libzstd_shared>,zstd::libzstd_shared,zstd::libzstd_static>
     )
 endif()
 
@@ -350,8 +349,6 @@ if(tmxlite_FOUND)
 elseif(TARGET PkgConfig::TMXLITE)
     target_link_libraries(ArenaSim PRIVATE
         PkgConfig::TMXLITE
-        ZLIB::ZLIB
-        $<IF:$<TARGET_EXISTS:zstd::libzstd_shared>,zstd::libzstd_shared,zstd::libzstd_static>
     )
 endif()
 
@@ -571,8 +568,6 @@ if(tmxlite_FOUND)
 elseif(TARGET PkgConfig::TMXLITE)
     target_link_libraries(test_headless_movement PRIVATE
         PkgConfig::TMXLITE
-        ZLIB::ZLIB
-        $<IF:$<TARGET_EXISTS:zstd::libzstd_shared>,zstd::libzstd_shared,zstd::libzstd_static>
     )
 endif()
 
