@@ -42,7 +42,14 @@ Below, `/opt/forge/bin/python` stands for that interpreter.
 It writes `assets/sprites/actors/<Name>.png` and `manifest.txt`. The game
 uses an actor's baked sheet automatically for any character or enemy with
 the same name; everything else falls back to the older placeholder sprites.
-A full character with 10 clips bakes in about 30 seconds.
+A full character with 10 clips bakes in about 30 seconds for procedural
+actors; textured mesh actors can take several minutes.
+
+Wade uses `art/models/Wade.glb` through `actors/wade.py`. His fitted mesh
+and animation adapter live in `_wade_mesh.py`; `_wade_boxing.py` retains
+the original boxing controls as the fallback when no saved animation exists.
+Run `build.py wade` after changing the model, fit, or animation data, then
+restart the client so it reloads `assets/sprites/actors/Wade.png`.
 
 While modelling or animating:
 

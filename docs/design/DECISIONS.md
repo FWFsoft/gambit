@@ -21,6 +21,25 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-15: Ship Wade's generated body
+- **Decision:** Make the fitted `art/models/Wade.glb` actor the default for
+  `build.py wade`, and bake it into the sprite sheet the game already loads.
+  Keep the original boxing controls in `_wade_boxing.py` for the mesh adapter.
+- **Pillars:** Clarity serves: Wade uses the textured character model and
+  fitted guard already prepared for him. Strategic Crunch, Comradery in
+  Competition, and Creative Builds are neutral: kit rules and timing stay the same.
+- **Why:** The generated body was only available as an excluded trial actor;
+  compiling the client continued to show the older procedural sprite sheet.
+  The user requested promoting the model to the in-game actor.
+- **Validation:** Baked all 15 clips in eight directions; inspected sampled
+  front, side, and back frames. The silhouette check flags six existing
+  pairs, none involving the new Wade. The native client loaded the new sheet;
+  its scripted match selected Gravon, so Wade combat was checked in previews.
+  Before/after: `docs/prototype/wade_mesh_before_after.png`.
+- **Status:** Built, needs review
+- **Where:** `tools/sprite_forge/actors/wade.py`, `_wade_mesh.py`,
+  `_wade_boxing.py`, `assets/sprites/actors/Wade.png`.
+
 ## 2026-11-13: Wade's kit rebuilt on real boxing
 - **Decision:** (requested by a human, with wireframe references for each
   move; the numbers and the points marked *agent's call* are mine.)

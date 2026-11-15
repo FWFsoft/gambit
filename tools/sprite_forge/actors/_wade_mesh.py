@@ -1,4 +1,4 @@
-"""Trial: Wade's body from his generated model, on his existing motion.
+"""Wade's body from his generated model, on his existing motion.
 
 The body is art/models/Wade.glb (Meshy, from the A-pose concept art), on
 the joints a human placed (art/models/Wade.fit.json). Nothing here changes
@@ -6,19 +6,14 @@ his proportions: the only scaling is the stretch on a punch's smear frames.
 
 The motion is data (anim.py): controls, which say where the hips, hands and
 feet are, and the clips that use them. The starting point is the shipped
-Wade's motion (wade.py) solved for this body, from the guard a human posed
+Wade's motion (_wade_boxing.py) solved for this body, from the guard a human posed
 on it. Once a human has saved from the pose editor,
 art/models/Wade.anim.json replaces the starting point.
 
-This is a trial, not the shipped Wade: the leading underscore keeps
-build.py from baking it over the game's sheet.
+The production wade.py exports this actor. _wade_boxing.py retains the
+original motion controls used as the starting point when no saved animation
+exists. Preview this actor with preview.py wade idle out.png 0,6.
 
-    <py> tools/sprite_forge/fit.py _wade_mesh out.png
-    <py> tools/sprite_forge/preview.py _wade_mesh idle out.png 0,6
-    <py> tools/sprite_forge/pose_editor.py _wade_mesh out.html
-
-To ship it: fix what the previews show, then move build() and FIT into
-wade.py (see .claude/skills/character-art/SKILL.md, step 3).
 """
 
 import math
@@ -31,7 +26,7 @@ import anim
 import forge
 from forge import Model
 import skin
-import wade
+import _wade_boxing as wade
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__)))))
@@ -136,7 +131,7 @@ class _Recorder(_rig.Rig):
 
 
 def animation():
-    """The shipped Wade's clips, solved for this body. wade.py authors its
+    """The original boxing clips, solved for this body. _wade_boxing.py authors its
     punches as controls built from its guard, so it is run here with this
     body's rig and guard in place of its own."""
     recorder = _Recorder(joint_table())
@@ -149,7 +144,7 @@ def animation():
         wade.RIG, wade.guard = theirs
     base = guard()
     out = anim.Builder()
-    # wade.py's punches start and end in its own stance, whose spine is not
+    # The original punches start and end in its own stance, whose spine is not
     # quite the guard posed on this body. They start and end in that guard.
     posed = recorder.control(base, wade.LOW)
     out.control(posed, "guard")
