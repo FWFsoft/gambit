@@ -72,7 +72,6 @@ h2 { font: 500 11px var(--body); letter-spacing: .08em; text-transform: uppercas
 .ground { stroke: #fff; stroke-opacity: .18; stroke-width: 1.5; stroke-dasharray: 3 7; pointer-events: none; }
 .dot { stroke: #14151a; stroke-width: 2; }
 .dot.c { fill: var(--joint); } .dot.l { fill: var(--left); } .dot.r { fill: var(--right); }
-.dot.own { stroke: #fff; }
 .dot.sel { stroke: #fff; stroke-width: 4; }
 .hit { fill: transparent; cursor: grab; }
 .label { font: 600 15px var(--body); fill: #fff; paint-order: stroke; stroke: #14151a; stroke-width: 4; pointer-events: none; }
@@ -81,6 +80,7 @@ h2 { font: 500 11px var(--body); letter-spacing: .08em; text-transform: uppercas
 .card { background: var(--panel); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
 #posename, #selname { font: 600 17px var(--display); }
 p { margin: 0; }
+[hidden] { display: none !important; }
 .dimtext { color: var(--dim); font-size: 12.5px; }
 .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .row label { font: 400 12px var(--mono); color: var(--dim); display: flex; align-items: center; gap: 4px; }
@@ -90,7 +90,6 @@ input[type=number] { width: 76px; padding: 5px 6px; font: 400 12.5px var(--mono)
 .jl { display: flex; flex-wrap: wrap; gap: 4px; }
 .jl button { padding: 3px 7px; font: 400 11.5px var(--mono); }
 .jl button.on { border-color: var(--left); color: var(--left); }
-.jl button.own { color: var(--fg); } .jl button:not(.own) { color: var(--dim); }
 .key { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--dim); }
 .key i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
 details summary { cursor: pointer; color: var(--dim); font-size: 13px; }
@@ -133,25 +132,28 @@ textarea { width: 100%; box-sizing: border-box; height: 130px; margin-top: 8px; 
 
     <div class="rail">
       <div class="card">
-        <h2>This key's pose</h2>
+        <h2>This key</h2>
         <div id="posename"></div>
         <p class="dimtext" id="poseinfo"></p>
-        <div class="row"><button id="resetpose" type="button">Put this pose back to how it started</button></div>
+        <div class="row">
+          <button id="solo" type="button" hidden>Change only this key</button>
+          <button id="resetpose" type="button">Put it back to how it started</button>
+        </div>
       </div>
       <div class="card">
         <h2>Selected joint</h2>
         <div id="selname">Pick a dot</div>
-        <p class="dimtext" id="selinfo">Drag a dot and the bone above it swings: the bone keeps its length. Drag the hips to move the whole body. Arrow keys nudge; Shift for bigger steps.</p>
+        <p class="dimtext" id="selinfo">Drag a hand or a foot and the limb follows. Drag the hips and the body moves over planted feet. Drag a spine dot or a shoulder and the body turns, hands with it. Arrow keys nudge; Shift for bigger steps.</p>
         <div id="selcontrols" hidden>
-          <div class="row" style="margin-bottom:8px">
-            <label>x <input type="number" id="rx" step="1"></label>
-            <label>y <input type="number" id="ry" step="1"></label>
-            <label>z <input type="number" id="rz" step="1"></label>
+          <div class="row" style="margin-bottom:8px" id="numrow">
+            <label><span id="lx">x</span> <input type="number" id="rx" step="1"></label>
+            <label><span id="ly">y</span> <input type="number" id="ry" step="1"></label>
+            <label><span id="lz">z</span> <input type="number" id="rz" step="1"></label>
           </div>
-          <div class="row">
+          <div class="row" id="twrow">
             <button id="twl" type="button">⟲ Twist</button>
             <button id="twr" type="button">Twist ⟳</button>
-            <button id="follow" type="button" hidden>Follow the base pose again</button>
+
           </div>
           <div class="row" style="margin-top:8px"><span class="pill warn" id="stretch" hidden></span></div>
         </div>
@@ -164,7 +166,7 @@ textarea { width: 100%; box-sizing: border-box; height: 130px; margin-top: 8px; 
           <span><i style="background:var(--left)"></i>his left</span>
           <span><i style="background:var(--right)"></i>his right</span>
         </div>
-        <p class="dimtext">A white ring or bright name means this pose sets that joint itself. The rest follow the pose it is built on.</p>
+        <p class="dimtext">Small dots are tips: they turn the head, a hand or a foot. Elbows and knees lean toward where you drag them.</p>
       </div>
       <details class="card">
         <summary>Saving not working? Copy the animation instead</summary>
@@ -187,6 +189,8 @@ const DATA = /*POSE_DATA*/null;
   const VW = 600, VH = 640;
   const HALF = DATA.height * 0.70, ZC = DATA.height * 0.54, PS = 2 * HALF / VH;
   const clone = (o) => JSON.parse(JSON.stringify(o));
+  const V = (a) => new T.Vector3(a[0], a[1], a[2]);
+  const arr = (v, d = 4) => [v.x, v.y, v.z].map((x) => +x.toFixed(d));
   $("charname").textContent = DATA.name;
 
   // ---- data -----------------------------------------------------------------
@@ -195,6 +199,9 @@ const DATA = /*POSE_DATA*/null;
   let saved = null, clipIx = 0, keyIx = 0, selected = null, activeView = "front";
   let yaw = 0, playing = false, playStart = 0, statusLocked = false;
   const history = [];
+  const SPINE = ["hips", "abdomen", "chest", "neck", "head"];
+  const RIDES = ["hips", "abdomen", "chest"];        // turning these carries the hands
+  const HINT = 5.0;
 
   const J = DATA.joints.map((j, i) => ({ ...j, i }));
   const jix = Object.fromEntries(J.map((j) => [j.name, j.i]));
@@ -202,36 +209,25 @@ const DATA = /*POSE_DATA*/null;
     j.p = j.parent === null ? -1 : jix[j.parent];
     const pr = j.p < 0 ? [0, 0, 0] : J[j.p].rest;
     j.local = new T.Vector3(j.rest[0] - pr[0], j.rest[1] - pr[1], j.rest[2] - pr[2]);
-    j.tip = DATA.tips[j.name] ? new T.Vector3(...DATA.tips[j.name]).sub(new T.Vector3(...j.rest)) : null;
+    j.tip = DATA.tips[j.name] ? V(DATA.tips[j.name]).sub(V(j.rest)) : null;
   }
   const skinJ = DATA.mesh.skin_joints.map((n) => jix[n]);
-  const shown = new Set(skinJ);                       // joints drawn as dots
-  const side = (n) => (n.endsWith("_L") ? "l" : n.endsWith("_R") ? "r" : "c");
-
-  function resolve(name) {
-    const chain = [];
-    for (let n = name; n != null; n = anim.poses[n].base) chain.push(anim.poses[n]);
-    const out = {};
-    for (const p of chain.reverse()) Object.assign(out, p.joints);
-    return out;
-  }
+  const shown = new Set(skinJ);
+  const sideOf = (n) => (n.endsWith("_L") ? "l" : n.endsWith("_R") ? "r" : "c");
+  const S = (n) => n.slice(-1);                       // "L" or "R"
+  const part = (n) => n.replace(/_[LR]$/, "");
   const clip = () => anim.clips[clipIx];
   const key = () => clip().keys[keyIx];
-  function keyPose(k) {
-    const pose = resolve(k.pose), out = {};
-    for (const n in pose) {
-      const r = pose[n], a = (k.add || {})[n];
-      out[n] = a ? [r[0] + a[0], r[1] + a[1], r[2] + a[2], ...r.slice(3)] : r;
-    }
-    return out;
-  }
+  const ctl = () => anim.controls[key().control];
   const scaleOf = (r) => (r.length >= 6 ? [r[3], r[4], r[5]] : r.length > 3 ? [r[3], r[3], r[3]] : [1, 1, 1]);
 
   // ---- forward kinematics (the forge's rules: rotate X, then Y, then Z) --------
   const eul = new T.Euler(), m1 = new T.Matrix4(), m2 = new T.Matrix4(), q1 = new T.Quaternion();
+  const rotM = (r) => new T.Matrix4().makeRotationFromEuler(new T.Euler(r[0] * DEG, r[1] * DEG, r[2] * DEG, "ZYX"));
+  const angles = (m) => { const e = new T.Euler().setFromRotationMatrix(m, "ZYX"); return [e.x / DEG, e.y / DEG, e.z / DEG]; };
   function fk(pose, offset, rot) {
     const W = new Array(J.length);
-    const root = new T.Matrix4().makeRotationFromEuler(eul.set(rot[0] * DEG, rot[1] * DEG, rot[2] * DEG, "ZYX"));
+    const root = rotM(rot);
     root.setPosition(offset[0], offset[1], offset[2]);
     for (const j of J) {
       const r = pose[j.name] || [0, 0, 0], s = scaleOf(r);
@@ -246,6 +242,59 @@ const DATA = /*POSE_DATA*/null;
   const posOf = (W, i) => new T.Vector3().setFromMatrixPosition(W[i]);
   const tipOf = (W, i) => J[i].tip.clone().applyMatrix4(W[i]);
   const rotOf = (m) => new T.Matrix4().extractRotation(m);
+  const inv = (m) => m.clone().invert();
+
+  // ---- the rig: a control becomes a pose (a port of actors/_rig.py) -------------
+  function frame(axis, toward) {
+    const x = axis.clone().normalize();
+    let y = toward.clone().sub(x.clone().multiplyScalar(toward.dot(x)));
+    if (y.length() < 1e-6) {
+      y = new T.Vector3(0, 1, 0).sub(x.clone().multiplyScalar(x.y));
+      if (y.length() < 1e-6) y = new T.Vector3(1, 0, 0).sub(x.clone().multiplyScalar(x.x));
+    }
+    y.normalize();
+    return new T.Matrix4().makeBasis(x, y, new T.Vector3().crossVectors(x, y));
+  }
+  function twoBone(rp, origin, target, pole, u0, l0, sign) {
+    let t = target.clone().sub(origin);
+    const reach = u0.length() + l0.length();
+    const d = Math.max(0.12 * reach, Math.min(0.997 * reach, t.length()));
+    if (t.length() < 1e-6) t = new T.Vector3(0, -1, 0);
+    const tip = (th) => l0.clone().applyMatrix4(m2.makeRotationX(th)).add(u0);
+    let lo = 0, hi = 176 * DEG;
+    for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2; if (tip(sign * m).length() > d) lo = m; else hi = m; }
+    const theta = sign * (lo + hi) / 2;
+    const r = frame(t, pole.clone().sub(origin)).multiply(frame(tip(theta), u0).transpose());
+    return { ang: angles(inv(rp).multiply(r)), bend: theta / DEG, r };
+  }
+  const ZERO = [0, 0, 0];
+  function solve(c) {
+    const pose = {};
+    for (const n of SPINE) pose[n] = c[n];
+    const W = fk(pose, c.offset, ZERO);
+    for (const s of "LR") {
+      const sh = jix["shoulder_" + s], el = jix["elbow_" + s], wr = jix["wrist_" + s];
+      let tb = twoBone(rotOf(W[jix.chest]), posOf(W, sh), V(c["hand_" + s]), V(c["elbow_" + s]), J[el].local, J[wr].local, -1);
+      pose["shoulder_" + s] = tb.ang;
+      pose["elbow_" + s] = [tb.bend, 0, 0].concat(c["fore_" + s] || [1, 1, 1]);
+      pose["wrist_" + s] = c["wrist_" + s] || ZERO;
+      const hp = jix["hip_" + s], kn = jix["knee_" + s], an = jix["ankle_" + s];
+      tb = twoBone(rotOf(W[jix.hips]), posOf(W, hp), V(c["foot_" + s]), V(c["knee_" + s]), J[kn].local, J[an].local, 1);
+      pose["hip_" + s] = tb.ang;
+      pose["knee_" + s] = [tb.bend, 0, 0];
+      const shin = tb.r.clone().multiply(new T.Matrix4().makeRotationX(tb.bend * DEG));
+      pose["ankle_" + s] = angles(inv(shin).multiply(rotM(c["footrot_" + s])));
+    }
+    for (const k in c) if (k.startsWith("j:")) pose[k.slice(2)] = c[k];
+    return pose;
+  }
+  function hint(origin, mid, end) {
+    const axis = end.clone().sub(origin);
+    let out = mid.clone().sub(origin);
+    if (axis.length() > 1e-6) { axis.normalize(); out.sub(axis.multiplyScalar(out.dot(axis))); }
+    if (out.length() < 1e-4) out.set(0, 0, -1);
+    return arr(origin.clone().add(out.normalize().multiplyScalar(HINT)));
+  }
 
   // ---- the mesh ------------------------------------------------------------------
   const bin = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0)).buffer;
@@ -329,16 +378,14 @@ const DATA = /*POSE_DATA*/null;
       g.setAttribute("x1", 0); g.setAttribute("x2", VW); g.setAttribute("y1", gy); g.setAttribute("y2", gy);
       s.svg.append(g);
       s.bones = []; s.dots = [];
-      const items = [];
       for (const j of J) {
         if (!shown.has(j.i)) continue;
-        if (j.p >= 0) items.push({ a: j.p, b: j.i, tip: false });
-        if (j.tip) items.push({ a: j.i, b: j.i, tip: true });
-      }
-      for (const it of items) {
-        const line = document.createElementNS(SVG, "line");
-        line.setAttribute("class", "bone" + (it.tip ? " tail" : ""));
-        s.svg.append(line); s.bones.push({ line, ...it });
+        for (const it of [j.p >= 0 ? { a: j.p, b: j.i, tip: false } : null, j.tip ? { a: j.i, b: j.i, tip: true } : null]) {
+          if (!it) continue;
+          const line = document.createElementNS(SVG, "line");
+          line.setAttribute("class", "bone" + (it.tip ? " tail" : ""));
+          s.svg.append(line); s.bones.push({ line, ...it });
+        }
       }
       const handles = [];
       for (const j of J) if (shown.has(j.i)) { handles.push({ j: j.i, tip: false }); if (j.tip) handles.push({ j: j.i, tip: true }); }
@@ -346,9 +393,9 @@ const DATA = /*POSE_DATA*/null;
         const g2 = document.createElementNS(SVG, "g");
         const hit = document.createElementNS(SVG, "circle"); hit.setAttribute("class", "hit"); hit.setAttribute("r", 15);
         const c = document.createElementNS(SVG, "circle"); c.setAttribute("r", h.tip ? 4.5 : 7);
-        c.setAttribute("class", "dot " + side(J[h.j].name));
+        c.setAttribute("class", "dot " + sideOf(J[h.j].name));
         const title = document.createElementNS(SVG, "title");
-        title.textContent = h.tip ? J[h.j].name + " (tip: turns this joint)" : J[h.j].name;
+        title.textContent = h.tip ? J[h.j].name + " tip: turns it" : J[h.j].name;
         const text = document.createElementNS(SVG, "text"); text.setAttribute("class", "label"); text.setAttribute("x", 11); text.setAttribute("y", 5);
         g2.append(hit, c, title, text); s.svg.append(g2);
         g2.addEventListener("pointerdown", (e) => beginDrag(e, h, id));
@@ -360,41 +407,53 @@ const DATA = /*POSE_DATA*/null;
     stages[id] = s;
   }
   const toPx = (p, s) => [VW / 2 + (s ? p.y : p.x) / PS, VH / 2 - (p.z - ZC) / PS];
-  const DIRS = ["S", "SE", "E", "NE", "N", "NW", "W", "SW"];
-  DIRS.forEach((d, i) => {
+  ["S", "SE", "E", "NE", "N", "NW", "W", "SW"].forEach((d, i) => {
     const b = document.createElement("button");
     b.type = "button"; b.textContent = d; b.title = "Facing " + d;
-    b.addEventListener("click", () => { yaw = i * 45; dirty = true; drawPanel(); });
+    b.addEventListener("click", () => { yaw = i * 45; drawPanel(); });
     $("dirs").append(b);
   });
 
   // ---- what is on screen --------------------------------------------------------------
-  let dirty = true, W = null;
-  function current() {
-    if (!playing) { const k = key(); return [keyPose(k), k.offset || [0, 0, 0], k.rot || [0, 0, 0]]; }
-    const c = clip(), dur = c.frames / c.fps;
-    let t = ((performance.now() - playStart) / 1000) / dur;
-    t = c.loop ? t % 1 : Math.min(1, t % 1.6);            // one-shots hold their last frame briefly
-    return sample(c, t);
+  // W: joints as drawn (with the key's whole-body rotation). Wr: the same
+  // without it, which is the space the controls live in.
+  let dirty = true, W = null, Wr = null, rootRot = new T.Matrix4();
+  const ease = (kind, u) => (kind === "linear" ? u : kind === "in" ? u * u : kind === "out" ? 1 - (1 - u) * (1 - u)
+    : kind === "snap" ? 1 - Math.pow(1 - u, 3) : u * u * (3 - 2 * u));
+  function blend(a, b, u) {
+    const out = {};
+    for (const k in a) {
+      const va = a[k], vb = k in b ? b[k] : va;
+      out[k] = (va.length !== vb.length || k.startsWith("fore_") || k.startsWith("wrist_")) ? (u >= 0.5 ? vb : va)
+        : va.map((x, i) => x + (vb[i] - x) * u);
+    }
+    for (const k in b) if (!(k in a)) out[k] = b[k];
+    return out;
   }
-  const ease = (kind, u) => (kind === "linear" ? u : kind === "in" ? u * u : kind === "out" ? 1 - (1 - u) * (1 - u) : u * u * (3 - 2 * u));
-  function sample(c, t) {
-    const ks = c.keys; let k0 = ks[0], k1 = ks[0], u = 0;
-    if (t >= ks[ks.length - 1].t) k0 = k1 = ks[ks.length - 1];
-    else if (t > ks[0].t) for (let i = 0; i < ks.length - 1; i++) if (ks[i].t <= t && t <= ks[i + 1].t) {
-      k0 = ks[i]; k1 = ks[i + 1]; u = ease(k1.ease, (t - k0.t) / Math.max(1e-6, k1.t - k0.t)); break;
+  function sample(c, f) {
+    const ks = c.keys, last = ks[ks.length - 1], C = (k) => anim.controls[k.control], R = (k) => k.rot || ZERO;
+    if (f <= ks[0].frame) return [C(ks[0]), R(ks[0])];
+    if (f >= last.frame) return [C(last), R(last)];
+    for (let i = 0; i < ks.length - 1; i++) if (ks[i].frame <= f && f <= ks[i + 1].frame) {
+      const u = ease(ks[i + 1].ease, (f - ks[i].frame) / Math.max(1e-6, ks[i + 1].frame - ks[i].frame));
+      const r0 = R(ks[i]), r1 = R(ks[i + 1]);
+      return [blend(C(ks[i]), C(ks[i + 1]), u), r0.map((x, a) => x + (r1[a] - x) * u)];
     }
-    const a = keyPose(k0), b = keyPose(k1), pose = {};
-    for (const n of new Set([...Object.keys(a), ...Object.keys(b)])) {
-      const ra = a[n] || [0, 0, 0], rb = b[n] || [0, 0, 0], sa = scaleOf(ra), sb = scaleOf(rb);
-      pose[n] = [0, 1, 2].map((i) => ra[i] + (rb[i] - ra[i]) * u).concat([0, 1, 2].map((i) => sa[i] + (sb[i] - sa[i]) * u));
-    }
-    const l3 = (x, y) => [0, 1, 2].map((i) => (x || [0, 0, 0])[i] + ((y || [0, 0, 0])[i] - (x || [0, 0, 0])[i]) * u);
-    return [pose, l3(k0.offset, k1.offset), l3(k0.rot, k1.rot)];
+    return [C(last), R(last)];
+  }
+  function current() {
+    if (!playing) return [ctl(), key().rot || ZERO];
+    const c = clip();
+    let f = (performance.now() - playStart) / 1000 * c.fps;
+    f = c.loop ? f % c.frames : Math.min(c.frames - 1, f % (c.frames + c.fps * 0.5));   // one-shots hold the end briefly
+    return sample(c, f);
+  }
+  function pose() {
+    const [c, rot] = current(), p = solve(c);
+    W = fk(p, c.offset, rot); Wr = fk(p, c.offset, ZERO); rootRot = rotM(rot);
   }
   function render() {
-    const [pose, offset, rot] = current();
-    W = fk(pose, offset, rot);
+    pose();
     skin(W);
     for (const id of ["front", "side", "game"]) {
       const s = stages[id];
@@ -405,7 +464,6 @@ const DATA = /*POSE_DATA*/null;
       s.ctx.drawImage(renderer.domElement, 0, 0);
       if (!s.svg) continue;
       s.svg.style.visibility = playing ? "hidden" : "visible";
-      const own = anim.poses[key().pose].joints;
       for (const b of s.bones) {
         const p = toPx(posOf(W, b.a), s.side), q = toPx(b.tip ? tipOf(W, b.b) : posOf(W, b.b), s.side);
         b.line.setAttribute("x1", p[0]); b.line.setAttribute("y1", p[1]); b.line.setAttribute("x2", q[0]); b.line.setAttribute("y2", q[1]);
@@ -415,7 +473,6 @@ const DATA = /*POSE_DATA*/null;
         d.g.setAttribute("transform", `translate(${p[0]} ${p[1]})`);
         const isSel = selected !== null && !d.tip && selected === d.j;
         d.c.classList.toggle("sel", isSel);
-        d.c.classList.toggle("own", !d.tip && J[d.j].name in own);
         d.text.textContent = isSel ? J[d.j].name : "";
       }
     }
@@ -427,55 +484,76 @@ const DATA = /*POSE_DATA*/null;
 
   // ---- editing ---------------------------------------------------------------------------
   function remember() { history.push(JSON.stringify(anim)); if (history.length > 120) history.shift(); }
-  function nearest(e, prev) {
+  function nearest(a, prev) {
     // The same rotation has two sets of angles; take the one closest to what
-    // was there, so the in-between frames do not spin the long way round.
-    const cands = [[e.x / DEG, e.y / DEG, e.z / DEG], [e.x / DEG + 180, 180 - e.y / DEG, e.z / DEG + 180]];
+    // was there, so in-between frames do not spin the long way round.
     let best = null, bd = 1e9;
-    for (const c of cands) {
+    for (const c of [a, [a[0] + 180, 180 - a[1], a[2] + 180]]) {
       const w = c.map((v, i) => v - 360 * Math.round((v - prev[i]) / 360));
       const d = w.reduce((s, v, i) => s + Math.abs(v - prev[i]), 0);
       if (d < bd) { bd = d; best = w; }
     }
     return best.map((v) => Math.round(v * 10) / 10);
   }
-  // Give joint i a new world orientation; writes the key's pose.
-  function setWorldRot(i, worldRot) {
-    const k = key(), name = J[i].name, shownR = keyPose(k)[name] || [0, 0, 0];
-    const parentRot = rotOf(J[i].p < 0 ? W.root : W[J[i].p]);
-    const local = parentRot.clone().invert().multiply(worldRot);
-    const e = new T.Euler().setFromRotationMatrix(local, "ZYX");
-    writeAngles(i, nearest(e, shownR));
-  }
-  function writeAngles(i, angles) {
-    const k = key(), name = J[i].name, pose = anim.poses[k.pose];
-    const before = resolve(k.pose)[name] || [0, 0, 0], add = (k.add || {})[name] || [0, 0, 0];
-    pose.joints[name] = angles.map((v, a) => Math.round((v - add[a]) * 10) / 10).concat(before.slice(3));
+  // Points and directions on screen -> the space the controls live in.
+  const toRigDir = (d) => d.clone().applyMatrix4(inv(rootRot));
+  const toRigPoint = (p) => { const o = V(ctl().offset); return p.clone().sub(o).applyMatrix4(inv(rootRot)).add(o); };
+  // Turn a spine joint by q (about its own position); hands ride with it.
+  function turnSpine(i, q) {
+    const c = ctl(), name = J[i].name, qm = new T.Matrix4().makeRotationFromQuaternion(q);
+    const parent = J[i].p < 0 ? new T.Matrix4() : rotOf(Wr[J[i].p]);
+    c[name] = nearest(angles(inv(parent).multiply(qm.clone().multiply(rotOf(Wr[i])))), c[name]);
+    if (RIDES.includes(name)) {
+      const pivot = posOf(Wr, i);
+      for (const k of ["hand_L", "hand_R", "elbow_L", "elbow_R"]) c[k] = arr(V(c[k]).sub(pivot).applyQuaternion(q).add(pivot));
+    }
   }
   function aim(h, view, sx, sy) {
-    const s = view === "side", i = h.j;
+    const s = view === "side", i = h.j, name = J[i].name, c = ctl();
     const tx = (sx - VW / 2) * PS, tz = ZC - (sy - VH / 2) * PS;
-    if (!h.tip && J[i].p < 0) {                         // the hips carry the whole body
-      const k = key(), p = posOf(W, i), o = (k.offset || [0, 0, 0]).slice();
-      if (s) o[1] += tx - p.y; else o[0] += tx - p.x;
-      o[2] += tz - p.z;
-      k.offset = o.map((v) => Math.round(v * 1000) / 1000);
+    const now = h.tip ? tipOf(W, i) : posOf(W, i);
+    const want = s ? new T.Vector3(now.x, tx, tz) : new T.Vector3(tx, now.y, tz);   // the view's two axes; depth kept
+    const kind = part(name);
+    if (!h.tip && name === "hips") {                      // the body moves; the feet stay
+      const d = toRigDir(want.clone().sub(now));
+      c.offset = arr(V(c.offset).add(d));
+      for (const k of ["hand_L", "hand_R", "elbow_L", "elbow_R"]) c[k] = arr(V(c[k]).add(d));
       return;
     }
+    if (!h.tip && kind === "wrist") { c["hand_" + S(name)] = arr(toRigPoint(want)); return; }
+    if (!h.tip && kind === "ankle") { c["foot_" + S(name)] = arr(toRigPoint(want)); return; }
+    if (!h.tip && kind === "elbow") {
+      c["elbow_" + S(name)] = hint(posOf(Wr, jix["shoulder_" + S(name)]), toRigPoint(want), posOf(Wr, jix["wrist_" + S(name)])); return;
+    }
+    if (!h.tip && kind === "knee") {
+      c["knee_" + S(name)] = hint(posOf(Wr, jix["hip_" + S(name)]), toRigPoint(want), posOf(Wr, jix["ankle_" + S(name)])); return;
+    }
+    // Everything else swings a bone of fixed length about the joint above:
+    // the pointer sets two axes and the length gives the third.
     const pivot = h.tip ? i : J[i].p;
-    const pP = posOf(W, pivot), pJ = h.tip ? tipOf(W, i) : posOf(W, i);
-    const L = pJ.distanceTo(pP);
+    const pP = posOf(W, pivot), L = now.distanceTo(pP);
     if (L < 1e-5) return;
-    // The pointer sets two axes; the bone's length gives the third.
     let u = tx - (s ? pP.y : pP.x), v = tz - pP.z;
     const r = Math.hypot(u, v);
     if (r > L) { u *= L / r; v *= L / r; }
-    const depthNow = s ? pJ.x - pP.x : pJ.y - pP.y;
+    const depthNow = s ? now.x - pP.x : now.y - pP.y;
     const depth = (depthNow < 0 ? -1 : 1) * Math.sqrt(Math.max(0, L * L - u * u - v * v));
-    const dNew = (s ? new T.Vector3(depth, u, v) : new T.Vector3(u, depth, v)).normalize();
-    const dOld = pJ.clone().sub(pP).normalize();
-    q1.setFromUnitVectors(dOld, dNew);
-    setWorldRot(pivot, new T.Matrix4().makeRotationFromQuaternion(q1).multiply(rotOf(W[pivot])));
+    const dNew = toRigDir((s ? new T.Vector3(depth, u, v) : new T.Vector3(u, depth, v)).normalize());
+    const dOld = toRigDir(now.clone().sub(pP).normalize());
+    const q = new T.Quaternion().setFromUnitVectors(dOld, dNew);
+    turn(pivot, q);
+  }
+  // Turn joint i by q, whatever kind of joint it is.
+  function turn(i, q) {
+    const c = ctl(), name = J[i].name, kind = part(name), qm = new T.Matrix4().makeRotationFromQuaternion(q);
+    if (SPINE.includes(name)) return turnSpine(i, q);
+    const world = qm.multiply(rotOf(Wr[i]));
+    if (kind === "wrist") {
+      const k = "wrist_" + S(name), old = c[k] || ZERO;
+      c[k] = nearest(angles(inv(rotOf(Wr[J[i].p])).multiply(world)), old).concat(old.slice(3));
+    } else if (kind === "ankle") {
+      c["footrot_" + S(name)] = nearest(angles(world), c["footrot_" + S(name)]);
+    }
   }
   function beginDrag(e, h, view) {
     if (playing) return;
@@ -491,7 +569,7 @@ const DATA = /*POSE_DATA*/null;
     const onMove = (ev) => {
       const r = s.svg.getBoundingClientRect();
       aim(h, view, (ev.clientX - r.left) * VW / r.width + ox, (ev.clientY - r.top) * VH / r.height + oy);
-      moved = true; W = fk(...current()); dirty = true;
+      moved = true; pose(); dirty = true;
     };
     const onUp = () => {
       window.removeEventListener("pointermove", onMove);
@@ -514,53 +592,75 @@ const DATA = /*POSE_DATA*/null;
     aim({ j: selected, tip: false }, view, p[0] + d[0] * step, p[1] + d[1] * step);
     drawPanel();
   }
+  const canTwist = (name) => SPINE.includes(name) || ["wrist", "ankle"].includes(part(name));
   function twist(deg) {
-    if (selected === null) return;
-    const i = selected, child = J.find((j) => j.p === i && shown.has(j.i));
-    const end = J[i].tip ? tipOf(W, i) : child ? posOf(W, child.i) : null;
-    if (!end) return;
+    if (selected === null || !canTwist(J[selected].name)) return;
+    const i = selected, name = J[i].name;
+    let axis;
+    if (part(name) === "ankle") axis = new T.Vector3(0, 0, 1);            // a foot turns on the floor
+    else {
+      const child = J.find((j) => j.p === i && SPINE.includes(j.name));
+      const end = J[i].tip ? tipOf(Wr, i) : child ? posOf(Wr, child.i) : null;
+      if (!end) return;
+      axis = end.sub(posOf(Wr, i)).normalize();
+    }
     remember();
-    const axis = end.sub(posOf(W, i)).normalize();
-    q1.setFromAxisAngle(axis, deg * DEG);
-    setWorldRot(i, new T.Matrix4().makeRotationFromQuaternion(q1).multiply(rotOf(W[i])));
+    turn(i, new T.Quaternion().setFromAxisAngle(axis, deg * DEG));
     drawPanel();
   }
 
   // ---- the panels ------------------------------------------------------------------------
   function uses(name) {
-    let keys = 0; const clips = new Set(), built = [];
-    for (const c of anim.clips) for (const k of c.keys) if (k.pose === name) { keys++; clips.add(c.name); }
-    for (const n in anim.poses) if (anim.poses[n].base === name) built.push(n);
-    return { keys, clips: [...clips], built };
+    let keys = 0; const clips = new Set();
+    for (const c of anim.clips) for (const k of c.keys) if (k.control === name) { keys++; clips.add(c.name); }
+    return { keys, clips: [...clips] };
+  }
+  // What the number boxes show for the selected joint: [key in the control, labels, step]
+  function numbers(name) {
+    if (SPINE.includes(name)) return [name, ["x°", "y°", "z°"], 1];
+    if (part(name) === "wrist") return ["hand_" + S(name), ["left", "back", "up"], 0.01];
+    if (part(name) === "ankle") return ["foot_" + S(name), ["left", "back", "up"], 0.01];
+    return null;
   }
   function drawPanel() {
     dirty = true;
-    const c = clip(), k = key(), pose = anim.poses[k.pose];
+    const c = clip(), k = key(), u = uses(k.control);
     $("keys").innerHTML = c.keys.map((kk, i) =>
-      `<button type="button" data-i="${i}" class="${i === keyIx ? "on" : ""}">${kk.pose}<small>${kk.t.toFixed(2)}</small></button>`).join("");
-    $("posename").textContent = k.pose;
-    const u = uses(k.pose), bits = [];
-    bits.push(pose.base ? `Built on “${pose.base}”: it only changes ${Object.keys(pose.joints).length} joints.` : "A full pose: it sets every joint itself.");
-    bits.push(`Used by ${u.keys} key${u.keys === 1 ? "" : "s"} in ${u.clips.join(", ")}.`);
-    if (u.built.length) bits.push(`${u.built.length} other pose${u.built.length === 1 ? " is" : "s are"} built on it, so a change here carries into ${u.built.length === 1 ? "it" : "them"}.`);
-    if (k.add) bits.push("This key adds the idle's bounce on top.");
+      `<button type="button" data-i="${i}" class="${i === keyIx ? "on" : ""}">${kk.control}<small>frame ${kk.frame}</small></button>`).join("");
+    $("posename").textContent = k.control;
+    const bits = [`${c.frames} frames at ${c.fps} a second${c.loop ? ", looping" : ""}.`];
+    if (u.keys > 1) bits.push(`${u.keys} keys share this pose (in ${u.clips.join(", ")}), so a change here changes all of them.`);
+    else bits.push("Only this key uses this pose.");
+    if (k.rot) bits.push("The whole body is turned over on this key (a fall).");
     $("poseinfo").textContent = bits.join(" ");
+    $("solo").hidden = u.keys < 2;
+    $("resetpose").disabled = !(k.control in start.controls);
     [...$("dirs").children].forEach((b, i) => b.classList.toggle("on", yaw === i * 45));
     $("jl").innerHTML = J.filter((j) => shown.has(j.i)).map((j) =>
-      `<button type="button" data-j="${j.i}" class="${selected === j.i ? "on " : ""}${j.name in pose.joints ? "own" : ""}">${j.name}</button>`).join("");
+      `<button type="button" data-j="${j.i}" class="${selected === j.i ? "on" : ""}">${j.name}</button>`).join("");
     const has = selected !== null;
     $("selcontrols").hidden = !has;
     if (has) {
-      const name = J[selected].name, r = keyPose(k)[name] || [0, 0, 0], own = name in pose.joints;
+      const name = J[selected].name, kind = part(name), cc = ctl(), num = numbers(name);
       $("selname").textContent = name;
-      $("selinfo").textContent = J[selected].p < 0
-        ? "Dragging this moves the whole body for this key. The angles turn the pelvis."
-        : own || !pose.base ? "Set by this pose." : `Following “${pose.base}”. Move it and this pose takes it over.`;
-      ["rx", "ry", "rz"].forEach((id, a) => { if (document.activeElement !== $(id)) $(id).value = Math.round(r[a] * 10) / 10; });
-      $("follow").hidden = !(own && pose.base);
-      const s = scaleOf(r), stretched = s.some((v) => Math.abs(v - 1) > 1e-6);
+      $("selinfo").textContent = name === "hips" ? "Drag to move the body: the feet stay where they are and the hands come along. The angles turn the pelvis."
+        : SPINE.includes(name) ? "Drag to swing it about the joint below. Turning the abdomen or chest carries the hands."
+        : kind === "wrist" ? "Drag the hand where it should be; the arm follows. Past his reach, the arm points straight at it."
+        : kind === "ankle" ? "Drag the foot where it should be; the leg follows."
+        : kind === "elbow" || kind === "knee" ? "Drag toward where it should stick out. It cannot leave the arc the limb allows."
+        : "Drag to turn the body: this joint is carried by the spine.";
+      $("numrow").hidden = !num;
+      if (num) {
+        ["lx", "ly", "lz"].forEach((id, a) => { $(id).textContent = num[1][a]; });
+        ["rx", "ry", "rz"].forEach((id, a) => { $(id).step = num[2]; if (document.activeElement !== $(id)) $(id).value = +cc[num[0]][a].toFixed(3); });
+      }
+      $("twrow").hidden = !canTwist(name);
+      const sd = /_[LR]$/.test(name) ? S(name) : null;
+      const st = sd && (kind === "elbow" || kind === "wrist") ? (cc["fore_" + sd] || [1, 1, 1]).concat(scaleOf(cc["wrist_" + sd] || ZERO)) : [];
+      const stretched = st.some((v) => Math.abs(v - 1) > 1e-6);
       $("stretch").hidden = !stretched;
-      if (stretched) $("stretch").textContent = `Stretched on this key (${s.map((v) => v.toFixed(2)).join(", ")}): a smear frame, kept as it is`;
+      if (stretched) $("stretch").textContent = "Stretched on this key (a smear frame): forearm " + st.slice(0, 3).map((v) => v.toFixed(2)).join(", ")
+        + ", fist " + st[3].toFixed(2) + ". Kept as it is.";
     }
     $("out").value = JSON.stringify({ name: DATA.name, model_id: DATA.model_id, anim });
     $("undo").disabled = history.length === 0;
@@ -573,34 +673,48 @@ const DATA = /*POSE_DATA*/null;
   }
   function setStatus(text, cls) { $("status").textContent = text; $("status").className = cls; }
   function go(ci, ki) {
-    clipIx = ci; keyIx = Math.max(0, Math.min(anim.clips[ci].keys.length - 1, ki));
+    clipIx = Math.max(0, Math.min(anim.clips.length - 1, ci));
+    keyIx = Math.max(0, Math.min(anim.clips[clipIx].keys.length - 1, ki));
+    $("clip").value = clipIx;
     drawPanel();
   }
   $("clip").innerHTML = anim.clips.map((c, i) => `<option value="${i}">${c.name}</option>`).join("");
-  $("clip").addEventListener("change", (e) => go(+e.target.value, 0));
+  $("clip").addEventListener("change", (e) => { playing = false; go(+e.target.value, 0); });
   $("keys").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { playing = false; go(clipIx, +b.dataset.i); } });
   $("prev").addEventListener("click", () => { playing = false; go(clipIx, keyIx - 1); });
   $("next").addEventListener("click", () => { playing = false; go(clipIx, keyIx + 1); });
   $("play").addEventListener("click", () => { playing = !playing; playStart = performance.now(); drawPanel(); });
   $("jl").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { selected = +b.dataset.j; stages[activeView].el.focus({ preventScroll: true }); drawPanel(); } });
   ["rx", "ry", "rz"].forEach((id, a) => $(id).addEventListener("change", () => {
-    if (selected === null || isNaN(parseFloat($(id).value))) return;
+    const v = parseFloat($(id).value), num = selected === null ? null : numbers(J[selected].name);
+    if (!num || isNaN(v)) return;
     remember();
-    const r = (keyPose(key())[J[selected].name] || [0, 0, 0]).slice(0, 3);
-    r[a] = parseFloat($(id).value);
-    writeAngles(selected, r);
+    const c = ctl();
+    if (SPINE.includes(num[0])) {
+      // Through turnSpine, so the hands ride as they do on a drag.
+      const want = c[num[0]].slice(0, 3); want[a] = v;
+      const parent = J[selected].p < 0 ? new T.Matrix4() : rotOf(Wr[J[selected].p]);
+      const delta = parent.clone().multiply(rotM(want)).multiply(inv(rotOf(Wr[selected])));
+      turnSpine(selected, new T.Quaternion().setFromRotationMatrix(delta));
+      c[num[0]] = want;
+    } else { c[num[0]] = c[num[0]].slice(); c[num[0]][a] = v; }
     drawPanel();
   }));
   $("twl").addEventListener("click", () => twist(-5));
   $("twr").addEventListener("click", () => twist(5));
-  $("follow").addEventListener("click", () => { remember(); delete anim.poses[key().pose].joints[J[selected].name]; drawPanel(); });
-  $("resetpose").addEventListener("click", () => {
-    const n = key().pose;
-    if (!start.poses[n]) return;
-    remember(); anim.poses[n] = clone(start.poses[n]);
-    const c0 = start.clips[clipIx];
-    if (c0 && c0.keys[keyIx]) key().offset = clone(c0.keys[keyIx].offset);
+  $("solo").addEventListener("click", () => {
+    remember();
+    const k = key(), base = `${clip().name} ${k.frame}`;
+    let name = base, n = 2;
+    while (name in anim.controls) name = `${base} (${n++})`;
+    anim.controls[name] = clone(anim.controls[k.control]);
+    k.control = name;
     drawPanel();
+  });
+  $("resetpose").addEventListener("click", () => {
+    const n = key().control;
+    if (!(n in start.controls)) return;
+    remember(); anim.controls[n] = clone(start.controls[n]); drawPanel();
   });
   const undo = () => { if (history.length) { anim = JSON.parse(history.pop()); go(clipIx, keyIx); } };
   $("undo").addEventListener("click", undo);
@@ -619,7 +733,8 @@ const DATA = /*POSE_DATA*/null;
     statusLocked = true; $("save").disabled = true; setStatus("Saving…", "");
     const text = JSON.stringify(anim);
     try {
-      await db.doc(docPath).set({ name: DATA.name, model_id: DATA.model_id, anim: JSON.parse(text), saved_at: new Date().toISOString() });
+      // Stored as text: the store has a limit on how deep a document nests.
+      await db.doc(docPath).set({ name: DATA.name, model_id: DATA.model_id, format: 2, anim_json: text, saved_at: new Date().toISOString() });
       saved = text; statusLocked = false; drawPanel();
     } catch (err) {
       setStatus("Could not save (" + ((err && err.code) || "error") + "). Copy the animation below and paste it to Claude.", "error");
@@ -627,7 +742,24 @@ const DATA = /*POSE_DATA*/null;
     $("save").disabled = false;
   });
 
-  window.__pose = { fk: () => W, J, posOf, tipOf, get anim() { return anim; }, go };   // for checks
+  // For checks: the page's solver against the forge's own answers.
+  window.__pose = {
+    get anim() { return anim; }, go, J, posOf, joints: () => W,
+    verify() {
+      let worst = 0, where = "";
+      for (const name in (DATA.check || {})) {
+        // The forge rig's own check ignores the smear stretch, so drop it here too.
+        const c = anim.controls[name], ps = solve(c);
+        for (const n in ps) ps[n] = ps[n].slice(0, 3);
+        const Wc = fk(ps, c.offset, ZERO);
+        for (const jn in DATA.check[name]) {
+          const d = posOf(Wc, jix[jn]).distanceTo(V(DATA.check[name][jn]));
+          if (d > worst) { worst = d; where = name + " / " + jn; }
+        }
+      }
+      return { controls: Object.keys(DATA.check || {}).length, worst, where };
+    },
+  };
   go(0, 0);
   loop();
   (async () => {
@@ -636,9 +768,10 @@ const DATA = /*POSE_DATA*/null;
       if (!db) return;
       const snap = await Promise.race([db.doc(docPath).get(), new Promise((_, no) => setTimeout(() => no(new Error("timeout")), 10000))]);
       const d = snap.exists ? snap.data() : null;
-      // Pick up where the last save left off, if it was for this same model.
-      if (d && d.model_id === DATA.model_id && d.anim && d.anim.poses && history.length === 0) {
-        anim = clone(d.anim); saved = JSON.stringify(anim); go(0, 0);
+      // Pick up where the last save left off, if it was for this model and this kind of data.
+      if (d && d.model_id === DATA.model_id && d.format === 2 && d.anim_json && history.length === 0) {
+        const got = JSON.parse(d.anim_json);
+        if (got.controls && got.clips) { anim = got; saved = JSON.stringify(anim); go(0, 0); }
       }
     } catch (err) { /* the page works without the store; Save reports its own errors */ }
   })();

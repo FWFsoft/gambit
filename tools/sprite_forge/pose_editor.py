@@ -4,18 +4,21 @@
     <forge python> tools/sprite_forge/pose_editor.py _wade_mesh out.html
 
 The page shows the skinned model from the front, the side and the game's
-camera. A human steps through each clip's keys and drags the joints; bones
-keep their length, so a drag turns the joint above it and nothing changes
-proportion. Saving stores the whole animation dictionary.
+camera. A human steps through each clip's keys and drags: a hand or a foot
+goes where it is put and the limb follows (the same solver as
+actors/_rig.py), the hips move the body over planted feet, the spine turns.
+Bones keep their length, so nothing changes proportion. Saving stores the
+whole animation dictionary.
 
 An agent publishes the page as an Artifact (capabilities db and user), gives
 the human the link, then reads the save back (ArtifactData get, collection
-"anims", doc id the actor's NAME) and writes its `anim` to
+"anims", doc id the actor's NAME) and writes its `anim_json`, parsed, to
 art/models/<Name>.anim.json. The steps are in
 .claude/skills/character-art/SKILL.md, step 4.
 
-The actor module needs: build(), current() returning the animation
-dictionary, MODEL, FIT, NAME.
+The actor module needs: build(), rig(), current() returning the animation
+dictionary, MODEL, FIT, NAME. Add --check to embed the rig's own answers so
+the page's solver can be compared with it (window.__pose.verify()).
 """
 
 import base64
@@ -118,10 +121,12 @@ def main():
     actor, out = sys.argv[1], sys.argv[2]
     mod = importlib.import_module(actor)
     bpy.ops.wm.read_factory_settings(use_empty=True)
+    data = mod.current()
+    rig = mod.rig()
+    bpy.ops.wm.read_factory_settings(use_empty=True)
     model, _base = mod.build()
     assert model.skins, f"{actor} has no skinned mesh; the editor needs one"
     s = model.skins[0]
-    data = mod.current()
     path = mod.MODEL if os.path.isabs(mod.MODEL) else os.path.join(REPO, mod.MODEL)
     with open(path, "rb") as f:
         model_id = hashlib.sha1(f.read()).hexdigest()[:12]
@@ -136,6 +141,13 @@ def main():
         "texture": texture_uri(s),
         "anim": data,
     }
+    if "--check" in sys.argv:
+        payload["check"] = {}
+        for name, c in data["controls"].items():
+            c = {k: tuple(v) for k, v in c.items()}
+            pose, off = rig.solve(c)
+            payload["check"][name] = {j: [round(float(x), 5) for x in p]
+                                      for j, (_r, p) in rig.fk(pose, off).items()}
     with open(os.path.join(HERE, "pose_editor.html")) as f:
         page = f.read()
     assert "/*POSE_DATA*/null" in page, "pose_editor.html lost its data slot"
@@ -144,7 +156,7 @@ def main():
     with open(out, "w") as f:
         f.write(page)
     print(f"wrote {out}: {os.path.getsize(out) / 1e6:.1f} MB, "
-          f"{payload['mesh']['count']} vertices, {len(data['poses'])} poses, "
+          f"{payload['mesh']['count']} vertices, {len(data['controls'])} controls, "
           f"{len(data['clips'])} clips")
 
 
