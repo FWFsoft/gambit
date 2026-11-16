@@ -98,8 +98,13 @@ struct PlayerState {
   uint8_t chargeSlot = 255;  // slot being charged/channelled (255 = none)
   uint16_t cooldowns[5] = {0, 0, 0, 0, 0};  // remaining, in 10ms units
   uint8_t resource = 0;     // kit-specific meter, 0-255
+  // A point the kit owns in the world and a prop it has set down (Nyx: her
+  // nanite swarm and her CRT), with a kit-specific mode byte (NyxMode).
+  float kitX = 0.0f, kitY = 0.0f;
+  float propX = 0.0f, propY = 0.0f;
+  uint8_t kitMode = 0;
 };
-constexpr size_t PLAYER_STATE_BYTES = 66;
+constexpr size_t PLAYER_STATE_BYTES = 83;
 
 struct StateUpdatePacket {
   PacketType type = PacketType::StateUpdate;
@@ -376,7 +381,8 @@ enum class VfxTheme : uint8_t {
   Blood = 9,    // red
   Shadow = 10,  // violet
   Heal = 11,    // mint
-  Danger = 12   // enemy telegraph red
+  Danger = 12,  // enemy telegraph red
+  Nanite = 13   // magenta pixels: Nyx's swarm
 };
 
 enum class Announcement : uint8_t {

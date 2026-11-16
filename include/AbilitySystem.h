@@ -130,6 +130,20 @@ class Kit {
     return 1.0f;
   }
   virtual void onRoundStart(Player& self) { (void)self; }
+  // Damage is about to land on a creature (an enemy, or a player other than
+  // `self`). Return how much of it the creature still takes; the kit may
+  // take a share itself (Nyx riding the target as a swarm).
+  virtual float onCreatureDamaged(AbilitySystem& sys, Player& self,
+                                  bool isEnemy, uint32_t targetId,
+                                  float damage) {
+    (void)sys;
+    (void)self;
+    (void)isEnemy;
+    (void)targetId;
+    return damage;
+  }
+  // Called after the player's core (infusion) ability is cast.
+  virtual void onCoreCast(AbilityContext& ctx) { (void)ctx; }
 };
 
 // Defined in CharacterKits.cpp. nullptr for characters without a kit.
@@ -347,4 +361,7 @@ class AbilitySystem {
   void notifyGuardLost(bool targetIsEnemy, uint32_t targetId, float x,
                        float y, float prevented);
   std::vector<uint32_t> enemyIdsNear(float x, float y, float radius) const;
+  // Let every kit in play take its share of damage aimed at a creature.
+  float shareDamage(bool isEnemy, uint32_t targetId, float damage);
+  bool sharingDamage = false;  // no share of a share
 };

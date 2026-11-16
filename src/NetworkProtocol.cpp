@@ -113,6 +113,11 @@ std::vector<uint8_t> serialize(const StateUpdatePacket& packet) {
       writeUint16(buffer, cooldown);
     }
     writeUint8(buffer, player.resource);
+    writeFloat(buffer, player.kitX);
+    writeFloat(buffer, player.kitY);
+    writeFloat(buffer, player.propX);
+    writeFloat(buffer, player.propY);
+    writeUint8(buffer, player.kitMode);
   }
 
   assert(buffer.size() == 7 + packet.players.size() * PLAYER_STATE_BYTES);
@@ -241,6 +246,16 @@ StateUpdatePacket deserializeStateUpdate(const uint8_t* data, size_t size) {
       offset += 2;
     }
     player.resource = readUint8(data + offset);
+    offset += 1;
+    player.kitX = readFloat(data + offset);
+    offset += 4;
+    player.kitY = readFloat(data + offset);
+    offset += 4;
+    player.propX = readFloat(data + offset);
+    offset += 4;
+    player.propY = readFloat(data + offset);
+    offset += 4;
+    player.kitMode = readUint8(data + offset);
     offset += 1;
 
     packet.players.push_back(player);

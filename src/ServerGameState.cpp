@@ -446,7 +446,8 @@ void ServerGameState::processClientInput(uint32_t clientId, const uint8_t* data,
   abilitySystem->setInput(player, input.buttons, input.aimX, input.aimY);
 
   // No walking while dead, still choosing a character, or mid-dash.
-  if (player.isDead() || player.characterId == 0 || player.forcedMs > 0.0f) {
+  if (player.isDead() || player.characterId == 0 || player.forcedMs > 0.0f ||
+      player.kitAnchored) {
     return;
   }
 
@@ -624,6 +625,11 @@ void ServerGameState::broadcastStateUpdate() {
           std::min(65535.0f, player.cooldownMs[slot] / 10.0f));
     }
     ps.resource = player.resource;
+    ps.kitX = player.kitX;
+    ps.kitY = player.kitY;
+    ps.propX = player.propX;
+    ps.propY = player.propY;
+    ps.kitMode = player.kitMode;
     packet.players.push_back(ps);
   }
 

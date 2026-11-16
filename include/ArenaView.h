@@ -95,6 +95,21 @@ class ArenaView {
   };
   std::unordered_map<std::string, ActorSheet> actorSheets;
   const ActorSheet* actorFor(const std::string& name) const;
+  // Nyx: when each Nyx last changed form (to time her drop and lift), which
+  // way she faced when she set the CRT down, and where her swarm is drawn
+  // (eased toward the server's position between state updates).
+  struct NyxView {
+    uint8_t form = 0;
+    float formSince = 0.0f;
+    int crtDirection = 0;
+    float swarmX = 0.0f, swarmY = 0.0f;
+    float lastSeconds = 0.0f;
+    bool seen = false;
+  };
+  std::unordered_map<uint32_t, NyxView> nyxViews;
+  void updateNyxView(const PlayerState& state);
+  void drawNyxSwarm(ImDrawList* dl, const PlayerState& state);
+  void drawNyxCrt(ImDrawList* dl, const PlayerState& state);
   // Remembered per entity so a clip plays from its start and stopped
   // characters keep facing where they last looked.
   struct AnimState {

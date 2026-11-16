@@ -11,10 +11,14 @@
 #include <cmath>
 #include <functional>
 #include <memory>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 
 #include "AbilitySystem.h"
 #include "EffectManager.h"
 #include "EnemySystem.h"
+#include "Infusions.h"
 #include "Logger.h"
 
 namespace {
@@ -23,6 +27,7 @@ using Arena::CharacterId::Gravon;
 using Arena::CharacterId::Isaac;
 using Arena::CharacterId::Mina;
 using Arena::CharacterId::Nolan;
+using Arena::CharacterId::Nyx;
 using Arena::CharacterId::Presidente;
 using Arena::CharacterId::Suds;
 using Arena::CharacterId::Volgore;
@@ -1499,6 +1504,606 @@ class PresidenteKit : public Kit {
   }
 };
 
+// ===========================================================================
+// Nyx, the Hive Mother (Playmaker)
+// A woman made of nanites who carries an old CRT on her shoulder. She sends
+// her swarm out to ride a foe (Silenced: +1 Dulled, +1 Weakened a second) or
+// an ally (Focused: +1 Sharpened a second), and can become a swarm herself:
+// she sets the CRT down, rides a target as a cloud, then streams back to the
+// CRT and lifts it onto her shoulder again.
+//
+// Nyx needs more state than the kit scratch slots hold, so it lives here,
+// keyed by player id. What clients draw is mirrored into Player::kitX/kitY
+// (the swarm), propX/propY (the CRT) and kitMode (Arena::NyxMode).
+//
+// Not built yet: the Miles clauses of Plague Bringer and Nanite Cloud (Miles
+// has no kit, so nobody can possess a target).
+// ===========================================================================
+class NyxKit : public Kit {
+ public:
+  // The swarm (LMB, passive)
+  static constexpr float SWARM_REACH = 560.0f;   // how far LMB sends it
+  static constexpr float SWARM_SPEED = 900.0f;   // px/s
+  static constexpr float SWARM_RADIUS = 60.0f;   // enemies inside gain Slow
+  static constexpr float SWARM_PICK = 70.0f;     // cursor to body, to attach
+  static constexpr float SWARM_LEASH = 760.0f;   // farther from Nyx: it returns
+  static constexpr float PULSE_MS = 1000.0f;     // stacks once a second
+  static constexpr float HOLD_MS = 1400.0f;      // Silenced/Focused while held
+  static constexpr float HOME_DIST = 24.0f;      // closer counts as with Nyx
+  // Plague Bringer (RMB)
+  static constexpr float PLAGUE_RADIUS_MIN = 150.0f;
+  static constexpr float PLAGUE_RADIUS_MAX = 260.0f;
+  static constexpr int CONTAMINATE_COUNT = 3;
+  // Become the Swarm (Shift)
+  static constexpr float FORM_REACH = 460.0f;
+  static constexpr float DROP_MS = 280.0f;       // setting the CRT down
+  static constexpr float CLOUD_SPEED = 1500.0f;  // px/s as a cloud
+  static constexpr float REFORM_MS = 450.0f;     // lifting the CRT back up
+  static constexpr float SHARE = 0.5f;           // of damage to her ride
+
+  struct State {
+    // The swarm
+    uint8_t swarm = Arena::NyxMode::SwarmHome;
+    float sx = 0.0f, sy = 0.0f;        // where it is
+    float destX = 0.0f, destY = 0.0f;  // where it is flying (a point)
+    uint32_t swarmTarget = 0;          // who it flies to or rides
+    bool swarmOnEnemy = false;
+    float swarmPulse = 0.0f;
+    std::vector<uint32_t> inside;  // enemies inside it now (Slow on entry)
+    // Nyx herself
+    uint8_t self = Arena::NyxMode::Body;
+    uint32_t rideTarget = 0;
+    bool rideOnEnemy = false;
+    float ridePulse = 0.0f;
+    float timerMs = 0.0f;  // Dropping / Reforming
+    float crtX = 0.0f, crtY = 0.0f;
+  };
+
+  void cast(AbilityContext& ctx, int slot) override {
+    switch (slot) {
+      case 0:
+        sendSwarm(ctx);
+        break;
+      case 1:
+        plagueBringer(ctx);
+        break;
+      case 2:
+        naniteCloud(ctx);
+        break;
+      case 3:
+        becomeSwarm(ctx);
+        break;
+      default:
+        assert(false && "Nyx has four kit slots");
+    }
+  }
+
+  bool canCast(AbilitySystem& sys, const Player& self, int slot) override {
+    const State* s = find(self.id);
+    uint8_t form = s ? s->self : Arena::NyxMode::Body;
+    // Mid-transformation she is neither a body nor a swarm: no casting.
+    if (form == Arena::NyxMode::Dropping || form == Arena::NyxMode::Homing ||
+        form == Arena::NyxMode::Reforming) {
+      return false;
+    }
+    if (slot == 2) {
+      if (s && (riding(*s) || swarmAttached(*s))) return true;
+      sys.fxRing(self.x, self.y, 60.0f, VfxTheme::Neutral);
+      return false;
+    }
+    if (slot == 3) {
+      if (form != Arena::NyxMode::Body) return true;  // detach
+      bool enemy = false;
+      if (pickTarget(sys, self, self.aimX, self.aimY, FORM_REACH, enemy)) {
+        return true;
+      }
+      sys.fxRing(self.x, self.y, FORM_REACH, VfxTheme::Neutral);
+      return false;
+    }
+    return true;
+  }
+
+  bool canRecast(const Player& self, int slot) const override {
+    if (slot != 3) return false;
+    const State* s = find(self.id);
+    return s && (s->self == Arena::NyxMode::Flying || riding(*s));
+  }
+
+  void tick(AbilitySystem& sys, Player& self, float dtMs) override {
+    State& s = state(self);
+    tickSelf(sys, self, s, dtMs);
+    tickSwarm(sys, self, s, dtMs);
+    mirror(self, s);
+  }
+
+  // Riding a target, she cannot be hit herself; she takes her share of what
+  // hits the target instead (onCreatureDamaged).
+  float onTakeDamage(AbilitySystem&, Player& self, float damage,
+                     uint32_t) override {
+    const State* s = find(self.id);
+    if (s && riding(*s) && !takingShare) return 0.0f;
+    return damage;
+  }
+
+  float onCreatureDamaged(AbilitySystem& sys, Player& self, bool isEnemy,
+                          uint32_t targetId, float damage) override {
+    const State* s = find(self.id);
+    if (!s || !riding(*s) || s->rideTarget != targetId ||
+        s->rideOnEnemy != isEnemy) {
+      return damage;
+    }
+    float share = damage * SHARE;
+    takingShare = true;
+    sys.damagePlayer(self, share, 0, DamageFlag::Proc);
+    takingShare = false;
+    // An ally is spared her share; a foe still takes all of it.
+    return isEnemy ? damage : damage - share;
+  }
+
+  // She falls beside her CRT, whatever she was riding.
+  bool onLethal(AbilitySystem&, Player& self) override {
+    State& s = state(self);
+    if (s.self != Arena::NyxMode::Body) {
+      self.x = s.crtX;
+      self.y = s.crtY;
+    }
+    s.self = Arena::NyxMode::Body;
+    s.rideTarget = 0;
+    s.swarm = Arena::NyxMode::SwarmHome;
+    s.swarmTarget = 0;
+    self.kitAnchored = false;
+    mirror(self, s);
+    return false;
+  }
+
+  // All abilities radiate from Nyx and from her swarm, core ones included:
+  // an area core goes off again where the swarm is.
+  void onCoreCast(AbilityContext& ctx) override {
+    Player& self = ctx.self;
+    const State* s = find(self.id);
+    if (!s || !swarmAway(*s, self)) return;
+    // Diamond Fortress is armour on Nyx, not an area: nothing to echo.
+    if (self.coreGenus == Arena::Genus::Frigidariant) return;
+    float x = self.x, y = self.y;
+    self.x = s->sx;
+    self.y = s->sy;
+    Infusions::castCore(ctx);
+    self.x = x;
+    self.y = y;
+  }
+
+  void onRoundStart(Player& self) override { states.erase(self.id); }
+
+ private:
+  std::unordered_map<uint32_t, State> states;
+  bool takingShare = false;
+
+  const State* find(uint32_t id) const {
+    auto it = states.find(id);
+    return it == states.end() ? nullptr : &it->second;
+  }
+
+  State& state(Player& self) {
+    auto it = states.find(self.id);
+    if (it == states.end()) {
+      State fresh;
+      fresh.sx = self.x;
+      fresh.sy = self.y;
+      it = states.emplace(self.id, fresh).first;
+    }
+    return it->second;
+  }
+
+  static bool riding(const State& s) {
+    return s.self == Arena::NyxMode::OnEnemy || s.self == Arena::NyxMode::OnAlly;
+  }
+  static bool swarmAttached(const State& s) {
+    return s.swarm == Arena::NyxMode::SwarmOnEnemy ||
+           s.swarm == Arena::NyxMode::SwarmOnAlly;
+  }
+  static bool swarmAway(const State& s, const Player& self) {
+    return s.swarm != Arena::NyxMode::SwarmHome &&
+           dist(s.sx, s.sy, self.x, self.y) > HOME_DIST;
+  }
+
+  // The enemy or ally (not Nyx) whose body is nearest (x, y), within
+  // SWARM_PICK of it and `reach` of Nyx. Returns its id; 0 for none.
+  static uint32_t pickTarget(AbilitySystem& sys, const Player& self, float x,
+                             float y, float reach, bool& isEnemy) {
+    uint32_t best = 0;
+    float bestD = 1e9f;
+    sys.enemiesInCircle(x, y, SWARM_PICK + 80.0f, [&](Enemy& enemy) {
+      float d = dist(enemy.x, enemy.y, x, y) - enemy.radius;
+      if (d > SWARM_PICK || d >= bestD) return;
+      if (dist(enemy.x, enemy.y, self.x, self.y) > reach + enemy.radius) return;
+      best = enemy.id;
+      bestD = d;
+      isEnemy = true;
+    });
+    for (auto& [id, ally] : sys.allPlayers()) {
+      if (id == self.id || !ally.isAlive() || ally.characterId == 0) continue;
+      float d = dist(ally.x, ally.y, x, y) - Arena::Tuning::PLAYER_RADIUS;
+      if (d > SWARM_PICK || d >= bestD) continue;
+      if (dist(ally.x, ally.y, self.x, self.y) > reach) continue;
+      best = id;
+      bestD = d;
+      isEnemy = false;
+    }
+    return best;
+  }
+
+  // Where a creature stands; false if it is gone or dead.
+  static bool bodyAt(AbilitySystem& sys, uint32_t id, bool isEnemy, float& x,
+                     float& y) {
+    if (isEnemy) {
+      Enemy* enemy = sys.findEnemy(id);
+      if (!enemy || enemy->state == EnemyState::Dead) return false;
+      x = enemy->x;
+      y = enemy->y;
+      return true;
+    }
+    Player* ally = sys.findPlayer(id);
+    if (!ally || !ally->isAlive()) return false;
+    x = ally->x;
+    y = ally->y;
+    return true;
+  }
+
+  // Step (x, y) toward (tx, ty); true on arrival.
+  static bool moveToward(float& x, float& y, float tx, float ty, float speed,
+                         float dtMs) {
+    float d = dist(x, y, tx, ty);
+    float step = speed * dtMs / 1000.0f;
+    if (d <= step) {
+      x = tx;
+      y = ty;
+      return true;
+    }
+    x += (tx - x) / d * step;
+    y += (ty - y) / d * step;
+    return false;
+  }
+
+  // Hive Mother on one host. Once a second: Silenced (enemy) or Focused
+  // (ally), whose own secondaries add the Dulled and Weakened or the
+  // Sharpened. False once the host has been cleansed or purged of it,
+  // which sends the swarm home.
+  static bool holdHost(AbilitySystem& sys, uint32_t nyxId, uint32_t hostId,
+                       bool isEnemy, float& pulse, float dtMs) {
+    EffectType hold = isEnemy ? EffectType::Silenced : EffectType::Focused;
+    pulse += dtMs;
+    if (pulse >= PULSE_MS) {
+      pulse -= PULSE_MS;
+      ActiveEffects& fx = sys.effects().mutableEffects(hostId, isEnemy);
+      const EffectInstance* had = fx.findEffect(hold);
+      float before = had ? had->remainingDuration : 0.0f;
+      if (isEnemy) {
+        if (Enemy* enemy = sys.findEnemy(hostId)) {
+          sys.applyToEnemy(*enemy, hold, 1, nyxId, HOLD_MS);
+        }
+      } else if (Player* ally = sys.findPlayer(hostId)) {
+        sys.applyToPlayer(*ally, hold, 1, nyxId, HOLD_MS);
+      }
+      // Silenced and Focused extend on reapply; the swarm only holds them,
+      // it does not bank time.
+      ActiveEffects& after = sys.effects().mutableEffects(hostId, isEnemy);
+      if (EffectInstance* held = after.findEffect(hold)) {
+        held->remainingDuration = std::max(before, HOLD_MS);
+      }
+    }
+    return sys.effects().mutableEffects(hostId, isEnemy).hasEffect(hold);
+  }
+
+  // ---- Nyx herself ---------------------------------------------------------
+
+  void tickSelf(AbilitySystem& sys, Player& self, State& s, float dtMs) {
+    using namespace Arena::NyxMode;
+    switch (s.self) {
+      case Body:
+        break;
+      case Dropping:
+        s.timerMs -= dtMs;
+        if (s.timerMs <= 0.0f) {
+          s.self = Flying;
+          sys.fxBurst(self.x, self.y, 70.0f, VfxTheme::Nanite);
+        }
+        break;
+      case Flying: {
+        float tx, ty;
+        if (!bodyAt(sys, s.rideTarget, s.rideOnEnemy, tx, ty)) {
+          startHoming(s);
+          break;
+        }
+        if (moveToward(self.x, self.y, tx, ty, CLOUD_SPEED, dtMs)) {
+          s.self = s.rideOnEnemy ? OnEnemy : OnAlly;
+          s.ridePulse = PULSE_MS;  // takes hold at once
+        }
+        break;
+      }
+      case OnEnemy:
+      case OnAlly: {
+        float tx, ty;
+        if (!bodyAt(sys, s.rideTarget, s.rideOnEnemy, tx, ty) ||
+            !holdHost(sys, self.id, s.rideTarget, s.rideOnEnemy, s.ridePulse,
+                      dtMs)) {
+          startHoming(s);
+          break;
+        }
+        self.x = tx;
+        self.y = ty;
+        break;
+      }
+      case Homing:
+        if (moveToward(self.x, self.y, s.crtX, s.crtY, CLOUD_SPEED, dtMs)) {
+          s.self = Reforming;
+          s.timerMs = REFORM_MS;
+          sys.fxBurst(self.x, self.y, 60.0f, VfxTheme::Nanite);
+        }
+        break;
+      case Reforming:
+        s.timerMs -= dtMs;
+        if (s.timerMs <= 0.0f) s.self = Body;
+        break;
+      default:
+        assert(false && "unknown Nyx form");
+    }
+
+    self.kitAnchored = s.self != Body;
+    if (s.self != Body) self.vx = self.vy = 0.0f;
+    if (s.self == Dropping || s.self == Homing || s.self == Reforming) {
+      self.chargeSlot = -1;  // a held Plague Bringer is lost
+    }
+    // A cloud is not a target. In transit she cannot be touched at all;
+    // riding, she takes her share of the host's damage.
+    bool cloud = s.self == Flying || s.self == Homing || riding(s);
+    if (cloud) self.hiddenMs = std::max(self.hiddenMs, 100.0f);
+    if (s.self == Flying || s.self == Homing) {
+      self.intangibleMs = std::max(self.intangibleMs, 100.0f);
+    }
+  }
+
+  static void startHoming(State& s) {
+    s.self = Arena::NyxMode::Homing;
+    s.rideTarget = 0;
+  }
+
+  void becomeSwarm(AbilityContext& ctx) {
+    using namespace Arena::NyxMode;
+    AbilitySystem& sys = ctx.sys;
+    Player& self = ctx.self;
+    State& s = state(self);
+    if (s.self == Flying || riding(s)) {
+      startHoming(s);
+      sys.fxBurst(self.x, self.y, 50.0f, VfxTheme::Nanite);
+      return;
+    }
+    assert(s.self == Body && "canCast refuses mid-transformation");
+    bool enemy = false;
+    uint32_t target = pickTarget(sys, self, ctx.aimX, ctx.aimY, FORM_REACH, enemy);
+    assert(target != 0 && "canCast checked for a target");
+    s.self = Dropping;
+    s.timerMs = DROP_MS;
+    s.rideTarget = target;
+    s.rideOnEnemy = enemy;
+    s.crtX = self.x;
+    s.crtY = self.y;
+    self.kitAnchored = true;
+    float tx = 0.0f, ty = 0.0f;
+    if (bodyAt(sys, target, enemy, tx, ty)) {
+      sys.fxTether(self.x, self.y, tx, ty, DROP_MS + 200.0f, VfxTheme::Nanite);
+    }
+  }
+
+  // ---- the swarm -----------------------------------------------------------
+
+  void tickSwarm(AbilitySystem& sys, Player& self, State& s, float dtMs) {
+    using namespace Arena::NyxMode;
+    // Too far from Nyx (even as a cloud, she is its anchor): it comes home.
+    if (s.swarm != SwarmHome && s.swarm != SwarmReturning &&
+        dist(s.sx, s.sy, self.x, self.y) > SWARM_LEASH) {
+      s.swarm = SwarmReturning;
+      s.swarmTarget = 0;
+    }
+    switch (s.swarm) {
+      case SwarmHome:
+        s.sx = self.x;
+        s.sy = self.y;
+        break;
+      case SwarmFlying: {
+        float tx = s.destX, ty = s.destY;
+        if (s.swarmTarget != 0 &&
+            !bodyAt(sys, s.swarmTarget, s.swarmOnEnemy, tx, ty)) {
+          // The host is gone: hang where the swarm got to.
+          s.swarmTarget = 0;
+          s.swarm = SwarmParked;
+          break;
+        }
+        if (moveToward(s.sx, s.sy, tx, ty, SWARM_SPEED, dtMs)) {
+          if (s.swarmTarget != 0) {
+            s.swarm = s.swarmOnEnemy ? SwarmOnEnemy : SwarmOnAlly;
+            s.swarmPulse = PULSE_MS;  // takes hold at once
+          } else {
+            s.swarm = SwarmParked;
+          }
+        }
+        break;
+      }
+      case SwarmParked:
+        break;
+      case SwarmOnEnemy:
+      case SwarmOnAlly: {
+        float tx, ty;
+        if (!bodyAt(sys, s.swarmTarget, s.swarmOnEnemy, tx, ty) ||
+            !holdHost(sys, self.id, s.swarmTarget, s.swarmOnEnemy,
+                      s.swarmPulse, dtMs)) {
+          s.swarm = SwarmReturning;
+          s.swarmTarget = 0;
+          break;
+        }
+        s.sx = tx;
+        s.sy = ty;
+        break;
+      }
+      case SwarmReturning:
+        if (moveToward(s.sx, s.sy, self.x, self.y, SWARM_SPEED * 1.3f, dtMs)) {
+          s.swarm = SwarmHome;
+        }
+        break;
+      default:
+        assert(false && "unknown swarm mode");
+    }
+
+    // Enemies passing through the swarm gain +1 Slow, once per pass.
+    std::vector<uint32_t> nowInside;
+    if (s.swarm != SwarmHome) {
+      sys.enemiesInCircle(s.sx, s.sy, SWARM_RADIUS, [&](Enemy& enemy) {
+        nowInside.push_back(enemy.id);
+        if (std::find(s.inside.begin(), s.inside.end(), enemy.id) ==
+            s.inside.end()) {
+          sys.applyToEnemy(enemy, EffectType::Slow, 1, self.id);
+        }
+      });
+    }
+    s.inside = std::move(nowInside);
+  }
+
+  void sendSwarm(AbilityContext& ctx) {
+    using namespace Arena::NyxMode;
+    AbilitySystem& sys = ctx.sys;
+    Player& self = ctx.self;
+    State& s = state(self);
+    bool enemy = false;
+    uint32_t target =
+        pickTarget(sys, self, ctx.aimX, ctx.aimY, SWARM_REACH, enemy);
+    if (s.swarm == SwarmHome) {
+      s.sx = self.x;
+      s.sy = self.y;
+    }
+    s.swarm = SwarmFlying;
+    s.swarmTarget = target;
+    s.swarmOnEnemy = enemy;
+    aimPoint(ctx, SWARM_REACH, s.destX, s.destY);
+  }
+
+  // ---- RMB and Q -----------------------------------------------------------
+
+  // Every enemy and ally within `radius` of Nyx or of her swarm, once each.
+  void inWave(AbilitySystem& sys, const Player& self, const State& s,
+              float radius, std::vector<uint32_t>& foes,
+              std::vector<uint32_t>& friends) {
+    auto add = [](std::vector<uint32_t>& v, uint32_t id) {
+      if (std::find(v.begin(), v.end(), id) == v.end()) v.push_back(id);
+    };
+    std::vector<std::pair<float, float>> origins = {{self.x, self.y}};
+    if (swarmAway(s, self)) origins.push_back({s.sx, s.sy});
+    for (const auto& [x, y] : origins) {
+      sys.fxRing(x, y, radius, VfxTheme::Nanite);
+      sys.fxBurst(x, y, radius * 0.45f, VfxTheme::Nanite);
+      sys.enemiesInCircle(x, y, radius, [&](Enemy& e) { add(foes, e.id); });
+      sys.playersInCircle(x, y, radius, [&](Player& p) { add(friends, p.id); });
+    }
+  }
+
+  void plagueBringer(AbilityContext& ctx) {
+    AbilitySystem& sys = ctx.sys;
+    Player& self = ctx.self;
+    State& s = state(self);
+    float radius = PLAGUE_RADIUS_MIN +
+                   (PLAGUE_RADIUS_MAX - PLAGUE_RADIUS_MIN) * ctx.charge;
+    std::vector<uint32_t> foes, friends;
+    inWave(sys, self, s, radius, foes, friends);
+
+    for (uint32_t id : foes) {
+      if (Enemy* enemy = sys.findEnemy(id)) {
+        sys.applyToEnemy(*enemy, EffectType::Weakened, 2, self.id);
+      }
+    }
+    for (uint32_t id : friends) {
+      if (Player* ally = sys.findPlayer(id)) {
+        sys.applyToPlayer(*ally, EffectType::Empowered, 1, self.id);
+      }
+    }
+
+    // Contaminate: the swarms' hosts pass their worst debuffs to every
+    // enemy the wave hit. A foe keeps its own; an ally is rid of them.
+    if (swarmAttached(s)) {
+      contaminate(sys, self, s.swarmTarget, s.swarmOnEnemy, foes);
+    }
+    if (riding(s) && !(swarmAttached(s) && s.swarmTarget == s.rideTarget &&
+                       s.swarmOnEnemy == s.rideOnEnemy)) {
+      contaminate(sys, self, s.rideTarget, s.rideOnEnemy, foes);
+    }
+  }
+
+  static void contaminate(AbilitySystem& sys, const Player& self,
+                          uint32_t hostId, bool hostIsEnemy,
+                          const std::vector<uint32_t>& foes) {
+    float hx, hy;
+    if (!bodyAt(sys, hostId, hostIsEnemy, hx, hy)) return;
+    std::vector<EffectInstance> debuffs;
+    for (const EffectInstance& e :
+         sys.effects().mutableEffects(hostId, hostIsEnemy).effects) {
+      if (EffectRegistry::getCategory(e.type) == EffectCategory::Debuff) {
+        debuffs.push_back(e);
+      }
+    }
+    std::stable_sort(debuffs.begin(), debuffs.end(),
+                     [](const EffectInstance& a, const EffectInstance& b) {
+                       return a.stacks > b.stacks;
+                     });
+    if (debuffs.size() > CONTAMINATE_COUNT) debuffs.resize(CONTAMINATE_COUNT);
+
+    for (const EffectInstance& debuff : debuffs) {
+      for (uint32_t id : foes) {
+        if (hostIsEnemy && id == hostId) continue;
+        Enemy* enemy = sys.findEnemy(id);
+        if (!enemy) continue;
+        int before = sys.effects().getEnemyEffects(id).getStacks(debuff.type);
+        sys.applyToEnemy(*enemy, debuff.type, debuff.stacks, self.id);
+        int after = sys.effects().getEnemyEffects(id).getStacks(debuff.type);
+        if (after != before) {
+          sys.fxEffectVerb(EffectVerb::Spread, debuff.type, id, true, enemy->x,
+                           enemy->y, static_cast<float>(before),
+                           static_cast<float>(after), hostId, hx, hy);
+        }
+      }
+      if (!hostIsEnemy) sys.effects().removeEffect(hostId, false, debuff.type);
+    }
+  }
+
+  void naniteCloud(AbilityContext& ctx) {
+    AbilitySystem& sys = ctx.sys;
+    Player& self = ctx.self;
+    State& s = state(self);
+    auto cloud = [&](uint32_t id, bool isEnemy) {
+      if (isEnemy) {
+        if (Enemy* enemy = sys.findEnemy(id)) {
+          sys.applyToEnemy(*enemy, EffectType::Marked, 1, self.id);
+          sys.fxBurst(enemy->x, enemy->y, 55.0f, VfxTheme::Nanite);
+        }
+      } else if (Player* ally = sys.findPlayer(id)) {
+        sys.applyToPlayer(*ally, EffectType::Stealth, 1, self.id);
+        sys.fxBurst(ally->x, ally->y, 55.0f, VfxTheme::Nanite);
+      }
+    };
+    if (swarmAttached(s)) cloud(s.swarmTarget, s.swarmOnEnemy);
+    if (riding(s) && (s.rideTarget != s.swarmTarget || !swarmAttached(s))) {
+      cloud(s.rideTarget, s.rideOnEnemy);
+    }
+  }
+
+  static void mirror(Player& self, const State& s) {
+    self.kitX = s.sx;
+    self.kitY = s.sy;
+    bool crtDown = s.self != Arena::NyxMode::Body;
+    self.propX = crtDown ? s.crtX : 0.0f;
+    self.propY = crtDown ? s.crtY : 0.0f;
+    self.kitMode = Arena::NyxMode::pack(s.swarm, s.self);
+    // The HUD meter: full while a swarm (or Nyx) rides someone.
+    self.resource = swarmAttached(s) || riding(s) ? 255 : 0;
+  }
+};
+
 }  // namespace
 
 std::unique_ptr<Kit> makeKit(uint32_t characterId) {
@@ -1517,6 +2122,8 @@ std::unique_ptr<Kit> makeKit(uint32_t characterId) {
       return std::make_unique<VolgoreKit>();
     case Nolan:
       return std::make_unique<NolanKit>();
+    case Nyx:
+      return std::make_unique<NyxKit>();
     case Wade:
       return std::make_unique<WadeKit>();
     case Presidente:
