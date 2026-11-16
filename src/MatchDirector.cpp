@@ -499,9 +499,11 @@ void MatchDirector::updateSpawning(float dtMs, bool bossPhase) {
 
 void MatchDirector::spawnPack(float x, float y, int size, bool targetShip,
                               Genus genusOverride, bool swarmersOnly) {
-  Genus genus = genusOverride != Genus::None
-                    ? genusOverride
-                    : Arena::genusForDirection(x - shipX, y - shipY);
+  // A cheat's override can still call up an unfielded genus's old aliens.
+  Genus genus =
+      genusOverride != Genus::None
+          ? genusOverride
+          : Arena::fieldedGenus(Arena::genusForDirection(x - shipX, y - shipY));
   int round = std::min(currentRound, Tuning::ROUND_COUNT);
 
   // Later rounds mix in more casters and brutes.
@@ -514,6 +516,12 @@ void MatchDirector::spawnPack(float x, float y, int size, bool targetShip,
   if (genus == Genus::Cerebrian) theme = VfxTheme::Psychic;
   if (genus == Genus::Frigidariant) theme = VfxTheme::Ice;
   if (genus == Genus::Magnarok) theme = VfxTheme::Fire;
+
+  // A simplified genus fields hero-sized thugs: about two thirds as many
+  // bodies, each worth more, and at most one elite enforcer leading them.
+  bool thugs = Arena::hasThugRoster(genus);
+  if (thugs) size = std::max(2, (size * 2 + 2) / 3);
+  bool eliteSpawned = false;
 
   for (int i = 0; i < size; i++) {
     float roll = random01();
@@ -530,8 +538,16 @@ void MatchDirector::spawnPack(float x, float y, int size, bool targetShip,
     options.targetShip = targetShip;
     options.healthScale = healthScale;
     options.damageScale = damageScale;
-    options.elite =
-        tier != EnemyTier::Swarmer && random01() < 0.04f * currentRound;
+    if (thugs) {
+      // The enforcer takes the brute's place: never in a ship raid, never
+      // in a cheat crowd, and rarer early.
+      options.elite = !targetShip && !swarmersOnly && !eliteSpawned &&
+                      random01() < 0.05f * currentRound;
+      eliteSpawned = eliteSpawned || options.elite;
+    } else {
+      options.elite =
+          tier != EnemyTier::Swarmer && random01() < 0.04f * currentRound;
+    }
 
     float ox = randomRange(-70.0f, 70.0f);
     float oy = randomRange(-70.0f, 70.0f);
@@ -772,21 +788,34 @@ void MatchDirector::dropLoot(const Enemy& enemy) {
 
   static const float INFUSION_CHANCE[3] = {0.07f, 0.24f, 0.75f};
   float chance = INFUSION_CHANCE[static_cast<int>(def.tier)];
+  // A thug pack is fewer bodies with no caster or brute in it: 0.16 a head
+  // keeps a pack's expected infusions where the mixed pack had them.
+  bool thug = Arena::hasThugRoster(def.genus);
+  if (thug) chance = 0.16f;
   if (enemy.elite) chance = 1.0f;
+  int pityKills = thug ? 4 : 6;
+  // The infusion is the territory's, not the body's: with one genus fielded
+  // everywhere, where you fight still decides what you can build.
+  Genus lootGenus =
+      thug ? Arena::genusForDirection(enemy.x - shipX, enemy.y - shipY)
+           : def.genus;
   // Pity: every round hands out its first infusion early so there is always
   // something to slot at the first intermission.
   int participants = std::max(1, participantCount());
-  if (infusionDropsThisRound < participants && killsThisRound >= 6 * (infusionDropsThisRound + 1)) {
+  if (infusionDropsThisRound < participants &&
+      killsThisRound >= pityKills * (infusionDropsThisRound + 1)) {
     chance = 1.0f;
   }
 
   if (random01() < chance) {
     infusionDropsThisRound++;
     hooks.spawnPickup(
-        Arena::PickupId::InfusionBase + static_cast<uint32_t>(def.genus),
+        Arena::PickupId::InfusionBase + static_cast<uint32_t>(lootGenus),
         enemy.x, enemy.y);
   }
-  if (def.tier == EnemyTier::Brute && random01() < 0.5f) {
+  // Scrap comes off the pack's heavy: a brute, or a thug pack's elite.
+  bool heavy = def.tier == EnemyTier::Brute || (thug && enemy.elite);
+  if (heavy && random01() < 0.5f) {
     hooks.spawnPickup(Arena::PickupId::Scrap, enemy.x + 24.0f, enemy.y);
   } else if (random01() < 0.05f) {
     hooks.spawnPickup(Arena::PickupId::Medkit, enemy.x - 20.0f, enemy.y);

@@ -29,6 +29,12 @@ const char* genusName(Genus g);
 // Angle is atan2(dy, dx) from the ship in screen space (y down).
 Genus genusForDirection(float dx, float dy);
 
+// The genus whose aliens actually spawn in a genus's territory. Only genera
+// with real models are fielded; until the other three get theirs, every
+// territory is held by Venoxarid thugs. The territory still decides which
+// infusion drops there (docs/design/DECISIONS.md, 2026-11-15).
+Genus fieldedGenus(Genus territory);
+
 // ---------------------------------------------------------------------------
 // Enemies
 // ---------------------------------------------------------------------------
@@ -36,10 +42,16 @@ Genus genusForDirection(float dx, float dy);
 enum class EnemyTier : uint8_t { Swarmer = 0, Caster = 1, Brute = 2, Boss = 3 };
 
 // Order matters: (genus - 1) * 3 + tier for the twelve regular kinds.
+//
+// The roster is being simplified one genus at a time, to one street thug
+// per genus plus its elite (docs/design/DECISIONS.md, 2026-11-15).
+// Venoxarid is done: every Venoxarid spawn is a VenoxaridGrunt, and
+// Venomire and Serpentide are retired. Their slots stay so the numbering
+// (and the network value of every other kind) does not move.
 enum class EnemyKind : uint8_t {
-  Toxlith = 0,
-  Venomire = 1,
-  Serpentide = 2,
+  VenoxaridGrunt = 0,
+  Venomire = 1,    // retired: never spawned
+  Serpentide = 2,  // retired: never spawned
   Psymite = 3,
   Cerebrax = 4,
   Synaptogon = 5,
@@ -69,7 +81,27 @@ struct EnemyKindDef {
 };
 
 const EnemyKindDef& enemyDef(EnemyKind kind);
+// The kind a genus fields for a tier. A simplified genus fields its grunt
+// for every tier.
 EnemyKind enemyKindFor(Genus genus, EnemyTier tier);
+// True for a genus on the simplified roster (a grunt and its elite).
+bool hasThugRoster(Genus genus);
+
+// What being elite does to an enemy. A thug's elite is its own, bigger
+// character with its own model; any other elite is the same body, tougher.
+struct EliteTuning {
+  float health;       // times the kind's health
+  float damage;       // times the kind's damage
+  float size;         // times the kind's radius (and, for thugs, height)
+  float speed;        // times the kind's speed
+  float attackRange;  // times the kind's attack range
+};
+const EliteTuning& eliteTuning(EnemyKind kind);
+
+// The baked sprite-forge actor (assets/sprites/actors/) that draws this
+// enemy. An elite thug has its own sheet, already drawn at elite size.
+const char* enemyActorName(EnemyKind kind, bool elite);
+bool eliteHasOwnActor(EnemyKind kind);
 
 // ---------------------------------------------------------------------------
 // Abilities / kits

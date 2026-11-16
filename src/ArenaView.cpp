@@ -488,6 +488,7 @@ std::string actionClip(const std::string& character, int slot,
 const ArenaView::EnemySprite* ArenaView::enemySprite(Arena::EnemyKind kind) {
   loadManifest();
   // The boss borrows the largest Cerebrian body until it has its own art.
+  // (Kinds drawn by a forge actor have no cut-out here and return nullptr.)
   const char* name = kind == Arena::EnemyKind::Boss
                          ? "Synaptogon"
                          : Arena::enemyDef(kind).name;
@@ -1306,7 +1307,12 @@ void ArenaView::drawEnemy(ImDrawList* dl, const ArenaClient::EnemyView& view) {
   bool stunned = (view.state.flags & EnemyFlags::Stunned) != 0;
   bool confused = (view.state.flags & EnemyFlags::Confused) != 0;
   bool boss = kind == Arena::EnemyKind::Boss;
-  float scale = def.drawScale * (elite ? 1.22f : 1.0f);
+  // An elite with its own sheet is already drawn at elite size.
+  bool ownEliteArt = elite && Arena::eliteHasOwnActor(kind);
+  float scale = def.drawScale * (elite && !ownEliteArt ? 1.22f : 1.0f);
+  // How much wider the body is on the ground than the kind's radius.
+  float girth = (ownEliteArt ? Arena::eliteTuning(kind).size : 1.0f) * scale /
+                def.drawScale;
   float speed = std::sqrt(view.state.vx * view.state.vx +
                           view.state.vy * view.state.vy);
 
@@ -1355,21 +1361,23 @@ void ArenaView::drawEnemy(ImDrawList* dl, const ArenaClient::EnemyView& view) {
     }
   }
 
-  if (!view.dying) drawShadow(dl, feet, def.radius * scale / def.drawScale * 1.05f);
+  if (!view.dying) drawShadow(dl, feet, def.radius * girth * 1.05f);
 
   static const std::vector<EffectInstance> noEnemyEffects;
   const std::vector<EffectInstance>& enemyEffects =
       effects && !view.dying ? effects->getEffects(view.state.id, true)
                              : noEnemyEffects;
-  float bodyRadius = def.radius * scale / def.drawScale;
+  float bodyRadius = def.radius * girth;
   effectFx.drawUnder(dl, view.state.id, true, feet, bodyRadius, enemyEffects);
   tint = multiplyColor(tint, effectFx.bodyTint(enemyEffects));
   if (elite && !view.dying) {
-    dl->AddCircle(feet, def.radius * 1.5f, IM_COL32(255, 210, 80, 200), 28, 2.5f);
+    dl->AddCircle(feet, def.radius * girth * 1.5f, IM_COL32(255, 210, 80, 200),
+                  28, 2.5f);
   }
 
   ImVec2 at(feet.x + offsetX, feet.y + offsetY);
-  const ActorSheet* actor = boss ? nullptr : actorFor(def.name);
+  const ActorSheet* actor =
+      boss ? nullptr : actorFor(Arena::enemyActorName(kind, elite));
   // Grappled: in El Presidente's hands. Pinned to the carry socket his
   // animation exports, so the foe rises with his leaps, whirls with the
   // Látigo and is driven down by the powerbomb.
@@ -1378,9 +1386,10 @@ void ArenaView::drawEnemy(ImDrawList* dl, const ArenaClient::EnemyView& view) {
   const CarryPoint* carrier = lifted ? carrierNear(view.x, view.y) : nullptr;
   if (carrier) {
     // Rolls are authored for an upright body (90 = lying across his hands).
-    // The aliens are long, low creatures, so a quarter turn more puts them
-    // on their backs, legs up.
-    liftRotation = (carrier->rollDeg + 90.0f) * (PI / 180.0f) *
+    // The old aliens are long, low creatures, so a quarter turn more puts
+    // them on their backs, legs up. Thugs stand upright and need none.
+    float extraRoll = Arena::hasThugRoster(def.genus) ? 0.0f : 90.0f;
+    liftRotation = (carrier->rollDeg + extraRoll) * (PI / 180.0f) *
                    (carrier->faceLeft ? -1.0f : 1.0f);
     // Put the foe's middle on his hands. Sprites rotate about the bottom
     // of their cell, which sits `drop` pixels below their feet.
@@ -1881,11 +1890,14 @@ void ArenaView::drawOverhead(ImDrawList* dl) {
     }
     bool elite = (view.state.flags & EnemyFlags::Elite) != 0;
     const ActorSheet* enemyActor =
-        kind == Arena::EnemyKind::Boss ? nullptr : actorFor(def.name);
+        kind == Arena::EnemyKind::Boss
+            ? nullptr
+            : actorFor(Arena::enemyActorName(kind, elite));
+    bool ownEliteArt = elite && Arena::eliteHasOwnActor(kind);
     float spriteHeight = enemyActor ? enemyActor->pivotY * enemyActor->scale * 0.72f
                                     : (sprite ? sprite->cellH : 40);
-    float height = spriteHeight * def.drawScale * (elite ? 1.22f : 1.0f) *
-                   camera->zoom;
+    float height = spriteHeight * def.drawScale *
+                   (elite && !ownEliteArt ? 1.22f : 1.0f) * camera->zoom;
     float top = feet.y - height - 8.0f;
     bool hurt = view.state.health < view.state.maxHealth - 0.5f;
     if (hurt || elite) {

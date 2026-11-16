@@ -75,9 +75,12 @@ uint32_t EnemySystem::spawn(EnemyKind kind, float x, float y,
   enemy.campGuard = options.campGuard;
   enemy.elite = options.elite;
   if (options.elite) {
-    enemy.maxHealth *= 2.2f;
-    enemy.damage *= 1.3f;
-    enemy.radius *= 1.15f;
+    const Arena::EliteTuning& tuning = Arena::eliteTuning(kind);
+    enemy.maxHealth *= tuning.health;
+    enemy.damage *= tuning.damage;
+    enemy.radius *= tuning.size;
+    enemy.speed *= tuning.speed;
+    enemy.attackRange *= tuning.attackRange;
   }
   enemy.health = enemy.maxHealth;
   // Stagger first attacks so a pack does not strike on the same frame.
@@ -735,7 +738,7 @@ void EnemySystem::resolveBossAttack(
   } else {
     // Summon a brood of swarmers from a random genus.
     std::uniform_int_distribution<int> genusPick(1, Arena::GENUS_COUNT);
-    Genus genus = static_cast<Genus>(genusPick(rng));
+    Genus genus = Arena::fieldedGenus(static_cast<Genus>(genusPick(rng)));
     int count = enraged ? 7 : 5;
     combat->fxRing(enemy.x, enemy.y, 240.0f, VfxTheme::Shadow);
     for (int i = 0; i < count; i++) {

@@ -123,5 +123,6 @@ to hips and forearms to chests.
 - File size under about 15 MB.
 
 Save it as `art/models/<Name>.glb` with the same name the game uses
-(`Wade`, `Presidente`, `Gravon`, ...), then ask a Claude Code session to
+(`Wade`, `Presidente`, `Gravon`, ...; enemies are `<Genus>Grunt` and
+`<Genus>Elite`, such as `VenoxaridGrunt`), then ask a Claude Code session to
 "make <Name> from the model".

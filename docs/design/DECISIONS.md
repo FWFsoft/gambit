@@ -21,6 +21,97 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-15: Only Venoxarid thugs spawn until the other genera have models
+- **Decision:** Every pack, in every direction from the ship, is Venoxarid
+  grunts and elites. Cerebrian, Frigidariant and Magnarok aliens no longer
+  spawn in a match (the boss's brood is thugs too); they come back one
+  genus at a time as each gets its real models. Their code, stats and old
+  sheets are kept, and the playtest cheat keys can still call them up.
+  - **Infusions still follow the map.** A kill drops the infusion of the
+    territory it happened in (south Venoxarid, west Cerebrian, north
+    Frigidariant, east Magnarok), not of the body.
+  - **Drop rates re-fitted for all-thug packs:** 16% per grunt (a mixed
+    pack was 7% / 24% / 75% by tier), an elite always drops, the pity drop
+    comes every 4 kills instead of 6, and an elite has the brute's 50%
+    chance of scrap.
+- **Pillars:**
+  - **Creative Builds & Dynamic Play** decided the infusion rule: with one
+    genus on the field, tying drops to the body would leave only Venoxarid
+    infusions and one build. Tying them to territory keeps all four.
+  - **Trades against Creative Builds & Dynamic Play** all the same: every
+    fight is now the same enemy with the same Wound on hit. Slow, Snare,
+    Silence and Weakened from enemies are gone, and so are ranged shots
+    and slams, so runs are more alike. This is temporary and was asked for.
+  - **Trades against Clarity, slightly:** nothing on screen now says which
+    territory you are in except the ground and the drop itself.
+  - **Strategic Crunch:** neutral. Where to fight still decides what you
+    can build.
+- **Why:** Requested by Noah: pare back to just the Venoxarids rather than
+  four genera of placeholder aliens, and bring the others back with their
+  own models. Drop numbers keep a pack's expected infusions about where
+  they were; **not playtested**. A full ArenaSim match and the unit tests
+  pass.
+- **Status:** Built, needs review
+- **Where:** `fieldedGenus()` in `src/ArenaData.cpp`,
+  `src/MatchDirector.cpp` (`spawnPack`, `dropLoot`), `src/EnemySystem.cpp`
+
+## 2026-11-15: Venoxarid simplified to street thugs: a grunt and an elite
+- **Decision:** The Venoxarid genus fields one enemy, the **grunt**, a
+  hero-sized street thug (think a beat-'em-up's back-alley muscle), plus an
+  **elite** enforcer one and a half times his size. Both are the team's
+  generated models. The Toxlith swarmer, Venomire caster and Serpentide
+  brute no longer spawn. The other three genera were unchanged by this entry (the entry above
+  then took them off the field).
+  - **Grunt:** 70 health, speed 150, radius 16, 9 damage, reach 48, a
+    450 ms wind-up and 1.5 s between attacks, 25 points. (Toxlith was 28
+    health, speed 195, radius 12, 5 damage, 350 ms, 10 points.) He still
+    Wounds on hit.
+  - **Elite:** 4x the grunt's health (280), 2x damage (18), 1.5x radius and
+    sprite height, 0.85x speed, 1.3x reach. Double score and a guaranteed
+    drop, as for any elite.
+  - **Packs:** about two thirds as many bodies as before (minimum 2). At
+    most one elite per pack, 5% per round for each member, never in a ship
+    raid or the cheat crowd.
+  - **One attack:** a big overhand right. The wind-up rears the fist far
+    back and is held for the whole telegraph.
+- **Pillars:**
+  - **Clarity** decided the size and the attack: a body as big as a hero
+    with one large, slow tell is easier to read than a carpet of
+    knee-high biters, and the elite reads as "the dangerous one" by size
+    and by the glowing tank on his back, not only by a ring.
+  - **Strategic Crunch:** each kill is now a small decision (who do I
+    commit a cooldown to) instead of mowing.
+  - **Trades against Creative Builds & Dynamic Play:** Venoxarid fights
+    lose the ranged caster and the slam brute, so they have less variety
+    than the other genera, and area-damage builds have fewer bodies to
+    hit. This was asked for ("simplify the enemies down"); the elite takes
+    the brute's place as the pack's heavy, but nothing replaces the
+    caster.
+  - **Trades against Clarity, in crowds:** hero-sized enemies hide players
+    more than small ones did. The per-player rim that ART_DIRECTION asks
+    for is still not built.
+- **Why:** Requested by Noah: fewer, bigger, more characterful enemies,
+  with the real models in the game. Numbers were set so a round-1 pack has
+  about the same total health and score as before (3 grunts at 70 against
+  4 mixed aliens averaging about 50). They are **not playtested**.
+  Simplifications to know about: the boss's Venoxarid brood and the map's
+  camp guards are also grunts now; the old kind slots stay in the enum so
+  network values do not move; the grunt and elite share one set of
+  animations; both skeletons were placed by Noah in the joint editor; both models look slightly
+  to their left in the A-pose, which every pose turns back (`HEAD_TURN`).
+  **Checks:** unit tests and a full ArenaSim match pass. The silhouette
+  check flags the grunt against Wade and Gravon (as black outlines a
+  hero-sized humanoid looks like a hero; only colour separates them) and
+  the grunt against the elite (same shape, told apart by size). Seen in
+  forge previews and a size line-up only, **not in a running fight**.
+- **Status:** Built, needs review (open: tuning after a playtest; whether
+  Venoxarid wants a second ranged unit back)
+- **Where:** `src/ArenaData.cpp`, `src/EnemySystem.cpp`,
+  `src/MatchDirector.cpp`, `src/ArenaView.cpp`,
+  `tools/sprite_forge/actors/_venox_thug.py`, `venoxarid_grunt.py`,
+  `venoxarid_elite.py`, `art/models/VenoxaridGrunt.glb`,
+  `art/models/VenoxaridElite.glb`
+
 ## 2026-11-15: Enable Nolan for in-game animation playtests
 - **Decision:** Register Nolan as a playable Striker with 250 HP and 262
   movement speed. Add a clearly labeled prototype kit: Sweep (26 damage,
