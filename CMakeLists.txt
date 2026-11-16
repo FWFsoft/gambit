@@ -712,6 +712,8 @@ FetchContent_Declare(
 
 # Only build tmxlite via CMake (it has a proper CMakeLists.txt)
 set(TMXLITE_STATIC_LIB TRUE CACHE BOOL "" FORCE)
+# tmxlite 1.4.4 asks for a CMake minimum below 3.5, which CMake 4 refuses.
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 FetchContent_MakeAvailable(tmxlite)
 
 # Populate spdlog, imgui, and glm without running their CMakeLists.txt
