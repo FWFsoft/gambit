@@ -84,6 +84,101 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
   `src/ClientPrediction.cpp`, `src/ArenaHud.cpp`, `src/UISystem.cpp`,
   `scripts/couch.sh`, `tests/test_inputsystem.cpp`
 
+## 2026-11-16: Nyx, the Hive Mother: a nanite swarm, a CRT she sets down
+- **Decision:** Nyx (id 13) is playable as a Playmaker, 230 HP, 258 speed,
+  built from Noah's ability sheet. Her body and CRT are Noah's Meshy models
+  (`art/models/Nyx.glb`, `NyxCRT.glb`, shrunk locally for free).
+  - **Hive Mother (passive):** her swarm rides one target. On an enemy it
+    reapplies Silenced each second; Silenced's existing secondaries add +1
+    Dulled and +1 Weakened. On an ally it reapplies Focused, whose
+    secondary adds +1 Sharpened. The swarm holds the status (1.4 s) and
+    does not bank time on it. If the status is gone (cleansed, purged, or
+    blocked by Inspired or Cursed), or the host dies, the swarm flies home.
+    It also flies home if Nyx is more than 760 px from it. Area abilities
+    go off from both Nyx and the swarm, and area core abilities (Miasma,
+    Mind Flay, Cauterize) go off a second time at the swarm. Diamond
+    Fortress is armour on her, so it does not repeat.
+  - **LMB Nanite Swarm** (0.45 s): sends the swarm up to 560 px, at
+    900 px/s, to the cursor. It attaches to the enemy or ally whose body
+    is within 70 px of the cursor. Enemies entering it gain +1 Slow, once
+    per pass.
+  - **RMB Plague Bringer** (hold up to 0.9 s, 6 s): a wave of 150-260 px
+    from Nyx and from the swarm. Enemies gain +2 Weakened, allies
+    (Nyx included) +1 Empowered. Up to 3 debuffs on each swarm host, the
+    largest stacks first, are **contaminated** onto every enemy hit: they
+    are copied, with an Effect Spread bolt from host to victim. On an enemy
+    host this is the swarm's own Silence, Dulled and Weakened, so Plague
+    Bringer spreads the infection. **Interpretation:** an ally host loses
+    the debuffs it passes on; an enemy host keeps them.
+  - **Q Nanite Cloud** (9 s): every target a swarm rides becomes Marked
+    (enemy) or gains Stealth (ally). Refused, with no cooldown spent, if
+    nothing is attached.
+  - **Shift Become the Swarm** (8 s): she picks an enemy or ally within
+    460 px of her and 70 px of the cursor. She sets the CRT down (0.28 s),
+    flies there as a cloud (1500 px/s, untouchable), and rides the target.
+    While riding she can still cast but cannot be hit directly, and she
+    takes half of every hit on her host: an ally is spared that half, an
+    enemy still takes all of it. Recast, host death, or a cleanse sends
+    her streaming back to the CRT, where she reforms and lifts it (0.45 s).
+    If she dies riding, she falls beside the CRT. **Interpretation:** she
+    counts as a swarm on her host, so the passive applies to her too.
+  - **Not built:** the Miles clauses (Plague Bringer contaminating every
+    debuff off a possessed target, Nanite Cloud's Stun), because Miles has
+    no kit yet.
+  - **Look:** a forge actor from her model on a joint fit Noah placed in
+    the fit editor (`art/models/Nyx.fit.json`). The CRT is a rigid prop on
+    two mounts (shoulder, hand); the carry and heave arm poses are solved
+    numerically for that fit, and the drop's crouch keeps her feet on the
+    floor. Clips: idle, run, swarm, plague_charge,
+    plague, cloud, drop, lift, hit, death. A NyxCRT sheet shows the set on
+    the floor where she left it. At runtime she frays into square pixels in
+    her palette (coat magenta, screen cyan, skin orange) from the coat's
+    edges and hem. Swarms are pixel clouds, magenta on a foe and cyan on a
+    friend, joined to her by a thread of pixels. As a cloud, she draws no
+    body. New VfxTheme `Nanite`.
+- **Pillars:**
+  - **Creative Builds** serves: the kit is all interactions. It spreads
+    and stacks existing effects, combos with any Cleanse, Purge or
+    Contaminate in other kits, and echoes infusion cores from a second
+    origin. It plays like no other kit.
+  - **Comradery in Competition** serves: Focus, Sharpened, Empowered and
+    Stealth land on allies, and riding an ally soaks half their damage.
+    **Trades against it:** she deals no damage, and score here comes from
+    damage and heals. In an 8-minute ArenaSim (Nyx, Wade, Nolan, Isaac)
+    she scored 45 against 728-1195. Her help is invisible on the board
+    until support contribution scores. Needs a decision.
+  - **Strategic Crunch** serves: the CRT is a real anchor. Riding far from
+    it costs a long, untouchable trip home, and the swarm's leash forces a
+    choice between staying near the fight and covering the host.
+  - **Clarity** serves, with a risk: the swarm's colour says enemy or
+    ally, the thread says whose it is, and the CRT on the floor says where
+    she will reappear. The steady pixel dissolve adds screen noise. Watch
+    it in a crowded fight.
+- **Conflicts with the sheet (not changed, need a human):**
+  - Dulled and Sharpened are on/off crit modifiers engine-wide (max 1
+    stack), so "up to 5 stacks" of each cannot happen. Weakened does reach
+    5. Raising their caps changes every character's crits.
+  - Marked on an enemy and Silenced on an enemy do little today. Enemies
+    have no abilities to silence, and per the effects spec Marked means
+    "nearby enemies will attack this target", which is not built for
+    enemies. The Dulled and Weakened from Silence do work.
+- **Known art issue:** automatic (bone-heat) weighting fails on this mesh,
+  so it falls back to distance weights and the long coat's hem follows
+  her legs. The fix, if it shows in play, is a model without the long coat,
+  with the coat added in code on springs (a new Meshy generation: credits).
+- **Why:** built as the sheet says where it is unambiguous. The two
+  interpretations above are the readings that keep the ally side helpful
+  (Comradery). Prototype numbers. Covered by `tests/test_nyx_kit.cpp`
+  (13 cases) and an 8-minute ArenaSim match with no asserts. **Not
+  playtested by a human; the client effects are checked by build only.**
+- **Status:** Built, needs review
+- **Where:** `src/CharacterKits.cpp` (`NyxKit`), `src/ArenaData.cpp`,
+  `include/ArenaData.h` (`NyxMode`), `src/AbilitySystem.cpp`
+  (`shareDamage`, `onCoreCast`, `kitAnchored`), `include/NetworkProtocol.h`
+  (`PlayerState` kit point, prop, mode; `VfxTheme::Nanite`),
+  `src/ArenaView.cpp` (Nyx drawing), `tools/sprite_forge/actors/nyx.py`,
+  `nyx_crt.py`, `docs/design/ART_DIRECTION.md`
+
 ## 2026-11-15: The scrap haul reads, and banking it pays off
 - **Decision:** Salvaging a scrapyard finishes the objective and puts the
   scrap in your hands; you bank it by walking into a ring around the ship.

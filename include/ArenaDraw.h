@@ -47,6 +47,8 @@ inline Rgb themeRgb(VfxTheme theme) {
       return {0.50f, 1.00f, 0.70f};
     case VfxTheme::Danger:
       return {1.00f, 0.20f, 0.16f};
+    case VfxTheme::Nanite:
+      return {0.93f, 0.24f, 0.64f};
     default:
       return {1.00f, 1.00f, 1.00f};
   }

@@ -1,8 +1,11 @@
 name: Claude Code Review
 
+# Disabled: no longer runs on pull requests. It can still be started by hand
+# from the Actions tab. To turn it back on, restore the pull_request trigger:
+#   pull_request:
+#     types: [opened, synchronize, ready_for_review, reopened]
 on:
-  pull_request:
-    types: [opened, synchronize, ready_for_review, reopened]
+  workflow_dispatch:
     # Optional: Only run on specific file changes
     # paths:
     #   - "src/**/*.ts"

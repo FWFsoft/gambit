@@ -159,12 +159,38 @@ constexpr uint32_t Gravon = 3;
 constexpr uint32_t Isaac = 4;
 constexpr uint32_t Mina = 9;
 constexpr uint32_t Nolan = 12;
+constexpr uint32_t Nyx = 13;
 constexpr uint32_t Presidente = 14;
 constexpr uint32_t Suds = 16;
 constexpr uint32_t Volgore = 18;
 constexpr uint32_t Wade = 19;
 constexpr uint32_t Zephyr = 20;
 }  // namespace CharacterId
+
+// Nyx's mirrored state (Player::kitMode): the swarm in the low nibble, Nyx
+// herself in the high nibble. kitX/kitY is the swarm, propX/propY the CRT.
+namespace NyxMode {
+// Swarm (kitMode & 0x0F)
+constexpr uint8_t SwarmHome = 0;      // with Nyx, around her body
+constexpr uint8_t SwarmFlying = 1;    // on its way somewhere
+constexpr uint8_t SwarmParked = 2;    // hanging at a point
+constexpr uint8_t SwarmOnEnemy = 3;   // attached: the foe is Silenced
+constexpr uint8_t SwarmOnAlly = 4;    // attached: the ally is Focused
+constexpr uint8_t SwarmReturning = 5;
+// Nyx (kitMode >> 4)
+constexpr uint8_t Body = 0;       // walking, the CRT on her shoulder
+constexpr uint8_t Dropping = 1;   // setting the CRT down, about to dissolve
+constexpr uint8_t Flying = 2;     // a cloud, on the way to her target
+constexpr uint8_t OnEnemy = 3;    // a cloud riding a foe
+constexpr uint8_t OnAlly = 4;     // a cloud riding an ally
+constexpr uint8_t Homing = 5;     // a cloud, streaming back to the CRT
+constexpr uint8_t Reforming = 6;  // body again, lifting the CRT
+inline uint8_t swarm(uint8_t mode) { return mode & 0x0F; }
+inline uint8_t self(uint8_t mode) { return mode >> 4; }
+inline uint8_t pack(uint8_t swarm, uint8_t self) {
+  return static_cast<uint8_t>((self << 4) | (swarm & 0x0F));
+}
+}  // namespace NyxMode
 
 // Wade's ability forms. The server picks one per cast (Player::castVariant)
 // and sends it with the AbilityCast event; the client maps it to a clip.

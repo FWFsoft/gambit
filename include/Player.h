@@ -69,6 +69,14 @@ struct Player : public Animatable {
   float kitTimer[4] = {0, 0, 0, 0};
   int kitCounter[4] = {0, 0, 0, 0};
   uint32_t kitTarget = 0;
+  // Mirrored to clients: a point the kit owns, a prop it set down, and a
+  // kit-specific mode (Nyx: swarm, CRT, Arena::NyxMode).
+  float kitX = 0.0f, kitY = 0.0f;
+  float propX = 0.0f, propY = 0.0f;
+  uint8_t kitMode = 0;
+  // The kit holds the player in place (Nyx riding a target as a swarm):
+  // input does not move them, but unlike forced motion they can still act.
+  bool kitAnchored = false;
   // Which form of the ability the kit just threw (which punch, which hand).
   // Set by Kit::cast and sent with the AbilityCast event so every client
   // plays the same animation. 0 = the default form.

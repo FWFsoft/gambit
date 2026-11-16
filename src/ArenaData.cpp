@@ -323,6 +323,36 @@ static const KitInfo KITS[] = {
           "Teleport to where an airborne foe will land. +1 Expose to it.",
           4000.0f, AbilityMode::Tap, 0.0f},
      }},
+    {CharacterId::Nyx,
+     "Nyx",
+     "the Hive Mother",
+     Archetype::Playmaker,
+     230.0f,
+     258.0f,
+     "Hive Mother",
+     "Nyx directs a nanite swarm. On an enemy: Silenced, and +1 Dulled and "
+     "+1 Weakened each second. On an ally: Focused, and +1 Sharpened each "
+     "second. Cleansing or purging it, or Nyx straying too far, sends it "
+     "home. Her abilities radiate from her and from the swarm.",
+     {
+         {"Nanite Swarm",
+          "Send the swarm to the cursor. It attaches to an enemy or ally "
+          "there. Enemies that pass through it gain +1 Slow.",
+          450.0f, AbilityMode::Tap, 0.0f, "Swarm"},
+         {"Plague Bringer",
+          "Hold: a wave of nanites. Enemies gain +2 Weakened, allies +1 "
+          "Empowered. Up to 3 debuffs on the swarm's target are contaminated "
+          "onto every enemy hit.",
+          6000.0f, AbilityMode::Charge, 900.0f},
+         {"Nanite Cloud",
+          "Everything a swarm rides is affected: enemies are Marked, allies "
+          "gain Stealth.",
+          9000.0f, AbilityMode::Tap, 0.0f, "Cloud"},
+         {"Become the Swarm",
+          "Set down the CRT and ride an enemy or ally as a swarm, taking half "
+          "the damage dealt to them. Again: stream back to the CRT.",
+          8000.0f, AbilityMode::Tap, 0.0f, "Swarm Form"},
+     }},
     {CharacterId::Wade,
      "Wade",
      "the Old Head",

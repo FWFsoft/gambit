@@ -453,6 +453,11 @@ std::string actionClip(const std::string& character, int slot,
         return alt ? "latigo" : "cajones";
     }
   }
+  if (character == "Nyx") {
+    // Become the Swarm plays from her form (drop, lift), not from the cast.
+    static const char* CLIPS[4] = {"swarm", "plague", "cloud", ""};
+    return CLIPS[std::max(0, std::min(3, slot))];
+  }
   if (character == "Nolan") {
     static const char* CLIPS[4] = {"sweep", "lotus", "blackout", "blink"};
     return CLIPS[std::max(0, std::min(3, slot))];
@@ -507,6 +512,93 @@ std::string actionClip(const std::string& character, int slot,
   static const char* GENERIC[5] = {"attack", "secondary", "special",
                                    "mobility", "special"};
   return GENERIC[std::max(0, std::min(4, slot))];
+}
+
+// ---- Nyx's nanites ---------------------------------------------------------
+// Square pixels in her palette, stateless: each one is a hash of its index
+// and the clock, so nothing is stored per particle.
+
+float nanoHash(uint32_t n) {
+  n = (n << 13u) ^ n;
+  n = n * (n * n * 15731u + 789221u) + 1376312589u;
+  return static_cast<float>(n & 0x7fffffffu) / 2147483647.0f;
+}
+
+float fract(float v) { return v - std::floor(v); }
+
+// The coat's magentas and pinks, the screen's cyan and blue, her skin's
+// orange, the trousers' cream. `bias` 0 = mostly coat, 1 = mostly screen.
+ImU32 naniteColour(float pick, float bias, float alpha) {
+  static const Rgb COAT[3] = {
+      {0.78f, 0.12f, 0.50f}, {0.95f, 0.36f, 0.62f}, {0.62f, 0.10f, 0.42f}};
+  static const Rgb SCREEN[2] = {{0.36f, 0.88f, 1.00f}, {0.26f, 0.42f, 0.95f}};
+  static const Rgb WARM[2] = {{0.98f, 0.68f, 0.26f}, {0.95f, 0.92f, 0.82f}};
+  float coatShare = 0.72f - 0.55f * bias;
+  float screenShare = 0.18f + 0.55f * bias;
+  Rgb c;
+  if (pick < coatShare) {
+    c = COAT[static_cast<int>(pick / coatShare * 2.99f)];
+  } else if (pick < coatShare + screenShare) {
+    c = SCREEN[static_cast<int>((pick - coatShare) / screenShare * 1.99f)];
+  } else {
+    c = WARM[pick > 0.97f ? 1 : 0];
+  }
+  return rgba(c, alpha);
+}
+
+void naniteSquare(ImDrawList* dl, float x, float y, float size, ImU32 col) {
+  float half = std::max(1.0f, std::round(size)) * 0.5f;
+  x = std::round(x);
+  y = std::round(y);
+  dl->AddRectFilled(ImVec2(x - half, y - half), ImVec2(x + half, y + half), col);
+}
+
+// Her body fraying into pixels: they leave the coat's edges and hem and
+// drift off, outward and up. `amount` 1 is her steady state; more while she
+// dissolves.
+void drawNaniteDissolve(ImDrawList* dl, ImVec2 feet, float t, float amount,
+                        float alpha) {
+  int count = static_cast<int>(22.0f * amount);
+  for (int i = 0; i < count; i++) {
+    uint32_t seed = static_cast<uint32_t>(i) * 7919u + 17u;
+    float period = 0.8f + 0.9f * nanoHash(seed);
+    float phase = fract(t / period + nanoHash(seed + 1));
+    float side = nanoHash(seed + 2) < 0.5f ? -1.0f : 1.0f;
+    // Most leave the coat (the lower two thirds), a few the shoulders.
+    float h = nanoHash(seed + 3);
+    float up = h < 0.75f ? 8.0f + 52.0f * (h / 0.75f) : 62.0f + 30.0f * nanoHash(seed + 4);
+    float edge = (up < 60.0f ? 10.0f + 0.12f * (60.0f - up) : 9.0f) +
+                 5.0f * nanoHash(seed + 5);
+    float drift = (6.0f + 18.0f * nanoHash(seed + 6)) * phase;
+    float x = feet.x + side * (edge + drift);
+    float y = feet.y - up - (3.0f + 12.0f * nanoHash(seed + 7)) * phase;
+    float size = (2.0f + 2.5f * nanoHash(seed + 8)) * (1.0f - 0.45f * phase);
+    float a = alpha * (1.0f - phase) * (fract(t * 9.0f + nanoHash(seed + 9)) > 0.12f ? 1.0f : 0.25f);
+    naniteSquare(dl, x, y, size, naniteColour(nanoHash(seed + 10), 0.2f, a));
+  }
+}
+
+// A swarm: pixels orbiting a centre `lift` above (x, y) on flattened rings,
+// glitching in and out. `onEnemy`/`onAlly` tint it toward the coat's
+// magenta (infection) or the screen's cyan (help).
+void drawNaniteCloud(ImDrawList* dl, ImVec2 at, float t, int count,
+                     float radius, float lift, float bias, uint32_t salt) {
+  ImVec2 centre(at.x, at.y - lift);
+  dl->AddCircleFilled(centre, radius * 1.15f,
+                      themeColor(VfxTheme::Nanite, 0.10f), 24);
+  for (int i = 0; i < count; i++) {
+    uint32_t seed = static_cast<uint32_t>(i) * 104729u + salt * 31u;
+    float speed = (0.9f + 1.6f * nanoHash(seed)) * (nanoHash(seed + 1) < 0.5f ? -1.0f : 1.0f);
+    float angle = t * speed + nanoHash(seed + 2) * 6.2832f;
+    float r = radius * (0.25f + 0.75f * nanoHash(seed + 3));
+    float bob = std::sin(t * 3.0f + nanoHash(seed + 4) * 6.0f) * radius * 0.25f;
+    float x = centre.x + std::cos(angle) * r;
+    float y = centre.y + std::sin(angle) * r * 0.6f + bob;
+    bool lit = fract(t * 7.0f + nanoHash(seed + 5)) > 0.1f;
+    float size = 2.0f + 2.5f * nanoHash(seed + 6);
+    naniteSquare(dl, x, y, size,
+                 naniteColour(nanoHash(seed + 7), bias, lit ? 0.95f : 0.3f));
+  }
 }
 
 }  // namespace
@@ -1249,6 +1341,36 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
   const CharacterDefinition* definition =
       CharacterRegistry::instance().getCharacter(state.characterId);
   const ActorSheet* actor = definition ? actorFor(definition->name) : nullptr;
+
+  // Nyx is made of nanites: as a swarm she has no body to draw, and as a
+  // body she is always fraying into pixels.
+  const bool isNyx = state.characterId == Arena::CharacterId::Nyx;
+  const uint8_t nyxForm = isNyx ? Arena::NyxMode::self(state.kitMode) : 0;
+  float nyxFormSeconds = 0.0f;
+  float bodyAlpha = 1.0f;
+  if (isNyx) {
+    using namespace Arena::NyxMode;
+    const NyxView& nv = nyxViews[state.playerId];
+    nyxFormSeconds = timeSeconds - nv.formSince;
+    bool cloud = nyxForm == Flying || nyxForm == OnEnemy ||
+                 nyxForm == OnAlly || nyxForm == Homing;
+    if (cloud && !dead) {
+      float bias = nyxForm == OnAlly ? 0.85f : (nyxForm == OnEnemy ? 0.0f : 0.4f);
+      drawNaniteCloud(dl, feet, timeSeconds, 64, 26.0f, 40.0f, bias,
+                      state.playerId);
+      effectFx.drawOver(dl, state.playerId, false, feet, 64.0f, playerEffects);
+      return;
+    }
+    // The body fades out as she dissolves, and in as she reforms.
+    if (nyxForm == Dropping) {
+      float u = std::min(1.0f, nyxFormSeconds / 0.29f);
+      bodyAlpha = 1.0f - 0.8f * std::max(0.0f, (u - 0.45f) / 0.55f);
+    } else if (nyxForm == Reforming) {
+      bodyAlpha = 0.25f + 0.75f * std::min(1.0f, nyxFormSeconds / 0.18f);
+    }
+    tint = withAlpha(tint, bodyAlpha * ((tint >> IM_COL32_A_SHIFT) & 0xFF) / 255.0f);
+  }
+
   if (actor) {
     // Real animation: choose a clip from what the character is doing.
     AnimState& anim = playerAnim[state.playerId];
@@ -1270,6 +1392,20 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
     if (!clip && charging && definition->name == "Nolan") {
       clip = actor->find("lotus_charge");
       elapsed = view.animTime;
+    }
+    if (!clip && isNyx) {
+      if (nyxForm == Arena::NyxMode::Dropping) {
+        clip = actor->find("drop");
+      } else if (nyxForm == Arena::NyxMode::Reforming) {
+        clip = actor->find("lift");
+      } else if (charging) {
+        clip = actor->find("plague_charge");
+      }
+      elapsed = charging && !clip ? elapsed
+                                  : (nyxForm == Arena::NyxMode::Body
+                                         ? view.animTime
+                                         : nyxFormSeconds);
+      if (clip && nyxForm != Arena::NyxMode::Body) anim.clip.clear();
     }
     if (!clip && !anim.clip.empty()) {
       const ActorAnim* action = actor->find(anim.clip);
@@ -1335,6 +1471,15 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
                       IM_COL32(state.r, state.g, state.b, 255), 10.0f);
   }
 
+  if (isNyx && !dead) {
+    float fray = nyxForm == Arena::NyxMode::Dropping
+                     ? 1.0f + 2.5f * std::min(1.0f, nyxFormSeconds / 0.29f)
+                 : nyxForm == Arena::NyxMode::Reforming ? 2.0f
+                                                        : 1.0f;
+    drawNaniteDissolve(dl, feet, timeSeconds + state.playerId * 3.7f, fray,
+                       hidden ? 0.4f : 1.0f);
+  }
+
   effectFx.drawOver(dl, state.playerId, false, feet, 64.0f, playerEffects);
 
   // Shield bubble
@@ -1346,6 +1491,77 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
     dl->AddCircleFilled(centre, 44.0f, themeColor(theme, 0.10f + 0.05f * pulse));
     dl->AddCircle(centre, 44.0f, themeHot(theme, 0.75f), 40, 2.5f);
   }
+}
+
+void ArenaView::updateNyxView(const PlayerState& state) {
+  NyxView& nv = nyxViews[state.playerId];
+  uint8_t form = Arena::NyxMode::self(state.kitMode);
+  float dt = nv.seen ? std::max(0.0f, timeSeconds - nv.lastSeconds) : 0.0f;
+  nv.lastSeconds = timeSeconds;
+  if (!nv.seen || form != nv.form) {
+    if (form == Arena::NyxMode::Dropping) {
+      // The CRT is set down facing the way she faced.
+      auto it = playerAnim.find(state.playerId);
+      nv.crtDirection = it == playerAnim.end() ? 0 : it->second.direction;
+    }
+    nv.form = form;
+    nv.formSince = timeSeconds;
+  }
+  // State updates come in steps; ease toward them, but jump a long way.
+  float dx = state.kitX - nv.swarmX, dy = state.kitY - nv.swarmY;
+  if (!nv.seen || dx * dx + dy * dy > 500.0f * 500.0f) {
+    nv.swarmX = state.kitX;
+    nv.swarmY = state.kitY;
+  } else {
+    float k = std::min(1.0f, dt * 16.0f);
+    nv.swarmX += dx * k;
+    nv.swarmY += dy * k;
+  }
+  nv.seen = true;
+}
+
+void ArenaView::drawNyxSwarm(ImDrawList* dl, const PlayerState& state) {
+  using namespace Arena::NyxMode;
+  const NyxView& nv = nyxViews[state.playerId];
+  ImVec2 at = toScreen(nv.swarmX, nv.swarmY);
+  if (!inView(at, 80, 120, 80, 80)) return;
+  uint8_t mode = swarm(state.kitMode);
+  bool riding = mode == SwarmOnEnemy || mode == SwarmOnAlly;
+  float bias = mode == SwarmOnAlly ? 0.85f : (mode == SwarmOnEnemy ? 0.0f : 0.4f);
+  drawNaniteCloud(dl, at, timeSeconds, riding ? 40 : 30, riding ? 24.0f : 18.0f,
+                  riding ? 34.0f : 20.0f, bias, state.playerId + 7u);
+  // A thread of pixels back to Nyx, so you can always tell whose it is.
+  ImVec2 home = toScreen(state.x, state.y - 50.0f);
+  ImVec2 to(at.x, at.y - (riding ? 34.0f : 20.0f));
+  for (int i = 0; i < 6; i++) {
+    float u = fract(timeSeconds * 0.8f + i / 6.0f);
+    naniteSquare(dl, home.x + (to.x - home.x) * u, home.y + (to.y - home.y) * u,
+                 2.0f, naniteColour(nanoHash(i + 300u), bias, 0.55f * (1.0f - u)));
+  }
+}
+
+void ArenaView::drawNyxCrt(ImDrawList* dl, const PlayerState& state) {
+  ImVec2 feet = toScreen(state.propX, state.propY);
+  if (!inView(feet, 80, 120, 80, 40)) return;
+  const NyxView& nv = nyxViews[state.playerId];
+  const ActorSheet* sheet = actorFor("NyxCRT");
+  const ActorAnim* still = sheet ? sheet->find("idle") : nullptr;
+  if (!sheet || !still) {
+    // Unbaked: a plain box so the spot still reads.
+    dl->AddRectFilled(ImVec2(feet.x - 12, feet.y - 22), ImVec2(feet.x + 12, feet.y),
+                      IM_COL32(205, 198, 176, 255), 2.0f);
+    dl->AddRectFilled(ImVec2(feet.x - 8, feet.y - 18), ImVec2(feet.x + 6, feet.y - 6),
+                      IM_COL32(80, 210, 245, 255));
+    return;
+  }
+  drawShadow(dl, feet, 13.0f);
+  drawActorFrame(dl, *sheet, *still, nv.crtDirection, 0.0f, feet, 1.0f,
+                 IM_COL32(255, 255, 255, 255), true, -1, 0.0f, true);
+  // The screen glows: a soft cyan pool, flickering like an old tube.
+  float flicker = 0.85f + 0.15f * std::sin(timeSeconds * 31.0f) *
+                              std::sin(timeSeconds * 7.0f);
+  dl->AddCircleFilled(ImVec2(feet.x, feet.y - 14.0f), 22.0f,
+                      themeColor(VfxTheme::Wind, 0.12f * flicker), 20);
 }
 
 void ArenaView::drawEnemy(ImDrawList* dl, const ArenaClient::EnemyView& view) {
@@ -1546,7 +1762,7 @@ void ArenaView::drawEnemy(ImDrawList* dl, const ArenaClient::EnemyView& view) {
 void ArenaView::drawEntities(ImDrawList* dl) {
   struct Item {
     float depth;
-    int kind;  // 0 player, 1 enemy, 2 pickup, 3 ship
+    int kind;  // 0 player, 1 enemy, 2 pickup, 3 ship, 4 Nyx's CRT, 5 swarm
     const void* ptr;
     uint32_t id;
     float x, y;
@@ -1564,6 +1780,21 @@ void ArenaView::drawEntities(ImDrawList* dl) {
       y = local.y;
     }
     items.push_back({y, 0, &view, id, x, y});
+    if (view.state.characterId == Arena::CharacterId::Nyx) {
+      updateNyxView(view.state);
+      using namespace Arena::NyxMode;
+      uint8_t form = self(view.state.kitMode);
+      // The CRT on the floor while she is a swarm.
+      if (form != Body && form != Dropping && form != Reforming) {
+        items.push_back({view.state.propY, 4, &view, id, view.state.propX,
+                         view.state.propY});
+      }
+      // Her swarm, drawn over whoever it rides.
+      if (swarm(view.state.kitMode) != SwarmHome) {
+        const NyxView& nv = nyxViews[id];
+        items.push_back({nv.swarmY + 30.0f, 5, &view, id, nv.swarmX, nv.swarmY});
+      }
+    }
   }
   for (const auto& [id, view] : arena->enemies()) {
     if (!inSight(view.x, view.y)) continue;  // fog of war
@@ -1613,6 +1844,12 @@ void ArenaView::drawEntities(ImDrawList* dl) {
         break;
       case 3:
         drawShip(dl);
+        break;
+      case 4:
+        drawNyxCrt(dl, static_cast<const ArenaClient::PlayerView*>(item.ptr)->state);
+        break;
+      case 5:
+        drawNyxSwarm(dl, static_cast<const ArenaClient::PlayerView*>(item.ptr)->state);
         break;
     }
   }
