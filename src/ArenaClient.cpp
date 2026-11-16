@@ -498,6 +498,12 @@ void ArenaClient::onUpdate(const UpdateEvent& e) {
     view.hitFlashMs = std::max(0.0f, view.hitFlashMs - dtMs);
     view.hitMs += dtMs;
     view.animTime += dt;
+    // Knocked up: rise fast, drop a little slower.
+    if ((view.state.flags & EnemyFlags::Airborne) != 0) {
+      view.air = std::min(1.0f, view.air + dtMs / 110.0f);
+    } else {
+      view.air = std::max(0.0f, view.air - dtMs / 140.0f);
+    }
     ++it;
   }
 

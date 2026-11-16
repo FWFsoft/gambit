@@ -21,6 +21,126 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-15: Enable Nolan for in-game animation playtests
+- **Decision:** Register Nolan as a playable Striker with 250 HP and 262
+  movement speed. Add a clearly labeled prototype kit: Sweep (26 damage,
+  600 ms cooldown), charged Lotus (35–90 damage, 4 s cooldown), Blackout
+  (55 damage, 6 s cooldown), and Blink (up to 240 units, 26 nearby damage,
+  5 s cooldown). Kicks hit on frame 2 at 24 fps. No passive yet.
+- **Why:** The user requested making Nolan selectable to test the new art.
+  His final combat design is not implemented; these temporary moves let
+  every existing animation be exercised with the real combat system.
+- **Pillars:** Clarity serves: slots play their matching kick clips and the
+  charge pose plays while holding Lotus. Strategic Crunch and Creative
+  Builds are provisional: damage and cooldowns are playtest values, not
+  balance decisions. Comradery in Competition is neutral.
+- **Status:** Built, needs review
+- **Where:** `src/ArenaData.cpp`, `src/CharacterKits.cpp`, `src/ArenaView.cpp`,
+  `include/ArenaData.h`, `tests/test_nolan_kit.cpp`.
+
+## 2026-11-15: Nolan's kit is playable, and enemies can be knocked into the air
+- **Decision:** Nolan's designed kit replaces the placeholder playtest kit.
+  - **Airborne** is a new enemy state (`Enemy::airMs`,
+    `AbilitySystem::knockUpEnemy`): it cannot act, its windup is cancelled,
+    and only a knockback moves it. Brutes stay up 60% as long, the boss 25%.
+    Clients draw it rising about 70 px above its shadow, which stays where
+    it will land.
+  - **Passive:** knock-ups and knockbacks last 35% longer per Expose stack
+    on the target, read before the hit consumes one.
+  - **LMB, Lower Limb Devastation** (650 ms): an 80-degree half-angle sweep,
+    120 px reach, 16 damage, 650 ms knock-up, +1 Expose, then an 80 px hop
+    back.
+  - **RMB, Sky Splitter** (hold up to 1 s, 5 s cooldown): no damage;
+    knockback of 90 to 260 px with charge, all around him within 150 px,
+    +1 Expose.
+  - **Q, Black-out Kick** (8 s): only on an airborne foe within 230 px. He
+    steps in, kicks it down for 48 damage and Stuns it and everything within
+    140 px for 1.4 s. Every living Wade on the team gains 1 Resonance for 8 s
+    (his Roll already spends it).
+  - **Shift, Anime Shit** (4 s): only on an airborne foe within 520 px;
+    teleports to where it will land and gives it +1 Expose.
+  - A kit can now refuse a press with nothing to act on (`Kit::canCast`):
+    the cooldown is not spent, and Nolan shows his reach as a ring.
+  - The HUD button shows an ability's short name when the full one does not
+    fit ("Lower Limb", "Sky Splitter", "Black-out Kick"); the passive line is
+    cut with an ellipsis; the tooltip and character select show the names in
+    full.
+- **Pillars:**
+  - Strategic Crunch serves: Q and Shift work only while a foe is in the air
+    (about 0.65 s without Expose), so the combo is a timing decision.
+  - Comradery serves: every Expose he stacks is +15% damage on a teammate's
+    next hit, and Black-out Kick charges Wade's Roll. It also trades against
+    Comradery in one place: the full-charge Lotus can throw enemies 260 px
+    out of a melee teammate's reach.
+  - Creative Builds serves: airborne is a state any later kit or infusion
+    can create or read.
+  - Clarity serves: the foe rises off its shadow, Stun shows, and a refused
+    press shows why. It is weakened slightly by the long names on the HUD,
+    and by bars and numbers piling up when several foes are in the air.
+- **Why:** The kit text is the design lead's. Interpretations that are mine,
+  to check:
+  - "If Wade is an ally" is read as any living Wade in the match, at any
+    distance.
+  - "End location" is the end of the foe's knockback, and he arrives just
+    short of its body.
+  - Q also steps him in beside the target, since the kit does not say how a
+    kick reaches it.
+  - Only enemies can be airborne, so Shift cannot follow an ally.
+  - RMB and Shift deal no damage, because the kit text gives them none.
+    That is also what lets Expose build: his own damage consumes a stack as
+    it adds one.
+  - The title "the Prodigy" is mine.
+  - Balance from `ArenaSim` (3 seeds each): in a mixed team Nolan's kills are
+    51 to 101 against Wade's 33 to 118. An all-Nolan team lasts about as
+    long as an all-Wade team (120 to 151 s against 79 to 138 s). The bots
+    press Q and Shift blindly, so most presses were refused.
+  - Checked in the running game: selectable, the kit text on character
+    select, sweep, knock-up above shadows, the Stun from Black-out Kick, the
+    Lotus ring. The HUD fixes were built after that run and are not yet seen
+    in game.
+- **Status:** Built, needs review
+- **Where:** `src/CharacterKits.cpp` (NolanKit), `src/ArenaData.cpp`,
+  `include/Enemy.h`, `src/EnemySystem.cpp`, `src/AbilitySystem.cpp`,
+  `include/AbilitySystem.h`, `include/NetworkProtocol.h`, `src/ArenaClient.cpp`,
+  `src/ArenaView.cpp`, `src/ArenaHud.cpp`, `src/UISystem.cpp`,
+  `tests/test_nolan_kit.cpp`, `tests/arena_sim.cpp`
+
+## 2026-11-15: Nolan's body and a kick-only starting moveset
+- **Decision:** Nolan's body is the fitted `art/models/Nolan.glb` (Meshy,
+  shrunk locally to 40,000 triangles), 1.9 units to the top of his hair, on
+  joints a human placed. His motion is themed on firebending as Zuko does
+  it: a low, wide, bladed stance (lead palm out, rear hand chambered), a
+  hand planted on the floor, and the legs drawing big arcs. Every attack is
+  a kick. Starting clips, named for his kit: `sweep` (LMB: floor sweep, then
+  a hop back), `lotus_charge` and `lotus` (RMB hold and release: a coil,
+  then a full airborne turn with the leg out flat), `blackout` (Q: an axe
+  kick down through an airborne target), `blink` (Shift: fold up, arrive
+  mid-air knee first), plus `idle`, `run` (chest forward, arms trailing),
+  `hit` and `death`. Kicks land on frame 2, as Wade's punches do.
+- **Pillars:** Clarity: his low stance, flat-out leg and blue hair give him
+  an outline no one else has, and each ability has its own shape (floor
+  arc, flat spin, vertical leg). Creative Builds: he is the hype foil to
+  Wade's plain boxing, so the two do not move alike. Strategic Crunch and
+  Comradery in Competition are neutral: no kit rule or timing is built yet.
+- **Why:** The first pass put Wade's boxing clips on Nolan's body as a
+  placeholder; the design lead rejected that (he is kick oriented, anime,
+  Zuko-like), so they were replaced. `hit` and `death` still reuse Wade's
+  poses. These are starting poses for the pose editor, not final
+  animation: the design lead opened the pose editor and chose to bake
+  them unchanged. Baked to `assets/sprites/actors/Nolan.png` (9 clips, 8
+  directions, 4576 x 4524, a little over the 4096 guide). Checked in
+  previews and the silhouette lineup only: Nolan is not flagged against
+  anyone (closest is Wade, shape 0.72). **Clarity is weakened in one
+  place:** at game size his face does not read from the front, because the
+  hair crest covers it; he is recognised by hair, bare chest and white
+  trousers. The model's hands are open, so he never shows a fist. Nolan's
+  kit is not in the game, so the clip names and the frame-2 hit timing are
+  not checked against code, and he has not been seen in a fight.
+- **Status:** Built, needs review
+- **Where:** `art/models/Nolan.glb`, `art/models/Nolan.fit.json`,
+  `tools/sprite_forge/actors/nolan.py`, `assets/sprites/actors/Nolan.png`,
+  `assets/sprites/actors/manifest.txt`, `docs/design/ART_DIRECTION.md`
+
 ## 2026-11-15: Ship Wade's generated body
 - **Decision:** Make the fitted `art/models/Wade.glb` actor the default for
   `build.py wade`, and bake it into the sprite sheet the game already loads.

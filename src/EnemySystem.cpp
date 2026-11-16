@@ -247,6 +247,22 @@ void EnemySystem::updateEnemy(Enemy& enemy,
 
   enemy.cooldownMs = std::max(0.0f, enemy.cooldownMs - deltaTime);
 
+  // Knocked up: in the air it cannot act, and only a knockback moves it.
+  if (enemy.airMs > 0.0f) {
+    enemy.netFlags |= EnemyFlags::Airborne;
+    enemy.airMs = std::max(0.0f, enemy.airMs - deltaTime);
+    if (enemy.state == EnemyState::Attack && enemy.type != EnemyKind::Boss) {
+      enemy.state = EnemyState::Chase;
+      enemy.windupMs = 0.0f;
+      enemy.cooldownMs = std::max(enemy.cooldownMs, 400.0f);
+    }
+    if (enemy.knockMs <= 0.0f) {
+      enemy.vx = 0.0f;
+      enemy.vy = 0.0f;
+      return;
+    }
+  }
+
   // Knockback / pull overrides everything else.
   if (enemy.knockMs > 0.0f) {
     float step = std::min(enemy.knockMs, deltaTime) / 1000.0f;

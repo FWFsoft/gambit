@@ -427,6 +427,10 @@ std::string actionClip(const std::string& character, int slot,
         return alt ? "latigo" : "cajones";
     }
   }
+  if (character == "Nolan") {
+    static const char* CLIPS[4] = {"sweep", "lotus", "blackout", "blink"};
+    return CLIPS[std::max(0, std::min(3, slot))];
+  }
   if (character == "Wade") {
     // The server picks the punch (Arena::WadeForm); play what it threw.
     switch (slot) {
@@ -1207,6 +1211,10 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
       clip = actor->find("death");
       elapsed = view.deadMs / 1000.0f;
     }
+    if (!clip && charging && definition->name == "Nolan") {
+      clip = actor->find("lotus_charge");
+      elapsed = view.animTime;
+    }
     if (!clip && !anim.clip.empty()) {
       const ActorAnim* action = actor->find(anim.clip);
       float t = timeSeconds - anim.startSeconds;
@@ -1395,6 +1403,15 @@ void ArenaView::drawEnemy(ImDrawList* dl, const ArenaClient::EnemyView& view) {
     at.x += view.faceLeft ? 18.0f : -18.0f;
     feet.x += view.faceLeft ? 18.0f : -18.0f;
   }
+  // Knocked up: tumbling in the air above its shadow, which stays on the
+  // ground where it will land.
+  bool airborne = !lifted && !view.dying && view.air > 0.0f;
+  if (airborne) {
+    float h = 70.0f * view.air * (2.0f - view.air);
+    at.y -= h;
+    feet.y -= h;
+    liftRotation = (view.faceLeft ? -0.6f : 0.6f) * view.air;
+  }
   if (actor) {
     AnimState& anim = enemyAnim[view.state.id];
     float faceX = 0.0f, faceY = 0.0f;
@@ -1435,18 +1452,18 @@ void ArenaView::drawEnemy(ImDrawList* dl, const ArenaClient::EnemyView& view) {
     if (clip) {
       ImU32 actorTint = tint;
       if (view.hitFlashMs > 0.0f) actorTint = IM_COL32(255, 150, 150, 255);
-      if (lifted) {
+      if (lifted || airborne) {
         clip = actor->find("hit");
         forced = 1;
       }
       if (clip) {
         drawActorFrame(dl, *actor, *clip, anim.direction, elapsed, feet, scale,
                        actorTint, true, forced, liftRotation,
-                       !view.dying && !lifted);
+                       !view.dying && !lifted && !airborne);
       }
     }
   } else if (sprite && sprite->texture) {
-    if (!view.dying && !lifted) {
+    if (!view.dying && !lifted && !airborne) {
       drawCastShadow(dl, sprite->texture, frame * sprite->cellW,
                      row * sprite->cellH, sprite->cellW, sprite->cellH, at, 0.0f,
                      scaleX, scaleY, view.faceLeft);

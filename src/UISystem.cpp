@@ -522,7 +522,9 @@ void UISystem::renderCharacterSelect() {
         const Arena::AbilityInfo& ability = kit->abilities[slot];
         ImGui::TextColored(ImVec4(1.0f, 0.86f, 0.5f, 1.0f), "%s", keys[slot]);
         ImGui::SameLine(96.0f);
-        ImGui::Text("%s", ability.name);
+        ImGui::PushTextWrapPos(425.0f);
+        ImGui::TextUnformatted(ability.name);
+        ImGui::PopTextWrapPos();
         if (ability.cooldownMs >= 1000.0f) {
           ImGui::SameLine();
           ImGui::TextDisabled("(%.0fs)", ability.cooldownMs / 1000.0f);

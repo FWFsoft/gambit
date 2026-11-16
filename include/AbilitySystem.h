@@ -65,6 +65,14 @@ class Kit {
     (void)self;
     (void)dtMs;
   }
+  // False refuses a press that has nothing to act on (no target in reach),
+  // so the ability is not spent. May show the player why. Tap and Charge.
+  virtual bool canCast(AbilitySystem& sys, const Player& self, int slot) {
+    (void)sys;
+    (void)self;
+    (void)slot;
+    return true;
+  }
   // Lets an ability be pressed again while on cooldown (recasts/toggles).
   virtual bool canRecast(const Player& self, int slot) const {
     (void)self;
@@ -204,6 +212,9 @@ class AbilitySystem {
                   float durationMs, bool ghost);
   void blinkPlayer(Player& player, float x, float y);
   void knockbackEnemy(Enemy& enemy, float fromX, float fromY, float distance);
+  // Throw an enemy into the air for durationMs: it cannot act until it lands.
+  // Brutes stay up for less, the boss for much less.
+  void knockUpEnemy(Enemy& enemy, float durationMs);
   void pullEnemy(Enemy& enemy, float toX, float toY, float maxDistance,
                  float stopShort);
 

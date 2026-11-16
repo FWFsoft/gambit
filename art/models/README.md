@@ -21,6 +21,9 @@ lighting, ink, eight directions, consistency across the cast.
 `tools/sprite_forge/meshy.py` does the trip from concept art to
 `art/models/<Name>.glb` without the Meshy website. It needs a Meshy API key
 (`MESHY_API_KEY`, or the key saved on the Claude Code cloud environment).
+Set the variable in your shell, or copy `.env.example` to `.env` at the repo
+root and put the key there; `.env` is git-ignored, so the key stays off
+GitHub.
 
 ```bash
 python tools/sprite_forge/meshy.py balance                 # free

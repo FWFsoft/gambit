@@ -274,11 +274,14 @@ void AbilitySystem::updateAbilityInput(Player& player, float dtMs) {
         bool recast = (pressed & bit) != 0 &&
                       (isCore ? Infusions::canRecastCore(player)
                               : kit->canRecast(player, slot));
-        if (ready || recast) fire(player, slot, 0.0f);
+        if ((ready || recast) && (isCore || kit->canCast(*this, player, slot))) {
+          fire(player, slot, 0.0f);
+        }
         break;
       }
       case Arena::AbilityMode::Charge: {
-        if (player.chargeSlot < 0 && (pressed & bit) != 0 && ready) {
+        if (player.chargeSlot < 0 && (pressed & bit) != 0 && ready &&
+            (isCore || kit->canCast(*this, player, slot))) {
           player.chargeSlot = slot;
           player.chargeMs = 0.0f;
         }
@@ -881,6 +884,15 @@ void AbilitySystem::knockbackEnemy(Enemy& enemy, float fromX, float fromY,
     d = 1.0f;
   }
   enemies->pushEnemy(enemy, dx / d, dy / d, distance, 170.0f);
+}
+
+void AbilitySystem::knockUpEnemy(Enemy& enemy, float durationMs) {
+  assert(durationMs >= 0.0f);
+  if (enemy.state == EnemyState::Dead) return;
+  const Arena::EnemyKindDef& def = Arena::enemyDef(enemy.type);
+  if (def.tier == Arena::EnemyTier::Brute) durationMs *= 0.6f;
+  if (def.tier == Arena::EnemyTier::Boss) durationMs *= 0.25f;
+  enemy.airMs = std::max(enemy.airMs, durationMs);
 }
 
 void AbilitySystem::pullEnemy(Enemy& enemy, float toX, float toY,

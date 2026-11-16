@@ -292,7 +292,7 @@ void ArenaView::drawAbilityBar() {
 
     // Name inside the box, wrapped to two short lines.
     if (available) {
-      std::string name = ability.name;
+      std::string name = ability.shortName ? ability.shortName : ability.name;
       size_t split = name.find(' ', name.size() / 3);
       std::string line1 = split == std::string::npos ? name : name.substr(0, split);
       std::string line2 = split == std::string::npos ? "" : name.substr(split + 1);
@@ -359,8 +359,20 @@ void ArenaView::drawAbilityBar() {
   {
     ImVec2 a(left - 190.0f, top + 4.0f), b(left - 14.0f, top + box - 4.0f);
     panel(dl, a, b, 0.6f);
+    // Long names are cut to the panel; the tooltip has the whole thing.
+    std::string passive = std::string("Passive: ") + kit->passiveName;
+    const float room = b.x - a.x - 16.0f;
+    ImFont* font = ImGui::GetFont();
+    if (font->CalcTextSizeA(12.0f, FLT_MAX, 0.0f, passive.c_str()).x > room) {
+      while (passive.size() > 12 &&
+             font->CalcTextSizeA(12.0f, FLT_MAX, 0.0f, (passive + "...").c_str()).x >
+                 room) {
+        passive.pop_back();
+      }
+      passive += "...";
+    }
     text(dl, ImVec2(a.x + 8.0f, a.y + 5.0f), IM_COL32(255, 220, 128, 255), 12.0f,
-         (std::string("Passive: ") + kit->passiveName).c_str(), false);
+         passive.c_str(), false);
     if (mouse.x >= a.x && mouse.x <= b.x && mouse.y >= a.y && mouse.y <= b.y) {
       ImGui::BeginTooltip();
       ImGui::PushTextWrapPos(320.0f);

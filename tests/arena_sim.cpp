@@ -70,6 +70,7 @@ uint32_t characterIdByName(const std::string& name) {
       {"Mina", Arena::CharacterId::Mina},
       {"Volgore", Arena::CharacterId::Volgore},
       {"Wade", Arena::CharacterId::Wade},
+      {"Nolan", Arena::CharacterId::Nolan},
       {"Presidente", Arena::CharacterId::Presidente},
   };
   auto it = ids.find(name);
@@ -92,6 +93,8 @@ float preferredRange(uint32_t characterId) {
       return 85.0f;
     case Arena::CharacterId::Wade:
       return 60.0f;
+    case Arena::CharacterId::Nolan:
+      return 70.0f;
     case Arena::CharacterId::Presidente:
       return 70.0f;
     case Arena::CharacterId::Volgore:
