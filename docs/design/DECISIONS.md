@@ -21,6 +21,40 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-16: Controller reticle reaches as far as the hero does; ally abilities snap
+- **Decision:** (both requested by a human after a question from Noah; the
+  numbers are the agent's call.)
+  - **Reach:** at full tilt the right stick puts the reticle as far out as
+    the longest ability in that hero's kit that lands on a chosen spot,
+    instead of a fixed 320 px for everyone: Suds 420, Zephyr and Presidente
+    460, Isaac 520, Nyx 560, Mina 580. Heroes with no such ability keep 320.
+    The near end stays at 110 px, and aiming by walking stays at 200 px.
+  - **Ally snap:** Isaac's Lifeline and Blessing and Zephyr's Gale's Embrace
+    go to the ally closest in angle to the way the stick points, within 35
+    degrees and within range (520 px for Isaac, 700 for Zephyr), not the
+    ally nearest the reticle. That ally wears a green ring the whole time
+    the controller is in use, and the reticle jumps onto them while the
+    button is held. Nobody in the cone: the ability behaves as before
+    (Blessing and Embrace on yourself, Lifeline on the ground).
+- **Pillars:** Clarity: the reticle now shows where a placed ability will
+  really land, and the ring shows who gets a support ability before it is
+  spent. Comradery in Competition: a support on a controller can reach a
+  team-mate across the fight as a mouse player can.
+- **Why:** with the fixed 320 px reticle a controller player could not use
+  the full range of five kits, and landing a reticle within 130 px of a
+  moving team-mate with a stick is hard. Rejected: raising the reach to
+  580 for everyone (melee heroes would aim at space they cannot hit). Costs
+  to know about: long-range heroes get coarser close-in placement, since
+  the same stick travel covers more ground; on a controller Isaac's
+  Blessing stops at 520 px where the mouse has no limit; while an ally
+  button is held, any other ability fired aims at that ally too; and the
+  ring is one more mark on screen for Isaac and Zephyr. The reach table in
+  `include/PadAim.h` is a copy of numbers in `src/CharacterKits.cpp` and
+  must be kept in step by hand. Not yet tried on a real controller.
+- **Status:** Accepted (requested by a human); numbers need review
+- **Where:** `include/PadAim.h`, `include/PadState.h`, `src/InputSystem.cpp`,
+  `src/ClientPrediction.cpp`, `src/ArenaHud.cpp`, `tests/test_inputsystem.cpp`
+
 ## 2026-11-15: Controller play, and couch co-op as two windows
 - **Decision:** (requested by a human for a playtest; the button layout and
   the numbers are the agent's call.)

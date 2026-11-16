@@ -1,3 +1,4 @@
+#include <cmath>
 #include <SDL2/SDL.h>
 
 #include <vector>
@@ -6,6 +7,7 @@
 #include "GameStateManager.h"
 #include "InputSystem.h"
 #include "Logger.h"
+#include "PadAim.h"
 #include "PadState.h"
 #include "test_utils.h"
 
@@ -137,6 +139,7 @@ void padReset() {
         padGotInput = true;
       });
   PadState::holding = false;
+  PadState::aimReach = PadAim::DEFAULT_REACH;
   PadState::scoreboardHeld = false;
   PadState::bound = true;
   PadState::active = false;
@@ -255,6 +258,16 @@ TEST(InputSystem_PadAim) {
   e = padTick();
   assert(e.padAim && e.padAimY == lastY);
 
+  // Full tilt reaches as far as the hero's longest placed ability.
+  padAxis(SDL_CONTROLLER_AXIS_RIGHTY, -1.0f);
+  PadState::aimReach = PadAim::reach(Arena::CharacterId::Mina);
+  e = padTick();
+  assert(std::fabs(-e.padAimY - 580.0f) < 0.5f);
+  PadState::aimReach = PadAim::reach(Arena::CharacterId::Wade);
+  e = padTick();
+  assert(std::fabs(-e.padAimY - PadAim::DEFAULT_REACH) < 0.5f);
+  padAxis(SDL_CONTROLLER_AXIS_RIGHTY, 0.0f);
+
   // A mouse click hands the aim back to the cursor.
   EventBus::instance().publish(
       MouseButtonEvent{SDL_BUTTON_LEFT, true, 100, 100});
@@ -308,6 +321,34 @@ TEST(InputSystem_PadHeldThroughPauseAndDisconnect) {
 
 // In menus the controller is the menu's: it presses keys, never abilities,
 // and a button held through a menu does nothing until it is pressed again.
+// Ally-targeted abilities go to the ally the stick points at.
+TEST(InputSystem_PadAllyPick) {
+  const PadAim::Point allies[] = {
+      {300.0f, 20.0f},   // right, slightly off the line
+      {0.0f, -200.0f},   // straight up
+      {900.0f, 0.0f},    // dead right, but out of range
+      {150.0f, 150.0f},  // down-right diagonal
+  };
+  // Aiming right: the near ally on the right, not the far one.
+  assert(PadAim::pickAlly(0, 0, 1, 0, allies, 4, 520.0f) == 0);
+  // With the range to reach them, the one dead on the line wins.
+  assert(PadAim::pickAlly(0, 0, 1, 0, allies, 4, 1000.0f) == 2);
+  // Aiming up.
+  assert(PadAim::pickAlly(0, 0, 0, -200, allies, 4, 520.0f) == 1);
+  // Aiming left: nobody is there, so nobody is picked.
+  assert(PadAim::pickAlly(0, 0, -1, 0, allies, 4, 520.0f) == -1);
+  // No aim, no allies.
+  assert(PadAim::pickAlly(0, 0, 0, 0, allies, 4, 520.0f) == -1);
+  assert(PadAim::pickAlly(0, 0, 1, 0, allies, 0, 520.0f) == -1);
+
+  // Only Isaac and Zephyr have such abilities.
+  assert(PadAim::allyTargeting(Arena::CharacterId::Isaac).buttons ==
+         (InputButtons::Secondary | InputButtons::Special));
+  assert(PadAim::allyTargeting(Arena::CharacterId::Zephyr).buttons ==
+         InputButtons::Special);
+  assert(PadAim::allyTargeting(Arena::CharacterId::Mina).buttons == 0);
+}
+
 TEST(InputSystem_PadMenus) {
   padReset();
   GameStateManager& gsm = GameStateManager::instance();
@@ -385,6 +426,7 @@ int main() {
   test_InputSystem_PadAbilityButtons();
   test_InputSystem_PadMovement();
   test_InputSystem_PadAim();
+  test_InputSystem_PadAllyPick();
   test_InputSystem_PadMenus();
   test_InputSystem_PadHeldThroughPauseAndDisconnect();
 
