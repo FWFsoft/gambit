@@ -97,6 +97,9 @@ struct AbilityInfo {
   float cooldownMs;
   AbilityMode mode;
   float maxChargeMs;  // Charge: time to full charge. Channel: repeat interval.
+  // Shown on the HUD button when the name is too long for it (two lines of
+  // about nine characters). nullptr: the name is short enough.
+  const char* shortName = nullptr;
 };
 
 enum class Archetype : uint8_t { Defender, Striker, Winger, Playmaker };
@@ -123,6 +126,7 @@ namespace CharacterId {
 constexpr uint32_t Gravon = 3;
 constexpr uint32_t Isaac = 4;
 constexpr uint32_t Mina = 9;
+constexpr uint32_t Nolan = 12;
 constexpr uint32_t Presidente = 14;
 constexpr uint32_t Suds = 16;
 constexpr uint32_t Volgore = 18;

@@ -522,6 +522,23 @@ add_executable(test_wade_kit
 target_include_directories(test_wade_kit PRIVATE include tests)
 target_link_libraries(test_wade_kit PRIVATE spdlog::spdlog SDL2::SDL2)
 
+add_executable(test_nolan_kit
+    tests/test_nolan_kit.cpp
+    src/Logger.cpp
+    src/EnemySystem.cpp
+    src/Effect.cpp
+    src/EffectManager.cpp
+    src/ArenaData.cpp
+    src/AbilitySystem.cpp
+    src/CharacterKits.cpp
+    src/Infusions.cpp
+    src/CollisionSystem.cpp
+    src/ItemRegistry.cpp
+    src/AnimationController.cpp
+)
+target_include_directories(test_nolan_kit PRIVATE include tests)
+target_link_libraries(test_nolan_kit PRIVATE spdlog::spdlog SDL2::SDL2)
+
 add_executable(test_headless_movement
     tests/test_headless_movement.cpp
     src/Logger.cpp
@@ -586,6 +603,7 @@ add_test(NAME AnimationController COMMAND test_animation_controller)
 add_test(NAME AnimationSystem COMMAND test_animation_system)
 add_test(NAME GameLoop COMMAND test_gameloop)
 add_test(NAME WadeKit COMMAND test_wade_kit)
+add_test(NAME NolanKit COMMAND test_nolan_kit)
 
 # Full match on the real server with bot players (lobby -> 3 rounds -> boss).
 # God mode makes the outcome deterministic: it must reach Victory.

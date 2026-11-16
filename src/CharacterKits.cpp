@@ -22,6 +22,7 @@ namespace {
 using Arena::CharacterId::Gravon;
 using Arena::CharacterId::Isaac;
 using Arena::CharacterId::Mina;
+using Arena::CharacterId::Nolan;
 using Arena::CharacterId::Presidente;
 using Arena::CharacterId::Suds;
 using Arena::CharacterId::Volgore;
@@ -724,6 +725,228 @@ class VolgoreKit : public Kit {
 };
 
 // ===========================================================================
+// Nolan, the Prodigy (Striker)
+// Wade's hype foil: every move is a kick. He throws foes into the air and
+// stacks Expose on them, and his Q and Shift only work on an airborne foe:
+// sweep it up, teleport to where it lands, kick it back down.
+//
+// Passive (No guys, I don't need a passive either): knock-ups and
+// knockbacks last longer for every stack of Expose on the target. Stacks
+// are read before the hit, since the hit's damage consumes one.
+// Kicks land on frame 2 of the forge's 24 fps clips.
+// ===========================================================================
+class NolanKit : public Kit {
+ public:
+  static constexpr float KICK_MS = 2000.0f / 24.0f;
+  static constexpr float EXPOSE_SCALE = 0.35f;  // +35% per Expose stack
+
+  // LMB: Lower Limb Devastation. A floor sweep, then a hop back.
+  static constexpr float SWEEP_RANGE = 120.0f;
+  static constexpr float SWEEP_HALF_ANGLE = 80.0f;
+  static constexpr float SWEEP_DAMAGE = 16.0f;
+  static constexpr float SWEEP_AIR_MS = 650.0f;
+  static constexpr float HOP_AT_MS = 6000.0f / 24.0f;  // frame 6
+  static constexpr float HOP_DISTANCE = 80.0f;
+  static constexpr float HOP_MS = 120.0f;
+
+  // RMB: Spinning Lotus Crane Tortoise Sky Splitter. Knockback all around.
+  static constexpr float LOTUS_RADIUS = 150.0f;
+  static constexpr float LOTUS_PUSH_MIN = 90.0f;
+  static constexpr float LOTUS_PUSH_MAX = 260.0f;
+  static constexpr float LOTUS_PUSH_MS = 170.0f;
+
+  // Q: Sun Slaying Black-out Kick of the Demon God.
+  static constexpr float BLACKOUT_REACH = 230.0f;
+  static constexpr float BLACKOUT_DAMAGE = 48.0f;
+  static constexpr float BLACKOUT_STUN_RADIUS = 140.0f;
+  static constexpr float BLACKOUT_STUN_MS = 1400.0f;
+  static constexpr float RESONANCE_MS = 8000.0f;
+
+  // LSHIFT: Anime Shit. Teleport to where an airborne foe will land.
+  static constexpr float BLINK_REACH = 520.0f;
+
+  static float exposeScale(AbilitySystem& sys, const Enemy& enemy) {
+    int stacks =
+        sys.effects().getEnemyEffects(enemy.id).getStacks(EffectType::Expose);
+    return 1.0f + EXPOSE_SCALE * static_cast<float>(stacks);
+  }
+
+  // The airborne foe nearest the cursor within reach of Nolan.
+  static Enemy* airborneTarget(AbilitySystem& sys, const Player& self,
+                               float reach) {
+    Enemy* best = nullptr;
+    float bestD = 1e9f;
+    sys.enemiesInCircle(self.x, self.y, reach, [&](Enemy& enemy) {
+      if (!enemy.airborne()) return;
+      float d = dist(enemy.x, enemy.y, self.aimX, self.aimY);
+      if (d < bestD) {
+        bestD = d;
+        best = &enemy;
+      }
+    });
+    return best;
+  }
+
+  // Where an airborne foe comes down: the end of any knockback it is in.
+  static void landingPoint(AbilitySystem& sys, const Enemy& enemy, float& x,
+                           float& y) {
+    float t = std::max(0.0f, enemy.knockMs) / 1000.0f;
+    x = enemy.x + enemy.knockVx * t;
+    y = enemy.y + enemy.knockVy * t;
+    sys.clampToWorld(x, y);
+  }
+
+  bool canCast(AbilitySystem& sys, const Player& self, int slot) override {
+    if (slot != 2 && slot != 3) return true;
+    float reach = slot == 2 ? BLACKOUT_REACH : BLINK_REACH;
+    if (airborneTarget(sys, self, reach)) return true;
+    // Nothing in the air: show his reach so the player learns it.
+    sys.fxRing(self.x, self.y, reach, VfxTheme::Neutral);
+    return false;
+  }
+
+  void cast(AbilityContext& ctx, int slot) override {
+    switch (slot) {
+      case 0:
+        sweep(ctx);
+        break;
+      case 1:
+        lotus(ctx);
+        break;
+      case 2:
+        blackout(ctx);
+        break;
+      case 3:
+        blink(ctx);
+        break;
+      default:
+        assert(false && "Nolan has four kit slots");
+    }
+  }
+
+ private:
+  static void sweep(AbilityContext& ctx) {
+    AbilitySystem* sys = &ctx.sys;
+    const uint32_t id = ctx.self.id;
+    const float x = ctx.self.x, y = ctx.self.y;
+    const float dx = ctx.dirX, dy = ctx.dirY;
+    sys->schedule(KICK_MS, [sys, id, x, y, dx, dy]() {
+      Player* self = sys->findPlayer(id);
+      if (!self || !self->isAlive()) return;
+      sys->fxSlash(x, y, dx, dy, SWEEP_RANGE, SWEEP_HALF_ANGLE * 2.0f,
+                   VfxTheme::Wind);
+      sys->enemiesInCone(x, y, dx, dy, SWEEP_RANGE, SWEEP_HALF_ANGLE,
+                         [&](Enemy& enemy) {
+                           uint32_t foeId = enemy.id;
+                           float scale = exposeScale(*sys, enemy);
+                           sys->damageEnemy(id, enemy, SWEEP_DAMAGE,
+                                            DamageFlag::Melee | DamageFlag::Basic);
+                           Enemy* foe = sys->findEnemy(foeId);
+                           if (!foe || foe->state == EnemyState::Dead) return;
+                           sys->knockUpEnemy(*foe, SWEEP_AIR_MS * scale);
+                           sys->applyToEnemy(*foe, EffectType::Expose, 1, id);
+                         });
+    });
+    // The hop back, as the clip lands it.
+    sys->schedule(HOP_AT_MS, [sys, id, dx, dy]() {
+      Player* self = sys->findPlayer(id);
+      if (!self || !self->isAlive()) return;
+      sys->dashPlayer(*self, -dx, -dy, HOP_DISTANCE, HOP_MS, false);
+    });
+  }
+
+  static void lotus(AbilityContext& ctx) {
+    AbilitySystem* sys = &ctx.sys;
+    const uint32_t id = ctx.self.id;
+    const float x = ctx.self.x, y = ctx.self.y;
+    const float push =
+        LOTUS_PUSH_MIN + (LOTUS_PUSH_MAX - LOTUS_PUSH_MIN) * ctx.charge;
+    sys->schedule(KICK_MS, [sys, id, x, y, push]() {
+      Player* self = sys->findPlayer(id);
+      if (!self || !self->isAlive()) return;
+      sys->fxRing(x, y, LOTUS_RADIUS, VfxTheme::Wind);
+      sys->enemiesInCircle(x, y, LOTUS_RADIUS, [&](Enemy& enemy) {
+        float scale = exposeScale(*sys, enemy);
+        float dx = enemy.x - x, dy = enemy.y - y;
+        float d = std::sqrt(dx * dx + dy * dy);
+        if (d < 0.01f) {
+          dx = 1.0f;
+          dy = 0.0f;
+          d = 1.0f;
+        }
+        sys->enemySystem().pushEnemy(enemy, dx / d, dy / d, push * scale,
+                                     LOTUS_PUSH_MS * scale);
+        sys->applyToEnemy(enemy, EffectType::Expose, 1, id);
+      });
+    });
+  }
+
+  static void blackout(AbilityContext& ctx) {
+    AbilitySystem& sys = ctx.sys;
+    Player& self = ctx.self;
+    Enemy* target = airborneTarget(sys, self, BLACKOUT_REACH);
+    assert(target && "canCast checked for an airborne target");
+    // Step in beside it for the kick.
+    float dx = target->x - self.x, dy = target->y - self.y;
+    float d = std::sqrt(dx * dx + dy * dy);
+    if (d > 70.0f) {
+      sys.blinkPlayer(self, target->x - dx / d * 55.0f,
+                      target->y - dy / d * 55.0f);
+    }
+    AbilitySystem* s = &sys;
+    const uint32_t id = self.id, foeId = target->id;
+    sys.schedule(KICK_MS, [s, id, foeId]() {
+      Player* nolan = s->findPlayer(id);
+      Enemy* foe = s->findEnemy(foeId);
+      if (!nolan || !nolan->isAlive() || !foe) return;
+      foe->airMs = 0.0f;  // driven into the ground
+      foe->knockMs = 0.0f;
+      const float x = foe->x, y = foe->y;
+      s->fxBurst(x, y, BLACKOUT_STUN_RADIUS, VfxTheme::Wind);
+      s->damageEnemy(id, *foe, BLACKOUT_DAMAGE, DamageFlag::Melee);
+      s->enemiesInCircle(x, y, BLACKOUT_STUN_RADIUS, [&](Enemy& enemy) {
+        s->applyToEnemy(enemy, EffectType::Stunned, 1, id, BLACKOUT_STUN_MS);
+      });
+      // When I win, we win: Wade gets Resonance for a long Roll.
+      for (auto& [otherId, ally] : s->allPlayers()) {
+        if (otherId == id || !ally.isAlive()) continue;
+        if (ally.characterId != Arena::CharacterId::Wade) continue;
+        int before = s->effects().getPlayerEffects(otherId).getStacks(
+            EffectType::Resonance);
+        s->applyToPlayer(ally, EffectType::Resonance, 1, id, RESONANCE_MS);
+        int after = s->effects().getPlayerEffects(otherId).getStacks(
+            EffectType::Resonance);
+        if (after != before) {
+          s->fxEffectVerb(EffectVerb::Apply, EffectType::Resonance, otherId,
+                          false, ally.x, ally.y, static_cast<float>(before),
+                          static_cast<float>(after), id, nolan->x, nolan->y);
+        }
+      }
+    });
+  }
+
+  static void blink(AbilityContext& ctx) {
+    AbilitySystem& sys = ctx.sys;
+    Player& self = ctx.self;
+    Enemy* target = airborneTarget(sys, self, BLINK_REACH);
+    assert(target && "canCast checked for an airborne target");
+    float lx, ly;
+    landingPoint(sys, *target, lx, ly);
+    // Arrive at the landing point, just short of the foe's body.
+    float dx = lx - self.x, dy = ly - self.y;
+    float d = std::sqrt(dx * dx + dy * dy);
+    float gap = Arena::Tuning::PLAYER_RADIUS + target->radius;
+    if (d > gap) {
+      lx -= dx / d * gap;
+      ly -= dy / d * gap;
+    }
+    sys.fxDashTrail(self.x, self.y, lx, ly, VfxTheme::Wind);
+    sys.blinkPlayer(self, lx, ly);
+    sys.applyToEnemy(*target, EffectType::Expose, 1, self.id);
+  }
+};
+
+// ===========================================================================
 // Wade, the Old Head (Striker)
 //   kitCounter[0]  punches thrown in the current combination (0-2); the
 //                  third grants Haste
@@ -1292,6 +1515,8 @@ std::unique_ptr<Kit> makeKit(uint32_t characterId) {
       return std::make_unique<MinaKit>();
     case Volgore:
       return std::make_unique<VolgoreKit>();
+    case Nolan:
+      return std::make_unique<NolanKit>();
     case Wade:
       return std::make_unique<WadeKit>();
     case Presidente:

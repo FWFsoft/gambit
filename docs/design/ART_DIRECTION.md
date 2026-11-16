@@ -202,6 +202,16 @@ Arms hang off the chest, so leaning forward tips them back. Solve the
 shoulder and elbow angles by measuring joint positions (wrist height
 against the head joint), not by eye.
 
+**Nolan: the firebender's kick.**
+The hype anime foil to Wade: lean, bare-chested, a tall crest of electric
+blue hair that tops his outline from every side, white baggy trousers
+gathered into heavy boots, a dark sash. He fights with his legs only, in
+the way Zuko firebends: low and wide, grounded, a hand on the floor, the
+legs drawing big arcs. His stance is bladed and sunk, lead palm out in
+front and the rear hand chambered at the ribs. Each move has its own
+shape: a leg scything the floor, a leg out flat through a full spin, a leg
+straight up before it comes down. He never throws a punch.
+
 **Suds: the barrel and the cooler.**
 A wide barrel of a torso in a blue Hawaiian shirt, on red armoured legs. A
 big white cooler juts out at his left hip. The life of the party: his idle

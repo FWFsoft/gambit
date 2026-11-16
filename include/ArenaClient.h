@@ -56,6 +56,7 @@ class ArenaClient {
     float deathMs = 0;   // time since death started
     float animTime = 0;
     float lastSeenMs = 0;
+    float air = 0;  // 0 on the ground .. 1 at the top of a knock-up
   };
 
   // One-shot effects (slash, cone, burst, ring, beam, trail, tether, puff,

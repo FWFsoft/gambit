@@ -43,6 +43,9 @@ struct Enemy : public Animatable {
   float cooldownMs = 0.0f;     // until the next attack may start
   float aimX = 0.0f, aimY = 0.0f;  // where the attack was aimed
   float knockVx = 0.0f, knockVy = 0.0f, knockMs = 0.0f;
+  // Knocked into the air: helpless until it lands (AbilitySystem::knockUp).
+  float airMs = 0.0f;
+  bool airborne() const { return airMs > 0.0f && state != EnemyState::Dead; }
   float deadMs = 0.0f;         // time since death (removed after a delay)
   bool targetShip = false;     // marches on the ship instead of players
   bool elite = false;

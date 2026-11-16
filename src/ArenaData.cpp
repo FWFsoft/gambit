@@ -266,6 +266,33 @@ static const KitInfo KITS[] = {
           "Mend.",
           9000.0f, AbilityMode::Tap, 0.0f},
      }},
+    {CharacterId::Nolan,
+     "Nolan",
+     "the Prodigy",
+     Archetype::Striker,
+     250.0f,
+     262.0f,
+     "No guys, I don't need a passive either",
+     "(Okay, I'll take it, that's kind of cool.) Knock-ups and knockbacks "
+     "last longer for every stack of Expose on the target.",
+     {
+         {"Look up! Secret Technique: Lower Limb Devastation!",
+          "A sweeping kick, then a hop backwards. Briefly knocks up everything "
+          "hit and applies +1 Expose.",
+          650.0f, AbilityMode::Tap, 0.0f, "Lower Limb"},
+         {"[TWIN DRAGON MODE ACTIVATED] Spinning Lotus Crane Tortoise Sky "
+          "Splitter",
+          "Hold: kick in a full arc, knocking back everything nearby. +1 "
+          "Expose. Knockback distance grows with charge.",
+          5000.0f, AbilityMode::Charge, 1000.0f, "Sky Splitter"},
+         {"Sun Slaying Black-out Kick of the Demon God",
+          "Kick an airborne foe into the ground. Stuns it and every enemy "
+          "nearby. If Wade is an ally, he gains Resonance.",
+          8000.0f, AbilityMode::Tap, 0.0f, "Black-out Kick"},
+         {"Anime Shit",
+          "Teleport to where an airborne foe will land. +1 Expose to it.",
+          4000.0f, AbilityMode::Tap, 0.0f},
+     }},
     {CharacterId::Wade,
      "Wade",
      "the Old Head",
