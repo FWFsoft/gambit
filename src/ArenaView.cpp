@@ -222,6 +222,32 @@ const char* effectTag(EffectType type) {
 }
 
 // Frame index for an 8-direction strip laid out S, SE, E, NE, N, NW, W, SW.
+const char* objectiveLabel(ObjectiveType type) {
+  switch (type) {
+    case ObjectiveType::AlienScrapyard:
+      return "Scrapyard";
+    case ObjectiveType::DerelictTurret:
+      return "Derelict Turret";
+    case ObjectiveType::CaptureOutpost:
+      return "Outpost";
+    case ObjectiveType::SalvageMedpacks:
+      return "Med Pod";
+    case ObjectiveType::RecoverProbe:
+      return "Crashed Probe";
+    case ObjectiveType::SaveTheFrogs:
+      return "Frogs";
+    case ObjectiveType::NoxiousGas:
+      return "Toxic Spores";
+    case ObjectiveType::LittleJohn:
+      return "Guarded Gate";
+    case ObjectiveType::DigPitTrap:
+      return "Pit Trap";
+    case ObjectiveType::StringTripwire:
+      return "Tripwire";
+  }
+  return "Objective";
+}
+
 int directionFrame(float dirX, float dirY) {
   float degrees = std::atan2(dirY, dirX) * 180.0f / PI;  // E = 0, S = 90
   int index = static_cast<int>(std::lround((90.0f - degrees) / 45.0f));
@@ -900,34 +926,64 @@ void ArenaView::drawGround(ImDrawList* dl) {
     }
   }
 
+  // Hauling something home: light up the drop-off ring around the ship and
+  // point the way from the hauler's feet.
+  {
+    const MatchPlayerState* mine = arena->matchPlayer(localId());
+    bool hauling = mine && mine->carryingScrap;
+    for (const auto& [id, objective] : prediction->getObjectives()) {
+      if (objective.type == ObjectiveType::RecoverProbe &&
+          objective.state == ObjectiveState::ReadyToDeposit) {
+        hauling = true;
+      }
+    }
+    if (fighting && hauling) {
+      ImVec2 ship = toScreen(match.shipX, match.shipY);
+      float pulse = 0.5f + 0.5f * std::sin(timeSeconds * 4.0f);
+      float r = Arena::Tuning::SHIP_DROP_RADIUS;
+      dl->AddCircleFilled(ship, r, IM_COL32(255, 180, 70, 22 + 18 * pulse), 64);
+      dl->AddCircle(ship, r, IM_COL32(255, 190, 90, 150 + 90 * pulse), 64,
+                    4.0f);
+      // Ticks sweeping inward: "bring it in here".
+      for (int i = 0; i < 12; i++) {
+        float a = i * PI / 6.0f + timeSeconds * 0.4f;
+        float in = r - 14.0f - 10.0f * pulse;
+        dl->AddLine(
+            ImVec2(ship.x + std::cos(a) * (r + 10.0f),
+                   ship.y + std::sin(a) * (r + 10.0f)),
+            ImVec2(ship.x + std::cos(a) * in, ship.y + std::sin(a) * in),
+            IM_COL32(255, 200, 110, 200), 3.0f);
+      }
+      float px, py;
+      localPosition(px, py);
+      float dx = match.shipX - px, dy = match.shipY - py;
+      float d = std::sqrt(dx * dx + dy * dy);
+      if (mine && mine->carryingScrap && d > r) {
+        // A chevron at the feet, leaning toward home.
+        ImVec2 feet = toScreen(px, py);
+        float ux = dx / d, uy = dy / d;
+        float lead = 46.0f + 6.0f * pulse;
+        ImVec2 tip(feet.x + ux * (lead + 18.0f), feet.y + uy * (lead + 18.0f));
+        ImVec2 base(feet.x + ux * lead, feet.y + uy * lead);
+        ImVec2 left(base.x - uy * 14.0f, base.y + ux * 14.0f);
+        ImVec2 right(base.x + uy * 14.0f, base.y - ux * 14.0f);
+        dl->AddTriangleFilled(tip, left, right, IM_COL32(255, 190, 90, 230));
+        dl->AddTriangle(tip, left, right, IM_COL32(40, 20, 10, 255), 2.0f);
+      }
+    }
+  }
+
   // Objectives
   for (const auto& [id, objective] : prediction->getObjectives()) {
     ImVec2 centre = toScreen(objective.x, objective.y);
     if (!inView(centre, 200, 200, 200, 200)) continue;
     ImU32 colour = IM_COL32(255, 220, 90, 150);
-    const char* label = "Objective";
     if (objective.state == ObjectiveState::InProgress) {
       colour = IM_COL32(90, 190, 255, 190);
     } else if (objective.state == ObjectiveState::ReadyToDeposit) {
       colour = IM_COL32(255, 160, 60, 190);
     } else if (objective.state == ObjectiveState::Completed) {
       colour = IM_COL32(110, 230, 130, 90);
-    }
-    switch (objective.type) {
-      case ObjectiveType::AlienScrapyard:
-        label = "Scrapyard";
-        break;
-      case ObjectiveType::DerelictTurret:
-        label = "Derelict Turret";
-        break;
-      case ObjectiveType::CaptureOutpost:
-        label = "Outpost";
-        break;
-      case ObjectiveType::SalvageMedpacks:
-        label = "Medpacks";
-        break;
-      default:
-        break;
     }
     float spin = timeSeconds * 0.6f;
     dl->AddCircle(centre, objective.radius, colour, 48, 2.0f);
@@ -942,7 +998,6 @@ void ArenaView::drawGround(ImDrawList* dl) {
     }
     dl->AddRectFilled(ImVec2(centre.x - 9, centre.y - 9),
                       ImVec2(centre.x + 9, centre.y + 9), colour, 2.0f);
-    (void)label;  // names and progress are drawn crisp in drawOverhead
   }
 
   // Ground zones: clouds, pools, vortex
@@ -1845,23 +1900,8 @@ void ArenaView::drawOverhead(ImDrawList* dl) {
         centre.y < -100 || centre.y > Config::Screen::HEIGHT + 100) {
       continue;
     }
-    const char* label = "Objective";
-    switch (objective.type) {
-      case ObjectiveType::AlienScrapyard:
-        label = "Scrapyard";
-        break;
-      case ObjectiveType::DerelictTurret:
-        label = "Derelict Turret";
-        break;
-      case ObjectiveType::CaptureOutpost:
-        label = "Outpost";
-        break;
-      case ObjectiveType::SalvageMedpacks:
-        label = "Medpacks";
-        break;
-      default:
-        break;
-    }
+    if (!wasSeen(objective.x, objective.y)) continue;  // not discovered yet
+    const char* label = objectiveLabel(objective.type);
     bool done = objective.state == ObjectiveState::Completed;
     text(dl, ImVec2(centre.x, centre.y + 20.0f),
          done ? IM_COL32(130, 220, 150, 170) : IM_COL32(255, 228, 130, 255),
@@ -1978,8 +2018,19 @@ void ArenaView::drawOverhead(ImDrawList* dl) {
     }
     const MatchPlayerState* mp = arena->matchPlayer(id);
     if (mp && mp->carryingScrap) {
-      text(dl, ImVec2(feet.x, top - (id == me ? 15.0f : 41.0f)),
-           IM_COL32(255, 200, 110, 255), 11.0f, "carrying scrap");
+      // A bundle of scrap held overhead, bobbing with the walk.
+      float bob = std::sin(timeSeconds * 6.0f + id) * 2.0f;
+      ImVec2 c(feet.x, top - (id == me ? 26.0f : 52.0f) + bob);
+      ImVec2 a(c.x - 15.0f, c.y - 10.0f), b(c.x + 15.0f, c.y + 10.0f);
+      dl->AddRectFilled(ImVec2(a.x - 2, a.y - 2), ImVec2(b.x + 2, b.y + 2),
+                        IM_COL32(20, 14, 10, 255), 3.0f);
+      dl->AddRectFilled(a, b, IM_COL32(176, 112, 54, 255), 2.0f);
+      dl->AddRectFilled(ImVec2(a.x, c.y - 2.0f), ImVec2(b.x, c.y + 2.0f),
+                        IM_COL32(205, 210, 220, 255));
+      dl->AddRectFilled(ImVec2(c.x - 2.0f, a.y), ImVec2(c.x + 2.0f, b.y),
+                        IM_COL32(205, 210, 220, 255));
+      text(dl, ImVec2(c.x, c.y - 22.0f), IM_COL32(255, 200, 110, 255), 11.0f,
+           "SCRAP");
     }
   }
 

@@ -48,6 +48,10 @@ class ObjectiveSystem {
 
   // Player attempts to interact with nearby objectives
   // Returns true if an interaction was started
+  // A player hauling an objective's item (a probe) delivers it just by
+  // walking into the deposit range.
+  void deliverOnArrival(uint32_t playerId, float x, float y);
+
   bool tryInteract(uint32_t playerId, float playerX, float playerY);
 
   // Player stops interacting (moved away or cancelled)

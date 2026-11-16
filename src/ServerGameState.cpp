@@ -65,6 +65,7 @@ ServerGameState::ServerGameState(NetworkServer* server,
     spawnWorldItem(itemId, x, y);
   };
   hooks.clearPickups = [this]() { clearArenaPickups(); };
+  hooks.resetWorld = [this]() { resetWorld(); };
   director = std::make_unique<MatchDirector>(
       players, enemySystem.get(), abilitySystem.get(), shipX, shipY,
       worldWidth, worldHeight, hooks);
@@ -89,7 +90,8 @@ ServerGameState::ServerGameState(NetworkServer* server,
   // Initialize objective system
   if (world.tiledMap != nullptr) {
     objectiveSystem = std::make_unique<ObjectiveSystem>();
-    objectiveSystem->initialize(world.tiledMap->getObjectives());
+    mapObjectives = world.tiledMap->getObjectives();
+    objectiveSystem->initialize(mapObjectives);
 
     // Set up callbacks for state changes
     objectiveSystem->setStateCallback(
@@ -112,13 +114,13 @@ ServerGameState::ServerGameState(NetworkServer* server,
           auto completer = players.find(playerId);
           if (director && completer != players.end()) {
             director->onObjectiveCompleted(
-                completer->second, obj->type == ObjectiveType::AlienScrapyard);
+                completer->second, obj->type == ObjectiveType::AlienScrapyard,
+                obj->x, obj->y);
           }
 
-          // Remove Slow debuff from player (applied during pickup phase)
-          if ((obj->type == ObjectiveType::AlienScrapyard ||
-               obj->type == ObjectiveType::RecoverProbe) &&
-              effectManager) {
+          // Remove Slow debuff from player (applied during pickup phase).
+          // Scrap keeps it: the weight stays until the scrap is banked.
+          if (obj->type == ObjectiveType::RecoverProbe && effectManager) {
             effectManager->cleanseDebuff(playerId, EffectType::Slow);
             Logger::info("Removed Slow from player " +
                          std::to_string(playerId) +
@@ -504,6 +506,12 @@ void ServerGameState::onUpdate(const UpdateEvent& e) {
         }
       }
     }
+
+    for (const auto& [playerId, player] : players) {
+      if (player.isAlive()) {
+        objectiveSystem->deliverOnArrival(playerId, player.x, player.y);
+      }
+    }
   }
 
   processArenaPickups();
@@ -519,7 +527,12 @@ void ServerGameState::handleEnemyDeaths() {
     if (enemy) {
       director->onEnemyKilled(*enemy, death.killerId);
       abilitySystem->onEnemyDied(*enemy, death.killerId);
-      if (objectiveSystem) objectiveSystem->onEnemyDeath(enemy->x, enemy->y);
+      // A camp guard counts for the place it guards, wherever it fell.
+      if (objectiveSystem) {
+        objectiveSystem->onEnemyDeath(
+            enemy->campGuard ? enemy->homeX : enemy->x,
+            enemy->campGuard ? enemy->homeY : enemy->y);
+      }
     }
 
     EnemyDiedPacket deathPacket;
@@ -1149,6 +1162,16 @@ void ServerGameState::processObjectiveInteract(uint32_t clientId,
     return;
   }
 
+  // One piece of scrap at a time: no salvaging with your hands full.
+  if (player.carryingScrap) {
+    const Objective* near =
+        objectiveSystem->findObjectiveNear(player.x, player.y);
+    if (near && near->type == ObjectiveType::AlienScrapyard &&
+        near->state == ObjectiveState::Inactive) {
+      return;
+    }
+  }
+
   Logger::info("ObjectiveInteract: player " + std::to_string(playerId) +
                " pos=(" + std::to_string(player.x) + "," +
                std::to_string(player.y) + ")");
@@ -1401,6 +1424,15 @@ void ServerGameState::updateObjectiveSideEffects(float deltaTime) {
       }
     }
   }
+}
+
+void ServerGameState::resetWorld() {
+  if (!enemySystem) return;
+  enemySystem->resetCamps();
+  if (!objectiveSystem) return;
+  objectiveSystem->initialize(mapObjectives);
+  initializeLittleJohnGuardians();
+  for (const auto& [id, player] : players) broadcastAllObjectives(id);
 }
 
 void ServerGameState::initializeLittleJohnGuardians() {

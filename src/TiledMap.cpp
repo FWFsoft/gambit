@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cassert>
 
+#include "ArenaData.h"
 #include "Logger.h"
 
 bool TiledMap::load(const std::string& filepath) {
@@ -211,12 +212,15 @@ void TiledMap::extractEnemySpawns() {
 
         // Extract enemy_type property
         std::string enemyTypeStr;
+        bool elite = false;
         const auto& properties = object.getProperties();
         for (const auto& prop : properties) {
           if (prop.getName() == "enemy_type" &&
               prop.getType() == tmx::Property::Type::String) {
             enemyTypeStr = prop.getStringValue();
-            break;
+          } else if (prop.getName() == "elite" &&
+                     prop.getType() == tmx::Property::Type::Boolean) {
+            elite = prop.getBoolValue();
           }
         }
 
@@ -229,7 +233,9 @@ void TiledMap::extractEnemySpawns() {
 
         // Parse enemy type
         EnemyType type;
-        if (enemyTypeStr == "slime") {
+        if (enemyTypeStr == "venoxarid_grunt") {
+          type = EnemyType::VenoxaridGrunt;
+        } else if (enemyTypeStr == "slime") {
           type = EnemyType::VenoxaridGrunt;
         } else if (enemyTypeStr == "goblin") {
           type = EnemyType::VenoxaridGrunt;
@@ -247,6 +253,7 @@ void TiledMap::extractEnemySpawns() {
         spawn.x = pos.x - centerWorldX;
         spawn.y = pos.y - centerWorldY;
         spawn.name = object.getName();
+        spawn.elite = elite;
 
         enemySpawns.push_back(spawn);
 
@@ -454,10 +461,10 @@ void TiledMap::extractObjectives() {
         }
 
         // Set deposit point — AlienScrapyard and RecoverProbe default to ship
-        bool isDepositType =
-            (objective.type == ObjectiveType::AlienScrapyard ||
-             objective.type == ObjectiveType::RecoverProbe ||
-             objective.type == ObjectiveType::SaveTheFrogs);
+        // Scrap is not on this list: salvaging finishes the scrapyard and
+        // the player carries the scrap home (MatchDirector banks it).
+        bool isDepositType = (objective.type == ObjectiveType::RecoverProbe ||
+                              objective.type == ObjectiveType::SaveTheFrogs);
 
         if (hasDepositPoint) {
           objective.depositX = depositX - centerWorldX;
@@ -468,6 +475,8 @@ void TiledMap::extractObjectives() {
           objective.depositX = shipX;
           objective.depositY = shipY;
           objective.hasDepositPoint = true;
+          // The ship's hull is solid: drop off anywhere around it.
+          objective.depositRadius = Arena::Tuning::SHIP_DROP_RADIUS;
           Logger::info("Objective '" + objective.name +
                        "' using ship as deposit point");
         } else if (isDepositType && !playerSpawns.empty()) {

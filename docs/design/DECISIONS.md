@@ -21,6 +21,99 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-15: The scrap haul reads, and banking it pays off
+- **Decision:** Salvaging a scrapyard finishes the objective and puts the
+  scrap in your hands; you bank it by walking into a ring around the ship.
+  - **Carrying:** a scrap crate bobs over the carrier's head (all players
+    see it), and the carrier is Slowed until the scrap is banked. A
+    "SCRAP SALVAGED" banner says to haul it home. You cannot salvage a
+    second piece with your hands full, and a downed carrier drops it.
+  - **Getting home:** while you carry anything, the drop-off ring around
+    the ship (190 px) glows and pulses with ticks sweeping inward, and a
+    chevron at your feet points to the ship.
+  - **Delivering:** step inside the ring: no button. The scrap is lobbed
+    onto the hull, which flares (burst and rings), a green "+180" repair
+    number rises over the ship, and the "SCRAP DELIVERED" banner shows.
+    Crashed probes deliver the same way.
+  - **Bug fixed:** the old drop-off was a 70 px circle around the ship's
+    centre, mostly inside the solid hull, and needed a button press there.
+- **Pillars:**
+  - **Clarity** decided it: requested by Noah after a playtest found no cue
+    for hauling, for being in range or for success. Every step now has a
+    cue that reads at a glance, for teammates too.
+  - **Strategic Crunch** serves: the Slow makes the haul a real cost (a
+    slowed player far out is exposed), and choosing who carries is a team
+    decision.
+  - **Comradery in Competition:** serves slightly; teammates can see who
+    is carrying and escort them.
+- **Why:** The haul is the scrapyard's whole gameplay, so it has to read.
+  Scrap uses the match director's carry state (as scrap dropped by elites
+  already did) instead of the objective's separate deposit step, so there
+  is one way to carry scrap. Covered by `tests/test_points_of_interest.cpp`;
+  **not playtested**.
+- **Status:** Built, needs review
+- **Where:** `src/MatchDirector.cpp` (`startCarryingScrap`, `bankScrap`),
+  `src/ObjectiveSystem.cpp` (`deliverOnArrival`), `src/ServerGameState.cpp`,
+  `src/TiledMap.cpp`, `src/ArenaView.cpp`, `src/ArenaHud.cpp`,
+  `src/ArenaClient.cpp`
+
+## 2026-11-15: Points of interest replace the horde; the zone holds until late
+- **Decision:** A round is now about choosing where to go, not surviving
+  a stream of enemies.
+  - **No roaming spawns in a round.** Enemies live in camps at points of
+    interest and stay dead once cleared, for the whole match. Raids on the
+    ship (every 45 s) are the only other pressure. The boss fight keeps
+    its top-up.
+  - **21 points of interest in three rings** around the ship (about 900,
+    1,550 and 2,350 px out), each on a pale clearing that stands out of the
+    dark ground: scrapyards, med pods and outposts behind camps, crashed
+    probes, frogs, toxic spores, and gates watched by a sleeping elite
+    (Little John). The far ring has bigger camps with elites, and any
+    objective 1,900 px or more from the ship pays two infusions. 44 camp
+    guards in all.
+  - **The map is bigger** (176 tiles, from 120) and the **zone is wider
+    and holds longer:** start radius 2,000 / 2,500 / 2,900 by round (was
+    1,150 / 1,500 / 1,850), shrinking only after 75% of the round (was
+    35%).
+  - **Discovery:** an objective's label and minimap marker only appear
+    once the crew has seen it; before, every objective showed on the
+    minimap from the start.
+  - **Fixes this needed:** a camp's kills count for its objective even if
+    it was cleared before anyone pressed interact; a Little John guardian
+    actually waits until its gate is touched or it is hit (the flag was
+    set but ignored); and a new match brings camps and objectives back.
+- **Pillars:**
+  - **Strategic Crunch** decided it. Requested by Noah after a playtest:
+    the constant horde left no choices, just "do the nearest objective
+    while fighting". Now each trip is a trade: near and cheap or far and
+    rich, this camp or that one, keep exploring or go defend the ship from
+    a raid, and when to turn back before the zone closes.
+  - **Clarity** serves: fights happen where you chose to go, and clearings
+    mark places worth visiting.
+  - **Creative Builds & Dynamic Play:** neutral. Every objective type the
+    code had is now on the map, but the layout is the same every match.
+  - **Comradery in Competition:** neutral to serves; splitting up to cover
+    more of the map is now a real option.
+  - **Trades against Strategic Crunch:** walking between cleared places
+    is dead time. Points of interest are about 600 to 900 px apart (3 to 4
+    seconds of walking) to keep that short, but there are no patrols on
+    the way, so the quiet stretches may feel empty.
+- **Why:** Matches far fewer kills: about 90 for a 4-bot ArenaSim match,
+  against about 560 before. The bots do not seek out objectives, so the
+  simulation says little about pacing; **not playtested**. Also: the
+  server now sends 44 more enemies all match (about 80 KB/s to four
+  clients in the sim, from about 30), the layout is fixed rather than
+  randomised per match, and clearings are ground colour only: no
+  landmark props exist yet.
+- **Status:** Built, needs review (open: patrols between points of
+  interest, randomised layouts, landmark art, camp health scaling by
+  round)
+- **Where:** `tools/arena_map/generate_arena.py`, `assets/maps/arena.tmx`,
+  `include/ArenaData.h` (zone tuning), `src/MatchDirector.cpp`,
+  `src/EnemySystem.cpp`, `src/ObjectiveSystem.cpp`,
+  `src/ServerGameState.cpp`, `src/TiledMap.cpp`, `src/ArenaView.cpp`,
+  `src/ArenaHud.cpp`
+
 ## 2026-11-15: Only Venoxarid thugs spawn until the other genera have models
 - **Decision:** Every pack, in every direction from the ship, is Venoxarid
   grunts and elites. Cerebrian, Frigidariant and Magnarok aliens no longer

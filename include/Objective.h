@@ -49,6 +49,7 @@ struct Objective {
   float depositX = 0.0f;
   float depositY = 0.0f;
   bool hasDepositPoint = false;  // True if deposit coords are set
+  float depositRadius = 0.0f;    // 0 = same as radius
 
   // For SaveTheFrogs: multi-deposit tracking (reuses enemiesRequired/Killed in
   // packet)
@@ -84,7 +85,8 @@ struct Objective {
     if (!hasDepositPoint) return false;
     float dx = px - depositX;
     float dy = py - depositY;
-    return (dx * dx + dy * dy) <= (radius * radius);
+    float reach = depositRadius > 0.0f ? depositRadius : radius;
+    return (dx * dx + dy * dy) <= (reach * reach);
   }
 
   // Get progress as a percentage (0.0 - 1.0)

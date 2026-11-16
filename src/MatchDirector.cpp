@@ -274,6 +274,8 @@ void MatchDirector::resetMatch() {
   bossSpawned = false;
   zone = Tuning::ZONE_START_RADIUS[0];
   enemies->despawnAll();
+  abilities->effects().clearAllEnemies();
+  if (hooks.resetWorld) hooks.resetWorld();
   abilities->clearTransient();
   abilities->setCombatEnabled(false);
   if (hooks.clearPickups) hooks.clearPickups();
@@ -443,8 +445,10 @@ void MatchDirector::updateSpawning(float dtMs, bool bossPhase) {
   // Solo has nobody to revive you, so it gets a lighter load.
   float playerScale = participants == 1 ? 0.65f : 0.55f + 0.45f * participants;
 
-  spawnTimer -= dtMs;
-  if (spawnTimer <= 0.0f) {
+  // Rounds have no roaming spawns: the field's enemies are the camps at the
+  // points of interest, so where you go decides what you fight.
+  if (bossPhase) spawnTimer -= dtMs;
+  if (bossPhase && spawnTimer <= 0.0f) {
     spawnTimer = Tuning::SPAWN_INTERVAL_MS -
                  400.0f * (std::min(currentRound, Tuning::ROUND_COUNT) - 1);
 
@@ -632,22 +636,41 @@ void MatchDirector::updateTurrets(float dtMs) {
   abilities->damageEnemy(0, *target, TURRET_DAMAGE, DamageFlag::Proc);
 }
 
+void MatchDirector::startCarryingScrap(Player& player) {
+  player.carryingScrap = true;
+  // It is heavy: the haul home is the cost of the scrap.
+  abilities->applyToPlayer(player, EffectType::Slow, 1, 0, 600000.0f);
+}
+
 void MatchDirector::bankScrap(Player& player) {
   player.carryingScrap = false;
+  abilities->effects().cleanseDebuff(player.id, EffectType::Slow);
   scrapBanked++;
-  shipHp = std::min(Tuning::SHIP_MAX_HEALTH,
-                    shipHp + Tuning::SHIP_REPAIR_PER_SCRAP);
+  float repaired =
+      std::min(Tuning::SHIP_MAX_HEALTH - shipHp, Tuning::SHIP_REPAIR_PER_SCRAP);
+  shipHp += repaired;
   player.score += Tuning::SCORE_SCRAP;
   abilities->fxAnnounce(scrapBanked == Tuning::SHIP_TURRET_SCRAP
                             ? Announcement::ShipTurretsOnline
                             : Announcement::ScrapDelivered);
+  // The scrap is heaved onto the hull, which flares as it is welded on.
+  abilities->fxLob(player.x, player.y, shipX, shipY - 30.0f, 22.0f, 380.0f,
+                   VfxTheme::Heal, 0);
+  abilities->fxBurst(shipX, shipY - 20.0f, 120.0f, VfxTheme::Heal);
   abilities->fxRing(shipX, shipY, 140.0f, VfxTheme::Heal);
+  abilities->fxRing(shipX, shipY, Tuning::SHIP_DROP_RADIUS, VfxTheme::Heal);
+  GameEventPacket hull;
+  hull.kind = GameEventKind::Heal;
+  hull.x = shipX;
+  hull.y = shipY - 40.0f;
+  hull.value = repaired > 0.0f ? repaired : Tuning::SHIP_REPAIR_PER_SCRAP;
+  abilities->emit(hull);
 }
 
 void MatchDirector::updateScrapDelivery() {
   for (auto& [id, player] : players) {
     if (!player.carryingScrap || player.isDead()) continue;
-    if (dist(player.x, player.y, shipX, shipY) <= Tuning::SHIP_RADIUS + 70.0f) {
+    if (dist(player.x, player.y, shipX, shipY) <= Tuning::SHIP_DROP_RADIUS) {
       bankScrap(player);
     }
   }
@@ -834,7 +857,7 @@ bool MatchDirector::onPickup(Player& player, uint32_t itemId) {
   }
   if (itemId == Arena::PickupId::Scrap) {
     if (player.carryingScrap) return false;  // one piece at a time
-    player.carryingScrap = true;
+    startCarryingScrap(player);
     return true;
   }
   if (itemId == Arena::PickupId::Medkit) {
@@ -845,18 +868,27 @@ bool MatchDirector::onPickup(Player& player, uint32_t itemId) {
   return false;
 }
 
-void MatchDirector::onObjectiveCompleted(Player& player, bool deliveredScrap) {
+void MatchDirector::onObjectiveCompleted(Player& player, bool salvagedScrap,
+                                         float objectiveX, float objectiveY) {
   player.score += Tuning::SCORE_OBJECTIVE;
+  if (salvagedScrap) {
+    abilities->fxAnnounce(Announcement::ScrapSalvaged);
+    startCarryingScrap(player);
+    return;
+  }
   abilities->fxAnnounce(Announcement::ObjectiveComplete);
-  if (deliveredScrap) {
-    player.carryingScrap = true;
-    bankScrap(player);
-  } else if (hooks.spawnPickup) {
-    // Objectives always pay out an infusion from the local genus.
-    Genus genus = Arena::genusForDirection(player.x - shipX, player.y - shipY);
-    hooks.spawnPickup(
-        Arena::PickupId::InfusionBase + static_cast<uint32_t>(genus),
-        player.x + 30.0f, player.y);
+  if (hooks.spawnPickup) {
+    // Objectives always pay out an infusion from the local genus, and the
+    // far ones pay two: the trip out is the price.
+    Genus genus =
+        Arena::genusForDirection(objectiveX - shipX, objectiveY - shipY);
+    bool far = dist(objectiveX, objectiveY, shipX, shipY) >=
+               Tuning::FAR_OBJECTIVE_DISTANCE;
+    for (int i = 0; i < (far ? 2 : 1); i++) {
+      hooks.spawnPickup(
+          Arena::PickupId::InfusionBase + static_cast<uint32_t>(genus),
+          player.x + 30.0f - 60.0f * i, player.y);
+    }
   }
 }
 

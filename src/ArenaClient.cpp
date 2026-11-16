@@ -409,7 +409,12 @@ void ArenaClient::onGameEvent(const GameEventPacket& p) {
           pushBanner("REVIVED", "", 0xFF90FF90, 1600.0f);
           break;
         case Announcement::ScrapDelivered:
-          pushBanner("SCRAP DELIVERED", "Ship repaired", 0xFFFFE0A0, 2000.0f);
+          pushBanner("SCRAP DELIVERED", "The hull is patched", 0xFFFFE0A0,
+                     2200.0f);
+          break;
+        case Announcement::ScrapSalvaged:
+          pushBanner("SCRAP SALVAGED", "It's heavy: haul it to the ship",
+                     0xFF6EBEFF, 2200.0f);
           break;
         case Announcement::ObjectiveComplete:
           pushBanner("OBJECTIVE COMPLETE", "", 0xFF90FF90, 2000.0f);

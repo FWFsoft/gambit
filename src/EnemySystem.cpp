@@ -48,6 +48,7 @@ void EnemySystem::spawnAllEnemies() {
     const auto& spawnPoint = spawns[i];
     SpawnOptions options;
     options.campGuard = true;
+    options.elite = spawnPoint.elite;
     uint32_t id = spawn(spawnPoint.type, spawnPoint.x, spawnPoint.y, options);
     enemies[id].spawnIndex = static_cast<uint32_t>(i);
   }
@@ -90,6 +91,12 @@ uint32_t EnemySystem::spawn(EnemyKind kind, float x, float y,
   uint32_t id = enemy.id;
   enemies[id] = enemy;
   return id;
+}
+
+void EnemySystem::resetCamps() {
+  despawnAll(true);
+  disabledZones.clear();
+  spawnAllEnemies();
 }
 
 void EnemySystem::despawnAll(bool includeCampGuards) {
@@ -176,6 +183,10 @@ EnemySystem::Target EnemySystem::pickTarget(
     }
     if (target.valid) return target;
   }
+
+  // A passive guardian (Little John) waits until its gate is touched or it
+  // is hit.
+  if (enemy.passive && enemy.lastHitBy == 0) return target;
 
   // Nearest living, visible player. Marked players pull aggro from afar.
   float aggro = enemy.campGuard ? CAMP_AGGRO_RANGE : enemy.detectionRange;

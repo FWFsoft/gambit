@@ -392,7 +392,8 @@ enum class Announcement : uint8_t {
   PlayerDown = 10,
   PlayerRevived = 11,
   ScrapDelivered = 12,
-  ObjectiveComplete = 13
+  ObjectiveComplete = 13,
+  ScrapSalvaged = 14
 };
 
 struct GameEventPacket {

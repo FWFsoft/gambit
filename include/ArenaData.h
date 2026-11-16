@@ -242,21 +242,28 @@ enum class MatchPhase : uint8_t {
 namespace Tuning {
 constexpr int ROUND_COUNT = 3;  // regular rounds before the boss
 constexpr float ROUND_SECONDS[ROUND_COUNT] = {150.0f, 165.0f, 180.0f};
-constexpr float ZONE_START_RADIUS[ROUND_COUNT] = {1150.0f, 1500.0f, 1850.0f};
+// The zone is the round's reach: wide enough that each round opens a new
+// ring of points of interest, and it holds for most of the round so there is
+// time to explore. It only closes at the end, as the run home.
+constexpr float ZONE_START_RADIUS[ROUND_COUNT] = {2000.0f, 2500.0f, 2900.0f};
 constexpr float ZONE_END_RADIUS = 300.0f;
-constexpr float ZONE_HOLD_FRACTION = 0.35f;  // of the round before shrinking
+constexpr float ZONE_HOLD_FRACTION = 0.75f;  // of the round before shrinking
 constexpr float ZONE_DAMAGE_PER_SECOND = 0.05f;  // fraction of max health
 constexpr float BOSS_ZONE_RADIUS = 950.0f;
 constexpr float INTERMISSION_SECONDS = 40.0f;
 constexpr float LOBBY_COUNTDOWN_SECONDS = 3.0f;
 
-// Enemy pressure. Living-enemy target during a round is
+// Enemy pressure. During a round the enemies live in camps at the map's
+// points of interest (placed in arena.tmx); nothing spawns around the
+// players. The only other pressure is raids on the ship. The living-enemy
+// target below is for the boss fight only:
 //   (BASE + PER_ROUND * round) * (0.55 + 0.45 * players) * ramp
-// where ramp climbs from 1 to 1 + RAMP over the round.
 constexpr float ENEMIES_BASE = 4.0f;
 constexpr float ENEMIES_PER_ROUND = 4.0f;
 constexpr float ENEMIES_RAMP = 0.6f;
-constexpr float SPAWN_INTERVAL_MS = 3200.0f;  // round 1; -400 per later round
+constexpr float SPAWN_INTERVAL_MS = 3200.0f;  // boss fight top-up interval
+// Objectives this far from the ship pay a second infusion.
+constexpr float FAR_OBJECTIVE_DISTANCE = 1900.0f;
 constexpr float RAID_FIRST_MS = 45000.0f;
 constexpr float RAID_INTERVAL_MS = 45000.0f;
 constexpr float SHIP_DAMAGE_SCALE = 0.5f;  // hull armor vs. enemy hits
@@ -264,6 +271,8 @@ constexpr float SHIP_DAMAGE_SCALE = 0.5f;  // hull armor vs. enemy hits
 constexpr float SHIP_MAX_HEALTH = 1500.0f;
 constexpr float SHIP_RADIUS = 110.0f;       // enemies attack inside this
 constexpr float SHIP_SAFE_RADIUS = 300.0f;  // "inside for the night"
+// Walk anything you are hauling (scrap, a probe) inside this to deliver it.
+constexpr float SHIP_DROP_RADIUS = 190.0f;
 constexpr float SHIP_REPAIR_PER_SCRAP = 180.0f;
 constexpr int SHIP_TURRET_SCRAP = 3;  // scrap banked before turrets come online
 
