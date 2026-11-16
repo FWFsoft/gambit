@@ -20,6 +20,11 @@ const char* genusName(Genus g) {
   }
 }
 
+Genus fieldedGenus(Genus territory) {
+  if (territory == Genus::None) return Genus::None;
+  return hasThugRoster(territory) ? territory : Genus::Venoxarid;
+}
+
 Genus genusForDirection(float dx, float dy) {
   // Screen space, y grows downward. Quadrants are split along the diagonals
   // so each genus owns one compass direction from the ship.
@@ -34,19 +39,22 @@ Genus genusForDirection(float dx, float dy) {
 static const EnemyKindDef ENEMY_DEFS[static_cast<int>(EnemyKind::Count)] = {
     // name, genus, tier, hp, speed, radius, dmg, range, windup, cooldown,
     // score, scale
-    {"Toxlith", Genus::Venoxarid, EnemyTier::Swarmer, 28, 195, 12, 5, 36, 350,
-     1300, 10, 1.0f},
-    {"Venomire", Genus::Venoxarid, EnemyTier::Caster, 95, 115, 18, 12, 330,
-     600, 2300, 30, 1.0f},
-    {"Serpentide", Genus::Venoxarid, EnemyTier::Brute, 340, 85, 34, 30, 85,
-     950, 2900, 100, 1.0f},
+    // The Venoxarid grunt: a hero-sized street thug. Fewer and tougher than
+    // the swarmers of the other genera, with a slower, bigger tell.
+    {"Venoxarid Grunt", Genus::Venoxarid, EnemyTier::Swarmer, 70, 150, 16, 9,
+     48, 450, 1500, 25, 1.0f},
+    // Retired with the Venoxarid simplification; kept so indices hold.
+    {"Venomire", Genus::Venoxarid, EnemyTier::Caster, 95, 115, 18, 12, 330, 600,
+     2300, 30, 1.0f},
+    {"Serpentide", Genus::Venoxarid, EnemyTier::Brute, 340, 85, 34, 30, 85, 950,
+     2900, 100, 1.0f},
 
     {"Psymite", Genus::Cerebrian, EnemyTier::Swarmer, 24, 205, 12, 5, 36, 330,
      1250, 10, 1.0f},
-    {"Cerebrax", Genus::Cerebrian, EnemyTier::Caster, 85, 120, 18, 13, 360,
-     650, 2400, 30, 1.0f},
-    {"Synaptogon", Genus::Cerebrian, EnemyTier::Brute, 310, 88, 34, 28, 85,
-     900, 3000, 100, 1.0f},
+    {"Cerebrax", Genus::Cerebrian, EnemyTier::Caster, 85, 120, 18, 13, 360, 650,
+     2400, 30, 1.0f},
+    {"Synaptogon", Genus::Cerebrian, EnemyTier::Brute, 310, 88, 34, 28, 85, 900,
+     3000, 100, 1.0f},
 
     {"Glacili", Genus::Frigidariant, EnemyTier::Swarmer, 32, 185, 12, 5, 36,
      370, 1350, 10, 1.0f},
@@ -57,13 +65,13 @@ static const EnemyKindDef ENEMY_DEFS[static_cast<int>(EnemyKind::Count)] = {
 
     {"Emberclad", Genus::Magnarok, EnemyTier::Swarmer, 26, 200, 12, 7, 36, 350,
      1300, 10, 1.0f},
-    {"Pyroclast", Genus::Magnarok, EnemyTier::Caster, 90, 118, 18, 16, 340,
-     600, 2300, 30, 1.0f},
+    {"Pyroclast", Genus::Magnarok, EnemyTier::Caster, 90, 118, 18, 16, 340, 600,
+     2300, 30, 1.0f},
     {"Lavaforge", Genus::Magnarok, EnemyTier::Brute, 330, 85, 34, 38, 85, 950,
      2800, 100, 1.0f},
 
-    {"The Matriarch", Genus::None, EnemyTier::Boss, 4200, 92, 62, 55, 130,
-     1100, 2300, 500, 2.0f},
+    {"The Matriarch", Genus::None, EnemyTier::Boss, 4200, 92, 62, 55, 130, 1100,
+     2300, 500, 2.0f},
 };
 
 const EnemyKindDef& enemyDef(EnemyKind kind) {
@@ -74,8 +82,30 @@ const EnemyKindDef& enemyDef(EnemyKind kind) {
 
 EnemyKind enemyKindFor(Genus genus, EnemyTier tier) {
   if (tier == EnemyTier::Boss || genus == Genus::None) return EnemyKind::Boss;
+  if (genus == Genus::Venoxarid) return EnemyKind::VenoxaridGrunt;
   int index = (static_cast<int>(genus) - 1) * 3 + static_cast<int>(tier);
   return static_cast<EnemyKind>(index);
+}
+
+bool hasThugRoster(Genus genus) { return genus == Genus::Venoxarid; }
+
+const EliteTuning& eliteTuning(EnemyKind kind) {
+  // The Venoxarid elite is the enforcer: 1.5x the grunt's size, and the
+  // pack's heavy now that the brute is gone.
+  static const EliteTuning THUG = {4.0f, 2.0f, 1.5f, 0.85f, 1.3f};
+  static const EliteTuning REGULAR = {2.2f, 1.3f, 1.15f, 1.0f, 1.0f};
+  return kind == EnemyKind::VenoxaridGrunt ? THUG : REGULAR;
+}
+
+bool eliteHasOwnActor(EnemyKind kind) {
+  return kind == EnemyKind::VenoxaridGrunt;
+}
+
+const char* enemyActorName(EnemyKind kind, bool elite) {
+  if (kind == EnemyKind::VenoxaridGrunt) {
+    return elite ? "VenoxaridElite" : "VenoxaridGrunt";
+  }
+  return enemyDef(kind).name;
 }
 
 const char* archetypeName(Archetype a) {

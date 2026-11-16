@@ -78,7 +78,7 @@ struct Enemy : public Animatable {
   // Constructor with defaults for Slime enemy type
   Enemy()
       : id(0),
-        type(EnemyType::Toxlith),
+        type(EnemyType::VenoxaridGrunt),
         state(EnemyState::Idle),
         x(0.0f),
         y(0.0f),

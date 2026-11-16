@@ -228,7 +228,8 @@ under it, head bowed and arms hanging, like a vessel the sword is wearing.
 He draws it only to swing (slashes, the overhead smash, Fury, the lunge),
 then it returns to his back.
 
-**Toxlith: the warty toad.**
+**Toxlith: the warty toad.** (No longer spawned: Venoxarid now fields the
+thugs described under Enemies. The actor is kept as a creature example.)
 Squat and wide: lumpy acid-green skin, a crest of magenta spines with
 glowing venom beads on the tips, red eyes and a long pink tongue. Low and
 wide, the opposite of every hero; the spiky crest is its top edge from any
@@ -247,13 +248,30 @@ differ in shape, not just scale. A starting point:
 
 | Genus | Body plan |
 | --- | --- |
-| Venoxarid | low and skittering, tails |
+| Venoxarid | upright street thugs: crests, open vests, baggy striped pants (built, see below) |
 | Cerebrian | floating, swollen brain bulbs |
 | Frigidariant | angular, crystalline, blocky |
 | Magnarok | hunched, rocky, heavy |
 
 The eleven old enemy sheets are one alien recoloured and rescaled. They
 fail the test, as the on-ramp doc already says.
+
+**Venoxarid is the first genus on the simplified roster** (decision log,
+2026-11-15): one grunt and one elite, both generated models, both in the
+genus colours of acid green skin and purple cloth.
+
+- **Grunt: the thug.** As tall as an average hero. A swept-back green
+  crest tops the outline; an open purple vest over a white shirt and baggy
+  purple track pants with a white stripe make the middle. Idle is a
+  slouch with the chin down and the hands loose in front.
+- **Elite: the enforcer.** One and a half times the grunt and twice as
+  wide. Spiked leather shoulders and gauntlets square off the outline; the
+  glowing venom tank on his back, with its hose, is the signature piece
+  and shows over his shoulder from every side.
+
+They differ from heroes by colour first (no hero is acid green on purple)
+and from each other by size and the tank. The crowd problem below is worse
+with hero-sized enemies and is still open.
 
 ## Beyond silhouettes: finding yourself in a crowd
 

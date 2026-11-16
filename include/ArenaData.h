@@ -29,6 +29,12 @@ const char* genusName(Genus g);
 // Angle is atan2(dy, dx) from the ship in screen space (y down).
 Genus genusForDirection(float dx, float dy);
 
+// The genus whose aliens actually spawn in a genus's territory. Only genera
+// with real models are fielded; until the other three get theirs, every
+// territory is held by Venoxarid thugs. The territory still decides which
+// infusion drops there (docs/design/DECISIONS.md, 2026-11-15).
+Genus fieldedGenus(Genus territory);
+
 // ---------------------------------------------------------------------------
 // Enemies
 // ---------------------------------------------------------------------------
@@ -36,10 +42,16 @@ Genus genusForDirection(float dx, float dy);
 enum class EnemyTier : uint8_t { Swarmer = 0, Caster = 1, Brute = 2, Boss = 3 };
 
 // Order matters: (genus - 1) * 3 + tier for the twelve regular kinds.
+//
+// The roster is being simplified one genus at a time, to one street thug
+// per genus plus its elite (docs/design/DECISIONS.md, 2026-11-15).
+// Venoxarid is done: every Venoxarid spawn is a VenoxaridGrunt, and
+// Venomire and Serpentide are retired. Their slots stay so the numbering
+// (and the network value of every other kind) does not move.
 enum class EnemyKind : uint8_t {
-  Toxlith = 0,
-  Venomire = 1,
-  Serpentide = 2,
+  VenoxaridGrunt = 0,
+  Venomire = 1,    // retired: never spawned
+  Serpentide = 2,  // retired: never spawned
   Psymite = 3,
   Cerebrax = 4,
   Synaptogon = 5,
@@ -69,7 +81,27 @@ struct EnemyKindDef {
 };
 
 const EnemyKindDef& enemyDef(EnemyKind kind);
+// The kind a genus fields for a tier. A simplified genus fields its grunt
+// for every tier.
 EnemyKind enemyKindFor(Genus genus, EnemyTier tier);
+// True for a genus on the simplified roster (a grunt and its elite).
+bool hasThugRoster(Genus genus);
+
+// What being elite does to an enemy. A thug's elite is its own, bigger
+// character with its own model; any other elite is the same body, tougher.
+struct EliteTuning {
+  float health;       // times the kind's health
+  float damage;       // times the kind's damage
+  float size;         // times the kind's radius (and, for thugs, height)
+  float speed;        // times the kind's speed
+  float attackRange;  // times the kind's attack range
+};
+const EliteTuning& eliteTuning(EnemyKind kind);
+
+// The baked sprite-forge actor (assets/sprites/actors/) that draws this
+// enemy. An elite thug has its own sheet, already drawn at elite size.
+const char* enemyActorName(EnemyKind kind, bool elite);
+bool eliteHasOwnActor(EnemyKind kind);
 
 // ---------------------------------------------------------------------------
 // Abilities / kits
@@ -210,21 +242,28 @@ enum class MatchPhase : uint8_t {
 namespace Tuning {
 constexpr int ROUND_COUNT = 3;  // regular rounds before the boss
 constexpr float ROUND_SECONDS[ROUND_COUNT] = {150.0f, 165.0f, 180.0f};
-constexpr float ZONE_START_RADIUS[ROUND_COUNT] = {1150.0f, 1500.0f, 1850.0f};
+// The zone is the round's reach: wide enough that each round opens a new
+// ring of points of interest, and it holds for most of the round so there is
+// time to explore. It only closes at the end, as the run home.
+constexpr float ZONE_START_RADIUS[ROUND_COUNT] = {2000.0f, 2500.0f, 2900.0f};
 constexpr float ZONE_END_RADIUS = 300.0f;
-constexpr float ZONE_HOLD_FRACTION = 0.35f;  // of the round before shrinking
+constexpr float ZONE_HOLD_FRACTION = 0.75f;  // of the round before shrinking
 constexpr float ZONE_DAMAGE_PER_SECOND = 0.05f;  // fraction of max health
 constexpr float BOSS_ZONE_RADIUS = 950.0f;
 constexpr float INTERMISSION_SECONDS = 40.0f;
 constexpr float LOBBY_COUNTDOWN_SECONDS = 3.0f;
 
-// Enemy pressure. Living-enemy target during a round is
+// Enemy pressure. During a round the enemies live in camps at the map's
+// points of interest (placed in arena.tmx); nothing spawns around the
+// players. The only other pressure is raids on the ship. The living-enemy
+// target below is for the boss fight only:
 //   (BASE + PER_ROUND * round) * (0.55 + 0.45 * players) * ramp
-// where ramp climbs from 1 to 1 + RAMP over the round.
 constexpr float ENEMIES_BASE = 4.0f;
 constexpr float ENEMIES_PER_ROUND = 4.0f;
 constexpr float ENEMIES_RAMP = 0.6f;
-constexpr float SPAWN_INTERVAL_MS = 3200.0f;  // round 1; -400 per later round
+constexpr float SPAWN_INTERVAL_MS = 3200.0f;  // boss fight top-up interval
+// Objectives this far from the ship pay a second infusion.
+constexpr float FAR_OBJECTIVE_DISTANCE = 1900.0f;
 constexpr float RAID_FIRST_MS = 45000.0f;
 constexpr float RAID_INTERVAL_MS = 45000.0f;
 constexpr float SHIP_DAMAGE_SCALE = 0.5f;  // hull armor vs. enemy hits
@@ -232,6 +271,8 @@ constexpr float SHIP_DAMAGE_SCALE = 0.5f;  // hull armor vs. enemy hits
 constexpr float SHIP_MAX_HEALTH = 1500.0f;
 constexpr float SHIP_RADIUS = 110.0f;       // enemies attack inside this
 constexpr float SHIP_SAFE_RADIUS = 300.0f;  // "inside for the night"
+// Walk anything you are hauling (scrap, a probe) inside this to deliver it.
+constexpr float SHIP_DROP_RADIUS = 190.0f;
 constexpr float SHIP_REPAIR_PER_SCRAP = 180.0f;
 constexpr int SHIP_TURRET_SCRAP = 3;  // scrap banked before turrets come online
 

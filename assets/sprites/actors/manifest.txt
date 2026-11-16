@@ -62,6 +62,18 @@ anim Toxlith run 48 6 14 1
 anim Toxlith attack 96 7 14 0
 anim Toxlith hit 152 3 16 0
 anim Toxlith death 176 7 12 0
+actor VenoxaridElite assets/sprites/actors/VenoxaridElite.png 264 234 132 192 17 1 smooth
+anim VenoxaridElite idle 0 8 8 1
+anim VenoxaridElite run 64 8 12 1
+anim VenoxaridElite attack 128 9 16 0
+anim VenoxaridElite hit 200 4 16 0
+anim VenoxaridElite death 232 9 12 0
+actor VenoxaridGrunt assets/sprites/actors/VenoxaridGrunt.png 176 156 88 128 17 1 smooth
+anim VenoxaridGrunt idle 0 8 8 1
+anim VenoxaridGrunt run 64 8 12 1
+anim VenoxaridGrunt attack 128 9 16 0
+anim VenoxaridGrunt hit 200 4 16 0
+anim VenoxaridGrunt death 232 9 12 0
 actor Wade assets/sprites/actors/Wade.png 176 156 88 128 34 1 smooth
 anim Wade idle 0 12 12 1
 anim Wade run 96 10 15 1

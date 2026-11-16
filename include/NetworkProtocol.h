@@ -392,7 +392,8 @@ enum class Announcement : uint8_t {
   PlayerDown = 10,
   PlayerRevived = 11,
   ScrapDelivered = 12,
-  ObjectiveComplete = 13
+  ObjectiveComplete = 13,
+  ScrapSalvaged = 14
 };
 
 struct GameEventPacket {
@@ -468,7 +469,7 @@ enum class DebugCommandKind : uint8_t {
 // Targets are picked near the cursor.
 enum class EffectLabAction : uint8_t {
   SpawnAllies = 1,     // two training allies beside you (they never die)
-  SpawnCrowd = 2,      // a big pack of Toxliths at the cursor
+  SpawnCrowd = 2,      // a big pack of Venoxarid grunts at the cursor
   Poison = 3,          // poison the enemy nearest the cursor
   AmplifyPoison = 4,   // multiply its poison
   SpreadPoison = 5,    // spread it to everything around it

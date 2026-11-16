@@ -21,6 +21,190 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-15: The scrap haul reads, and banking it pays off
+- **Decision:** Salvaging a scrapyard finishes the objective and puts the
+  scrap in your hands; you bank it by walking into a ring around the ship.
+  - **Carrying:** a scrap crate bobs over the carrier's head (all players
+    see it), and the carrier is Slowed until the scrap is banked. A
+    "SCRAP SALVAGED" banner says to haul it home. You cannot salvage a
+    second piece with your hands full, and a downed carrier drops it.
+  - **Getting home:** while you carry anything, the drop-off ring around
+    the ship (190 px) glows and pulses with ticks sweeping inward, and a
+    chevron at your feet points to the ship.
+  - **Delivering:** step inside the ring: no button. The scrap is lobbed
+    onto the hull, which flares (burst and rings), a green "+180" repair
+    number rises over the ship, and the "SCRAP DELIVERED" banner shows.
+    Crashed probes deliver the same way.
+  - **Bug fixed:** the old drop-off was a 70 px circle around the ship's
+    centre, mostly inside the solid hull, and needed a button press there.
+- **Pillars:**
+  - **Clarity** decided it: requested by Noah after a playtest found no cue
+    for hauling, for being in range or for success. Every step now has a
+    cue that reads at a glance, for teammates too.
+  - **Strategic Crunch** serves: the Slow makes the haul a real cost (a
+    slowed player far out is exposed), and choosing who carries is a team
+    decision.
+  - **Comradery in Competition:** serves slightly; teammates can see who
+    is carrying and escort them.
+- **Why:** The haul is the scrapyard's whole gameplay, so it has to read.
+  Scrap uses the match director's carry state (as scrap dropped by elites
+  already did) instead of the objective's separate deposit step, so there
+  is one way to carry scrap. Covered by `tests/test_points_of_interest.cpp`;
+  **not playtested**.
+- **Status:** Built, needs review
+- **Where:** `src/MatchDirector.cpp` (`startCarryingScrap`, `bankScrap`),
+  `src/ObjectiveSystem.cpp` (`deliverOnArrival`), `src/ServerGameState.cpp`,
+  `src/TiledMap.cpp`, `src/ArenaView.cpp`, `src/ArenaHud.cpp`,
+  `src/ArenaClient.cpp`
+
+## 2026-11-15: Points of interest replace the horde; the zone holds until late
+- **Decision:** A round is now about choosing where to go, not surviving
+  a stream of enemies.
+  - **No roaming spawns in a round.** Enemies live in camps at points of
+    interest and stay dead once cleared, for the whole match. Raids on the
+    ship (every 45 s) are the only other pressure. The boss fight keeps
+    its top-up.
+  - **21 points of interest in three rings** around the ship (about 900,
+    1,550 and 2,350 px out), each on a pale clearing that stands out of the
+    dark ground: scrapyards, med pods and outposts behind camps, crashed
+    probes, frogs, toxic spores, and gates watched by a sleeping elite
+    (Little John). The far ring has bigger camps with elites, and any
+    objective 1,900 px or more from the ship pays two infusions. 44 camp
+    guards in all.
+  - **The map is bigger** (176 tiles, from 120) and the **zone is wider
+    and holds longer:** start radius 2,000 / 2,500 / 2,900 by round (was
+    1,150 / 1,500 / 1,850), shrinking only after 75% of the round (was
+    35%).
+  - **Discovery:** an objective's label and minimap marker only appear
+    once the crew has seen it; before, every objective showed on the
+    minimap from the start.
+  - **Fixes this needed:** a camp's kills count for its objective even if
+    it was cleared before anyone pressed interact; a Little John guardian
+    actually waits until its gate is touched or it is hit (the flag was
+    set but ignored); and a new match brings camps and objectives back.
+- **Pillars:**
+  - **Strategic Crunch** decided it. Requested by Noah after a playtest:
+    the constant horde left no choices, just "do the nearest objective
+    while fighting". Now each trip is a trade: near and cheap or far and
+    rich, this camp or that one, keep exploring or go defend the ship from
+    a raid, and when to turn back before the zone closes.
+  - **Clarity** serves: fights happen where you chose to go, and clearings
+    mark places worth visiting.
+  - **Creative Builds & Dynamic Play:** neutral. Every objective type the
+    code had is now on the map, but the layout is the same every match.
+  - **Comradery in Competition:** neutral to serves; splitting up to cover
+    more of the map is now a real option.
+  - **Trades against Strategic Crunch:** walking between cleared places
+    is dead time. Points of interest are about 600 to 900 px apart (3 to 4
+    seconds of walking) to keep that short, but there are no patrols on
+    the way, so the quiet stretches may feel empty.
+- **Why:** Matches far fewer kills: about 90 for a 4-bot ArenaSim match,
+  against about 560 before. The bots do not seek out objectives, so the
+  simulation says little about pacing; **not playtested**. Also: the
+  server now sends 44 more enemies all match (about 80 KB/s to four
+  clients in the sim, from about 30), the layout is fixed rather than
+  randomised per match, and clearings are ground colour only: no
+  landmark props exist yet.
+- **Status:** Built, needs review (open: patrols between points of
+  interest, randomised layouts, landmark art, camp health scaling by
+  round)
+- **Where:** `tools/arena_map/generate_arena.py`, `assets/maps/arena.tmx`,
+  `include/ArenaData.h` (zone tuning), `src/MatchDirector.cpp`,
+  `src/EnemySystem.cpp`, `src/ObjectiveSystem.cpp`,
+  `src/ServerGameState.cpp`, `src/TiledMap.cpp`, `src/ArenaView.cpp`,
+  `src/ArenaHud.cpp`
+
+## 2026-11-15: Only Venoxarid thugs spawn until the other genera have models
+- **Decision:** Every pack, in every direction from the ship, is Venoxarid
+  grunts and elites. Cerebrian, Frigidariant and Magnarok aliens no longer
+  spawn in a match (the boss's brood is thugs too); they come back one
+  genus at a time as each gets its real models. Their code, stats and old
+  sheets are kept, and the playtest cheat keys can still call them up.
+  - **Infusions still follow the map.** A kill drops the infusion of the
+    territory it happened in (south Venoxarid, west Cerebrian, north
+    Frigidariant, east Magnarok), not of the body.
+  - **Drop rates re-fitted for all-thug packs:** 16% per grunt (a mixed
+    pack was 7% / 24% / 75% by tier), an elite always drops, the pity drop
+    comes every 4 kills instead of 6, and an elite has the brute's 50%
+    chance of scrap.
+- **Pillars:**
+  - **Creative Builds & Dynamic Play** decided the infusion rule: with one
+    genus on the field, tying drops to the body would leave only Venoxarid
+    infusions and one build. Tying them to territory keeps all four.
+  - **Trades against Creative Builds & Dynamic Play** all the same: every
+    fight is now the same enemy with the same Wound on hit. Slow, Snare,
+    Silence and Weakened from enemies are gone, and so are ranged shots
+    and slams, so runs are more alike. This is temporary and was asked for.
+  - **Trades against Clarity, slightly:** nothing on screen now says which
+    territory you are in except the ground and the drop itself.
+  - **Strategic Crunch:** neutral. Where to fight still decides what you
+    can build.
+- **Why:** Requested by Noah: pare back to just the Venoxarids rather than
+  four genera of placeholder aliens, and bring the others back with their
+  own models. Drop numbers keep a pack's expected infusions about where
+  they were; **not playtested**. A full ArenaSim match and the unit tests
+  pass.
+- **Status:** Built, needs review
+- **Where:** `fieldedGenus()` in `src/ArenaData.cpp`,
+  `src/MatchDirector.cpp` (`spawnPack`, `dropLoot`), `src/EnemySystem.cpp`
+
+## 2026-11-15: Venoxarid simplified to street thugs: a grunt and an elite
+- **Decision:** The Venoxarid genus fields one enemy, the **grunt**, a
+  hero-sized street thug (think a beat-'em-up's back-alley muscle), plus an
+  **elite** enforcer one and a half times his size. Both are the team's
+  generated models. The Toxlith swarmer, Venomire caster and Serpentide
+  brute no longer spawn. The other three genera were unchanged by this entry (the entry above
+  then took them off the field).
+  - **Grunt:** 70 health, speed 150, radius 16, 9 damage, reach 48, a
+    450 ms wind-up and 1.5 s between attacks, 25 points. (Toxlith was 28
+    health, speed 195, radius 12, 5 damage, 350 ms, 10 points.) He still
+    Wounds on hit.
+  - **Elite:** 4x the grunt's health (280), 2x damage (18), 1.5x radius and
+    sprite height, 0.85x speed, 1.3x reach. Double score and a guaranteed
+    drop, as for any elite.
+  - **Packs:** about two thirds as many bodies as before (minimum 2). At
+    most one elite per pack, 5% per round for each member, never in a ship
+    raid or the cheat crowd.
+  - **One attack:** a big overhand right. The wind-up rears the fist far
+    back and is held for the whole telegraph.
+- **Pillars:**
+  - **Clarity** decided the size and the attack: a body as big as a hero
+    with one large, slow tell is easier to read than a carpet of
+    knee-high biters, and the elite reads as "the dangerous one" by size
+    and by the glowing tank on his back, not only by a ring.
+  - **Strategic Crunch:** each kill is now a small decision (who do I
+    commit a cooldown to) instead of mowing.
+  - **Trades against Creative Builds & Dynamic Play:** Venoxarid fights
+    lose the ranged caster and the slam brute, so they have less variety
+    than the other genera, and area-damage builds have fewer bodies to
+    hit. This was asked for ("simplify the enemies down"); the elite takes
+    the brute's place as the pack's heavy, but nothing replaces the
+    caster.
+  - **Trades against Clarity, in crowds:** hero-sized enemies hide players
+    more than small ones did. The per-player rim that ART_DIRECTION asks
+    for is still not built.
+- **Why:** Requested by Noah: fewer, bigger, more characterful enemies,
+  with the real models in the game. Numbers were set so a round-1 pack has
+  about the same total health and score as before (3 grunts at 70 against
+  4 mixed aliens averaging about 50). They are **not playtested**.
+  Simplifications to know about: the boss's Venoxarid brood and the map's
+  camp guards are also grunts now; the old kind slots stay in the enum so
+  network values do not move; the grunt and elite share one set of
+  animations; both skeletons were placed by Noah in the joint editor; both models look slightly
+  to their left in the A-pose, which every pose turns back (`HEAD_TURN`).
+  **Checks:** unit tests and a full ArenaSim match pass. The silhouette
+  check flags the grunt against Wade and Gravon (as black outlines a
+  hero-sized humanoid looks like a hero; only colour separates them) and
+  the grunt against the elite (same shape, told apart by size). Seen in
+  forge previews and a size line-up only, **not in a running fight**.
+- **Status:** Built, needs review (open: tuning after a playtest; whether
+  Venoxarid wants a second ranged unit back)
+- **Where:** `src/ArenaData.cpp`, `src/EnemySystem.cpp`,
+  `src/MatchDirector.cpp`, `src/ArenaView.cpp`,
+  `tools/sprite_forge/actors/_venox_thug.py`, `venoxarid_grunt.py`,
+  `venoxarid_elite.py`, `art/models/VenoxaridGrunt.glb`,
+  `art/models/VenoxaridElite.glb`
+
 ## 2026-11-15: Enable Nolan for in-game animation playtests
 - **Decision:** Register Nolan as a playable Striker with 250 HP and 262
   movement speed. Add a clearly labeled prototype kit: Sweep (26 damage,

@@ -24,6 +24,8 @@ class MatchDirector {
     std::function<void(uint32_t itemId, float x, float y)> spawnPickup;
     // Remove every pickup lying on the ground.
     std::function<void()> clearPickups;
+    // A new match: camps back at full strength, objectives undone.
+    std::function<void()> resetWorld;
   };
 
   MatchDirector(std::unordered_map<uint32_t, Player>& players,
@@ -42,7 +44,9 @@ class MatchDirector {
   void onEnemyKilled(const Enemy& enemy, uint32_t killerId);
   // Returns true if the pickup was consumed.
   bool onPickup(Player& player, uint32_t itemId);
-  void onObjectiveCompleted(Player& player, bool deliveredScrap);
+  // salvagedScrap: the player now carries scrap home (banked at the ship).
+  void onObjectiveCompleted(Player& player, bool salvagedScrap,
+                            float objectiveX, float objectiveY);
   void damageShip(float amount);
   void onDebugCommand(Player& player, DebugCommandKind command, uint8_t arg);
 
@@ -121,6 +125,7 @@ class MatchDirector {
   void spawnBoss();
   void dropLoot(const Enemy& enemy);
   void bringPlayersHome(bool reviveAndHeal);
+  void startCarryingScrap(Player& player);
   void bankScrap(Player& player);
 
   int participantCount() const;

@@ -698,7 +698,9 @@ void ArenaView::drawMinimap() {
   dl->AddCircle(centre, radius, IM_COL32(255, 255, 255, 70), 48, 2.0f);
 
   // Objectives
+  // Only places the crew has seen: the rest of the map is for discovering.
   for (const auto& [id, objective] : prediction->getObjectives()) {
+    if (!wasSeen(objective.x, objective.y)) continue;
     ImVec2 p = toMap(objective.x, objective.y, false);
     if (!inside(p)) continue;
     ImU32 colour = objective.state == ObjectiveState::Completed
@@ -1121,25 +1123,37 @@ void ArenaView::drawPrompts() {
   for (const auto& [id, objective] : prediction->getObjectives()) {
     float dx = px - objective.x, dy = py - objective.y;
     bool inRange = dx * dx + dy * dy <= objective.radius * objective.radius;
+    bool scrapyard = objective.type == ObjectiveType::AlienScrapyard;
     if (objective.state == ObjectiveState::Inactive && inRange) {
-      prompt = objective.type == ObjectiveType::AlienScrapyard
-                   ? "[F] Salvage scrap  (stay close while you work)"
-                   : "[F] Start objective  (stay close while you work)";
+      if (scrapyard && me && me->carryingScrap) {
+        prompt = "Your hands are full: bank this scrap at the ship first";
+        colour = IM_COL32(255, 190, 110, 255);
+      } else {
+        prompt = scrapyard ? "[F] Salvage scrap  (stay close while you work)"
+                           : "[F] Start objective  (stay close while you work)";
+      }
     } else if (objective.state == ObjectiveState::InProgress && inRange) {
       prompt = "Working... hold your ground";
       colour = IM_COL32(150, 220, 255, 255);
+    } else if (objective.state == ObjectiveState::ReadyToDeposit &&
+               objective.type == ObjectiveType::RecoverProbe) {
+      // Delivered by walking into the ship's ring.
+      if (!prompt) {
+        prompt = "Probe recovered: carry it into the ring around the ship";
+        colour = IM_COL32(255, 190, 110, 255);
+      }
     } else if (objective.state == ObjectiveState::ReadyToDeposit) {
       float sx = px - objective.depositX, sy = py - objective.depositY;
       if (sx * sx + sy * sy <= objective.radius * objective.radius) {
-        prompt = "[F] Deliver the scrap to the ship";
+        prompt = "[F] Drop it off";
       } else if (!prompt) {
-        prompt = "Scrap salvaged: haul it back to the ship and press [F]";
+        prompt = "Carry it to the drop-off and press [F]";
         colour = IM_COL32(255, 190, 110, 255);
       }
     }
   }
   if (!prompt && me && me->carryingScrap) {
-    prompt = "Carrying scrap: walk it to the ship";
+    prompt = "Carrying scrap: walk it into the ring around the ship";
     colour = IM_COL32(255, 190, 110, 255);
   }
   if (!prompt && me && me->coreGenus == 0) {

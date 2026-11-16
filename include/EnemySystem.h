@@ -25,6 +25,9 @@ class EnemySystem {
 
   // Spawn enemies at all static map spawn points (camp guards).
   void spawnAllEnemies();
+  // Everything gone, and every camp from the map back at full strength (a
+  // new match).
+  void resetCamps();
 
   struct SpawnOptions {
     bool targetShip = false;

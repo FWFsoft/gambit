@@ -274,6 +274,8 @@ void MatchDirector::resetMatch() {
   bossSpawned = false;
   zone = Tuning::ZONE_START_RADIUS[0];
   enemies->despawnAll();
+  abilities->effects().clearAllEnemies();
+  if (hooks.resetWorld) hooks.resetWorld();
   abilities->clearTransient();
   abilities->setCombatEnabled(false);
   if (hooks.clearPickups) hooks.clearPickups();
@@ -443,8 +445,10 @@ void MatchDirector::updateSpawning(float dtMs, bool bossPhase) {
   // Solo has nobody to revive you, so it gets a lighter load.
   float playerScale = participants == 1 ? 0.65f : 0.55f + 0.45f * participants;
 
-  spawnTimer -= dtMs;
-  if (spawnTimer <= 0.0f) {
+  // Rounds have no roaming spawns: the field's enemies are the camps at the
+  // points of interest, so where you go decides what you fight.
+  if (bossPhase) spawnTimer -= dtMs;
+  if (bossPhase && spawnTimer <= 0.0f) {
     spawnTimer = Tuning::SPAWN_INTERVAL_MS -
                  400.0f * (std::min(currentRound, Tuning::ROUND_COUNT) - 1);
 
@@ -499,9 +503,11 @@ void MatchDirector::updateSpawning(float dtMs, bool bossPhase) {
 
 void MatchDirector::spawnPack(float x, float y, int size, bool targetShip,
                               Genus genusOverride, bool swarmersOnly) {
-  Genus genus = genusOverride != Genus::None
-                    ? genusOverride
-                    : Arena::genusForDirection(x - shipX, y - shipY);
+  // A cheat's override can still call up an unfielded genus's old aliens.
+  Genus genus =
+      genusOverride != Genus::None
+          ? genusOverride
+          : Arena::fieldedGenus(Arena::genusForDirection(x - shipX, y - shipY));
   int round = std::min(currentRound, Tuning::ROUND_COUNT);
 
   // Later rounds mix in more casters and brutes.
@@ -514,6 +520,12 @@ void MatchDirector::spawnPack(float x, float y, int size, bool targetShip,
   if (genus == Genus::Cerebrian) theme = VfxTheme::Psychic;
   if (genus == Genus::Frigidariant) theme = VfxTheme::Ice;
   if (genus == Genus::Magnarok) theme = VfxTheme::Fire;
+
+  // A simplified genus fields hero-sized thugs: about two thirds as many
+  // bodies, each worth more, and at most one elite enforcer leading them.
+  bool thugs = Arena::hasThugRoster(genus);
+  if (thugs) size = std::max(2, (size * 2 + 2) / 3);
+  bool eliteSpawned = false;
 
   for (int i = 0; i < size; i++) {
     float roll = random01();
@@ -530,8 +542,16 @@ void MatchDirector::spawnPack(float x, float y, int size, bool targetShip,
     options.targetShip = targetShip;
     options.healthScale = healthScale;
     options.damageScale = damageScale;
-    options.elite =
-        tier != EnemyTier::Swarmer && random01() < 0.04f * currentRound;
+    if (thugs) {
+      // The enforcer takes the brute's place: never in a ship raid, never
+      // in a cheat crowd, and rarer early.
+      options.elite = !targetShip && !swarmersOnly && !eliteSpawned &&
+                      random01() < 0.05f * currentRound;
+      eliteSpawned = eliteSpawned || options.elite;
+    } else {
+      options.elite =
+          tier != EnemyTier::Swarmer && random01() < 0.04f * currentRound;
+    }
 
     float ox = randomRange(-70.0f, 70.0f);
     float oy = randomRange(-70.0f, 70.0f);
@@ -616,22 +636,41 @@ void MatchDirector::updateTurrets(float dtMs) {
   abilities->damageEnemy(0, *target, TURRET_DAMAGE, DamageFlag::Proc);
 }
 
+void MatchDirector::startCarryingScrap(Player& player) {
+  player.carryingScrap = true;
+  // It is heavy: the haul home is the cost of the scrap.
+  abilities->applyToPlayer(player, EffectType::Slow, 1, 0, 600000.0f);
+}
+
 void MatchDirector::bankScrap(Player& player) {
   player.carryingScrap = false;
+  abilities->effects().cleanseDebuff(player.id, EffectType::Slow);
   scrapBanked++;
-  shipHp = std::min(Tuning::SHIP_MAX_HEALTH,
-                    shipHp + Tuning::SHIP_REPAIR_PER_SCRAP);
+  float repaired =
+      std::min(Tuning::SHIP_MAX_HEALTH - shipHp, Tuning::SHIP_REPAIR_PER_SCRAP);
+  shipHp += repaired;
   player.score += Tuning::SCORE_SCRAP;
   abilities->fxAnnounce(scrapBanked == Tuning::SHIP_TURRET_SCRAP
                             ? Announcement::ShipTurretsOnline
                             : Announcement::ScrapDelivered);
+  // The scrap is heaved onto the hull, which flares as it is welded on.
+  abilities->fxLob(player.x, player.y, shipX, shipY - 30.0f, 22.0f, 380.0f,
+                   VfxTheme::Heal, 0);
+  abilities->fxBurst(shipX, shipY - 20.0f, 120.0f, VfxTheme::Heal);
   abilities->fxRing(shipX, shipY, 140.0f, VfxTheme::Heal);
+  abilities->fxRing(shipX, shipY, Tuning::SHIP_DROP_RADIUS, VfxTheme::Heal);
+  GameEventPacket hull;
+  hull.kind = GameEventKind::Heal;
+  hull.x = shipX;
+  hull.y = shipY - 40.0f;
+  hull.value = repaired > 0.0f ? repaired : Tuning::SHIP_REPAIR_PER_SCRAP;
+  abilities->emit(hull);
 }
 
 void MatchDirector::updateScrapDelivery() {
   for (auto& [id, player] : players) {
     if (!player.carryingScrap || player.isDead()) continue;
-    if (dist(player.x, player.y, shipX, shipY) <= Tuning::SHIP_RADIUS + 70.0f) {
+    if (dist(player.x, player.y, shipX, shipY) <= Tuning::SHIP_DROP_RADIUS) {
       bankScrap(player);
     }
   }
@@ -772,21 +811,34 @@ void MatchDirector::dropLoot(const Enemy& enemy) {
 
   static const float INFUSION_CHANCE[3] = {0.07f, 0.24f, 0.75f};
   float chance = INFUSION_CHANCE[static_cast<int>(def.tier)];
+  // A thug pack is fewer bodies with no caster or brute in it: 0.16 a head
+  // keeps a pack's expected infusions where the mixed pack had them.
+  bool thug = Arena::hasThugRoster(def.genus);
+  if (thug) chance = 0.16f;
   if (enemy.elite) chance = 1.0f;
+  int pityKills = thug ? 4 : 6;
+  // The infusion is the territory's, not the body's: with one genus fielded
+  // everywhere, where you fight still decides what you can build.
+  Genus lootGenus =
+      thug ? Arena::genusForDirection(enemy.x - shipX, enemy.y - shipY)
+           : def.genus;
   // Pity: every round hands out its first infusion early so there is always
   // something to slot at the first intermission.
   int participants = std::max(1, participantCount());
-  if (infusionDropsThisRound < participants && killsThisRound >= 6 * (infusionDropsThisRound + 1)) {
+  if (infusionDropsThisRound < participants &&
+      killsThisRound >= pityKills * (infusionDropsThisRound + 1)) {
     chance = 1.0f;
   }
 
   if (random01() < chance) {
     infusionDropsThisRound++;
     hooks.spawnPickup(
-        Arena::PickupId::InfusionBase + static_cast<uint32_t>(def.genus),
+        Arena::PickupId::InfusionBase + static_cast<uint32_t>(lootGenus),
         enemy.x, enemy.y);
   }
-  if (def.tier == EnemyTier::Brute && random01() < 0.5f) {
+  // Scrap comes off the pack's heavy: a brute, or a thug pack's elite.
+  bool heavy = def.tier == EnemyTier::Brute || (thug && enemy.elite);
+  if (heavy && random01() < 0.5f) {
     hooks.spawnPickup(Arena::PickupId::Scrap, enemy.x + 24.0f, enemy.y);
   } else if (random01() < 0.05f) {
     hooks.spawnPickup(Arena::PickupId::Medkit, enemy.x - 20.0f, enemy.y);
@@ -805,7 +857,7 @@ bool MatchDirector::onPickup(Player& player, uint32_t itemId) {
   }
   if (itemId == Arena::PickupId::Scrap) {
     if (player.carryingScrap) return false;  // one piece at a time
-    player.carryingScrap = true;
+    startCarryingScrap(player);
     return true;
   }
   if (itemId == Arena::PickupId::Medkit) {
@@ -816,18 +868,27 @@ bool MatchDirector::onPickup(Player& player, uint32_t itemId) {
   return false;
 }
 
-void MatchDirector::onObjectiveCompleted(Player& player, bool deliveredScrap) {
+void MatchDirector::onObjectiveCompleted(Player& player, bool salvagedScrap,
+                                         float objectiveX, float objectiveY) {
   player.score += Tuning::SCORE_OBJECTIVE;
+  if (salvagedScrap) {
+    abilities->fxAnnounce(Announcement::ScrapSalvaged);
+    startCarryingScrap(player);
+    return;
+  }
   abilities->fxAnnounce(Announcement::ObjectiveComplete);
-  if (deliveredScrap) {
-    player.carryingScrap = true;
-    bankScrap(player);
-  } else if (hooks.spawnPickup) {
-    // Objectives always pay out an infusion from the local genus.
-    Genus genus = Arena::genusForDirection(player.x - shipX, player.y - shipY);
-    hooks.spawnPickup(
-        Arena::PickupId::InfusionBase + static_cast<uint32_t>(genus),
-        player.x + 30.0f, player.y);
+  if (hooks.spawnPickup) {
+    // Objectives always pay out an infusion from the local genus, and the
+    // far ones pay two: the trip out is the price.
+    Genus genus =
+        Arena::genusForDirection(objectiveX - shipX, objectiveY - shipY);
+    bool far = dist(objectiveX, objectiveY, shipX, shipY) >=
+               Tuning::FAR_OBJECTIVE_DISTANCE;
+    for (int i = 0; i < (far ? 2 : 1); i++) {
+      hooks.spawnPickup(
+          Arena::PickupId::InfusionBase + static_cast<uint32_t>(genus),
+          player.x + 30.0f - 60.0f * i, player.y);
+    }
   }
 }
 

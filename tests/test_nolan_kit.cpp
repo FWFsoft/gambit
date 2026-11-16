@@ -58,7 +58,8 @@ struct World {
   }
 
   // A sturdy foe that will not die to the test's hits.
-  uint32_t foe(float x, float y, Arena::EnemyKind kind = Arena::EnemyKind::Toxlith) {
+  uint32_t foe(float x, float y,
+               Arena::EnemyKind kind = Arena::EnemyKind::VenoxaridGrunt) {
     uint32_t id = enemies.spawn(kind, x, y);
     Enemy &e = enemies.getEnemies().at(id);
     e.health = e.maxHealth = 5000.0f;

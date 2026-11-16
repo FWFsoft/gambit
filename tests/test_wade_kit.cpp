@@ -71,7 +71,7 @@ struct World {
   }
 
   Enemy &spawnEnemy(float x, float y) {
-    uint32_t id = enemies.spawn(Arena::EnemyKind::Toxlith, x, y);
+    uint32_t id = enemies.spawn(Arena::EnemyKind::VenoxaridGrunt, x, y);
     Enemy &enemy = enemies.getEnemies().at(id);
     enemy.maxHealth = enemy.health = 1000.0f;
     return enemy;

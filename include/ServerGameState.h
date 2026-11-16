@@ -102,4 +102,8 @@ class ServerGameState {
 
   // Link LittleJohn objectives to their guardian enemies
   void initializeLittleJohnGuardians();
+  // A new match: camps and objectives back as the map has them.
+  void resetWorld();
+  // The objectives as the map places them, to restore for a new match.
+  std::vector<Objective> mapObjectives;
 };

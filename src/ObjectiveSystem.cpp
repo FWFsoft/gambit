@@ -77,6 +77,16 @@ void ObjectiveSystem::update(float deltaTime) {
   }
 }
 
+void ObjectiveSystem::deliverOnArrival(uint32_t playerId, float x, float y) {
+  for (auto& obj : objectives) {
+    if (obj.type != ObjectiveType::RecoverProbe) continue;
+    if (obj.state != ObjectiveState::ReadyToDeposit) continue;
+    if (obj.interactingPlayerId != playerId) continue;
+    if (!obj.isInDepositRange(x, y)) continue;
+    completeObjective(obj);
+  }
+}
+
 bool ObjectiveSystem::tryInteract(uint32_t playerId, float playerX,
                                   float playerY) {
   // Check if player is already interacting
@@ -278,12 +288,19 @@ void ObjectiveSystem::onEnemyDeath(float enemyX, float enemyY) {
       continue;
     }
 
-    if (obj.state != ObjectiveState::InProgress) {
+    // A camp can be cleared before anyone presses interact: the first kill
+    // starts the objective.
+    if (obj.state != ObjectiveState::InProgress &&
+        obj.state != ObjectiveState::Inactive) {
       continue;
     }
 
     // Check if enemy died within objective radius
     if (obj.isInRange(enemyX, enemyY)) {
+      if (obj.state == ObjectiveState::Inactive) {
+        obj.state = ObjectiveState::InProgress;
+        if (stateCallback) stateCallback(obj.id, obj.state);
+      }
       obj.enemiesKilled++;
 
       Logger::info("Enemy killed in " + objectiveTypeToString(obj.type) + " '" +
