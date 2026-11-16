@@ -3,7 +3,14 @@
   "name": "gambit",
   "version-string": "0.1.0",
   "dependencies": [
-    "sdl2",
+    {
+      "name": "sdl2",
+      "default-features": false,
+      "features": [
+        { "name": "x11", "platform": "linux" },
+        { "name": "wayland", "platform": "linux" }
+      ]
+    },
     "enet",
     "spdlog",
     "tmxlite",
