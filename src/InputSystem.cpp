@@ -37,10 +37,9 @@ constexpr float PAD_AIM_DEADZONE = 0.30f;    // right stick, to take the aim
 constexpr float PAD_TRIGGER_PRESSED = 0.50f; // trigger travel that counts
 constexpr float PAD_MENU_FLICK = 0.60f;      // left stick as a menu D-pad
 // How far from the hero the aim point sits (world pixels): the right stick
-// reaches from MIN at the deadzone to MAX at full tilt; aiming by moving
-// uses the middle.
+// reaches from MIN at the deadzone to the hero's own reach at full tilt
+// (PadState::aimReach); aiming by moving uses a fixed distance.
 constexpr float PAD_AIM_MIN = 110.0f;
-constexpr float PAD_AIM_MAX = 320.0f;
 constexpr float PAD_AIM_MOVING = 200.0f;
 // sin(22.5 deg): splits the stick circle into eight equal move sectors.
 constexpr float PAD_SECTOR = 0.3827f;
@@ -532,7 +531,9 @@ void InputSystem::onUpdate(const UpdateEvent& e) {
     if (aimTilt > PAD_AIM_DEADZONE) {
       const float reach = std::min(
           1.0f, (aimTilt - PAD_AIM_DEADZONE) / (1.0f - PAD_AIM_DEADZONE));
-      const float distance = PAD_AIM_MIN + (PAD_AIM_MAX - PAD_AIM_MIN) * reach;
+      // Full tilt is as far as this hero's longest placed ability lands.
+      const float aimMax = std::max(PAD_AIM_MIN, PadState::aimReach);
+      const float distance = PAD_AIM_MIN + (aimMax - PAD_AIM_MIN) * reach;
       padAimX = padRightX / aimTilt * distance;
       padAimY = padRightY / aimTilt * distance;
     } else if (moveX != 0.0f || moveY != 0.0f) {

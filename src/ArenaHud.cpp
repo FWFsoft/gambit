@@ -20,6 +20,7 @@
 #include "ArenaView.h"
 #include "CharacterRegistry.h"
 #include "ClientPrediction.h"
+#include "PadAim.h"
 #include "Effect.h"
 #include "EffectTracker.h"
 #include "MatchReadiness.h"
@@ -155,6 +156,8 @@ void ArenaView::renderHud() {
     drawDownedOverlay();
   }
 
+  drawPadAllyTarget();
+
   // Reticle: the cursor is the aim point, so make it easy to track.
   ImGuiIO& io = ImGui::GetIO();
   if (PadState::active ? !PadState::overlayOpen : !io.WantCaptureMouse) {
@@ -172,6 +175,44 @@ void ArenaView::renderHud() {
     fg->AddCircle(m, 9.0f, IM_COL32(255, 255, 255, 235), 20, 1.5f);
     fg->AddCircleFilled(m, 2.0f, IM_COL32(255, 255, 255, 255));
   }
+}
+
+// Controller, playing a hero with an ability that picks an ally: choose the
+// ally the stick points at and mark them, so the player can see who will
+// get it before pressing the button. ClientPrediction aims at them while
+// that button is held.
+void ArenaView::drawPadAllyTarget() {
+  PadState::allyAimed = false;
+  if (!PadState::active || PadState::overlayOpen) return;
+  const Player& local = prediction->getLocalPlayer();
+  if (local.isDead()) return;
+  const PadAim::AllyTargeting targeting =
+      PadAim::allyTargeting(local.characterId);
+  PadState::allyButtons = targeting.buttons;
+  if (targeting.buttons == 0) return;
+
+  std::vector<PadAim::Point> allies;
+  const uint32_t me = localId();
+  for (const auto& [id, view] : arena->players()) {
+    if (id == me || view.state.characterId == 0 || !view.hasPosition) continue;
+    if (view.state.health <= 0.0f) continue;
+    allies.push_back({view.x, view.y});
+  }
+  const int picked = PadAim::pickAlly(
+      local.x, local.y, PadState::aimDirX, PadState::aimDirY, allies.data(),
+      static_cast<int>(allies.size()), targeting.range);
+  if (picked < 0) return;
+
+  PadState::allyAimed = true;
+  PadState::allyX = allies[picked].x;
+  PadState::allyY = allies[picked].y;
+
+  // A ring around the ally at body height, where the reticle would sit.
+  ImDrawList* fg = ImGui::GetForegroundDrawList();
+  const ImVec2 at = toZoomedScreen(
+      allies[picked].x, allies[picked].y - ClientPrediction::AIM_HEIGHT);
+  fg->AddCircle(at, 26.0f, IM_COL32(0, 0, 0, 200), 28, 4.5f);
+  fg->AddCircle(at, 26.0f, IM_COL32(130, 255, 180, 240), 28, 2.0f);
 }
 
 void ArenaView::handleHotkeys() {
