@@ -73,8 +73,15 @@ void ClientPrediction::onLocalInput(const LocalInputEvent& e) {
       viewY = camera->y;
     }
   }
-  aimX = viewX + (e.mouseX - Config::Screen::WIDTH / 2.0f) / zoom;
-  aimY = viewY + (e.mouseY - Config::Screen::HEIGHT / 2.0f) / zoom + AIM_HEIGHT;
+  if (e.padAim) {
+    // Controller: the stick points away from the hero, wherever the camera is.
+    aimX = localPlayer.x + e.padAimX;
+    aimY = localPlayer.y + e.padAimY;
+  } else {
+    aimX = viewX + (e.mouseX - Config::Screen::WIDTH / 2.0f) / zoom;
+    aimY =
+        viewY + (e.mouseY - Config::Screen::HEIGHT / 2.0f) / zoom + AIM_HEIGHT;
+  }
   localPlayer.aimX = aimX;
   localPlayer.aimY = aimY;
 

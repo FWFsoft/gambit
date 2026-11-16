@@ -3,15 +3,26 @@
 
 NUM_CLIENTS?=2
 
-.PHONY: help build test clean run-server run-client dev test-coverage test-coverage-open pre-commit
+# Locate the vcpkg toolchain: first existing of $VCPKG_ROOT, ~/vcpkg, ~/dev/vcpkg
+VCPKG_TOOLCHAIN := $(firstword $(wildcard $(addsuffix /scripts/buildsystems/vcpkg.cmake,$(VCPKG_ROOT) $(HOME)/vcpkg $(HOME)/dev/vcpkg)))
+# Only the targets that configure with cmake need it (see check-vcpkg).
+
+.PHONY: help build test clean run-server run-client dev couch test-coverage test-coverage-open pre-commit
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
 
-build:  ## Builds the project as is
+.PHONY: check-vcpkg
+check-vcpkg:
+	@if [ -z "$(VCPKG_TOOLCHAIN)" ]; then \
+		echo "vcpkg not found. Set VCPKG_ROOT to your vcpkg checkout (tried: $(VCPKG_ROOT) $(HOME)/vcpkg $(HOME)/dev/vcpkg)"; \
+		exit 1; \
+	fi
+
+build: check-vcpkg  ## Builds the project as is
 	@mkdir -p build
 	@cd build && \
-	cmake .. -DCMAKE_TOOLCHAIN_FILE=$$HOME/dev/vcpkg/scripts/buildsystems/vcpkg.cmake && \
+	cmake .. -DCMAKE_TOOLCHAIN_FILE=$(VCPKG_TOOLCHAIN) && \
 	make -j8
 
 clean:  ## Remove build artifacts for a fresh rebuild
@@ -25,11 +36,11 @@ clean:  ## Remove build artifacts for a fresh rebuild
 test: build  ## Builds and runs tests
 	@cd build && ctest --output-on-failure
 
-test-coverage:  ## Run tests with code coverage and generate HTML report
+test-coverage: check-vcpkg  ## Run tests with code coverage and generate HTML report
 	@echo "Building with coverage enabled..."
 	@mkdir -p build
 	@cd build && \
-	cmake -DENABLE_COVERAGE=ON -DCMAKE_TOOLCHAIN_FILE=$$HOME/dev/vcpkg/scripts/buildsystems/vcpkg.cmake .. && \
+	cmake -DENABLE_COVERAGE=ON -DCMAKE_TOOLCHAIN_FILE=$(VCPKG_TOOLCHAIN) .. && \
 	make -j8
 	@echo "Running tests..."
 	@cd build && ctest --output-on-failure
@@ -64,6 +75,9 @@ run-client: build  ## Start a single Gambit client
 
 dev: build  ## Full dev environment: 1 server + N clients
 	@./scripts/dev.sh $(NUM_CLIENTS)
+
+couch: build  ## Couch co-op: 1 server + 2 side-by-side clients, one controller each
+	@./scripts/couch.sh
 
 
 .PHONY: pre-commit
