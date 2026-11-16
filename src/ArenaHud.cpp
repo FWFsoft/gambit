@@ -6,6 +6,8 @@
 
 #include <imgui.h>
 
+#include "PadState.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -16,6 +18,7 @@
 #include "ArenaView.h"
 #include "CharacterRegistry.h"
 #include "ClientPrediction.h"
+#include "PadAim.h"
 #include "Effect.h"
 #include "EffectTracker.h"
 #include "config/ScreenConfig.h"
@@ -29,7 +32,14 @@ namespace {
 constexpr float SCREEN_W = static_cast<float>(Config::Screen::WIDTH);
 constexpr float SCREEN_H = static_cast<float>(Config::Screen::HEIGHT);
 
-const char* SLOT_KEYS[Arena::SLOT_COUNT] = {"LMB", "RMB", "Q", "SHIFT", "E"};
+const char* KEYBOARD_SLOT_KEYS[Arena::SLOT_COUNT] = {"LMB", "RMB", "Q", "SHIFT",
+                                                    "E"};
+const char* PAD_SLOT_KEYS[Arena::SLOT_COUNT] = {"RT", "LT", "RB", "A", "LB"};
+
+// The prompt for an ability slot on the device the player is holding.
+const char* slotKey(int slot) {
+  return PadState::active ? PAD_SLOT_KEYS[slot] : KEYBOARD_SLOT_KEYS[slot];
+}
 
 const char* characterName(uint32_t characterId) {
   const CharacterDefinition* def =
@@ -74,7 +84,7 @@ void ArenaView::renderHud() {
   MatchPhase phase = arena->phase();
   drawStatusBar();
   drawMinimap();
-  drawScoreboard(ImGui::IsKeyDown(ImGuiKey_Tab));
+  drawScoreboard(ImGui::IsKeyDown(ImGuiKey_Tab) || PadState::scoreboardHeld);
   drawAbilityBar();
   drawPrompts();
   drawCameraHud();
@@ -90,23 +100,78 @@ void ArenaView::renderHud() {
   } else if (suitScreenOpen) {
     drawSuitScreen(false);
   }
+  // While one of these panels is up, a controller navigates it instead of
+  // driving the hero (InputSystem, UISystem).
+  PadState::overlayOpen = phase == MatchPhase::Victory ||
+                          phase == MatchPhase::Defeat ||
+                          phase == MatchPhase::Intermission || suitScreenOpen;
   if (phase == MatchPhase::Round || phase == MatchPhase::BossFight) {
     drawDownedOverlay();
   }
 
+  drawPadAllyTarget();
+
   // Reticle: the cursor is the aim point, so make it easy to track.
   ImGuiIO& io = ImGui::GetIO();
-  if (!io.WantCaptureMouse) {
+  if (PadState::active ? !PadState::overlayOpen : !io.WantCaptureMouse) {
     ImDrawList* fg = ImGui::GetForegroundDrawList();
     ImVec2 m = io.MousePos;
+    if (PadState::active) {
+      // Controller: there is no cursor, so show where the stick is aiming.
+      const Player& local = prediction->getLocalPlayer();
+      // Drawn at body height like the cursor is, so "reticle on the enemy"
+      // means the same on both devices.
+      m = toZoomedScreen(local.aimX,
+                         local.aimY - ClientPrediction::AIM_HEIGHT);
+    }
     fg->AddCircle(m, 9.0f, IM_COL32(0, 0, 0, 200), 20, 3.5f);
     fg->AddCircle(m, 9.0f, IM_COL32(255, 255, 255, 235), 20, 1.5f);
     fg->AddCircleFilled(m, 2.0f, IM_COL32(255, 255, 255, 255));
   }
 }
 
+// Controller, playing a hero with an ability that picks an ally: choose the
+// ally the stick points at and mark them, so the player can see who will
+// get it before pressing the button. ClientPrediction aims at them while
+// that button is held.
+void ArenaView::drawPadAllyTarget() {
+  PadState::allyAimed = false;
+  if (!PadState::active || PadState::overlayOpen) return;
+  const Player& local = prediction->getLocalPlayer();
+  if (local.isDead()) return;
+  const PadAim::AllyTargeting targeting =
+      PadAim::allyTargeting(local.characterId);
+  PadState::allyButtons = targeting.buttons;
+  if (targeting.buttons == 0) return;
+
+  std::vector<PadAim::Point> allies;
+  const uint32_t me = localId();
+  for (const auto& [id, view] : arena->players()) {
+    if (id == me || view.state.characterId == 0 || !view.hasPosition) continue;
+    if (view.state.health <= 0.0f) continue;
+    allies.push_back({view.x, view.y});
+  }
+  const int picked = PadAim::pickAlly(
+      local.x, local.y, PadState::aimDirX, PadState::aimDirY, allies.data(),
+      static_cast<int>(allies.size()), targeting.range);
+  if (picked < 0) return;
+
+  PadState::allyAimed = true;
+  PadState::allyX = allies[picked].x;
+  PadState::allyY = allies[picked].y;
+
+  // A ring around the ally at body height, where the reticle would sit.
+  ImDrawList* fg = ImGui::GetForegroundDrawList();
+  const ImVec2 at = toZoomedScreen(
+      allies[picked].x, allies[picked].y - ClientPrediction::AIM_HEIGHT);
+  fg->AddCircle(at, 26.0f, IM_COL32(0, 0, 0, 200), 28, 4.5f);
+  fg->AddCircle(at, 26.0f, IM_COL32(130, 255, 180, 240), 28, 2.0f);
+}
+
 void ArenaView::handleHotkeys() {
   ImGuiIO& io = ImGui::GetIO();
+  const bool padSuitToggle = PadState::toggleSuitRequested;
+  PadState::toggleSuitRequested = false;
   if (io.WantTextInput) return;
 
   auto debug = [&](DebugCommandKind kind, uint8_t arg = 0) {
@@ -124,7 +189,19 @@ void ArenaView::handleHotkeys() {
     packet.ready = (me && me->ready) ? 0 : 1;
     prediction->sendToServer(serialize(packet));
   }
-  if (ImGui::IsKeyPressed(ImGuiKey_B, false)) suitScreenOpen = !suitScreenOpen;
+  // The suit screen is only yours to open and close during play. In the
+  // intermission it is always up, and on the end screen it has no place;
+  // a toggle there would leave it open, unseen, to pop up over the next
+  // round.
+  const MatchPhase phase = arena->hasMatch() ? arena->phase() : MatchPhase::Lobby;
+  const bool suitIsForced = phase == MatchPhase::Intermission ||
+                            phase == MatchPhase::Victory ||
+                            phase == MatchPhase::Defeat;
+  if (suitIsForced) {
+    suitScreenOpen = false;
+  } else if (ImGui::IsKeyPressed(ImGuiKey_B, false) || padSuitToggle) {
+    suitScreenOpen = !suitScreenOpen;
+  }
 
   // F3: fog of war on / off, to compare.
   if (ImGui::IsKeyPressed(ImGuiKey_F3, false)) fogEnabled = !fogEnabled;
@@ -339,13 +416,13 @@ void ArenaView::drawAbilityBar() {
 
     // Key cap
     text(dl, ImVec2(a.x + box * 0.5f, b.y + 4.0f), IM_COL32(230, 230, 240, 255),
-         12.0f, SLOT_KEYS[slot]);
+         12.0f, slotKey(slot));
 
     if (mouse.x >= a.x && mouse.x <= b.x && mouse.y >= a.y && mouse.y <= b.y) {
       ImGui::BeginTooltip();
       ImGui::PushTextWrapPos(320.0f);
       ImGui::TextColored(ImVec4(1.0f, 0.86f, 0.5f, 1.0f), "%s  [%s]",
-                         ability.name, SLOT_KEYS[slot]);
+                         ability.name, slotKey(slot));
       ImGui::TextUnformatted(ability.description);
       if (ability.cooldownMs > 0.0f) {
         ImGui::TextDisabled("Cooldown %.1fs", ability.cooldownMs / 1000.0f);
@@ -392,7 +469,10 @@ void ArenaView::drawAbilityBar() {
                          : IM_COL32(170, 170, 180, 255),
            12.0f, buffer, false);
       text(dl, ImVec2(a.x + 8.0f, a.y + 36.0f), IM_COL32(150, 150, 165, 255),
-           11.0f, "[B] suit   [TAB] scores", false);
+           11.0f,
+           PadState::active ? "[BACK] suit   [Y] scores"
+                            : "[B] suit   [TAB] scores",
+           false);
     }
   }
 }
@@ -1119,6 +1199,7 @@ void ArenaView::drawPrompts() {
   const float y = SCREEN_H - 176.0f;
 
   const char* prompt = nullptr;
+  const bool pad = PadState::active;  // show the button they are holding
   ImU32 colour = IM_COL32(255, 235, 150, 255);
   for (const auto& [id, objective] : prediction->getObjectives()) {
     float dx = px - objective.x, dy = py - objective.y;
@@ -1129,8 +1210,11 @@ void ArenaView::drawPrompts() {
         prompt = "Your hands are full: bank this scrap at the ship first";
         colour = IM_COL32(255, 190, 110, 255);
       } else {
-        prompt = scrapyard ? "[F] Salvage scrap  (stay close while you work)"
-                           : "[F] Start objective  (stay close while you work)";
+        prompt = scrapyard
+                     ? (pad ? "[X] Salvage scrap  (stay close while you work)"
+                            : "[F] Salvage scrap  (stay close while you work)")
+                     : (pad ? "[X] Start objective  (stay close while you work)"
+                            : "[F] Start objective  (stay close while you work)");
       }
     } else if (objective.state == ObjectiveState::InProgress && inRange) {
       prompt = "Working... hold your ground";
@@ -1145,9 +1229,10 @@ void ArenaView::drawPrompts() {
     } else if (objective.state == ObjectiveState::ReadyToDeposit) {
       float sx = px - objective.depositX, sy = py - objective.depositY;
       if (sx * sx + sy * sy <= objective.radius * objective.radius) {
-        prompt = "[F] Drop it off";
+        prompt = pad ? "[X] Drop it off" : "[F] Drop it off";
       } else if (!prompt) {
-        prompt = "Carry it to the drop-off and press [F]";
+        prompt = pad ? "Carry it to the drop-off and press [X]"
+                     : "Carry it to the drop-off and press [F]";
         colour = IM_COL32(255, 190, 110, 255);
       }
     }
@@ -1163,7 +1248,8 @@ void ArenaView::drawPrompts() {
     if (unslotted > 0 &&
         dx * dx + dy * dy <= Arena::Tuning::SHIP_SAFE_RADIUS *
                                  Arena::Tuning::SHIP_SAFE_RADIUS) {
-      prompt = "[B] You have an infusion: open your suit beside the ship";
+      prompt = pad ? "[BACK] You have an infusion: open your suit beside the ship"
+                   : "[B] You have an infusion: open your suit beside the ship";
       colour = IM_COL32(150, 255, 190, 255);
     }
   }

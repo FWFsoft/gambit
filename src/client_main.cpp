@@ -54,7 +54,17 @@ int main(int argc, char* argv[]) {
   //   --map <path.tmx>    map to load (must match the server's map)
   //   --test-mode         scripted input + screenshots (see visual-test skill)
   //   --record <n>        with --test-mode: save every nth frame for clips
+  //   --controller <n>    game controller for this client: 0 = first
+  //                       (default), 1 = second, ... or "none". Passing it
+  //                       also keeps the controller working while the
+  //                       window is in the background (couch co-op).
+  //   --window-pos <x> <y>  where to put the window (couch co-op: two
+  //                       clients side by side, see scripts/couch.sh)
   bool embeddedMode = false;
+  int controllerIndex = 0;
+  bool controllerChosen = false;
+  bool hasWindowPos = false;
+  int windowX = 0, windowY = 0;
   std::string serverAddress = Config::Network::SERVER_ADDRESS;
   for (int i = 1; i < argc; i++) {
     std::string arg = argv[i];
@@ -66,6 +76,21 @@ int main(int argc, char* argv[]) {
       Logger::info("Embedded server mode enabled");
     } else if (arg == "--record" && i + 1 < argc) {
       Config::TestMode::testConfig.recordInterval = std::atoi(argv[++i]);
+    } else if (arg == "--controller" && i + 1 < argc) {
+      std::string value = argv[++i];
+      const bool isNumber =
+          !value.empty() && value.size() <= 2 &&
+          value.find_first_not_of("0123456789") == std::string::npos;
+      if (value != "none" && !isNumber) {
+        Logger::error("--controller takes a number (0 = first) or \"none\"");
+        return EXIT_FAILURE;
+      }
+      controllerIndex = value == "none" ? -1 : std::atoi(value.c_str());
+      controllerChosen = true;
+    } else if (arg == "--window-pos" && i + 2 < argc) {
+      hasWindowPos = true;
+      windowX = std::atoi(argv[++i]);
+      windowY = std::atoi(argv[++i]);
     } else if (arg == "--connect" && i + 1 < argc) {
       serverAddress = argv[++i];
     } else if (arg == "--map" && i + 1 < argc) {
@@ -109,8 +134,18 @@ int main(int argc, char* argv[]) {
   // Start in title screen
   GameStateManager::instance().transitionTo(GameState::TitleScreen);
 
+  // A client that was given its own controller keeps listening to it while
+  // another window has the focus (two clients, one machine). Without the
+  // flag only the focused window hears the controller, so several dev
+  // clients do not all follow one pad.
+  if (controllerChosen) {
+    SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+  }
+
   Window window("Gambit Client", Config::Screen::WIDTH, Config::Screen::HEIGHT);
+  window.bindController(controllerIndex);
   window.initImGui();
+  if (hasWindowPos) window.setPosition(windowX, windowY);
   GameLoop gameLoop;
 
   TiledMap map;

@@ -21,6 +21,103 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-16: Controller reticle reaches as far as the hero does; ally abilities snap
+- **Decision:** (both requested by a human after a question from Noah; the
+  numbers are the agent's call.)
+  - **Reach:** at full tilt the right stick puts the reticle as far out as
+    the longest ability in that hero's kit that lands on a chosen spot,
+    instead of a fixed 320 px for everyone: Suds 420, Zephyr and Presidente
+    460, Isaac 520, Nyx 560, Mina 580. Heroes with no such ability keep 320.
+    The near end stays at 110 px, and aiming by walking stays at 200 px.
+  - **Ally snap:** Isaac's Lifeline and Blessing and Zephyr's Gale's Embrace
+    go to the ally closest in angle to the way the stick points, within 35
+    degrees and within range (520 px for Isaac, 700 for Zephyr), not the
+    ally nearest the reticle. That ally wears a green ring the whole time
+    the controller is in use, and the reticle jumps onto them while the
+    button is held. Nobody in the cone: the ability behaves as before
+    (Blessing and Embrace on yourself, Lifeline on the ground).
+- **Pillars:** Clarity: the reticle now shows where a placed ability will
+  really land, and the ring shows who gets a support ability before it is
+  spent. Comradery in Competition: a support on a controller can reach a
+  team-mate across the fight as a mouse player can.
+- **Why:** with the fixed 320 px reticle a controller player could not use
+  the full range of five kits, and landing a reticle within 130 px of a
+  moving team-mate with a stick is hard. Rejected: raising the reach to
+  580 for everyone (melee heroes would aim at space they cannot hit). Costs
+  to know about: long-range heroes get coarser close-in placement, since
+  the same stick travel covers more ground; on a controller Isaac's
+  Blessing stops at 520 px where the mouse has no limit; while an ally
+  button is held, any other ability fired aims at that ally too; and the
+  ring is one more mark on screen for Isaac and Zephyr. The reach table in
+  `include/PadAim.h` is a copy of numbers in `src/CharacterKits.cpp` and
+  must be kept in step by hand. Not yet tried on a real controller.
+- **Status:** Accepted (requested by a human); numbers need review
+- **Where:** `include/PadAim.h`, `include/PadState.h`, `src/InputSystem.cpp`,
+  `src/ClientPrediction.cpp`, `src/ArenaHud.cpp`, `tests/test_inputsystem.cpp`
+
+## 2026-11-15: Controller play, and couch co-op as two windows
+- **Decision:** (requested by a human for a playtest; the button layout and
+  the numbers are the agent's call.)
+  - **Layout:** left stick or D-pad moves (snapped to 8 directions, stick
+    deadzone 0.40). RT / LT are Primary / Secondary, RB is Special, LB is
+    Core, A is Mobility, X is Interact, Start pauses, Back opens the suit
+    screen, holding Y shows the scoreboard, clicking the right stick opens
+    the inventory (kept off the face buttons because it stops your hero).
+    Every ability slot has a button; nothing in a kit is
+    unreachable on a controller.
+  - **Aim:** the right stick aims, 110 to 320 world pixels from the hero
+    depending on tilt (deadzone 0.30). With the right stick at rest the aim
+    follows the direction you walk (200 px out), and when you stand still
+    it stays where it was. A reticle is drawn at the aim point, because
+    there is no cursor. It sits at body height, like the cursor does.
+  - **Prompts:** the ability bar and the objective prompts show the
+    controller buttons (RT, LT, RB, A, LB, [X]) while the controller is
+    the device in use, and switch back when the mouse or keyboard is used.
+  - **Menus:** any button leaves the title; D-pad or stick picks a
+    character and A confirms; pause, suit infusions and the end screen are
+    navigated with D-pad / A / B. A button held through a menu does
+    nothing in the game until it is pressed again, and a menu that opens
+    mid-fight ignores the controller until it is let go.
+  - **Suit screen toggle (keyboard too):** B / Back only opens and closes
+    the suit screen during play. In the intermission and on the end screen
+    it does nothing, and the screen is closed when the next round starts.
+    Before, pressing B there left it open, unseen, to cover the next round.
+  - **Couch co-op:** `make couch` runs the server and two clients side by
+    side on one machine, each bound to its own controller
+    (`--controller 0` / `1`). The second window is silent so sound is not
+    doubled. It is two windows, not split screen.
+- **Pillars:** Comradery (two people on one couch can play together at
+  all). Clarity (prompts match the device in your hands; the reticle shows
+  where a stick is aiming; aim-follows-movement means a new player who
+  never touches the right stick still attacks the way they face). Creative
+  Builds is neutral: all five slots are mapped, so no build is closed to a
+  controller player.
+- **Why:** Two windows was chosen over true split screen because the client
+  assumes one local player throughout (camera, fog, HUD, prediction);
+  split screen is a refactor of a week or more, this was a day. Known
+  costs, flagged rather than hidden:
+  - **Crunch, slightly weaker on a controller.** There is no camera
+    unlock on the controller (panning needs the cursor), so a controller
+    player cannot scout with the camera. And while the suit screen is
+    open the controller navigates it, so the hero stands still; a
+    keyboard player can still walk with WASD while clicking.
+  - **Clarity gaps.** Some labels still name keys whatever you hold: the
+    camera line ("[Y] camera"), "[R]" on the ready buttons, and the
+    ability key list on the character select screen.
+  - **No remapping yet.** The layout is fixed in code; a human has asked
+    for remapping eventually.
+  - **Movement is 8-way**, not analog: the input packet carries four
+    direction flags. Analog would be a protocol change.
+  - **Each window is 1280x720**, so both only fit side by side on a
+    desktop at least 2560 wide.
+  - **Not tested on a real controller yet.** The mapping and menu rules
+    are covered by unit tests; the SDL device layer and the feel of the
+    aim numbers need a human with a controller.
+- **Status:** Built, needs review
+- **Where:** `src/InputSystem.cpp`, `src/Window.cpp`, `include/PadState.h`,
+  `src/ClientPrediction.cpp`, `src/ArenaHud.cpp`, `src/UISystem.cpp`,
+  `scripts/couch.sh`, `tests/test_inputsystem.cpp`
+
 ## 2026-11-16: Nyx, the Hive Mother: a nanite swarm, a CRT she sets down
 - **Decision:** Nyx (id 13) is playable as a Playmaker, 230 HP, 258 speed,
   built from Noah's ability sheet. Her body and CRT are Noah's Meshy models

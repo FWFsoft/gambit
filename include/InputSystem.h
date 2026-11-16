@@ -41,4 +41,33 @@ class InputSystem {
   void onMouseMove(const MouseMoveEvent& e);
   void onMouseButton(const MouseButtonEvent& e);
   void onUpdate(const UpdateEvent& e);
+
+  // --- Game controller -------------------------------------------------
+  //
+  //   Left stick / D-pad   move (8-way)
+  //   Right stick          aim (aim follows movement while it is at rest)
+  //   RT  LT               Primary, Secondary        (LMB, RMB)
+  //   RB  LB               Special, Core             (Q, E)
+  //   A                    Mobility                  (SHIFT)
+  //   X                    Interact                  (F)
+  //   Start                Pause                     (ESC)
+  //   Back                 Suit infusions            (B)
+  //   Y (hold)             Scoreboard                (TAB)
+  //   Right stick click    Inventory                 (I)
+  //
+  // In menus the controller navigates instead (D-pad / stick, A, B).
+  uint32_t padHeld = 0;   // PadBit mask of buttons / triggers held now
+  uint32_t padStale = 0;  // held since a menu: ignored until released
+  float padLeftX = 0.0f, padLeftY = 0.0f;
+  float padRightX = 0.0f, padRightY = 0.0f;
+  int padMenuX = 0, padMenuY = 0;  // left stick as a D-pad, for menus
+  float padAimX = 0.0f;            // aim offset from the hero, world px
+  float padAimY = 0.0f;
+
+  void onControllerButton(const ControllerButtonEvent& e);
+  void onControllerAxis(const ControllerAxisEvent& e);
+  void padPress(uint32_t bit);
+  void padMenuKey(SDL_Keycode key);
+  bool padGameplayActive() const;
+  void padMoveDirection(float& x, float& y) const;
 };
