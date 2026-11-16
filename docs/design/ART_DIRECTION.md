@@ -212,6 +212,20 @@ front and the rear hand chambered at the ribs. Each move has its own
 shape: a leg scything the floor, a leg out flat through a full spin, a leg
 straight up before it comes down. He never throws a punch.
 
+**Nyx: the woman with a TV on her shoulder.**
+A Playmaker made of nanites. Her signature piece is the cream CRT riding
+her right shoulder, held by the hand at her ear with the elbow out: it is
+the highest, squarest thing on her outline from every side, and nobody
+else in the cast has a box on their silhouette. Below it, a long magenta
+coat slipping off both shoulders, a bandeau, cream trousers, orange skin
+crazed with plate lines. She is always fraying: square pixels in the
+coat's magenta, the screen's cyan and her skin's orange leave the coat's
+edges and hem and drift away (a runtime effect, not in the sheet). Her
+idle is unhurried, hip cocked, the free hand loose; the swarm does the
+work. As a swarm she has no body, only a cloud of those pixels (magenta
+on a foe, cyan on a friend), and the CRT stays on the floor where she set
+it down until she comes back for it.
+
 **Suds: the barrel and the cooler.**
 A wide barrel of a torso in a blue Hawaiian shirt, on red armoured legs. A
 big white cooler juts out at his left hip. The life of the party: his idle

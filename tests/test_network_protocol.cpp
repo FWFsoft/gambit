@@ -52,6 +52,11 @@ TEST(ArenaPlayerStateRoundTrip) {
   p.cooldowns[0] = 5;
   p.cooldowns[4] = 1200;
   p.resource = 128;
+  p.kitX = 512.5f;
+  p.kitY = -64.0f;
+  p.propX = 30.0f;
+  p.propY = 40.0f;
+  p.kitMode = 0x43;
   original.players.push_back(p);
 
   auto serialized = serialize(original);
@@ -67,6 +72,9 @@ TEST(ArenaPlayerStateRoundTrip) {
   assert(q.charge == 200 && q.chargeSlot == 1);
   assert(q.cooldowns[0] == 5 && q.cooldowns[4] == 1200);
   assert(q.resource == 128);
+  assert(q.kitX == 512.5f && q.kitY == -64.0f);
+  assert(q.propX == 30.0f && q.propY == 40.0f);
+  assert(q.kitMode == 0x43);
 }
 
 TEST(ArenaPacketsRoundTrip) {

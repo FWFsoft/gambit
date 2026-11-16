@@ -18,6 +18,19 @@ anim Nolan blackout 448 12 24 0
 anim Nolan blink 544 8 24 0
 anim Nolan hit 608 6 20 0
 anim Nolan death 656 12 14 0
+actor Nyx assets/sprites/actors/Nyx.png 176 156 88 128 24 1 smooth
+anim Nyx idle 0 8 8 1
+anim Nyx run 64 8 12 1
+anim Nyx swarm 128 6 16 0
+anim Nyx plague_charge 176 6 10 1
+anim Nyx plague 224 8 16 0
+anim Nyx cloud 288 6 14 0
+anim Nyx drop 336 7 24 0
+anim Nyx lift 392 11 24 0
+anim Nyx hit 480 6 20 0
+anim Nyx death 528 12 14 0
+actor NyxCRT assets/sprites/actors/NyxCRT.png 112 96 56 72 16 1 smooth
+anim NyxCRT idle 0 1 1 1
 actor Presidente assets/sprites/actors/Presidente.png 107 145 53 129 37 1.35
 anim Presidente idle 0 8 8 1
 socket Presidente idle 0,-35,0,1 0,-35,0,1 0,-35,0,1 0,-35,0,1 0,-35,0,1 0,-35,0,1 0,-36,0,1 0,-35,0,1 2,-35,0,1 2,-35,0,1 2,-35,0,1 2,-35,0,1 2,-35,0,1 2,-36,0,1 1,-36,0,1 2,-36,0,1 2,-36,0,1 2,-36,0,1 2,-36,0,1 2,-36,0,1 2,-36,0,1 2,-37,0,1 2,-37,0,1 2,-37,0,1 2,-37,0,0 2,-37,0,0 2,-37,0,0 2,-37,0,0 2,-37,0,0 2,-37,0,0 1,-37,0,0 2,-37,0,0 0,-37,0,0 0,-37,0,0 0,-37,0,0 0,-37,0,0 0,-37,0,0 0,-38,0,0 0,-38,0,0 0,-38,0,0 -2,-37,0,0 -2,-37,0,0 -2,-37,0,0 -2,-37,0,0 -2,-37,0,0 -2,-37,0,0 -1,-37,0,0 -2,-37,0,0 -2,-36,0,1 -2,-36,0,1 -2,-36,0,1 -2,-36,0,1 -2,-36,0,1 -2,-37,0,1 -2,-37,0,1 -2,-37,0,1 -2,-35,0,1 -2,-35,0,1 -2,-35,0,1 -2,-35,0,1 -2,-35,0,1 -2,-36,0,1 -1,-36,0,1 -2,-36,0,1

@@ -110,6 +110,11 @@ void AbilitySystem::resetPlayerForRound(Player& player) {
   for (float& t : player.kitTimer) t = 0.0f;
   for (int& c : player.kitCounter) c = 0;
   player.kitTarget = 0;
+  player.kitX = player.x;
+  player.kitY = player.y;
+  player.propX = player.propY = 0.0f;
+  player.kitMode = 0;
+  player.kitAnchored = false;
   for (float& t : player.infusionTimer) t = 0.0f;
   player.reviveProgress = 0.0f;
   effectManager->clearEntity(player.id, false);
@@ -219,7 +224,9 @@ void AbilitySystem::updatePlayer(Player& player, float dtMs) {
   uint8_t flags = 0;
   if (!mods.canMove) flags |= PlayerFlags::Rooted;
   if (!mods.canAct) flags |= PlayerFlags::Stunned;
-  if (player.forcedMs > 0.0f) flags |= PlayerFlags::MoveLocked;
+  if (player.forcedMs > 0.0f || player.kitAnchored) {
+    flags |= PlayerFlags::MoveLocked;
+  }
   if (player.chargeSlot >= 0) flags |= PlayerFlags::Charging;
   if (player.hiddenMs > 0.0f || player.intangibleMs > 0.0f) {
     flags |= PlayerFlags::Hidden;
@@ -374,6 +381,7 @@ void AbilitySystem::fire(Player& player, int slot, float charge) {
   player.castVariant = 0;
   if (isCore) {
     Infusions::castCore(ctx);
+    kit->onCoreCast(ctx);
   } else {
     kit->cast(ctx, slot);
   }
@@ -446,6 +454,7 @@ float AbilitySystem::damageEnemy(uint32_t attackerId, Enemy& enemy,
     }
   }
 
+  damage = shareDamage(true, enemy.id, damage);
   if (damage <= 0.0f) return 0.0f;
   float applied = std::min(damage, enemy.health);
   uint32_t enemyId = enemy.id;
@@ -503,6 +512,7 @@ float AbilitySystem::damagePlayer(Player& player, float amount,
 
   Enemy* source = findEnemy(sourceEnemyId);
   damage = Infusions::onPlayerDamaged(*this, player, damage, source, flags);
+  damage = shareDamage(false, player.id, damage);
   if (damage <= 0.0f) return 0.0f;
 
   float total = damage;
@@ -533,6 +543,28 @@ float AbilitySystem::damagePlayer(Player& player, float amount,
     }
   }
   return total;
+}
+
+float AbilitySystem::shareDamage(bool isEnemy, uint32_t targetId,
+                                 float damage) {
+  if (sharingDamage || damage <= 0.0f) return damage;
+  sharingDamage = true;
+  std::vector<uint32_t> ids;
+  ids.reserve(players.size());
+  for (const auto& [id, p] : players) {
+    if (p.isAlive() && p.characterId != 0 && (isEnemy || id != targetId)) {
+      ids.push_back(id);
+    }
+  }
+  for (uint32_t id : ids) {
+    Player* sharer = findPlayer(id);
+    if (!sharer) continue;
+    if (Kit* kit = kitFor(*sharer)) {
+      damage = kit->onCreatureDamaged(*this, *sharer, isEnemy, targetId, damage);
+    }
+  }
+  sharingDamage = false;
+  return damage;
 }
 
 float AbilitySystem::healPlayer(uint32_t healerId, Player& target, float amount,
