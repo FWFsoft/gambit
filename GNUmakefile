@@ -9,7 +9,7 @@ export CMAKE_TOOLCHAIN_FILE
 endif
 export VCPKG_ROOT
 
-.PHONY: help build test clean run-server run-client dev test-coverage test-coverage-open pre-commit
+.PHONY: help build test clean run-server run-client dev couch test-coverage test-coverage-open pre-commit
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
@@ -64,6 +64,9 @@ run-client: build  ## Start a single Gambit client
 
 dev: build  ## Full dev environment: 1 server + N clients
 	@./scripts/dev.sh $(NUM_CLIENTS)
+
+couch: build  ## Couch co-op: 1 server + 2 side-by-side clients, one controller each
+	@./scripts/couch.sh
 
 
 .PHONY: pre-commit

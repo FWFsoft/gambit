@@ -6,9 +6,12 @@
 
 #include <imgui.h>
 
+#include "PadState.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -31,7 +34,14 @@ namespace {
 constexpr float SCREEN_W = static_cast<float>(Config::Screen::WIDTH);
 constexpr float SCREEN_H = static_cast<float>(Config::Screen::HEIGHT);
 
-const char* SLOT_KEYS[Arena::SLOT_COUNT] = {"LMB", "RMB", "Q", "SHIFT", "E"};
+const char* KEYBOARD_SLOT_KEYS[Arena::SLOT_COUNT] = {"LMB", "RMB", "Q", "SHIFT",
+                                                    "E"};
+const char* PAD_SLOT_KEYS[Arena::SLOT_COUNT] = {"RT", "LT", "RB", "A", "LB"};
+
+// The prompt for an ability slot on the device the player is holding.
+const char* slotKey(int slot) {
+  return PadState::active ? PAD_SLOT_KEYS[slot] : KEYBOARD_SLOT_KEYS[slot];
+}
 
 const char* characterName(uint32_t characterId) {
   const CharacterDefinition* def =
@@ -61,6 +71,25 @@ void panel(ImDrawList* dl, ImVec2 a, ImVec2 b, float alpha = 0.72f) {
   dl->AddRect(a, b, IM_COL32(255, 255, 255, 36), 6.0f);
 }
 
+// A keyboard prompt with the controller's buttons named instead: [F]
+// (interact) becomes [X], [B] (suit) becomes [BACK]. Writes into `out`.
+const char* padPrompt(const char* prompt, char* out, size_t size) {
+  std::string result;
+  for (const char* c = prompt; *c; c++) {
+    if (std::strncmp(c, "[F]", 3) == 0) {
+      result += "[X]";
+      c += 2;
+    } else if (std::strncmp(c, "[B]", 3) == 0) {
+      result += "[BACK]";
+      c += 2;
+    } else {
+      result += *c;
+    }
+  }
+  std::snprintf(out, size, "%s", result.c_str());
+  return out;
+}
+
 }  // namespace
 
 // ---------------------------------------------------------------------------
@@ -87,7 +116,7 @@ void ArenaView::renderHud() {
   MatchPhase phase = arena->phase();
   drawStatusBar();
   drawMinimap();
-  drawScoreboard(ImGui::IsKeyDown(ImGuiKey_Tab));
+  drawScoreboard(ImGui::IsKeyDown(ImGuiKey_Tab) || PadState::scoreboardHeld);
   drawAbilityBar();
   drawPrompts();
   drawCameraHud();
@@ -117,15 +146,28 @@ void ArenaView::renderHud() {
     drawSuitScreen(false);
     suitShownThisFrame = true;
   }
+  // While one of these panels is up, a controller navigates it instead of
+  // driving the hero (InputSystem, UISystem).
+  PadState::overlayOpen = phase == MatchPhase::Victory ||
+                          phase == MatchPhase::Defeat ||
+                          phase == MatchPhase::Intermission || suitScreenOpen;
   if (phase == MatchPhase::Round || phase == MatchPhase::BossFight) {
     drawDownedOverlay();
   }
 
   // Reticle: the cursor is the aim point, so make it easy to track.
   ImGuiIO& io = ImGui::GetIO();
-  if (!io.WantCaptureMouse) {
+  if (PadState::active ? !PadState::overlayOpen : !io.WantCaptureMouse) {
     ImDrawList* fg = ImGui::GetForegroundDrawList();
     ImVec2 m = io.MousePos;
+    if (PadState::active) {
+      // Controller: there is no cursor, so show where the stick is aiming.
+      const Player& local = prediction->getLocalPlayer();
+      // Drawn at body height like the cursor is, so "reticle on the enemy"
+      // means the same on both devices.
+      m = toZoomedScreen(local.aimX,
+                         local.aimY - ClientPrediction::AIM_HEIGHT);
+    }
     fg->AddCircle(m, 9.0f, IM_COL32(0, 0, 0, 200), 20, 3.5f);
     fg->AddCircle(m, 9.0f, IM_COL32(255, 255, 255, 235), 20, 1.5f);
     fg->AddCircleFilled(m, 2.0f, IM_COL32(255, 255, 255, 255));
@@ -134,6 +176,8 @@ void ArenaView::renderHud() {
 
 void ArenaView::handleHotkeys() {
   ImGuiIO& io = ImGui::GetIO();
+  const bool padSuitToggle = PadState::toggleSuitRequested;
+  PadState::toggleSuitRequested = false;
   if (io.WantTextInput) return;
 
   auto debug = [&](DebugCommandKind kind, uint8_t arg = 0) {
@@ -151,7 +195,19 @@ void ArenaView::handleHotkeys() {
     packet.ready = (me && me->ready) ? 0 : 1;
     prediction->sendToServer(serialize(packet));
   }
-  if (ImGui::IsKeyPressed(ImGuiKey_B, false)) suitScreenOpen = !suitScreenOpen;
+  // The suit screen is only yours to open and close during play. In the
+  // intermission it is always up, and on the end screen it has no place;
+  // a toggle there would leave it open, unseen, to pop up over the next
+  // round.
+  const MatchPhase phase = arena->hasMatch() ? arena->phase() : MatchPhase::Lobby;
+  const bool suitIsForced = phase == MatchPhase::Intermission ||
+                            phase == MatchPhase::Victory ||
+                            phase == MatchPhase::Defeat;
+  if (suitIsForced) {
+    suitScreenOpen = false;
+  } else if (ImGui::IsKeyPressed(ImGuiKey_B, false) || padSuitToggle) {
+    suitScreenOpen = !suitScreenOpen;
+  }
   // U: spend the crew's banked scrap on the ship's next tier (intermission).
   if (ImGui::IsKeyPressed(ImGuiKey_U, false) && canUpgradeShip()) {
     prediction->sendToServer(serialize(ShipUpgradePacket()));
@@ -463,13 +519,13 @@ void ArenaView::drawAbilityBar() {
 
     // Key cap
     text(dl, ImVec2(a.x + box * 0.5f, b.y + 4.0f), IM_COL32(230, 230, 240, 255),
-         12.0f, SLOT_KEYS[slot]);
+         12.0f, slotKey(slot));
 
     if (mouse.x >= a.x && mouse.x <= b.x && mouse.y >= a.y && mouse.y <= b.y) {
       ImGui::BeginTooltip();
       ImGui::PushTextWrapPos(320.0f);
       ImGui::TextColored(ImVec4(1.0f, 0.86f, 0.5f, 1.0f), "%s  [%s]",
-                         ability.name, SLOT_KEYS[slot]);
+                         ability.name, slotKey(slot));
       ImGui::TextUnformatted(ability.description);
       if (ability.cooldownMs > 0.0f) {
         ImGui::TextDisabled("Cooldown %.1fs", ability.cooldownMs / 1000.0f);
@@ -520,7 +576,10 @@ void ArenaView::drawAbilityBar() {
                          : IM_COL32(170, 170, 180, 255),
            12.0f, buffer, false);
       text(dl, ImVec2(a.x + 8.0f, a.y + 36.0f), IM_COL32(150, 150, 165, 255),
-           11.0f, "[B] suit   [TAB] scores", false);
+           11.0f,
+           PadState::active ? "[BACK] suit   [Y] scores"
+                            : "[B] suit   [TAB] scores",
+           false);
     }
   }
 }
@@ -2266,6 +2325,7 @@ void ArenaView::drawPrompts() {
 
   const char* prompt = nullptr;
   static char line[160];
+  const bool pad = PadState::active;  // show the button they are holding
   ImU32 colour = IM_COL32(255, 235, 150, 255);
   const ImU32 todo = IM_COL32(255, 190, 110, 255);
   const ImU32 working = IM_COL32(150, 220, 255, 255);
@@ -2419,7 +2479,11 @@ void ArenaView::drawPrompts() {
       colour = IM_COL32(150, 255, 190, 255);
     }
   }
-  if (prompt) text(dl, ImVec2(SCREEN_W * 0.5f, y), colour, 16.0f, prompt);
+  if (!prompt) return;
+  // On a controller, name the pad buttons: Interact is X, the suit is Back.
+  static char padLine[200];
+  if (pad) prompt = padPrompt(prompt, padLine, sizeof padLine);
+  text(dl, ImVec2(SCREEN_W * 0.5f, y), colour, 16.0f, prompt);
 }
 
 bool ArenaView::localAtShip() const {

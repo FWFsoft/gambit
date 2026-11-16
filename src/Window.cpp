@@ -12,13 +12,23 @@
 
 #include "ShaderCompat.h"
 
+#include <cassert>
 #include <stdexcept>
 
 #include "EventBus.h"
 #include "Logger.h"
+#include "PadState.h"
+
+namespace {
+// Stick / trigger travel as -1..1 (triggers 0..1).
+float normalizeAxis(Sint16 raw) {
+  return raw < 0 ? raw / 32768.0f : raw / 32767.0f;
+}
+}  // namespace
 
 Window::Window(const std::string& title, int width, int height) : open(true) {
-  if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
+  if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) !=
+      0) {
     throw std::runtime_error("Failed to initialize SDL: " +
                              std::string(SDL_GetError()));
   }
@@ -68,6 +78,10 @@ Window::Window(const std::string& title, int width, int height) : open(true) {
 
 Window::~Window() {
   shutdownImGui();
+  if (controller) {
+    SDL_GameControllerClose(controller);
+    controller = nullptr;
+  }
   if (glContext) {
     SDL_GL_DeleteContext(glContext);
   }
@@ -78,6 +92,80 @@ Window::~Window() {
 }
 
 SDL_Window* Window::getWindow() const { return sdlWindow; }
+
+void Window::setPosition(int x, int y) {
+  SDL_SetWindowPosition(sdlWindow, x, y);
+}
+
+void Window::bindController(int index) {
+  assert(index >= -1);
+  dropController();
+  controllerIndex = index;
+  controllerEverBound = false;
+  refreshController();
+}
+
+void Window::dropController() {
+  if (!controller) return;
+  SDL_GameControllerClose(controller);
+  controller = nullptr;
+  controllerInstance = -1;
+  // Whatever was held on it is released.
+  EventBus::instance().publish(ControllerDisconnectedEvent{});
+}
+
+void Window::openController(int device) {
+  assert(!controller);
+  controller = SDL_GameControllerOpen(device);
+  if (!controller) {
+    Logger::error("Could not open controller: " + std::string(SDL_GetError()));
+    return;
+  }
+  controllerEverBound = true;
+  controllerInstance =
+      SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(controller));
+  // Player light on pads that have one: 1 for the first client, 2 for the
+  // second.
+  SDL_GameControllerSetPlayerIndex(controller, controllerIndex);
+  const char* name = SDL_GameControllerName(controller);
+  Logger::info("Controller " + std::to_string(controllerIndex) +
+               " bound: " + std::string(name ? name : "unknown"));
+}
+
+void Window::refreshController(int addedDevice) {
+  if (controller && !SDL_GameControllerGetAttached(controller)) {
+    Logger::info("Controller disconnected");
+    dropController();
+  }
+
+  if (!controller && controllerIndex >= 0) {
+    if (!controllerEverBound) {
+      // First bind: the Nth device that SDL recognises as a game controller.
+      int seen = 0;
+      for (int i = 0; i < SDL_NumJoysticks(); i++) {
+        if (!SDL_IsGameController(i)) continue;
+        if (seen++ != controllerIndex) continue;
+        openController(i);
+        break;
+      }
+    } else if (addedDevice >= 0 && SDL_IsGameController(addedDevice)) {
+      // We lost ours: take the one that was just plugged in. Counting to
+      // the Nth again could pick up the other player's controller.
+      openController(addedDevice);
+    }
+  }
+
+  PadState::bound = controller != nullptr;
+  if (!controller) PadState::active = false;
+
+  // Menus are navigated by this client's own controller only, never by
+  // whichever one ImGui would find first.
+  if (imguiReady) {
+    ImGui_ImplSDL2_SetGamepadMode(ImGui_ImplSDL2_GamepadMode_Manual,
+                                  controller ? &controller : nullptr,
+                                  controller ? 1 : 0);
+  }
+}
 
 void Window::pollEvents() {
   SDL_Event event;
@@ -102,6 +190,21 @@ void Window::pollEvents() {
       }
     } else if (event.type == SDL_KEYUP && !imguiWantsKeyboard) {
       EventBus::instance().publish(KeyUpEvent{event.key.keysym.sym});
+    } else if (event.type == SDL_CONTROLLERDEVICEADDED) {
+      refreshController(event.cdevice.which);  // device index
+    } else if (event.type == SDL_CONTROLLERDEVICEREMOVED) {
+      refreshController();
+    } else if (event.type == SDL_CONTROLLERBUTTONDOWN ||
+               event.type == SDL_CONTROLLERBUTTONUP) {
+      if (controller && event.cbutton.which == controllerInstance) {
+        EventBus::instance().publish(ControllerButtonEvent{
+            event.cbutton.button, event.type == SDL_CONTROLLERBUTTONDOWN});
+      }
+    } else if (event.type == SDL_CONTROLLERAXISMOTION) {
+      if (controller && event.caxis.which == controllerInstance) {
+        EventBus::instance().publish(ControllerAxisEvent{
+            event.caxis.axis, normalizeAxis(event.caxis.value)});
+      }
     } else if (event.type == SDL_MOUSEMOTION) {
       EventBus::instance().publish(
           MouseMoveEvent{event.motion.x, event.motion.y});
@@ -139,10 +242,14 @@ void Window::initImGui() {
   // Setup Dear ImGui style (dark theme)
   ImGui::StyleColorsDark();
 
+  imguiReady = true;
+  refreshController();
+
   Logger::info("ImGui initialized");
 }
 
 void Window::shutdownImGui() {
+  imguiReady = false;
   ImGui_ImplOpenGL3_Shutdown();
   ImGui_ImplSDL2_Shutdown();
   ImGui::DestroyContext();

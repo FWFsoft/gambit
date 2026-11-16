@@ -1,5 +1,7 @@
 #include "UISystem.h"
 
+#include "PadState.h"
+
 #include <imgui.h>
 #include <imgui_impl_opengl3.h>
 #include <imgui_impl_sdl2.h>
@@ -141,6 +143,28 @@ UISystem::~UISystem() {
 void UISystem::onRender(const RenderEvent& e) { render(); }
 
 void UISystem::render() {
+  // A controller navigates ImGui panels (pause, suit infusions, end screen)
+  // with the D-pad / A / B, but only while one is up: during play the same
+  // buttons belong to the hero. Title and character select are driven as
+  // key presses instead (InputSystem).
+  {
+    const GameState state = GameStateManager::instance().getCurrentState();
+    const bool menuUp =
+        state == GameState::Paused || state == GameState::Inventory ||
+        state == GameState::MainMenu ||
+        (state == GameState::Playing && PadState::overlayOpen);
+    ImGuiIO& io = ImGui::GetIO();
+    const bool navOn = (io.ConfigFlags & ImGuiConfigFlags_NavEnableGamepad) != 0;
+    if (!PadState::bound || !menuUp) {
+      io.ConfigFlags &= ~ImGuiConfigFlags_NavEnableGamepad;
+    } else if (!navOn && !PadState::holding) {
+      // Wait for the controller to be let go first: ImGui hears nothing
+      // from it while navigation is off, so a button still held from the
+      // fight would read as a fresh press on the menu.
+      io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+    }
+  }
+
   // Start ImGui frame
   ImGui_ImplOpenGL3_NewFrame();
   ImGui_ImplSDL2_NewFrame();
