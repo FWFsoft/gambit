@@ -20,9 +20,10 @@ you pass it back:
 The number must equal the printed cost. `balance`, `list` and `fetch` are
 free. Rules for agents are in art/models/README.md ("Spending credits").
 
-The key: set MESHY_API_KEY. In a Claude Code cloud session the key is saved
-on the environment instead and added to requests for you; leave the variable
-unset there.
+The key: set MESHY_API_KEY, in your shell or in a `.env` file at the repo
+root (git-ignored; copy `.env.example`). The shell wins over the file. In a
+Claude Code cloud session the key is saved on the environment instead and
+added to requests for you; leave the variable unset there.
 
 Output, next to each other in art/models/:
     <Name>.glb           the model
@@ -67,10 +68,29 @@ def die(message):
     sys.exit(f"meshy: {message}")
 
 
+def api_key():
+    """MESHY_API_KEY from the shell, else from the repo's .env, else the
+    placeholder a cloud session's proxy replaces with the saved key."""
+    key = os.environ.get("MESHY_API_KEY", "").strip()
+    if key:
+        return key
+    try:
+        with open(os.path.join(REPO, ".env"), encoding="utf-8") as f:
+            for line in f:
+                name, eq, value = line.strip().partition("=")
+                if name.replace("export ", "").strip() == "MESHY_API_KEY" and eq:
+                    value = value.strip().strip("'\"")
+                    if value:
+                        return value
+    except FileNotFoundError:
+        pass
+    return "proxy-injected"
+
+
 # ---- HTTP ---------------------------------------------------------------
 def call(method, path, body=None):
     """One API request. Returns (parsed JSON, headers)."""
-    key = os.environ.get("MESHY_API_KEY", "proxy-injected")
+    key = api_key()
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(API + path, data=data, method=method, headers={
         "Authorization": f"Bearer {key}",
@@ -83,7 +103,8 @@ def call(method, path, body=None):
     except urllib.error.HTTPError as e:
         text = e.read().decode("utf-8", "replace")[:600]
         if e.code == 401:
-            die("401 from Meshy: no valid API key. Set MESHY_API_KEY.")
+            die("401 from Meshy: no valid API key. Set MESHY_API_KEY "
+                "(shell, or .env at the repo root).")
         if e.code == 402:
             die(f"402 from Meshy: not enough credits. {text}")
         raise RuntimeError(f"{method} {path}: HTTP {e.code}: {text}") from e
