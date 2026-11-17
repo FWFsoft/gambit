@@ -343,6 +343,18 @@ constexpr int SCORE_SCRAP = 100;
 constexpr int SCORE_REVIVE = 120;
 constexpr int SCORE_DEATH = -100;
 constexpr int SCORE_BOSS = 500;
+
+// Hitstop: when a melee hit lands, the attacker's swing and the target both
+// hold for a beat. Heavier hits hold longer; Haste cuts it, so a hasted
+// fighter's hits run together (Wade: boom, pause, boom ... bap-bap-bap).
+//   ms = min(MAX, BASE + PER_DAMAGE * power) / (1 + HASTE_CUT * haste)
+// where power is the hit's damage after crit and Empowered, before armour.
+constexpr float HITSTOP_BASE_MS = 60.0f;
+constexpr float HITSTOP_MS_PER_DAMAGE = 2.0f;
+constexpr float HITSTOP_MAX_MS = 250.0f;
+constexpr float HITSTOP_HASTE_CUT = 0.3f;
+// The boss barely flinches, so four players cannot pin it in place.
+constexpr float HITSTOP_BOSS_TARGET_SCALE = 0.25f;
 }  // namespace Tuning
 
 }  // namespace Arena

@@ -698,6 +698,16 @@ void ArenaView::renderWorld(ImDrawList* dl) {
       v.pos.y = cy + (v.pos.y - cy) * zoom;
     }
   }
+  // Your own melee hit landing kicks the camera, harder for heavier hits.
+  {
+    auto local = arena->players().find(localId());
+    float held = local != arena->players().end() ? local->second.hitStopMs
+                                                 : 0.0f;
+    if (held > lastLocalHitStopMs + 1.0f) {
+      effectFx.kick(std::min(5.0f, 0.8f + held / 70.0f));
+    }
+    lastLocalHitStopMs = held;
+  }
   // Big effect moments (detonations, corruptions) shake the world a little.
   ImVec2 shake = effectFx.shakeOffset();
   if (shake.x != 0.0f || shake.y != 0.0f) {
@@ -1450,7 +1460,7 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
       anim.castCount = view.castCount;
       anim.clip = actionClip(definition->name, view.castSlot, view.castCount,
                              view.castAlt, view.castVariant);
-      anim.startSeconds = timeSeconds;
+      anim.startSeconds = view.actionSeconds;
     }
     const ActorAnim* clip = nullptr;
     float elapsed = 0.0f;
@@ -1494,7 +1504,7 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
     }
     if (!clip && !anim.clip.empty()) {
       const ActorAnim* action = actor->find(anim.clip);
-      float t = timeSeconds - anim.startSeconds;
+      float t = view.actionSeconds - anim.startSeconds;
       if (action && t < static_cast<float>(action->frames) / action->fps) {
         clip = action;
         elapsed = t;
@@ -1759,6 +1769,11 @@ void ArenaView::drawEnemy(ImDrawList* dl, const ArenaClient::EnemyView& view) {
     }
     if (stunned) rotation = std::sin(view.animTime * 10.0f) * 0.10f;
     if (confused) offsetX += std::sin(view.animTime * 14.0f) * 2.0f;
+    if (view.hitStopMs > 0.0f) {
+      // Held by a hit: a hard shudder for as long as the hold lasts.
+      offsetX += std::sin(view.hitStopMs * 0.9f) * 6.0f;
+      offsetY += std::cos(view.hitStopMs * 0.7f) * 2.0f;
+    }
     if (view.hitFlashMs > 0.0f) {
       tint = IM_COL32(255, 110, 110, 255);
       scaleX *= 1.06f;
@@ -2157,23 +2172,29 @@ void ArenaView::drawAir(ImDrawList* dl) {
         float angle = std::atan2(f.y2, f.x2);
         float half = f.value2 * 0.5f * PI / 180.0f;
         float sweep = ease(t * 1.7f);
-        float head = angle - half + 2.0f * half * sweep;
-        float start = angle - half;
+        // param 1: from the swinger's right to their left.
+        float way = (f.param & 1) ? -1.0f : 1.0f;
+        float start = angle - way * half;
+        float head = start + way * 2.0f * half * sweep;
+        // The trail behind the head, never past where the swing began.
+        auto trailFrom = [&](float length) {
+          return way > 0.0f ? std::max(start, head - length)
+                            : std::min(start, head + length);
+        };
         float radius = f.value * (0.86f + 0.14f * sweep);
         int segments = std::max(8, static_cast<int>(half * radius / 8.0f));
         // Echoes: wider, fainter, slightly smaller.
         for (int i = 3; i >= 1; i--) {
           float r = radius * (1.0f - 0.09f * i);
-          float tail = std::max(start, head - half * (0.5f + 0.35f * i));
+          float tail = trailFrom(half * (0.5f + 0.35f * i));
           dl->PathArcTo(origin, r, tail, head, segments);
           dl->PathStroke(themeColor(f.theme, (0.55f - 0.13f * i) * fade), 0,
                          radius * 0.11f * (1.0f + 0.5f * i));
         }
-        float tail = std::max(start, head - half * 0.9f);
+        float tail = trailFrom(half * 0.9f);
         dl->PathArcTo(origin, radius, tail, head, segments);
         dl->PathStroke(themeHot(f.theme, 0.85f * fade), 0, radius * 0.13f);
-        dl->PathArcTo(origin, radius, std::max(start, head - half * 0.45f), head,
-                      segments);
+        dl->PathArcTo(origin, radius, trailFrom(half * 0.45f), head, segments);
         dl->PathStroke(IM_COL32(255, 255, 255, static_cast<int>(255 * fade)), 0,
                        radius * 0.05f);
         // Spark at the tip of the swing.

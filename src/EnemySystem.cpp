@@ -259,6 +259,16 @@ void EnemySystem::updateEnemy(Enemy& enemy,
     if (enemy.heldLow) enemy.netFlags |= EnemyFlags::HeldLow;
   }
 
+  // Hitstop: held mid-flinch. Everything waits (windup, knockback, time in
+  // the air) and picks up where it was once the hold ends.
+  if (enemy.hitStopMs > 0.0f) {
+    enemy.hitStopMs = std::max(0.0f, enemy.hitStopMs - deltaTime);
+    if (enemy.airMs > 0.0f) enemy.netFlags |= EnemyFlags::Airborne;
+    enemy.vx = 0.0f;
+    enemy.vy = 0.0f;
+    return;
+  }
+
   enemy.cooldownMs = std::max(0.0f, enemy.cooldownMs - deltaTime);
 
   // Knocked up: in the air it cannot act, and only a knockback moves it.

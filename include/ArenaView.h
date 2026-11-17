@@ -138,6 +138,8 @@ class ArenaView {
     int direction = 0;
   };
   std::unordered_map<uint32_t, AnimState> playerAnim;
+  // The local player's hitstop last frame: a rise means a hit just landed.
+  float lastLocalHitStopMs = 0.0f;
   std::unordered_map<uint32_t, AnimState> enemyAnim;
   // Where each carrier's hands were last drawn, so a grappled foe can be
   // pinned to them (and drawn in front of or behind the carrier).

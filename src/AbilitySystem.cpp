@@ -100,6 +100,7 @@ void AbilitySystem::resetPlayerForRound(Player& player) {
   player.chargeMs = 0.0f;
   player.channelTimerMs = 0.0f;
   player.actionLockMs = 0.0f;
+  player.hitStopMs = 0.0f;
   player.forcedMs = 0.0f;
   player.intangibleMs = 0.0f;
   player.hiddenMs = 0.0f;
@@ -208,10 +209,14 @@ void AbilitySystem::updatePlayer(Player& player, float dtMs) {
   float rechargeRate = 1.0f + 0.15f * active.getStacks(EffectType::Haste) -
                        0.15f * active.getStacks(EffectType::Slow);
   rechargeRate = std::max(0.4f, rechargeRate);
+  // Hitstop: the swing holds, so its clocks stand still for that long.
+  float heldMs = std::min(player.hitStopMs, dtMs);
+  player.hitStopMs -= heldMs;
+  float actionDtMs = dtMs - heldMs;
   for (float& cooldown : player.cooldownMs) {
-    cooldown = std::max(0.0f, cooldown - dtMs * rechargeRate);
+    cooldown = std::max(0.0f, cooldown - actionDtMs * rechargeRate);
   }
-  player.actionLockMs = std::max(0.0f, player.actionLockMs - dtMs);
+  player.actionLockMs = std::max(0.0f, player.actionLockMs - actionDtMs);
   player.intangibleMs = std::max(0.0f, player.intangibleMs - dtMs);
   player.hiddenMs = std::max(0.0f, player.hiddenMs - dtMs);
   if (player.shieldMs > 0.0f) {
@@ -232,7 +237,7 @@ void AbilitySystem::updatePlayer(Player& player, float dtMs) {
 
   bool canAct = mods.canAct && player.forcedMs <= 0.0f && combatEnabled;
   if (canAct) {
-    updateAbilityInput(player, dtMs);
+    updateAbilityInput(player, dtMs, actionDtMs);
   } else if (player.chargeSlot >= 0) {
     // Interrupted: the charge is lost but the cooldown is not spent.
     player.chargeSlot = -1;
@@ -265,7 +270,8 @@ AbilityContext AbilitySystem::makeContext(Player& player, float charge) {
                         charge};
 }
 
-void AbilitySystem::updateAbilityInput(Player& player, float dtMs) {
+void AbilitySystem::updateAbilityInput(Player& player, float dtMs,
+                                       float actionDtMs) {
   Kit* kit = kitFor(player);
   const Arena::KitInfo* info = Arena::kitInfo(player.characterId);
   if (!kit || !info) return;
@@ -343,7 +349,7 @@ void AbilitySystem::updateAbilityInput(Player& player, float dtMs) {
         if (!channelling) break;
         if ((held & bit) != 0) {
           player.chargeMs += dtMs;
-          player.channelTimerMs -= dtMs;
+          player.channelTimerMs -= actionDtMs;
           if (player.channelTimerMs <= 0.0f) {
             int haste = effectManager->getPlayerEffects(player.id).getStacks(
                 EffectType::Haste);
@@ -462,6 +468,8 @@ float AbilitySystem::damageEnemy(uint32_t attackerId, Enemy& enemy,
       if (crit) damage *= sharpened ? 2.0f : 1.75f;
     }
   }
+  // How hard the blow is, before the target's armour: drives the hitstop.
+  const float power = damage;
 
   // Guard / Expose are consumed by real hits, not by damage over time.
   if (flags & DamageFlag::Dot) {
@@ -493,6 +501,19 @@ float AbilitySystem::damageEnemy(uint32_t attackerId, Enemy& enemy,
   if (flags & DamageFlag::Dot) number.param |= 4;
   emit(number);
 
+  if (attacker && (flags & DamageFlag::Melee) &&
+      !(flags & (DamageFlag::Proc | DamageFlag::Dot))) {
+    // Every melee hit lands with weight, the killing blow included.
+    if (Enemy* still = findEnemy(enemyId)) {
+      hitStop(*attacker, *still, power);
+    } else {
+      attacker->hitStopMs = std::max(
+          attacker->hitStopMs,
+          hitStopMsFor(power, effectManager->getPlayerEffects(attackerId)
+                                  .getStacks(EffectType::Haste)));
+    }
+  }
+
   if (attacker) {
     attacker->scoreAccum += applied * SCORE_PER_DAMAGE;
     if (!(flags & (DamageFlag::Proc | DamageFlag::Dot))) {
@@ -506,6 +527,41 @@ float AbilitySystem::damageEnemy(uint32_t attackerId, Enemy& enemy,
     }
   }
   return damage;
+}
+
+float AbilitySystem::hitStopMsFor(float power, int hasteStacks) {
+  assert(power >= 0.0f);
+  assert(hasteStacks >= 0);
+  using namespace Arena::Tuning;
+  float ms = std::min(HITSTOP_MAX_MS,
+                      HITSTOP_BASE_MS + HITSTOP_MS_PER_DAMAGE * power);
+  return ms / (1.0f + HITSTOP_HASTE_CUT * static_cast<float>(hasteStacks));
+}
+
+float AbilitySystem::hitStop(Player& attacker, Enemy& target, float power) {
+  int haste = effectManager->getPlayerEffects(attacker.id)
+                  .getStacks(EffectType::Haste);
+  float ms = hitStopMsFor(power, haste);
+  // Several targets struck in the same instant hold once, not once each.
+  attacker.hitStopMs = std::max(attacker.hitStopMs, ms);
+  float targetMs = ms;
+  if (target.type == Arena::EnemyKind::Boss) {
+    targetMs *= Arena::Tuning::HITSTOP_BOSS_TARGET_SCALE;
+  }
+  if (target.state != EnemyState::Dead) {
+    target.hitStopMs = std::max(target.hitStopMs, targetMs);
+  }
+
+  GameEventPacket stop;
+  stop.kind = GameEventKind::HitStop;
+  stop.sourceId = attacker.id;
+  stop.extraId = target.id;
+  stop.x = target.x;
+  stop.y = target.y;
+  stop.value = ms;
+  stop.value2 = target.state != EnemyState::Dead ? targetMs : 0.0f;
+  emit(stop);
+  return ms;
 }
 
 float AbilitySystem::damagePlayer(Player& player, float amount,
@@ -1329,9 +1385,12 @@ void AbilitySystem::emit(const GameEventPacket& packet) {
 }
 
 void AbilitySystem::fxSlash(float x, float y, float dirX, float dirY,
-                            float radius, float arcDeg, VfxTheme theme) {
+                            float radius, float arcDeg, VfxTheme theme,
+                            uint32_t ownerId, bool reverse) {
   GameEventPacket p;
   p.kind = GameEventKind::Slash;
+  p.sourceId = ownerId;
+  p.param = reverse ? 1 : 0;
   p.x = x;
   p.y = y;
   p.x2 = dirX;

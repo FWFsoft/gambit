@@ -45,6 +45,8 @@ struct Enemy : public Animatable {
   float knockVx = 0.0f, knockVy = 0.0f, knockMs = 0.0f;
   // Knocked into the air: helpless until it lands (AbilitySystem::knockUp).
   float airMs = 0.0f;
+  // Held by a melee hit (hitstop): frozen in place, its windup paused.
+  float hitStopMs = 0.0f;
   bool airborne() const { return airMs > 0.0f && state != EnemyState::Dead; }
   float deadMs = 0.0f;         // time since death (removed after a delay)
   bool targetShip = false;     // marches on the ship instead of players

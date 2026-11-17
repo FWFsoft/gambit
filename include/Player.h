@@ -57,6 +57,10 @@ struct Player : public Animatable {
   float chargeMs = 0.0f;      // time held so far
   float channelTimerMs = 0.0f;
   float actionLockMs = 0.0f;  // brief lock after a cast
+  // Hitstop: the swing holds on a melee hit. While it runs, cooldowns, the
+  // action lock and channel rhythm stand still (movement does not, so
+  // client prediction stays in step).
+  float hitStopMs = 0.0f;
   // Forced motion (dash / roll / pull). Input is ignored while it runs.
   float forcedVx = 0.0f, forcedVy = 0.0f, forcedMs = 0.0f;
   bool forcedGhost = false;    // passes through enemies while dashing

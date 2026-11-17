@@ -36,6 +36,10 @@ class ArenaClient {
     float hitMs = 1e9f;      // time since the last hit taken (hit animation)
     float hitFlashMs = 0;
     float animTime = 0;     // seconds, drives bob / walk cycle
+    // Hitstop: the swing holds on a melee hit. actionSeconds is the clock
+    // attack clips run on; it stands still while hitStopMs runs.
+    float hitStopMs = 0;
+    float actionSeconds = 0;
     float shieldBubbleMs = 0;
     uint8_t shieldTheme = 0;
     float lastSeenMs = 0;
@@ -55,6 +59,7 @@ class ArenaClient {
     bool dying = false;
     float deathMs = 0;   // time since death started
     float animTime = 0;
+    float hitStopMs = 0;  // held by a melee hit: frozen, shaking
     float lastSeenMs = 0;
     float air = 0;  // 0 on the ground .. 1 at the top of a knock-up
   };
@@ -69,6 +74,7 @@ class ArenaClient {
     VfxTheme theme;
     float ageMs = 0;
     float lifeMs = 300;
+    uint32_t ownerId = 0;  // Slash: the swinging player; holds with them
   };
 
   struct Projectile {
