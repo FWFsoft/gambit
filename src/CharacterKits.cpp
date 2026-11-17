@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "AbilitySystem.h"
+#include "CollisionSystem.h"
 #include "EffectManager.h"
 #include "EnemySystem.h"
 #include "Infusions.h"
@@ -747,13 +748,20 @@ class GravonKit : public Kit {
 // ===========================================================================
 // Isaac, the Beacon (Winger)
 //   kitCounter[0]  player id carrying the Blessing (0 = nobody)
-//   kitTarget      Lifeline ally id (0 = anchored to terrain)
-//   kitTimer[1,2]  Lifeline anchor point
+//   kitCounter[1]  Lifeline anchor: 0 none, 1 an ally, 2 terrain
+//   kitTarget      Lifeline ally id
+//   kitTimer[1,2]  Lifeline terrain anchor point (on the rock's face)
 //   kitTimer[3]    Lifeline heal/tether pulse accumulator
 // ===========================================================================
 class IsaacKit : public Kit {
  public:
-  static constexpr float LIFELINE_RANGE = 520.0f;
+  static constexpr float LIFELINE_RANGE = Arena::Tuning::LIFELINE_RANGE;
+  // How far from the cursor an ally or a rock can be and still be caught.
+  static constexpr float LIFELINE_ALLY_SNAP = 120.0f;
+  static constexpr float LIFELINE_TERRAIN_SNAP = 140.0f;
+  // With nothing to bond to, the cooldown mostly comes back.
+  static constexpr float LIFELINE_MISS_COOLDOWN_MS = 1500.0f;
+  enum Anchor { None = 0, Ally = 1, Terrain = 2 };
 
   void cast(AbilityContext& ctx, int slot) override {
     AbilitySystem& sys = ctx.sys;
@@ -770,7 +778,9 @@ class IsaacKit : public Kit {
                         [&](Enemy& enemy) {
                           hits++;
                           sys.applyToEnemy(enemy, EffectType::Slow, 1, selfId);
-                          sys.damageEnemy(selfId, enemy, 9.0f, DamageFlag::Basic);
+                          // Wingers deal no base damage (ARCHETYPES.md); the
+                          // light still counts as a hit for infusions.
+                          sys.touchEnemy(selfId, enemy, DamageFlag::Basic);
                         });
       if (hits > 0) {
         float heal = 4.0f * std::min(hits, 5);
@@ -780,16 +790,29 @@ class IsaacKit : public Kit {
       }
     } else if (slot == 1) {
       // Lifeline release: get pulled to the anchor.
+      int anchor = self.kitCounter[1];
+      self.kitCounter[1] = None;
+      if (anchor == None) {
+        self.cooldownMs[1] =
+            std::min(self.cooldownMs[1], LIFELINE_MISS_COOLDOWN_MS);
+        self.kitTarget = 0;
+        return;
+      }
       float tx = self.kitTimer[1];
       float ty = self.kitTimer[2];
-      if (Player* ally = sys.findPlayer(self.kitTarget)) {
-        if (ally->isAlive()) {
-          tx = ally->x;
-          ty = ally->y;
+      if (anchor == Ally) {
+        Player* ally = sys.findPlayer(self.kitTarget);
+        if (!ally || !ally->isAlive()) {
+          self.kitTarget = 0;
+          return;  // the bond broke when they went down
         }
+        tx = ally->x;
+        ty = ally->y;
       }
       float d = dist(self.x, self.y, tx, ty);
-      float travel = std::min(LIFELINE_RANGE, std::max(0.0f, d - 34.0f));
+      // Stop beside an ally; against a rock, the rock stops him.
+      float stopShort = anchor == Ally ? 34.0f : 0.0f;
+      float travel = std::min(LIFELINE_RANGE, std::max(0.0f, d - stopShort));
       if (travel > 10.0f) {
         float dx = (tx - self.x) / d;
         float dy = (ty - self.y) / d;
@@ -827,26 +850,49 @@ class IsaacKit : public Kit {
     Player& self = ctx.self;
 
     if (self.chargeMs <= dtMs + 0.01f) {
-      // First tick: pick the anchor.
-      float x, y;
-      aimPoint(ctx, LIFELINE_RANGE, x, y);
-      Player* ally = sys.nearestAlly(self, ctx.aimX, ctx.aimY, 120.0f, false);
+      // First tick: pick the anchor. An ally near the cursor first, then
+      // the rock nearest the cursor; both within reach of Isaac.
+      self.kitTarget = 0;
+      self.kitCounter[1] = None;
+      self.kitTimer[3] = 400.0f;  // pulse immediately
+      Player* ally =
+          sys.nearestAlly(self, ctx.aimX, ctx.aimY, LIFELINE_ALLY_SNAP, false);
       if (ally && dist(self.x, self.y, ally->x, ally->y) <= LIFELINE_RANGE) {
         self.kitTarget = ally->id;
-      } else {
-        self.kitTarget = 0;
+        self.kitCounter[1] = Ally;
+      } else if (const CollisionSystem* solid = sys.collisionSystem()) {
+        const CollisionShape* rock =
+            solid->terrainNear(ctx.aimX, ctx.aimY, LIFELINE_TERRAIN_SNAP);
+        if (rock) {
+          float fx, fy;  // the face of the rock that looks at Isaac
+          CollisionSystem::closestPoint(rock->aabb, self.x, self.y, fx, fy);
+          if (dist(self.x, self.y, fx, fy) <= LIFELINE_RANGE) {
+            self.kitTimer[1] = fx;
+            self.kitTimer[2] = fy;
+            self.kitCounter[1] = Terrain;
+          }
+        }
       }
-      self.kitTimer[1] = x;
-      self.kitTimer[2] = y;
-      self.kitTimer[3] = 400.0f;  // pulse immediately
+      if (self.kitCounter[1] == None) {
+        // Nothing in reach: a spark at the cursor says so.
+        sys.fxRing(ctx.aimX, ctx.aimY, 26.0f, VfxTheme::Holy);
+      }
     }
+    if (self.kitCounter[1] == None) return;
 
     self.kitTimer[3] += dtMs;
     if (self.kitTimer[3] < 400.0f) return;
     self.kitTimer[3] -= 400.0f;
 
-    Player* ally = sys.findPlayer(self.kitTarget);
-    if (ally && ally->isDead()) ally = nullptr;
+    Player* ally = nullptr;
+    if (self.kitCounter[1] == Ally) {
+      ally = sys.findPlayer(self.kitTarget);
+      if (!ally || ally->isDead()) {
+        self.kitCounter[1] = None;  // the bond breaks
+        self.kitTarget = 0;
+        return;
+      }
+    }
     float tx = ally ? ally->x : self.kitTimer[1];
     float ty = ally ? ally->y : self.kitTimer[2];
     sys.fxTether(self.x, self.y, tx, ty, 420.0f, VfxTheme::Holy);

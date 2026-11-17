@@ -92,9 +92,15 @@ def _set_coords(mesh, co):
     mesh.update()
 
 
-def load_mesh(path, height, yaw_deg=0.0):
+def load_mesh(path, height, yaw_deg=0.0, centre_x=0.0):
     """Import a model file as one mesh object, normalised: feet on z = 0,
-    `height` tall, centred, facing -Y. Returns (object, vertices Nx3)."""
+    `height` tall, centred, facing -Y. Returns (object, vertices Nx3).
+
+    Centring uses the torso's width, which a lopsided costume (a backpack
+    on one shoulder, a cape on one side) pulls off the body's real centre
+    line. `centre_x` is where that line sits after the automatic centring
+    (measure it from the head and feet); it is moved to x = 0, so the
+    mirrored right-hand joints land on the body."""
     assert os.path.exists(path), f"model file not found: {path}"
     before = set(bpy.data.objects)
     ext = os.path.splitext(path)[1].lower()
@@ -152,7 +158,7 @@ def load_mesh(path, height, yaw_deg=0.0):
     v *= height / tall
     torso = (v[:, 2] > 0.45 * height) & (v[:, 2] < 0.75 * height)
     core = v[torso] if torso.sum() > 10 else v
-    v[:, 0] -= (core[:, 0].min() + core[:, 0].max()) / 2
+    v[:, 0] -= (core[:, 0].min() + core[:, 0].max()) / 2 + centre_x
     v[:, 1] -= np.median(core[:, 1])
     _set_coords(mesh, v)
 
@@ -526,10 +532,10 @@ class Skin:
 
 def prepare(path, height, fit=None, yaw=0.0, skeleton=HUMANOID,
             tails=HUMANOID_TAILS, down=HUMANOID_DOWN, level=HUMANOID_LEVEL,
-            cache=True, log=print):
+            cache=True, log=print, centre_x=0.0):
     """Everything attach() does short of touching a Model. Returns a dict:
     obj, imported (Nx3), fit, weights, rest (Nx3), rest_pos."""
-    obj, v = load_mesh(path, height, yaw)
+    obj, v = load_mesh(path, height, yaw, centre_x)
     guess = auto_fit(v, height) if skeleton is HUMANOID else {}
     full = complete_fit(fit, guess)
     missing = [n for n, _ in skeleton if n not in full]

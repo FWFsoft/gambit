@@ -21,6 +21,111 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-17: Terrain on the arena; Isaac's Lifeline anchors to it
+- **Decision** (requested by Noah, who picked Isaac to force terrain in):
+  the arena has terrain: 51 rock outcrops (rectangles of Tiled type
+  `terrain` in a new "Terrain" layer of `arena.tmx`, 70 to 150 by 45 to 95
+  units). They are about 560 apart, inside the round-3 zone, clear of the
+  ship's ring, every objective circle and every spawn; 6 sit inside the
+  boss ring. `tools/maps/place_terrain.py` places them from a seed.
+  Players collide with them (they load as collision, so dashes and
+  prediction agree), and enemies slide off them. Lifeline now needs an
+  anchor: an ally within 120 of the cursor, else the rock nearest the
+  cursor (within 140), and either must be within 520 of Isaac (to the
+  rock's nearest face). Release pulls him to the ally or against the rock.
+  A rock still heals Isaac more than an ally bond (7 vs 4 per pulse). With
+  no anchor the hold does nothing, a small spark marks the cursor, and the
+  cooldown drops to 1.5 s instead of 8 s. The "anywhere on the ground"
+  anchor is gone. Rocks are drawn in code as inked stone; when you play
+  Isaac, rocks in reach get a faint amber rim and the one you bond to
+  pulses.
+- **Pillars:** Strategic Crunch serves: crossing explored open ground is
+  dead time, and Isaac now chains rock to rock across it. The 560 spacing
+  is just under Lifeline's reach on purpose, so each pull is a choice of
+  route, not a free teleport. The rocks also give everyone cover and
+  corners to fight around. Creative Builds serves: terrain is a new system
+  other kits can use later (knock foes into rocks, perch on them). Clarity
+  serves: the reach rim and the bond pulse show what Lifeline will do
+  before you commit. Small trade against Crunch: the miss refund takes the
+  sting out of a wasted Lifeline; without it, misreading the rim would cost
+  8 s.
+- **Why:** The kit says "an ally or terrain", and the map had none. Rocks
+  are collision rectangles because the map, the server, the client
+  prediction and the dashes already share that system: no network changes.
+  Simplifications to review:
+  - Rocks block bodies but not projectiles or sight.
+  - Enemies slide off them with no pathfinding. Rocks are kept small and
+    apart so nothing gets trapped.
+  - The rocks are code-drawn stand-ins, against ART_DIRECTION's rule that
+    drawing comes from concept art. They need terrain concept art.
+
+  Bots (Wade, Nolan, Nyx, Isaac; seeds 1 to 3) won every full match with
+  and without terrain (559 to 566 s with rocks, 573 to 601 s without), so
+  the rocks do not stall the enemy flow or the match. The sim bot now aims
+  Lifeline at the rock nearest its fight, else an ally.
+- **Status:** Accepted (requested by a human); placement and tuning need
+  review
+- **Where:** `assets/maps/arena.tmx` (Terrain layer),
+  `tools/maps/place_terrain.py`, `src/CollisionSystem.cpp` (`terrainNear`,
+  `pushOutOfTerrain`), `src/EnemySystem.cpp`, `src/CharacterKits.cpp`
+  (`IsaacKit`), `src/ArenaView.cpp` (`drawRock`), `include/ArenaData.h`
+  (`LIFELINE_RANGE`), `tests/test_isaac_kit.cpp`, `tests/arena_sim.cpp`,
+  `docs/prototype/isaac_lifeline_rock.png`
+
+## 2026-11-17: Isaac's body and motion
+- **Decision:** Isaac's in-game sprite comes from his generated model
+  (`art/models/Isaac.glb`, shrunk from 3.2M to 40k triangles for free), on
+  joints Noah placed. His motion is a brawler's body that never makes a
+  fist (shape brief in ART_DIRECTION.md):
+  - idle: an open-palmed stance;
+  - Ray: a two-handed push from the chest;
+  - Lifeline: a hand out on the rope while he leans back, then pulled
+    off his feet on release;
+  - Blessing: a hand raised, then brought down toward the target;
+  - Flash: hands meet at the heart, then he arrives arms flung wide.
+  The run turns his legs in so the toes point where he goes (Noah's
+  correction; the rule is now in ART_DIRECTION.md). His cell is 184 by 184
+  with the feet higher in it, so his fall stays inside it.
+- **Pillars:** Clarity serves: each ability has its own outline. The
+  canister rack and cape make him lopsided from every side, and the
+  open-handed pose reads as a healer at a glance. Silhouette check:
+  Isaac/Suds was flagged at 0.73 facing south-east. Opening his stance
+  brought it to 0.72, exactly at the limit, so it passes, but only just.
+- **Why:** He needed real art to be playtested. His sheet is 4968 px
+  square, over the ~4096 guideline but smaller than Wade's and Gravon's.
+  Model-level problem: the weights use the distance fallback, because the
+  mesh's holes defeat automatic weighting; the cape follows his left
+  shoulder and hip and has not torn in any preview.
+- **Status:** Built, needs review
+- **Where:** `tools/sprite_forge/actors/isaac.py`, `art/models/Isaac.*`,
+  `assets/sprites/actors/Isaac.png`, `src/ArenaView.cpp` (`actionClip`,
+  `lifeline_charge`), `tools/sprite_forge/skin.py` (`centre_x`)
+
+## 2026-11-17: Isaac's Ray of Benevolence deals no damage; archetype rules checked in
+- **Decision** (requested by Noah): Ray of Benevolence no longer deals 9
+  damage per enemy. It still slows (+1) and heals allies per enemy hit, and
+  each enemy it touches still counts as a hit for on-hit infusions, through
+  a new zero-damage `AbilitySystem::touchEnemy`. The conclusions of
+  DD-AA-003 (character archetypes) are now in `docs/design/ARCHETYPES.md`.
+- **Pillars:** Creative Builds serves: Wingers have no base damage, so an
+  on-hit damage infusion on a slowing cone cannot steamroll from minute
+  one, and Isaac's damage now comes only from his build. Comradery, mixed:
+  Isaac's score in ArenaSim fell from about 820 to 275 (Wade, Nolan, Nyx,
+  Isaac; 8 minutes; seeds 1 to 3), because healing scores far less than
+  damage. The team result did not change (round 3 in every run). A Winger
+  who heals well should not be last on the scoreboard. That is a scoring
+  question for all Wingers, left open. Clarity, slight trade: Ray hits
+  no longer pop a damage number. The light cone and the Slow remain the
+  feedback.
+- **Why:** The kit broke the Winger rule "no DMG in the base kit". Going
+  through the damage path with 0 damage would have skipped infusions, which
+  only fire on damage above 0. Zephyr and El Presidente (Playmakers) also
+  deal base damage, which goes against the same doc; they are not changed
+  here.
+- **Status:** Accepted (requested by a human)
+- **Where:** `src/CharacterKits.cpp` (`IsaacKit`), `src/AbilitySystem.cpp`,
+  `include/AbilitySystem.h` (`touchEnemy`), `docs/design/ARCHETYPES.md`
+
 ## 2026-11-16: Heroes face where they walk, and turn to the cursor to cast
 - **Decision** (requested by Noah): a hero's sprite faces their movement
   direction in 8 ways (W = N, W+A = NW, A = W, ...). While an ability is

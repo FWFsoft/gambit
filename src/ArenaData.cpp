@@ -192,8 +192,8 @@ static const KitInfo KITS[] = {
           "enemy hit.",
           520.0f, AbilityMode::Tap, 0.0f},
          {"Lifeline",
-          "Hold: bond with an ally or the ground, healing over the channel. "
-          "Release to be pulled to the target.",
+          "Hold: bond with an ally or a rock, healing both of you over the "
+          "channel (a rock heals Isaac more). Release to be pulled to it.",
           8000.0f, AbilityMode::Charge, 2500.0f},
          {"The Blessing of Isaac",
           "Bless an ally or yourself. The blessed target is healed whenever "

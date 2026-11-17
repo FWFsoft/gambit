@@ -5,6 +5,7 @@
 #include <cmath>
 
 #include "AbilitySystem.h"
+#include "CollisionSystem.h"
 #include "EffectManager.h"
 #include "Logger.h"
 
@@ -15,6 +16,7 @@ using Arena::Genus;
 namespace {
 
 constexpr float DEAD_LINGER_MS = 1200.0f;  // corpse stays for the death anim
+constexpr float ENEMY_TERRAIN_RADIUS = 16.0f;  // body size against terrain
 constexpr float AGGRO_RANGE = 620.0f;
 constexpr float CAMP_AGGRO_RANGE = 300.0f;
 constexpr float SHIP_REACH = 60.0f;
@@ -295,7 +297,12 @@ void EnemySystem::updateEnemy(Enemy& enemy,
     enemy.knockMs -= deltaTime;
     enemy.vx = 0.0f;
     enemy.vy = 0.0f;
-    if (combat) combat->clampToWorld(enemy.x, enemy.y);
+    if (combat) {
+      combat->clampToWorld(enemy.x, enemy.y);
+      if (const CollisionSystem* solid = combat->collisionSystem()) {
+        solid->pushOutOfTerrain(enemy.x, enemy.y, ENEMY_TERRAIN_RADIUS);
+      }
+    }
     // Being thrown around interrupts a windup (bosses shrug it off).
     if (enemy.state == EnemyState::Attack && enemy.type != EnemyKind::Boss) {
       enemy.state = EnemyState::Chase;
@@ -407,7 +414,13 @@ void EnemySystem::updateEnemy(Enemy& enemy,
     enemy.y += enemy.vy * dt;
   }
   separate(enemy);
-  if (combat) combat->clampToWorld(enemy.x, enemy.y);
+  if (combat) {
+    combat->clampToWorld(enemy.x, enemy.y);
+    // Terrain is solid for them too: they slide off its faces.
+    if (const CollisionSystem* solid = combat->collisionSystem()) {
+      solid->pushOutOfTerrain(enemy.x, enemy.y, ENEMY_TERRAIN_RADIUS);
+    }
+  }
 }
 
 void EnemySystem::separate(Enemy& enemy) {
