@@ -268,10 +268,11 @@ class GravonKit : public Kit {
   static constexpr int LANDING = 1 << 1;
   static constexpr int FULL_SHOWN = 1 << 2;
 
-  static float hostMaxHealth() {
+  // The host's body keeps the Hides slotted in his suit; the blade does not.
+  static float hostMaxHealth(const Player& self) {
     const Arena::KitInfo* info = Arena::kitInfo(Gravon);
     assert(info && "Gravon has a kit");
-    return info->maxHealth;
+    return info->maxHealth + Infusions::maxHealthBonus(self);
   }
   static float ravagerMaxChargeMs() {
     const Arena::KitInfo* info = Arena::kitInfo(Gravon);
@@ -575,7 +576,7 @@ class GravonKit : public Kit {
       // The blade broke. He comes back (revived, or next round) as the host,
       // with the blade half mended.
       setForm(self, Arena::GravonMode::Host);
-      self.maxHealth = hostMaxHealth();
+      self.maxHealth = hostMaxHealth(self);
       self.kitTimer[0] = 0.0f;
       self.kitTimer[1] = BLADE_MAX_HEALTH * 0.5f;
       self.kitTarget = 0;
@@ -629,7 +630,7 @@ class GravonKit : public Kit {
   void onRoundStart(Player& self) override {
     // Scratch state was just cleared, so he is the host again. If the round
     // turned over while he was the blade, give the host his body back.
-    float hostMax = hostMaxHealth();
+    float hostMax = hostMaxHealth(self);
     if (self.maxHealth != hostMax) {
       self.maxHealth = hostMax;
       if (self.isAlive()) self.health = hostMax * REVIVE_HEALTH_FRACTION;
@@ -734,7 +735,7 @@ class GravonKit : public Kit {
     self.kitTarget = 0;
     self.kitX = 0.0f;
     self.kitAnchored = false;
-    self.maxHealth = hostMaxHealth();
+    self.maxHealth = hostMaxHealth(self);
     self.health = self.maxHealth * REVIVE_HEALTH_FRACTION;
     self.intangibleMs = std::max(self.intangibleMs, 800.0f);
     // One tick of forced motion: clients must not predict over the jump.

@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <vector>
 
+#include "ArenaData.h"
+
 enum class PacketType : uint8_t {
   ClientInput = 1,
   StateUpdate = 2,
@@ -433,10 +435,14 @@ struct MatchPlayerState {
   uint16_t kills = 0;
   uint8_t deaths = 0;
   uint8_t ready = 0;
-  uint8_t coreGenus = 0;            // Arena::Genus
-  uint8_t treeGenus[4] = {0, 0, 0, 0};  // per InfusionTree
-  uint8_t treeLevel[4] = {0, 0, 0, 0};
-  uint8_t inventory[4] = {0, 0, 0, 0};  // unslotted infusions per genus
+  uint8_t coreGenus = 0;  // Arena::Genus
+  uint8_t corePart = 0;   // Arena::InfusionPart
+  // Suit nodes, indexed like Arena::suitNode (genus 0 = empty). Only filled
+  // nodes go on the wire.
+  uint8_t nodeGenus[Arena::MAX_SUIT_NODES] = {};
+  uint8_t nodePart[Arena::MAX_SUIT_NODES] = {};
+  // Unslotted infusion items by genus (index genus - 1) and part.
+  uint8_t inventory[Arena::GENUS_COUNT][Arena::PART_COUNT] = {};
   uint8_t carryingScrap = 0;
   float reviveProgress = 0.0f;  // 0-1 while being revived
 };
@@ -460,7 +466,8 @@ struct MatchStatePacket {
 struct InfusionSlotPacket {
   PacketType type = PacketType::InfusionSlot;
   uint8_t genus = 0;  // Arena::Genus
-  uint8_t slot = 0;   // 0 = core, 1-4 = InfusionTree + 1
+  uint8_t part = 0;   // Arena::InfusionPart
+  uint8_t node = 0;   // Arena::suitNode index, or Arena::CORE_NODE
 };
 
 struct PlayerReadyPacket {
@@ -469,9 +476,9 @@ struct PlayerReadyPacket {
 };
 
 enum class DebugCommandKind : uint8_t {
-  SkipPhase = 1,       // jump to the next phase
-  GiveInfusions = 2,   // one of each genus
-  SpawnWave = 3,       // spawn a pack around the player
+  SkipPhase = 1,      // jump to the next phase
+  GiveInfusions = 2,  // one of every infusion item
+  SpawnWave = 3,      // spawn a pack around the player
   ToggleGodMode = 4,
   SpawnBoss = 5,
   KillAll = 6,

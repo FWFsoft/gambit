@@ -295,7 +295,6 @@ enum class InfusionTree : uint8_t {
   Genealogy = 3
 };
 constexpr int TREE_COUNT = 4;
-constexpr int MAX_TREE_LEVEL = 3;
 
 const char* treeName(InfusionTree t);
 
@@ -306,17 +305,122 @@ struct InfusionText {
 
 // Core ability granted by the first infusion (activated with E).
 const AbilityInfo& coreAbility(Genus g);
-// Effect granted by slotting an infusion of `g` into `tree`.
+// Genus effect granted by slotting an infusion of `g` anywhere in `tree`.
+// Every further infusion of `g` in the same tree raises its level.
 const InfusionText& infusionText(Genus g, InfusionTree tree);
 
+// ---- Infusion items --------------------------------------------------------
+// An infusion is an item: a genus (what it does when slotted) and a body
+// part (what it gives on its own, wherever it is slotted). "Venoxarid Talon".
+enum class InfusionPart : uint8_t { Talon = 0, Hide = 1, Eye = 2, Sinew = 3 };
+constexpr int PART_COUNT = 4;
+
+struct InfusionPartInfo {
+  const char* name;
+  const char* description;  // the item's own effect, per copy slotted
+  float damageBonus;        // fraction of all damage dealt
+  float maxHealthBonus;     // flat
+  float rechargeBonus;      // fraction faster ability recharge
+  float speedBonus;         // fraction of move speed
+};
+const InfusionPartInfo& partInfo(InfusionPart part);
+
+// ---- Suit layout ------------------------------------------------------------
+// The suit is the core plus four trees. Each tree is rows of nodes (tiers):
+// a node at tier N can be filled once the tree has a node at tier N-1 (tier 1
+// needs the core), and only one node per tier per tree can be filled, so each
+// tier past the first is a multiple choice. Every node carries a talent, on
+// top of the genus effect of the infusion slotted into it.
+//
+// The whole layout is the SUIT_NODES table in ArenaData.cpp. To grow the
+// suit, add rows (depth) or options to a row (width) there and a matching
+// Talent below; nothing else assumes the shape.
+enum class Talent : uint8_t {
+  // Offense
+  KillerInstinct,
+  OpeningStrike,
+  Relentless,
+  Affliction,
+  Executioner,
+  Bloodlust,
+  FocusFire,
+  // Defense
+  Plating,
+  SecondWind,
+  Regrowth,
+  Guardian,
+  Thorns,
+  LastStand,
+  ShareTheLoad,
+  // Mobility
+  LightFrame,
+  QuickRecovery,
+  Slipstream,
+  HitAndRun,
+  Tailwind,
+  Blitz,
+  EscapeArtist,
+  // Genealogy
+  Bloodline,
+  Purebred,
+  HybridVigor,
+  Overcharge,
+  SharedGift,
+  ApexMutation,
+  FeedbackLoop,
+  Count
+};
+constexpr int TALENT_COUNT = static_cast<int>(Talent::Count);
+// Room for the suit to grow without touching save or network layouts.
+constexpr int MAX_SUIT_NODES = 64;
+static_assert(TALENT_COUNT <= MAX_SUIT_NODES, "suit outgrew MAX_SUIT_NODES");
+// Node index used for the core in slot requests.
+constexpr uint8_t CORE_NODE = 255;
+
+struct SuitNode {
+  InfusionTree tree;
+  uint8_t tier;  // 1-based
+  Talent talent;
+  const char* name;
+  const char* description;
+};
+int suitNodeCount();
+// Nodes are indexed by talent: suitNode(i).talent == Talent(i).
+const SuitNode& suitNode(int index);
+// Number of tiers in a tree (the deepest node's tier).
+int treeTierCount(InfusionTree tree);
+
+// Where a node stands for a suit whose nodes hold `nodeGenus` (indexed like
+// suitNode, Genus::None = empty). Shared by the server rules and the HUD.
+enum class NodeState : uint8_t {
+  Locked,  // the tier above (or the core) is not filled yet
+  Open,    // can take an infusion now
+  Filled,
+  Closed  // another option in this tier was chosen
+};
+NodeState nodeState(const Genus* nodeGenus, bool coreFilled, int node);
+
 // World item ids used for arena pickups (reuses ItemSpawned/ItemPickedUp).
+// An infusion's id carries its genus and part: 1000 + genus * 16 + part.
 namespace PickupId {
-constexpr uint32_t InfusionBase = 1000;  // + Genus value (1..4)
+constexpr uint32_t InfusionBase = 1000;
 constexpr uint32_t Scrap = 2000;
 constexpr uint32_t Medkit = 2001;
-inline bool isInfusion(uint32_t id) { return id > 1000 && id <= 1004; }
+inline uint32_t infusion(Genus genus, InfusionPart part) {
+  return InfusionBase + static_cast<uint32_t>(genus) * 16u +
+         static_cast<uint32_t>(part);
+}
+inline bool isInfusion(uint32_t id) {
+  if (id < InfusionBase + 16u || id >= InfusionBase + 16u * (GENUS_COUNT + 1)) {
+    return false;
+  }
+  return (id - InfusionBase) % 16u < static_cast<uint32_t>(PART_COUNT);
+}
 inline Genus infusionGenus(uint32_t id) {
-  return static_cast<Genus>(id - InfusionBase);
+  return static_cast<Genus>((id - InfusionBase) / 16u);
+}
+inline InfusionPart infusionPart(uint32_t id) {
+  return static_cast<InfusionPart>((id - InfusionBase) % 16u);
 }
 }  // namespace PickupId
 

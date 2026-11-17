@@ -95,15 +95,23 @@ struct Player : public Animatable {
   // Downed / revive
   float reviveProgress = 0.0f;
 
-  // Infusions (suit loadout)
+  // Infusions (suit loadout). See Infusions.h for the rules.
+  // Unslotted infusion items, by genus (index genus - 1) and part.
+  uint8_t infusionInventory[Arena::GENUS_COUNT][Arena::PART_COUNT] = {};
   Arena::Genus coreGenus = Arena::Genus::None;
-  Arena::Genus treeGenus[Arena::TREE_COUNT] = {
-      Arena::Genus::None, Arena::Genus::None, Arena::Genus::None,
-      Arena::Genus::None};
-  uint8_t treeLevel[Arena::TREE_COUNT] = {0, 0, 0, 0};
-  uint8_t infusionInventory[Arena::GENUS_COUNT] = {0, 0, 0, 0};
-  float infusionTimer[4] = {0, 0, 0, 0};  // per-tree cooldown / accumulators
-  int infusionCounter[4] = {0, 0, 0, 0};
+  Arena::InfusionPart corePart = Arena::InfusionPart::Talon;
+  // What fills each suit node (index = Arena::suitNode index).
+  Arena::Genus nodeGenus[Arena::MAX_SUIT_NODES] = {};
+  Arena::InfusionPart nodePart[Arena::MAX_SUIT_NODES] = {};
+  // Derived from the above by Infusions::recount; never set by hand.
+  uint8_t genusInTree[Arena::TREE_COUNT][Arena::GENUS_COUNT + 1] = {};
+  uint8_t partsSlotted[Arena::PART_COUNT] = {};
+  // Genus effect state, per tree and genus: internal cooldowns/accumulators.
+  float infusionTimer[Arena::TREE_COUNT][Arena::GENUS_COUNT + 1] = {};
+  int infusionCounter[Arena::TREE_COUNT][Arena::GENUS_COUNT + 1] = {};
+  // Talent state, per talent.
+  float talentTimer[Arena::TALENT_COUNT] = {};
+  int talentCounter[Arena::TALENT_COUNT] = {};
   float coreTimerMs = 0.0f;  // core ability active window
 
   // Match stats
@@ -114,10 +122,21 @@ struct Player : public Animatable {
   bool ready = false;
   bool carryingScrap = false;
 
-  // Level of `genus` infusion slotted in `tree` (0 = none).
+  // Level of the `genus` effect in `tree`: how many infusions of that genus
+  // fill the tree's nodes (0 = none). Apex Mutation adds one for the core's
+  // genus.
   int infusionLevel(Arena::Genus genus, Arena::InfusionTree tree) const {
-    int t = static_cast<int>(tree);
-    return treeGenus[t] == genus ? treeLevel[t] : 0;
+    int g = static_cast<int>(genus);
+    if (g < 1 || g > Arena::GENUS_COUNT) return 0;
+    int level = genusInTree[static_cast<int>(tree)][g];
+    if (level > 0 && genus == coreGenus &&
+        hasTalent(Arena::Talent::ApexMutation)) {
+      level++;
+    }
+    return level;
+  }
+  bool hasTalent(Arena::Talent talent) const {
+    return nodeGenus[static_cast<int>(talent)] != Arena::Genus::None;
   }
 
   Player()

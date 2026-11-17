@@ -417,8 +417,10 @@ void ArenaView::drawAbilityBar() {
     }
     // Infusions summary
     if (me) {
-      int unslotted = me->inventory[0] + me->inventory[1] + me->inventory[2] +
-                      me->inventory[3];
+      int unslotted = 0;
+      for (const auto& row : me->inventory) {
+        for (uint8_t n : row) unslotted += n;
+      }
       char buffer[64];
       std::snprintf(buffer, sizeof(buffer), "Infusions in pack: %d", unslotted);
       text(dl, ImVec2(a.x + 8.0f, a.y + 22.0f),
@@ -630,16 +632,27 @@ void ArenaView::drawScoreboard(bool expanded) {
         ImGui::TextColored(genusColorV(core, 1.0f), "%s", Arena::genusName(core));
       }
       ImGui::TableNextColumn();
+      // Genus effects by level (Apex Mutation's bonus is not shown here).
       bool any = false;
       for (int t = 0; t < Arena::TREE_COUNT; t++) {
-        Genus g = static_cast<Genus>(p->treeGenus[t]);
-        if (g == Genus::None) continue;
-        if (any) ImGui::SameLine();
-        ImGui::TextColored(
-            genusColorV(g, 1.0f), "%s %d",
-            Arena::infusionText(g, static_cast<Arena::InfusionTree>(t)).name,
-            p->treeLevel[t]);
-        any = true;
+        for (int g = 1; g <= Arena::GENUS_COUNT; g++) {
+          int level = 0;
+          for (int n = 0; n < Arena::suitNodeCount(); n++) {
+            if (p->nodeGenus[n] == g &&
+                static_cast<int>(Arena::suitNode(n).tree) == t) {
+              level++;
+            }
+          }
+          if (level == 0) continue;
+          if (any) ImGui::SameLine();
+          Genus genus = static_cast<Genus>(g);
+          ImGui::TextColored(
+              genusColorV(genus, 1.0f), "%s %d",
+              Arena::infusionText(genus, static_cast<Arena::InfusionTree>(t))
+                  .name,
+              level);
+          any = true;
+        }
       }
       if (!any) ImGui::TextDisabled("-");
     }
@@ -847,48 +860,140 @@ void ArenaView::drawCameraHud() {
 // ---------------------------------------------------------------------------
 // Suit screen (infusions)
 // ---------------------------------------------------------------------------
+//
+// Laid out like the paper sketch in the Genera and Infusion doc: the core in
+// the middle, each tree growing out from it into its own corner (Offense top
+// left, Defense top right, Genealogy bottom left, Mobility bottom right),
+// one row of nodes per tier. The pack is on the left, a summary of what the
+// suit gives on the right. Details are in hover tooltips.
+
+namespace {
+
+using Arena::InfusionPart;
+using Arena::InfusionTree;
+using Arena::NodeState;
+
+// Which way each tree grows from the core (screen space, y down).
+ImVec2 treeDirection(InfusionTree tree) {
+  const float d = 0.70710678f;
+  switch (tree) {
+    case InfusionTree::Offense:
+      return ImVec2(-d, -d);
+    case InfusionTree::Defense:
+      return ImVec2(d, -d);
+    case InfusionTree::Genealogy:
+      return ImVec2(-d, d);
+    case InfusionTree::Mobility:
+      return ImVec2(d, d);
+  }
+  return ImVec2(0.0f, 0.0f);
+}
+
+struct SuitView {
+  Genus core = Genus::None;
+  InfusionPart corePart = InfusionPart::Talon;
+  Genus nodes[Arena::MAX_SUIT_NODES] = {};
+  InfusionPart parts[Arena::MAX_SUIT_NODES] = {};
+
+  explicit SuitView(const MatchPlayerState& p) {
+    core = static_cast<Genus>(p.coreGenus);
+    corePart = static_cast<InfusionPart>(p.corePart);
+    for (int i = 0; i < Arena::MAX_SUIT_NODES; i++) {
+      nodes[i] = static_cast<Genus>(p.nodeGenus[i]);
+      parts[i] = static_cast<InfusionPart>(p.nodePart[i]);
+    }
+  }
+  bool has(Arena::Talent talent) const {
+    return nodes[static_cast<int>(talent)] != Genus::None;
+  }
+  NodeState state(int node) const {
+    return Arena::nodeState(nodes, core != Genus::None, node);
+  }
+  // Same rule as Player::infusionLevel, with `extra` more of `genus` in the
+  // tree (to preview a slot).
+  int level(Genus genus, InfusionTree tree, int extra = 0) const {
+    int count = extra;
+    for (int i = 0; i < Arena::suitNodeCount(); i++) {
+      if (nodes[i] == genus && Arena::suitNode(i).tree == tree) count++;
+    }
+    if (count > 0 && genus == core && has(Arena::Talent::ApexMutation)) count++;
+    return count;
+  }
+  int partCount(InfusionPart part) const {
+    int count = core != Genus::None && corePart == part ? 1 : 0;
+    for (int i = 0; i < Arena::suitNodeCount(); i++) {
+      if (nodes[i] != Genus::None && parts[i] == part) count++;
+    }
+    return count;
+  }
+};
+
+std::string itemName(Genus genus, InfusionPart part) {
+  return std::string(Arena::genusName(genus)) + " " +
+         Arena::partInfo(part).name;
+}
+
+// What slotting `genus` into `tree` would give (or gives, at `level`).
+void genusEffectLine(Genus genus, InfusionTree tree, int level) {
+  const Arena::InfusionText& info = Arena::infusionText(genus, tree);
+  ImGui::TextColored(genusColorV(genus, 1.0f), "%s  %s (level %d)",
+                     Arena::treeName(tree), info.name, level);
+  ImGui::TextUnformatted(info.description);
+}
+
+}  // namespace
 
 void ArenaView::drawSuitScreen(bool intermission) {
   const MatchPlayerState* me = arena->matchPlayer(localId());
   if (!me) return;
   const MatchStatePacket& match = arena->match();
-  Genus core = static_cast<Genus>(me->coreGenus);
+  const SuitView suit(*me);
 
-  auto slotInfusion = [&](int genus, int slot) {
+  auto send = [&](int genus, int part, int node) {
     InfusionSlotPacket packet;
     packet.genus = static_cast<uint8_t>(genus);
-    packet.slot = static_cast<uint8_t>(slot);
+    packet.part = static_cast<uint8_t>(part);
+    packet.node = static_cast<uint8_t>(node);
     prediction->sendToServer(serialize(packet));
   };
 
-  // Drop the selection once that genus runs out.
-  if (selectedGenus != 0 && me->inventory[selectedGenus - 1] == 0) {
+  // Keep the selection on an item we still have.
+  auto count = [&](int genus, int part) {
+    return genus >= 1 ? static_cast<int>(me->inventory[genus - 1][part]) : 0;
+  };
+  if (count(selectedGenus, selectedPart) == 0) {
     selectedGenus = 0;
-  }
-  if (selectedGenus == 0) {
-    for (int g = 0; g < Arena::GENUS_COUNT; g++) {
-      if (me->inventory[g] > 0) {
-        selectedGenus = g + 1;
-        break;
+    for (int g = 0; g < Arena::GENUS_COUNT && selectedGenus == 0; g++) {
+      for (int p = 0; p < Arena::PART_COUNT; p++) {
+        if (me->inventory[g][p] > 0) {
+          selectedGenus = g + 1;
+          selectedPart = p;
+          break;
+        }
       }
     }
   }
+  const bool havePick = selectedGenus != 0;
+  const Genus picked = static_cast<Genus>(selectedGenus);
+  const InfusionPart pickedPart = static_cast<InfusionPart>(selectedPart);
 
-  ImGui::SetNextWindowPos(ImVec2(SCREEN_W * 0.5f, SCREEN_H * 0.5f - 20.0f),
+  const float width = 1240.0f, height = 690.0f;
+  ImGui::SetNextWindowPos(ImVec2(SCREEN_W * 0.5f, SCREEN_H * 0.5f),
                           ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-  ImGui::SetNextWindowSize(ImVec2(880.0f, 440.0f), ImGuiCond_Always);
-  ImGui::SetNextWindowBgAlpha(0.94f);
+  ImGui::SetNextWindowSize(ImVec2(width, height), ImGuiCond_Always);
+  ImGui::SetNextWindowBgAlpha(1.0f);
   ImGui::Begin("Suit", nullptr,
                ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
                    ImGuiWindowFlags_NoSavedSettings);
 
+  // --- header ---------------------------------------------------------------
   ImGui::SetWindowFontScale(1.5f);
   ImGui::Text("SUIT INFUSIONS");
   ImGui::SetWindowFontScale(1.0f);
-  ImGui::SameLine(520.0f);
+  ImGui::SameLine(860.0f);
   if (intermission) {
     ImGui::Text("Next round in %s", formatTime(match.timeRemaining).c_str());
-    ImGui::SameLine(740.0f);
+    ImGui::SameLine(1100.0f);
     bool ready = me->ready != 0;
     ImGui::PushStyleColor(ImGuiCol_Button, ready ? ImVec4(0.2f, 0.55f, 0.3f, 1.0f)
                                                  : ImVec4(0.6f, 0.4f, 0.1f, 1.0f));
@@ -902,119 +1007,364 @@ void ArenaView::drawSuitScreen(bool intermission) {
     ImGui::TextDisabled("Only works beside the ship.  [B] closes");
   }
   ImGui::TextDisabled(
-      "Infusions drop from aliens. Your first one powers the CORE (ability on "
-      "E); the rest go into one of four trees.");
+      "Pick an infusion from your pack, then click a glowing slot. The first "
+      "one powers the CORE (ability on E). Each slot past the first in a tree "
+      "is a choice: one per row.");
   ImGui::Separator();
 
-  // --- inventory ---------------------------------------------------------
-  ImGui::Text("In your pack (click to select):");
+  const float top = ImGui::GetCursorPosY();
+  const float bodyHeight = height - top - 12.0f;
+
+  // --- pack (left)
+  // ------------------------------------------------------------
+  ImGui::BeginChild("pack", ImVec2(230.0f, bodyHeight), true);
+  ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "PACK");
+  ImGui::Separator();
+  bool anyItem = false;
   for (int g = 0; g < Arena::GENUS_COUNT; g++) {
     Genus genus = static_cast<Genus>(g + 1);
-    int count = me->inventory[g];
-    bool selected = selectedGenus == g + 1;
-    if (g > 0) ImGui::SameLine();
-    ImGui::PushID(g);
-    ImGui::PushStyleColor(ImGuiCol_Button,
-                          genusColorV(genus, selected ? 0.75f : 0.32f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, genusColorV(genus, 0.85f));
-    ImGui::PushStyleColor(ImGuiCol_Text,
-                          count > 0 ? ImVec4(1, 1, 1, 1) : ImVec4(1, 1, 1, 0.4f));
-    char label[48];
-    std::snprintf(label, sizeof(label), "%s  x%d", Arena::genusName(genus), count);
-    if (ImGui::Button(label, ImVec2(205.0f, 34.0f)) && count > 0) {
-      selectedGenus = g + 1;
-    }
-    ImGui::PopStyleColor(3);
-    ImGui::PopID();
-  }
-  ImGui::Spacing();
-
-  Genus picked = static_cast<Genus>(selectedGenus);
-  bool havePick = selectedGenus != 0;
-
-  // --- core ----------------------------------------------------------------
-  ImGui::BeginChild("core", ImVec2(0.0f, 86.0f), true);
-  if (core == Genus::None) {
-    ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "CORE  -  empty");
-    if (havePick) {
-      const Arena::AbilityInfo& ability = Arena::coreAbility(picked);
-      ImGui::TextColored(genusColorV(picked, 1.0f), "%s core: %s",
-                         Arena::genusName(picked), ability.name);
-      ImGui::TextWrapped("%s", ability.description);
-      ImGui::SameLine(700.0f);
-      ImGui::SetCursorPosY(26.0f);
-      ImGui::PushStyleColor(ImGuiCol_Button, genusColorV(picked, 0.6f));
-      if (ImGui::Button("SLOT AS CORE", ImVec2(150.0f, 40.0f))) {
-        slotInfusion(selectedGenus, 0);
+    for (int p = 0; p < Arena::PART_COUNT; p++) {
+      int n = me->inventory[g][p];
+      if (n == 0) continue;
+      anyItem = true;
+      InfusionPart part = static_cast<InfusionPart>(p);
+      bool selected = selectedGenus == g + 1 && selectedPart == p;
+      ImGui::PushID(g * 16 + p);
+      ImGui::PushStyleColor(ImGuiCol_Button,
+                            genusColorV(genus, selected ? 0.8f : 0.3f));
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, genusColorV(genus, 0.9f));
+      std::string label = itemName(genus, part) + "  x" + std::to_string(n);
+      if (ImGui::Button(label.c_str(), ImVec2(206.0f, 30.0f))) {
+        selectedGenus = g + 1;
+        selectedPart = p;
       }
-      ImGui::PopStyleColor();
-    } else {
-      ImGui::TextDisabled("Kill aliens to find your first infusion.");
+      ImGui::PopStyleColor(2);
+      if (ImGui::IsItemHovered()) {
+        // The tooltip from the doc: the item's own effect, then what its
+        // genus does in each place it could go.
+        ImGui::BeginTooltip();
+        ImGui::PushTextWrapPos(380.0f);
+        ImGui::TextColored(genusColorV(genus, 1.0f), "%s",
+                           itemName(genus, part).c_str());
+        ImGui::Text("Always: %s", Arena::partInfo(part).description);
+        ImGui::Separator();
+        if (suit.core == Genus::None) {
+          const Arena::AbilityInfo& ability = Arena::coreAbility(genus);
+          ImGui::TextColored(genusColorV(genus, 1.0f), "In the core: %s [E]",
+                             ability.name);
+          ImGui::TextUnformatted(ability.description);
+        } else {
+          ImGui::TextDisabled("In a tree, plus that slot's talent:");
+          for (int t = 0; t < Arena::TREE_COUNT; t++) {
+            InfusionTree tree = static_cast<InfusionTree>(t);
+            genusEffectLine(genus, tree, suit.level(genus, tree, 1));
+          }
+        }
+        ImGui::PopTextWrapPos();
+        ImGui::EndTooltip();
+      }
+      ImGui::PopID();
     }
-  } else {
-    const Arena::AbilityInfo& ability = Arena::coreAbility(core);
-    ImGui::TextColored(genusColorV(core, 1.0f), "CORE  -  %s: %s  [E]",
-                       Arena::genusName(core), ability.name);
-    ImGui::TextWrapped("%s", ability.description);
+  }
+  if (!anyItem) {
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextDisabled(
+        "Empty. Kill aliens and finish objectives to find infusions; each "
+        "territory drops its own genus.");
+    ImGui::PopTextWrapPos();
   }
   ImGui::EndChild();
 
-  // --- trees -----------------------------------------------------------------
-  for (int t = 0; t < Arena::TREE_COUNT; t++) {
-    Arena::InfusionTree tree = static_cast<Arena::InfusionTree>(t);
-    Genus current = static_cast<Genus>(me->treeGenus[t]);
-    int level = me->treeLevel[t];
-    if (t > 0) ImGui::SameLine();
-    ImGui::PushID(100 + t);
-    ImGui::BeginChild("tree", ImVec2(208.0f, 196.0f), true);
-    ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "%s",
-                       Arena::treeName(tree));
-    ImGui::Separator();
-    if (current != Genus::None) {
-      const Arena::InfusionText& info = Arena::infusionText(current, tree);
-      ImGui::TextColored(genusColorV(current, 1.0f), "%s  (level %d)", info.name,
-                         level);
-      ImGui::PushTextWrapPos(196.0f);
-      ImGui::TextUnformatted(info.description);
-      ImGui::PopTextWrapPos();
-    } else {
-      ImGui::TextDisabled("empty");
-    }
+  // --- suit (middle) -------------------------------------------------------
+  ImGui::SameLine();
+  const float suitWidth = 620.0f;
+  ImGui::BeginChild("suit", ImVec2(suitWidth, bodyHeight), true,
+                    ImGuiWindowFlags_NoScrollbar);
+  ImDrawList* dl = ImGui::GetWindowDrawList();
+  const ImVec2 origin = ImGui::GetCursorScreenPos();
+  const ImVec2 centre(origin.x + suitWidth * 0.5f - 8.0f,
+                      origin.y + bodyHeight * 0.5f - 8.0f);
+  const float coreRadius = 38.0f, nodeRadius = 20.0f;
+  const float firstStep = 92.0f, tierStep = 78.0f, optionGap = 92.0f;
 
-    if (havePick && core != Genus::None) {
-      const Arena::InfusionText& preview = Arena::infusionText(picked, tree);
-      bool upgrade = current == picked;
-      bool maxed = upgrade && level >= Arena::MAX_TREE_LEVEL;
-      ImGui::SetCursorPosY(118.0f);
-      ImGui::Separator();
-      if (!upgrade) {
-        ImGui::TextColored(genusColorV(picked, 0.9f), "-> %s", preview.name);
-        if (ImGui::IsItemHovered()) {
-          ImGui::BeginTooltip();
-          ImGui::PushTextWrapPos(300.0f);
-          ImGui::TextUnformatted(preview.description);
-          if (current != Genus::None) {
-            ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.4f, 1.0f),
-                               "Replaces what is slotted here.");
-          }
-          ImGui::PopTextWrapPos();
-          ImGui::EndTooltip();
-        }
-      }
-      ImGui::SetCursorPosY(156.0f);
-      ImGui::PushStyleColor(ImGuiCol_Button, genusColorV(picked, maxed ? 0.2f : 0.55f));
-      const char* label = maxed ? "MAX LEVEL"
-                                : (upgrade ? "UPGRADE" : (current == Genus::None
-                                                              ? "SLOT HERE"
-                                                              : "REPLACE"));
-      if (ImGui::Button(label, ImVec2(190.0f, 30.0f)) && !maxed) {
-        slotInfusion(selectedGenus, t + 1);
-      }
-      ImGui::PopStyleColor();
-    }
-    ImGui::EndChild();
-    ImGui::PopID();
+  // Quadrant guides and tree names, as on the sketch.
+  ImU32 guide = IM_COL32(255, 255, 255, 26);
+  dl->AddLine(ImVec2(centre.x, origin.y),
+              ImVec2(centre.x, origin.y + bodyHeight), guide);
+  dl->AddLine(ImVec2(origin.x, centre.y),
+              ImVec2(origin.x + suitWidth, centre.y), guide);
+  for (int t = 0; t < Arena::TREE_COUNT; t++) {
+    InfusionTree tree = static_cast<InfusionTree>(t);
+    ImVec2 dir = treeDirection(tree);
+    // In the quadrant's outer corner, clear of the branch.
+    ImVec2 at(dir.x < 0.0f ? origin.x + 12.0f : origin.x + suitWidth - 112.0f,
+              dir.y < 0.0f ? origin.y + 8.0f : origin.y + bodyHeight - 34.0f);
+    text(dl, at, IM_COL32(255, 220, 140, 220), 17.0f, Arena::treeName(tree),
+         false);
   }
+
+  // Node positions: each tier is a row across the tree's branch.
+  ImVec2 nodePos[Arena::MAX_SUIT_NODES];
+  for (int t = 0; t < Arena::TREE_COUNT; t++) {
+    InfusionTree tree = static_cast<InfusionTree>(t);
+    ImVec2 dir = treeDirection(tree);
+    ImVec2 side(-dir.y, dir.x);
+    for (int tier = 1; tier <= Arena::treeTierCount(tree); tier++) {
+      std::vector<int> row;
+      for (int i = 0; i < Arena::suitNodeCount(); i++) {
+        const Arena::SuitNode& node = Arena::suitNode(i);
+        if (node.tree == tree && node.tier == tier) row.push_back(i);
+      }
+      float along = firstStep + tierStep * (tier - 1);
+      for (size_t k = 0; k < row.size(); k++) {
+        float across =
+            (static_cast<float>(k) - (row.size() - 1) * 0.5f) * optionGap;
+        nodePos[row[k]] = ImVec2(centre.x + dir.x * along + side.x * across,
+                                 centre.y + dir.y * along + side.y * across);
+      }
+    }
+  }
+
+  // Links: a spine runs down each branch through the middle of every row,
+  // and a stub joins each option to the spine. The spine lights up as far
+  // as the tree is filled, in the colour of the deepest infusion; a stub
+  // lights up when its node is filled.
+  ImU32 dim = IM_COL32(255, 255, 255, 40);
+  for (int t = 0; t < Arena::TREE_COUNT; t++) {
+    InfusionTree tree = static_cast<InfusionTree>(t);
+    ImVec2 dir = treeDirection(tree);
+    ImVec2 from = centre;
+    for (int tier = 1; tier <= Arena::treeTierCount(tree); tier++) {
+      float along = firstStep + tierStep * (tier - 1);
+      ImVec2 mid(centre.x + dir.x * along, centre.y + dir.y * along);
+      Genus filledHere = Genus::None;
+      for (int i = 0; i < Arena::suitNodeCount(); i++) {
+        const Arena::SuitNode& node = Arena::suitNode(i);
+        if (node.tree != tree || node.tier != tier) continue;
+        if (suit.nodes[i] != Genus::None) filledHere = suit.nodes[i];
+      }
+      bool lit = filledHere != Genus::None;
+      dl->AddLine(from, mid, lit ? genusColor(filledHere, 0.9f) : dim,
+                  lit ? 3.0f : 1.5f);
+      for (int i = 0; i < Arena::suitNodeCount(); i++) {
+        const Arena::SuitNode& node = Arena::suitNode(i);
+        if (node.tree != tree || node.tier != tier) continue;
+        bool filled = suit.nodes[i] != Genus::None;
+        dl->AddLine(mid, nodePos[i],
+                    filled ? genusColor(suit.nodes[i], 0.9f) : dim,
+                    filled ? 3.0f : 1.5f);
+      }
+      from = mid;
+    }
+  }
+
+  float pulse =
+      0.5f + 0.5f * std::sin(static_cast<float>(ImGui::GetTime()) * 5.0f);
+
+  // Core.
+  {
+    ImGui::SetCursorScreenPos(
+        ImVec2(centre.x - coreRadius, centre.y - coreRadius));
+    ImGui::InvisibleButton("core",
+                           ImVec2(coreRadius * 2.0f, coreRadius * 2.0f));
+    bool hovered = ImGui::IsItemHovered();
+    bool canSlot = suit.core == Genus::None && havePick;
+    if (ImGui::IsItemClicked() && canSlot) {
+      send(selectedGenus, selectedPart, Arena::CORE_NODE);
+    }
+    if (suit.core != Genus::None) {
+      dl->AddCircleFilled(centre, coreRadius, genusColor(suit.core, 0.85f), 40);
+      text(dl, ImVec2(centre.x, centre.y - 14.0f), IM_COL32(255, 255, 255, 255),
+           13.0f, "CORE");
+      text(dl, ImVec2(centre.x, centre.y + 1.0f), IM_COL32(255, 255, 255, 255),
+           11.0f, Arena::coreAbility(suit.core).name);
+    } else {
+      dl->AddCircleFilled(centre, coreRadius, IM_COL32(24, 26, 38, 255), 40);
+      text(dl, ImVec2(centre.x, centre.y - 7.0f), IM_COL32(255, 220, 140, 255),
+           14.0f, "CORE");
+      if (canSlot) {
+        dl->AddCircle(centre, coreRadius + 3.0f + 3.0f * pulse,
+                      genusColor(picked, 0.9f), 40, 3.0f);
+      }
+    }
+    dl->AddCircle(centre, coreRadius, IM_COL32(255, 255, 255, 160), 40, 2.0f);
+    if (hovered) {
+      ImGui::BeginTooltip();
+      ImGui::PushTextWrapPos(380.0f);
+      if (suit.core != Genus::None) {
+        const Arena::AbilityInfo& ability = Arena::coreAbility(suit.core);
+        ImGui::TextColored(genusColorV(suit.core, 1.0f), "CORE: %s  [E]",
+                           ability.name);
+        ImGui::TextUnformatted(ability.description);
+        ImGui::TextDisabled("%s: %s",
+                            itemName(suit.core, suit.corePart).c_str(),
+                            Arena::partInfo(suit.corePart).description);
+      } else if (havePick) {
+        const Arena::AbilityInfo& ability = Arena::coreAbility(picked);
+        ImGui::Text("Click to slot %s as your core:",
+                    itemName(picked, pickedPart).c_str());
+        ImGui::TextColored(genusColorV(picked, 1.0f), "%s  [E]", ability.name);
+        ImGui::TextUnformatted(ability.description);
+        ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f),
+                           "The core is permanent for this match.");
+      } else {
+        ImGui::TextUnformatted("Your first infusion powers the core.");
+      }
+      ImGui::PopTextWrapPos();
+      ImGui::EndTooltip();
+    }
+  }
+
+  // Tree nodes.
+  for (int i = 0; i < Arena::suitNodeCount(); i++) {
+    const Arena::SuitNode& node = Arena::suitNode(i);
+    ImVec2 at = nodePos[i];
+    NodeState state = suit.state(i);
+    ImGui::PushID(1000 + i);
+    ImGui::SetCursorScreenPos(ImVec2(at.x - nodeRadius, at.y - nodeRadius));
+    ImGui::InvisibleButton("node",
+                           ImVec2(nodeRadius * 2.0f, nodeRadius * 2.0f));
+    bool hovered = ImGui::IsItemHovered();
+    bool canSlot = state == NodeState::Open && havePick;
+    if (ImGui::IsItemClicked() && canSlot) {
+      send(selectedGenus, selectedPart, i);
+    }
+    ImGui::PopID();
+
+    ImU32 fill = IM_COL32(24, 26, 38, 255);
+    ImU32 ring = IM_COL32(255, 255, 255, 60);
+    ImU32 label = IM_COL32(150, 150, 165, 200);
+    switch (state) {
+      case NodeState::Filled:
+        fill = genusColor(suit.nodes[i], 0.85f);
+        ring = IM_COL32(255, 255, 255, 220);
+        label = IM_COL32(255, 255, 255, 255);
+        break;
+      case NodeState::Open:
+        ring = IM_COL32(255, 220, 140, 220);
+        label = IM_COL32(255, 230, 180, 255);
+        break;
+      case NodeState::Closed:
+        fill = IM_COL32(14, 15, 22, 255);
+        ring = IM_COL32(255, 255, 255, 18);
+        label = IM_COL32(110, 110, 120, 120);
+        break;
+      case NodeState::Locked:
+        break;
+    }
+    dl->AddCircleFilled(at, nodeRadius, fill, 28);
+    dl->AddCircle(at, nodeRadius, ring, 28,
+                  state == NodeState::Filled ? 2.5f : 1.5f);
+    if (canSlot) {
+      dl->AddCircle(at, nodeRadius + 2.0f + 3.0f * pulse,
+                    genusColor(picked, 0.9f), 28, 2.5f);
+    }
+    if (state == NodeState::Filled) {
+      // The part, as a letter: T(alon), H(ide), E(ye), S(inew).
+      char letter[2] = {Arena::partInfo(suit.parts[i]).name[0], 0};
+      text(dl, ImVec2(at.x, at.y - 7.0f), IM_COL32(255, 255, 255, 255), 14.0f,
+           letter);
+    }
+    text(dl, ImVec2(at.x, at.y + nodeRadius + 2.0f), label, 11.0f, node.name);
+
+    if (hovered) {
+      ImGui::BeginTooltip();
+      ImGui::PushTextWrapPos(380.0f);
+      ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "%s  (%s, tier %d)",
+                         node.name, Arena::treeName(node.tree), node.tier);
+      ImGui::TextUnformatted(node.description);
+      ImGui::Separator();
+      if (state == NodeState::Filled) {
+        Genus genus = suit.nodes[i];
+        ImGui::Text("Holds %s (%s).", itemName(genus, suit.parts[i]).c_str(),
+                    Arena::partInfo(suit.parts[i]).description);
+        genusEffectLine(genus, node.tree, suit.level(genus, node.tree));
+      } else if (state == NodeState::Open && havePick) {
+        ImGui::Text("Click to slot %s here. You get:",
+                    itemName(picked, pickedPart).c_str());
+        ImGui::BulletText("%s", node.name);
+        ImGui::BulletText("%s", Arena::partInfo(pickedPart).description);
+        genusEffectLine(picked, node.tree, suit.level(picked, node.tree, 1));
+        if (node.tier > 1) {
+          ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f),
+                             "Closes the other options in this row.");
+        }
+      } else if (state == NodeState::Open) {
+        ImGui::TextDisabled("Open. Pick an infusion from your pack.");
+      } else if (state == NodeState::Closed) {
+        ImGui::TextDisabled("Closed: another option in this row was taken.");
+      } else {
+        ImGui::TextDisabled(suit.core == Genus::None
+                                ? "Fill the core first."
+                                : "Fill a slot in the row before it first.");
+      }
+      ImGui::PopTextWrapPos();
+      ImGui::EndTooltip();
+    }
+  }
+  ImGui::EndChild();
+
+  // --- summary (right)
+  // --------------------------------------------------------
+  ImGui::SameLine();
+  ImGui::BeginChild("summary", ImVec2(0.0f, bodyHeight), true);
+  ImGui::PushTextWrapPos(0.0f);
+  ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "YOUR SUIT");
+  ImGui::Separator();
+  if (suit.core != Genus::None) {
+    ImGui::TextColored(genusColorV(suit.core, 1.0f), "Core: %s [E]",
+                       Arena::coreAbility(suit.core).name);
+  } else {
+    ImGui::TextDisabled("Core: empty");
+  }
+  ImGui::Spacing();
+  ImGui::TextDisabled("Genus effects");
+  bool anyEffect = false;
+  for (int t = 0; t < Arena::TREE_COUNT; t++) {
+    InfusionTree tree = static_cast<InfusionTree>(t);
+    for (int g = 1; g <= Arena::GENUS_COUNT; g++) {
+      Genus genus = static_cast<Genus>(g);
+      int level = suit.level(genus, tree);
+      if (level == 0) continue;
+      anyEffect = true;
+      ImGui::TextColored(genusColorV(genus, 1.0f), "%s %d",
+                         Arena::infusionText(genus, tree).name, level);
+      if (ImGui::IsItemHovered()) {
+        ImGui::BeginTooltip();
+        ImGui::PushTextWrapPos(380.0f);
+        genusEffectLine(genus, tree, level);
+        ImGui::PopTextWrapPos();
+        ImGui::EndTooltip();
+      }
+    }
+  }
+  if (!anyEffect) ImGui::TextDisabled("  none yet");
+  ImGui::Spacing();
+  ImGui::TextDisabled("Talents");
+  bool anyTalent = false;
+  for (int i = 0; i < Arena::suitNodeCount(); i++) {
+    if (suit.nodes[i] == Genus::None) continue;
+    anyTalent = true;
+    const Arena::SuitNode& node = Arena::suitNode(i);
+    ImGui::Text("%s", node.name);
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", node.description);
+  }
+  if (!anyTalent) ImGui::TextDisabled("  none yet");
+  ImGui::Spacing();
+  ImGui::TextDisabled("From the items themselves");
+  bool anyPart = false;
+  for (int p = 0; p < Arena::PART_COUNT; p++) {
+    InfusionPart part = static_cast<InfusionPart>(p);
+    int n = suit.partCount(part);
+    if (n == 0) continue;
+    anyPart = true;
+    ImGui::Text("%d x %s: %s", n, Arena::partInfo(part).name,
+                Arena::partInfo(part).description);
+  }
+  if (!anyPart) ImGui::TextDisabled("  none yet");
+  ImGui::PopTextWrapPos();
+  ImGui::EndChild();
+
   ImGui::End();
 }
 
@@ -1191,8 +1541,10 @@ void ArenaView::drawPrompts() {
     colour = IM_COL32(255, 190, 110, 255);
   }
   if (!prompt && me && me->coreGenus == 0) {
-    int unslotted = me->inventory[0] + me->inventory[1] + me->inventory[2] +
-                    me->inventory[3];
+    int unslotted = 0;
+    for (const auto& row : me->inventory) {
+      for (uint8_t n : row) unslotted += n;
+    }
     float dx = px - match.shipX, dy = py - match.shipY;
     if (unslotted > 0 &&
         dx * dx + dy * dy <= Arena::Tuning::SHIP_SAFE_RADIUS *

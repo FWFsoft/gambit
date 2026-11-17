@@ -198,7 +198,8 @@ class ArenaView {
   Texture* shipTexture = nullptr;
 
   // HUD state
-  int selectedGenus = 0;        // infusion picked up in the suit screen
+  int selectedGenus = 0;        // infusion item picked in the suit screen
+  int selectedPart = 0;         // (genus 0 = none)
   bool suitScreenOpen = false;  // toggled with B outside intermission
   bool effectLab = false;       // F12: number keys drive effect verbs
   void drawEffectLabPanel();

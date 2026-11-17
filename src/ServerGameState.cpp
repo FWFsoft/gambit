@@ -375,13 +375,13 @@ void ServerGameState::onNetworkPacketReceived(
       break;
 
     case PacketType::InfusionSlot: {
-      if (e.size < 3) break;
+      if (e.size < 4) break;
       InfusionSlotPacket packet = deserializeInfusionSlot(e.data, e.size);
       auto playerIt = players.find(e.clientId);
       if (playerIt != players.end()) {
-        director->onSlotInfusion(playerIt->second,
-                                 static_cast<Arena::Genus>(packet.genus),
-                                 packet.slot);
+        director->onSlotInfusion(
+            playerIt->second, static_cast<Arena::Genus>(packet.genus),
+            static_cast<Arena::InfusionPart>(packet.part), packet.node);
       }
       break;
     }

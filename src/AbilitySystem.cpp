@@ -90,6 +90,7 @@ void AbilitySystem::applyKitStats(Player& player) {
     player.maxHealth = Config::Player::MAX_HEALTH;
     player.moveSpeed = Config::Player::SPEED;
   }
+  player.maxHealth += Infusions::maxHealthBonus(player);
   player.health = player.maxHealth;
   resetPlayerForRound(player);
 }
@@ -116,7 +117,7 @@ void AbilitySystem::resetPlayerForRound(Player& player) {
   player.propX = player.propY = 0.0f;
   player.kitMode = 0;
   player.kitAnchored = false;
-  for (float& t : player.infusionTimer) t = 0.0f;
+  Infusions::resetForRound(player);
   player.reviveProgress = 0.0f;
   effectManager->clearEntity(player.id, false);
   if (Kit* kit = kitFor(player)) kit->onRoundStart(player);
@@ -213,8 +214,11 @@ void AbilitySystem::updatePlayer(Player& player, float dtMs) {
   float heldMs = std::min(player.hitStopMs, dtMs);
   player.hitStopMs -= heldMs;
   float actionDtMs = dtMs - heldMs;
-  for (float& cooldown : player.cooldownMs) {
-    cooldown = std::max(0.0f, cooldown - actionDtMs * rechargeRate);
+  for (int slot = 0; slot < Arena::SLOT_COUNT; slot++) {
+    float& cooldown = player.cooldownMs[slot];
+    cooldown = std::max(
+        0.0f, cooldown - actionDtMs * rechargeRate *
+                             Infusions::rechargeMultiplier(player, slot));
   }
   player.actionLockMs = std::max(0.0f, player.actionLockMs - actionDtMs);
   player.intangibleMs = std::max(0.0f, player.intangibleMs - dtMs);
@@ -412,6 +416,7 @@ void AbilitySystem::fire(Player& player, int slot, float charge) {
   } else {
     kit->cast(ctx, slot);
   }
+  Infusions::onAbilityUsed(*this, player, slot);
   // Sent after the cast so it can carry the form the kit chose.
   cast.extraId = player.castVariant;
   emit(cast);
@@ -458,12 +463,15 @@ float AbilitySystem::damageEnemy(uint32_t attackerId, Enemy& enemy,
   if (attacker) {
     auto mods = effectManager->calculateModifiers(attackerId, false);
     damage *= mods.damageDealtMultiplier;
+    damage *= Infusions::damageMultiplier(*this, *attacker, enemy, flags);
 
     if (!(flags & DamageFlag::Dot)) {
       const ActiveEffects& fx = effectManager->getPlayerEffects(attackerId);
       bool sharpened = fx.hasEffect(EffectType::Sharpened);
       bool dulled = fx.hasEffect(EffectType::Dulled);
-      float chance = dulled ? 0.0f : (sharpened ? 0.40f : 0.05f);
+      float chance = dulled ? 0.0f
+                            : (sharpened ? 0.40f : 0.05f) +
+                                  Infusions::critChanceBonus(*attacker);
       crit = (flags & DamageFlag::ForceCrit) != 0 || random01() < chance;
       if (crit) damage *= sharpened ? 2.0f : 1.75f;
     }
