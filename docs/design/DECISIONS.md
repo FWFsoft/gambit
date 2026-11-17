@@ -21,6 +21,151 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-16: Gravon made heavy: the blade out, a flat half-circle, a slam that throws him
+- **Decision** (requested by Noah; numbers mine):
+  - **Slow:** base speed 205 (it was 255; the cast is 250-260), and 15%
+    slower again with the blade out (174). 35% speed through every swing.
+  - **Blade out or on his back:** any attack draws it; after 4 s without
+    one (counted once a swing or landing ends) he puts it back. Out, he
+    stands braced over it with both hands on the grip and the point on
+    the floor ("guard"), and runs dragging it behind him in one hand, the
+    point scraping sparks ("drag_run"). The game plays "sheathe" when it
+    goes back.
+  - **Titan's Slash** is one flat 180-degree arc (half-angle 90, range
+    135), the blade parallel to the floor, 1 s cooldown. The first swing
+    depends on where the blade is: from his back, he drops his left
+    shoulder and heaves it off one-handed into a backhand (420 ms, 46
+    damage); out of a run (0.25 s on the move with it out), he heaves it
+    up from the drag into a forehand (380 ms, 46). After that, two hands,
+    back and forth (300 ms, 38), each swing the other way from the last.
+  - **Ravager's Edge** release is two motions: he throws it over with his
+    feet planted, then its weight pulls him over his planted left foot,
+    head below his waist and right leg high, as it slams down flat ahead.
+    The server moves him a 15 px lurch (after playtest round 2: 70 px read
+    as jumping), the slam landing 300 ms after release on a spot 110 px
+    ahead (shown with a violet circle). Then he is rooted and cannot act until 1.2 s after
+    release, on his knees behind it, hauling it out of the floor and onto
+    his shoulder. Damage unchanged.
+- **Pillars:** Clarity and the character's identity (a hero who looks and
+  plays heavy; the slam lands where the circle says, and the 1.2 s
+  recovery is a window enemies and allies can read). Crunch on the
+  attacks: every swing and slam is a commitment. **Trades against
+  Crunch's "dead time":** 205 speed makes crossing explored ground slower
+  for him than anyone, and every swing slows him to a crawl. Blade Rush
+  is his only fast move. If it feels bad in a playtest, the first lever
+  is the 0.85 drag multiplier, not the swings.
+- **Why:** asked for directly. The heave-first combo makes sheathing a
+  real state (opening from the back is slower than opening drawn), so
+  keeping the blade out has a cost (speed) and a benefit (quicker swings).
+  **Balance check** (ArenaSim, Gravon + Wade + Nyx + Suds, seeds 1-3):
+  Gravon 1,575 to 2,230, second in two of three, 1 to 5 deaths. The last
+  version was first in two of three, with 1 death each.
+- **Art:** the actor now solves the arms with two-bone IK from where the
+  hands and blade should be, so both hands are on the grip in every
+  two-handed pose (within 8 cm; 10 cm in the stab's chamber). After
+  Noah's first look ("he's gesturing with his hand"), the body drives every
+  move: in a swing the hips and chest turn first and the blade trails
+  them, he coils low on the back leg, lunges and leans into the cut, his
+  arms pulled straight by the blade, and the follow-through drags him on
+  past it. In the slam he swings about the grip, not his feet, so the blade
+  pulls him off the floor. The stab chambers at the hip during the slide,
+  then drives through in a deep lunge. The guard hunches lower and heaves;
+  the drag run hauls. Swing keys sit on frame times, so no frame blends two
+  blade angles. Playtest round 2: the idles are a still power stance that
+  only breathes (they swayed like a bowling pin); at rest with the blade
+  out, it stands point-down beside him under his right hand. Everything he
+  swings he holds in both hands, the heave from a run included; the swings
+  start lower and drive from the legs, the back leg straightening, the
+  side crunching into the pull. Blade Rush slides two-handed; in the beat
+  he sinks into a low stance with the blade raised level with his
+  shoulders, hands by his right cheek, and thrusts it straight out at
+  shoulder height (round 3). Round 3 also: running (sheathed or with the
+  blade out) the legs turn in at the hip so his toes point where he runs
+  (the model's feet turn out about 17 degrees, right for the stance only);
+  the sheathed run is the same hard, leaning run as the drag, arms
+  pumping clear of his sides.
+  **Bug fixed (round 3):** the host dying to damage over time ended a
+  solo match with the blade still whole: the match director judged the
+  team before the kit turned him into the blade. AbilitySystem now settles
+  deaths (every kit's lethal hook) at the start of each server tick, before
+  the director runs; a match test covers it.
+  New clips: guard, drag_run, sheathe,
+  heave, heave_run, slash_f, slash_b, hit_drawn, and a 12-frame ravager.
+  The sheet bakes at pixel scale 1.55 in a taller cell, to fit the slam's
+  reach toward the camera.
+- **Status:** Built, needs review
+- **Where:** `src/CharacterKits.cpp`, `include/ArenaData.h`
+  (GravonMode::DrawnBit, GravonForm), `src/ArenaData.cpp`,
+  `src/ArenaView.cpp`, `tests/test_gravon_kit.cpp`,
+  `tools/sprite_forge/actors/gravon.py`
+
+## 2026-11-16: Gravon rebuilt: the blade is the hero, the host is its body
+- **Decision:** Gravon (id 3, Striker, 240 HP, 255 speed) rebuilt from the
+  kit sheet; the earlier prototype is replaced, not extended.
+  - **Soulblade (passive):** the blade and the host have separate health.
+    The host has the kit's 240; the blade 120, kept between falls and shown
+    as his meter while the host stands. When the host falls the player *is*
+    the blade: it stands point-first in the floor where he fell, exposed
+    (enemies target and hit it), and cannot move or act. After 15 s, 1 s
+    less per enemy that dies within 450 px, it raises the host where it is,
+    at 60% health, and becomes untargetable again. Any ally who walks over
+    it (55 px, after 0.6 s) picks it up and carries it on their back, where
+    nothing can touch it; if the carrier falls it drops. If the blade
+    breaks, Gravon is down like anyone else and is revived as the host.
+    **Interpretations:** no once-per-round limit (the sheet gives none), so
+    every fall is a blade phase; carrying costs the carrier nothing; a
+    death from damage over time also leaves the blade (the death hook now
+    fires for every kit, not only on hits).
+  - **LMB Titan's Slash** (0.95 s): a 260 ms wind-up (he moves at 35%
+    speed through the swing), then 38 damage and a short knockback in a
+    150-degree arc out to 135 px. Alternates backhand and forehand clips.
+    Cancelled if the host falls mid-swing.
+  - **RMB Ravager's Edge** (hold up to 1.5 s, 5 s): **roots him** while it
+    builds. On release the blade slams down 95 px ahead: 35 to 150 damage
+    in a 110 to 160 px circle. At full charge, +1 Sharpened and a
+    guaranteed crit (so 300 at full, about 8 times a slash).
+  - **Q Fury of the Blade** (14 s): +1 Empowered and +1 Haste for 6 s.
+    While either is on him, each hit takes 0.7 s off Blade Rush. Dark
+    violet ooze runs off him while it lasts.
+  - **Shift Blade Rush** (7 s): two beats. A 190 px slide (170 ms,
+    through enemies), a 90 ms beat, then a 45 px lunge and a stab of 62 to
+    the first enemy within 140 px ahead.
+- **Pillars:** Comradery (the carry: picking him up is a way to help that
+  only an ally can give, and it is drawn on them for everyone to see);
+  Crunch (a heavy slash and a rooted charge are commitments; the slash's
+  wind-up and slow make positioning matter); Creative Builds (Fury's
+  refunds and the full-charge Sharpened feed crit and Haste builds);
+  Clarity (the blade is the tallest thing on the field, with a ring that
+  fills as the host returns). **Trades against Crunch:** the 15 s blade
+  phase is waiting with little to decide for Gravon's own player. Kills
+  nearby shorten it and being carried keeps him in the fight, but it is
+  dead time; watch it in playtests.
+- **Why:** built from the kit sheet and the request ("slow weighty arcing
+  strike", "a charge that locks him in place... a large slam", purple ooze
+  on Q, "two distinct chunky motions" on Shift). The blade as its own
+  sheet follows Nyx's CRT. Rejected: drawing the host's body at the fall
+  spot for the whole phase (he would then rise somewhere else when the
+  blade has been carried away); the body sinks into violet smoke instead
+  and the host re-forms at the blade.
+  **Balance check** (ArenaSim, Gravon + Wade + Nyx + Suds, seeds 1-3):
+  Gravon scored 2,762 to 3,296, first in two of three, with 1 death each
+  game. Host falls are not counted as deaths, so that number hides how
+  often he goes down. He may be strong; the open questions are the
+  missing once-per-round limit and the free carry.
+- **Art:** body from the Meshy host model, on the joints Noah placed in the
+  fit editor. The model was shrunk locally (1.24M to 40k triangles), and
+  the wrist chains were cut out (`tools/sprite_forge/cut.py`): they hang
+  straight down in the A-pose and the forearms swung them through his legs.
+  The blade (Meshy, 20k triangles) is 2.4 m long against his 2.0 m, worn on a
+  30-degree diagonal per Noah's reference. The sheet bakes at pixel scale
+  1.25 to fit the reach of the blade in a reasonable sheet.
+- **Status:** Built, needs review
+- **Where:** `src/CharacterKits.cpp` (GravonKit), `include/ArenaData.h`
+  (GravonMode, GravonForm), `src/ArenaData.cpp`, `src/AbilitySystem.cpp`
+  (the death hook), `src/ArenaView.cpp`, `tests/test_gravon_kit.cpp`,
+  `tools/sprite_forge/actors/gravon.py`, `gravon_blade.py`,
+  `tools/sprite_forge/cut.py`, `art/models/Gravon*`
+
 ## 2026-11-16: Nyx, the Hive Mother: a nanite swarm, a CRT she sets down
 - **Decision:** Nyx (id 13) is playable as a Playmaker, 230 HP, 258 speed,
   built from Noah's ability sheet. Her body and CRT are Noah's Meshy models

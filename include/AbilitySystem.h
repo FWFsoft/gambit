@@ -172,6 +172,10 @@ class AbilitySystem {
   // Remove projectiles, zones and pending timers (round end).
   void clearTransient();
   void onEnemyDied(const Enemy& enemy, uint32_t killerId);
+  // Give each kit its say on any player who died outside the damage
+  // pipeline since the last tick (damage over time, zone damage), before
+  // anything else judges them dead. Call before the match rules run.
+  void settleDeaths();
   // When false, players cannot use abilities (lobby / intermission / end).
   void setCombatEnabled(bool enabled) { combatEnabled = enabled; }
 
@@ -351,6 +355,7 @@ class AbilitySystem {
   std::mt19937 rng{20240107};
 
   void updatePlayer(Player& player, float dtMs);
+  void settleDeath(Player& player);
   void updateAbilityInput(Player& player, float dtMs);
   void fire(Player& player, int slot, float charge);
   void updateForcedMotion(Player& player, float dtMs);

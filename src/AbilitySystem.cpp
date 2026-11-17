@@ -164,6 +164,26 @@ bool AbilitySystem::isTargetable(const Player& player) const {
 // Per-player update
 // ---------------------------------------------------------------------------
 
+void AbilitySystem::settleDeath(Player& player) {
+  if (player.characterId == 0) return;
+  if (player.isDead() && !player.deathSeen) {
+    // Died outside damagePlayer (damage over time, zone damage): the kit
+    // still gets its say (Gravon's host falling leaves the blade).
+    player.deathSeen = true;
+    Kit* dying = kitFor(player);
+    if (dying && dying->onLethal(*this, player)) {
+      player.health = std::max(player.health, 1.0f);
+    } else {
+      player.health = 0.0f;
+    }
+  }
+  if (player.isAlive()) player.deathSeen = false;
+}
+
+void AbilitySystem::settleDeaths() {
+  for (auto& [id, player] : players) settleDeath(player);
+}
+
 void AbilitySystem::updatePlayer(Player& player, float dtMs) {
   if (player.characterId == 0) {
     // Still picking a character: not in the world yet.
@@ -171,6 +191,7 @@ void AbilitySystem::updatePlayer(Player& player, float dtMs) {
     player.prevButtons = player.buttons;
     return;
   }
+  settleDeath(player);
   if (player.isDead()) {
     player.chargeSlot = -1;
     player.forcedMs = 0.0f;
@@ -540,6 +561,7 @@ float AbilitySystem::damagePlayer(Player& player, float amount,
       player.health = std::max(player.health, 1.0f);
     } else {
       player.health = 0.0f;
+      player.deathSeen = true;
     }
   }
   return total;

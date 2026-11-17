@@ -81,6 +81,9 @@ struct Player : public Animatable {
   // Set by Kit::cast and sent with the AbilityCast event so every client
   // plays the same animation. 0 = the default form.
   uint8_t castVariant = 0;
+  // Set once a death has been offered to the kit (Kit::onLethal), so a death
+  // from damage over time gets the same chance as one from a hit, once.
+  bool deathSeen = false;
   bool godMode = false;
   // Effect-lab training ally: takes effects but never takes damage.
   bool trainingDummy = false;

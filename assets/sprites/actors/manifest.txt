@@ -1,13 +1,25 @@
-actor Gravon assets/sprites/actors/Gravon.png 293 341 146 267 25 0.75 smooth
-anim Gravon idle 0 8 8 1
-anim Gravon run 64 8 12 1
-anim Gravon slash_a 128 6 18 0
-anim Gravon slash_b 176 6 18 0
-anim Gravon ravager 224 8 14 0
-anim Gravon fury 288 8 12 0
-anim Gravon rush 352 6 18 0
-anim Gravon hit 400 4 16 0
-anim Gravon death 432 9 12 0
+actor Gravon assets/sprites/actors/Gravon.png 206 184 103 115 28 1.55 smooth
+anim Gravon idle 0 6 5 1
+anim Gravon run 48 6 9 1
+anim Gravon guard 96 6 5 1
+anim Gravon drag_run 144 6 9 1
+anim Gravon sheathe 192 6 9 0
+anim Gravon heave 240 8 11 0
+anim Gravon heave_run 304 7 11 0
+anim Gravon slash_f 360 7 12 0
+anim Gravon slash_b 416 7 12 0
+anim Gravon ravager_charge 472 3 8 1
+anim Gravon ravager 496 12 10 0
+anim Gravon fury 592 6 9 0
+anim Gravon rush 640 3 11 0
+anim Gravon rush_stab 664 5 12 0
+anim Gravon hit 704 3 14 0
+anim Gravon hit_drawn 728 3 14 0
+anim Gravon death 752 6 10 0
+anim Gravon rise 800 6 9 0
+actor GravonBlade assets/sprites/actors/GravonBlade.png 160 160 80 120 16 1.25 smooth
+anim GravonBlade floor 0 1 1 1
+anim GravonBlade back 8 1 1 1
 actor Nolan assets/sprites/actors/Nolan.png 176 156 88 128 26 1 smooth
 anim Nolan idle 0 12 10 1
 anim Nolan run 96 10 15 1

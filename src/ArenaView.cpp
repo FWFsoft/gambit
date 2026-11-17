@@ -496,17 +496,27 @@ std::string actionClip(const std::string& character, int slot,
     }
   }
   if (character == "Gravon") {
+    // The server picks the form (Arena::GravonForm); play what it threw.
     switch (slot) {
       case 0:
-        return odd ? "slash_a" : "slash_b";  // Titan's Slash, back and forth
+        switch (variant) {
+          case Arena::GravonForm::SlashHeave:
+            return "heave";  // off his back
+          case Arena::GravonForm::SlashHeaveRun:
+            return "heave_run";  // up from the drag
+          case Arena::GravonForm::SlashBackhand:
+            return "slash_b";
+          default:
+            return "slash_f";
+        }
       case 1:
-        return "ravager";  // Ravager's Edge
+        return "ravager";  // the leap, the landing, the haul out
       case 2:
-        return "fury";     // Fury of the Blade
+        return "fury";
       case 3:
-        return "rush";     // Blade Rush
+        return variant == Arena::GravonForm::RushStab ? "rush_stab" : "rush";
       default:
-        return "slash_a";
+        return "slash_f";
     }
   }
   static const char* GENERIC[5] = {"attack", "secondary", "special",
@@ -1233,6 +1243,51 @@ void ArenaView::drawPickup(ImDrawList* dl, uint32_t itemId, float worldX,
   }
 }
 
+// ---- Gravon's fury -----------------------------------------------------------
+// Fury of the Blade: the same dark violet that fills the host's face oozes
+// out of him. Thick drops well up on his shoulders and arms, run down and
+// fall; a few wisps lift off his back. Stateless, like the nanites.
+static void drawFuryOoze(ImDrawList* dl, ImVec2 feet, float t, uint32_t seed,
+                  float alpha) {
+  const ImU32 core = IM_COL32(28, 6, 44, static_cast<int>(235 * alpha));
+  for (int i = 0; i < 26; i++) {
+    float h0 = nanoHash(seed + i * 7u);
+    float h1 = nanoHash(seed + i * 7u + 1u);
+    float h2 = nanoHash(seed + i * 7u + 2u);
+    float life = 0.9f + 0.7f * h2;
+    float u = fract(t / life + h0);  // 0 welling up .. 1 gone
+    // Where on the body it wells up: shoulders, arms and back.
+    float x = feet.x + (h1 - 0.5f) * 34.0f;
+    float y0 = feet.y - 74.0f + 34.0f * h0 * h0;
+    float fall = u < 0.35f ? 0.0f : (u - 0.35f) * (u - 0.35f) * 120.0f;
+    float y = y0 + 10.0f * u + fall;
+    float r = (1.6f + 2.2f * h2) * (u < 0.2f ? u / 0.2f : 1.0f - 0.5f * u);
+    float a = alpha * (1.0f - u * u);
+    ImU32 glow = themeColor(VfxTheme::Shadow, 0.45f * a);
+    // The drip stretches as it runs.
+    float stretch = 1.0f + 6.0f * std::max(0.0f, u - 0.3f);
+    dl->AddCircleFilled(ImVec2(x, y - r * stretch * 0.5f), r * 1.9f, glow, 10);
+    dl->AddRectFilled(ImVec2(x - r * 0.7f, y - r * stretch), ImVec2(x + r * 0.7f, y),
+                      withAlpha(core, a), r);
+    dl->AddCircleFilled(ImVec2(x, y), r, withAlpha(core, a), 10);
+    dl->AddCircleFilled(ImVec2(x - r * 0.3f, y - r * 0.3f), r * 0.35f,
+                        themeHot(VfxTheme::Shadow, 0.8f * a), 6);
+  }
+  // Wisps: violet smoke leaving his back.
+  for (int i = 0; i < 8; i++) {
+    float h0 = nanoHash(seed + 500u + i * 3u);
+    float h1 = nanoHash(seed + 501u + i * 3u);
+    float u = fract(t * 0.6f + h0);
+    float x = feet.x + (h1 - 0.5f) * 26.0f + std::sin(t * 2.0f + i) * 5.0f * u;
+    float y = feet.y - 60.0f - 46.0f * u;
+    dl->AddCircleFilled(ImVec2(x, y), 3.0f + 7.0f * u,
+                        themeColor(VfxTheme::Shadow, 0.28f * alpha * (1.0f - u)), 12);
+  }
+  // A dark pool where it lands.
+  dl->AddEllipseFilled(feet, ImVec2(24.0f, 9.0f),
+                       IM_COL32(24, 4, 38, static_cast<int>(120 * alpha)), 0.0f, 20);
+}
+
 void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
                            float worldX, float worldY, bool isLocal) {
   const PlayerState& state = view.state;
@@ -1342,6 +1397,20 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
       CharacterRegistry::instance().getCharacter(state.characterId);
   const ActorSheet* actor = definition ? actorFor(definition->name) : nullptr;
 
+  // Gravon is the blade. When the host has fallen there is no body to draw:
+  // the blade stands in the floor (or rides an ally, drawn with them) and
+  // the host's body sinks away where he fell.
+  const bool isGravon = state.characterId == Arena::CharacterId::Gravon;
+  const uint8_t gravonForm =
+      isGravon ? Arena::GravonMode::form(state.kitMode) : 0;
+  if (isGravon && !dead && gravonForm != Arena::GravonMode::Host) {
+    drawGravonFallen(dl, state);
+    if (gravonForm == Arena::GravonMode::Exposed) {
+      drawGravonBlade(dl, view, feet, -1);
+    }
+    return;
+  }
+
   // Nyx is made of nanites: as a swarm she has no body to draw, and as a
   // body she is always fraying into pixels.
   const bool isNyx = state.characterId == Arena::CharacterId::Nyx;
@@ -1393,6 +1462,22 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
       clip = actor->find("lotus_charge");
       elapsed = view.animTime;
     }
+    if (!clip && isGravon) {
+      // Ravager's Edge held: the coil. Just risen: the rise.
+      float sinceRise = timeSeconds - gravonViews[state.playerId].riseAt;
+      const ActorAnim* rise = actor->find("rise");
+      if (charging) {
+        clip = actor->find("ravager_charge");
+        elapsed = view.animTime;
+        anim.clip.clear();
+      } else if (rise && sinceRise < static_cast<float>(rise->frames) / rise->fps) {
+        clip = rise;
+        elapsed = sinceRise;
+        anim.clip.clear();
+      }
+    }
+    const bool gravonDrawn =
+        isGravon && (state.kitMode & Arena::GravonMode::DrawnBit) != 0;
     if (!clip && isNyx) {
       if (nyxForm == Arena::NyxMode::Dropping) {
         clip = actor->find("drop");
@@ -1417,9 +1502,23 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
         anim.clip.clear();
       }
     }
+    if (!clip && isGravon && !gravonDrawn) {
+      // Not attacking for a while: he puts it away (an attack cuts it off).
+      float since = timeSeconds - gravonViews[state.playerId].sheatheAt;
+      const ActorAnim* sheathe = actor->find("sheathe");
+      if (sheathe && since < static_cast<float>(sheathe->frames) / sheathe->fps) {
+        clip = sheathe;
+        elapsed = since;
+      }
+    }
     if (!clip && view.hitMs < 220.0f) {
-      clip = actor->find("hit");
+      clip = actor->find(gravonDrawn ? "hit_drawn" : "hit");
       elapsed = view.hitMs / 1000.0f;
+    }
+    if (!clip && gravonDrawn) {
+      // The blade out: braced over it standing, dragging it on the move.
+      clip = actor->find(moving ? "drag_run" : "guard");
+      elapsed = view.animTime;
     }
     if (!clip) {
       // Characters that carry things (Presidente) have holding variants.
@@ -1478,6 +1577,40 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
                                                         : 1.0f;
     drawNaniteDissolve(dl, feet, timeSeconds + state.playerId * 3.7f, fray,
                        hidden ? 0.4f : 1.0f);
+  }
+
+  if (isGravon && !dead && moving &&
+      (state.kitMode & Arena::GravonMode::DrawnBit)) {
+    // The point scraping along the floor behind him: grit and sparks.
+    float inv = 1.0f / std::max(speed, 1.0f);
+    ImVec2 back = toScreen(worldX - vx * inv * 70.0f, worldY - vy * inv * 70.0f);
+    ImVec2 tip(back.x, back.y);
+    for (int i = 0; i < 9; i++) {
+      float h0 = nanoHash(state.playerId * 31u + i * 5u);
+      float h1 = nanoHash(state.playerId * 31u + i * 5u + 1u);
+      float u = fract(timeSeconds * (1.6f + h0) + h1);
+      float sx = tip.x + (h0 - 0.5f) * 10.0f - vx * inv * 18.0f * u;
+      float sy = tip.y - 3.0f - 10.0f * u * (1.0f - u) * 4.0f * h1;
+      if (i < 4) {
+        dl->AddCircleFilled(ImVec2(sx, sy), 1.4f,
+                            IM_COL32(255, 210, 170, static_cast<int>(230 * (1.0f - u))), 6);
+      } else {
+        dl->AddCircleFilled(ImVec2(sx, sy + 2.0f), 2.5f + 5.0f * u,
+                            IM_COL32(120, 110, 120, static_cast<int>(70 * (1.0f - u))), 10);
+      }
+    }
+  }
+  if (isGravon && !dead && (state.kitMode & Arena::GravonMode::FuryBit)) {
+    drawFuryOoze(dl, feet, timeSeconds, state.playerId * 131u,
+                 hidden ? 0.4f : 1.0f);
+  }
+  if (isGravon && charging && (state.kitMode & Arena::GravonMode::ChargedBit)) {
+    // Full charge: the blade's will flares (the strike will crit).
+    float pulse = 0.5f + 0.5f * std::sin(timeSeconds * 18.0f);
+    dl->AddCircleFilled(ImVec2(feet.x, feet.y - 40.0f), 30.0f + 6.0f * pulse,
+                        themeColor(VfxTheme::Blood, 0.16f + 0.10f * pulse), 24);
+    dl->AddCircle(feet, 34.0f + 4.0f * pulse, themeHot(VfxTheme::Blood, 0.9f), 32,
+                  3.0f);
   }
 
   effectFx.drawOver(dl, state.playerId, false, feet, 64.0f, playerEffects);
@@ -1759,10 +1892,109 @@ void ArenaView::drawEnemy(ImDrawList* dl, const ArenaClient::EnemyView& view) {
                     std::max(26.0f, bodyRadius * 3.2f), enemyEffects);
 }
 
+void ArenaView::updateGravonView(const PlayerState& state) {
+  GravonView& gv = gravonViews[state.playerId];
+  uint8_t form = Arena::GravonMode::form(state.kitMode);
+  bool drawn = (state.kitMode & Arena::GravonMode::DrawnBit) != 0;
+  if (!gv.seen) {
+    gv.form = form;
+    gv.drawn = drawn;
+    gv.seen = true;
+    return;
+  }
+  if (gv.drawn && !drawn && form == Arena::GravonMode::Host &&
+      gv.form == Arena::GravonMode::Host && state.health > 0.0f) {
+    gv.sheatheAt = timeSeconds;  // put it away
+  }
+  gv.drawn = drawn;
+  if (form == gv.form) return;
+  bool wasHost = gv.form == Arena::GravonMode::Host;
+  bool isHost = form == Arena::GravonMode::Host;
+  if (wasHost && !isHost) {
+    // The host fell: remember where, and which way he faced.
+    gv.fallX = state.propX;
+    gv.fallY = state.propY;
+    auto it = playerAnim.find(state.playerId);
+    gv.fallDirection = it == playerAnim.end() ? 0 : it->second.direction;
+    gv.formSince = timeSeconds;
+  } else if (!wasHost && isHost && state.health > 0.0f) {
+    gv.riseAt = timeSeconds;  // the blade raised him
+  }
+  gv.form = form;
+}
+
+void ArenaView::drawGravonFallen(ImDrawList* dl, const PlayerState& state) {
+  const GravonView& gv = gravonViews[state.playerId];
+  float t = timeSeconds - gv.formSince;
+  const float FADE_FROM = 0.7f, GONE = 1.8f;
+  if (t >= GONE) return;
+  ImVec2 at = toScreen(gv.fallX, gv.fallY);
+  if (!inView(at, 120, 160, 120, 60)) return;
+  const ActorSheet* sheet = actorFor("Gravon");
+  const ActorAnim* death = sheet ? sheet->find("death") : nullptr;
+  if (!sheet || !death) return;
+  float alpha = t < FADE_FROM ? 1.0f : 1.0f - (t - FADE_FROM) / (GONE - FADE_FROM);
+  drawActorFrame(dl, *sheet, *death, gv.fallDirection, t, at, 1.0f,
+                 IM_COL32(255, 255, 255, static_cast<int>(255 * alpha)), true);
+  // The body goes to violet smoke: what is left of the host leaves him.
+  if (t > FADE_FROM) {
+    drawFuryOoze(dl, at, timeSeconds, state.playerId * 977u, alpha);
+  }
+}
+
+void ArenaView::drawGravonBlade(ImDrawList* dl, const ArenaClient::PlayerView& view,
+                                ImVec2 feet, int direction) {
+  const PlayerState& state = view.state;
+  if (!inView(feet, 120, 200, 120, 60)) return;
+  bool onBack = direction >= 0;
+  ImU32 tint = IM_COL32(255, 255, 255, 255);
+  if (view.hitFlashMs > 0.0f) tint = IM_COL32(255, 120, 120, 255);
+
+  if (!onBack) {
+    // How close the host is to rising: a ring that fills, with the blade's
+    // pulse. Everyone can see where to go and how long is left.
+    float progress = state.resource / 255.0f;
+    float pulse = 0.5f + 0.5f * std::sin(timeSeconds * 4.0f);
+    dl->AddEllipseFilled(feet, ImVec2(30.0f, 12.0f),
+                         themeColor(VfxTheme::Shadow, 0.14f + 0.08f * pulse), 0.0f, 24);
+    dl->AddEllipse(feet, ImVec2(34.0f, 13.5f), themeColor(VfxTheme::Shadow, 0.35f),
+                   0.0f, 32, 2.0f);
+    const int segments = 40;
+    for (int i = 0; i < segments; i++) {
+      float a0 = -PI * 0.5f + 2.0f * PI * i / segments;
+      float a1 = -PI * 0.5f + 2.0f * PI * (i + 1) / segments;
+      if (static_cast<float>(i) / segments >= progress) break;
+      dl->AddLine(ImVec2(feet.x + std::cos(a0) * 34.0f, feet.y + std::sin(a0) * 13.5f),
+                  ImVec2(feet.x + std::cos(a1) * 34.0f, feet.y + std::sin(a1) * 13.5f),
+                  themeHot(VfxTheme::Shadow, 0.95f), 3.0f);
+    }
+  }
+
+  const ActorSheet* sheet = actorFor("GravonBlade");
+  const ActorAnim* clip = sheet ? sheet->find(onBack ? "back" : "floor") : nullptr;
+  if (!sheet || !clip) {
+    // Unbaked: a plain slab so the spot still reads.
+    float top = onBack ? 90.0f : 110.0f;
+    dl->AddLine(ImVec2(feet.x - 6, feet.y - (onBack ? 20.0f : 0.0f)),
+                ImVec2(feet.x + 10, feet.y - top), IM_COL32(150, 40, 110, 255), 9.0f);
+    return;
+  }
+  if (!onBack) drawShadow(dl, feet, 10.0f);
+  drawActorFrame(dl, *sheet, *clip, onBack ? direction : 0, 0.0f, feet, 1.0f, tint,
+                 true, -1, 0.0f, !onBack);
+  if (!onBack) {
+    // The red eye in the crossguard watches.
+    float glow = 0.6f + 0.4f * std::sin(timeSeconds * 3.0f);
+    dl->AddCircleFilled(ImVec2(feet.x + 6.0f, feet.y - 88.0f), 7.0f,
+                        themeColor(VfxTheme::Blood, 0.25f * glow), 12);
+  }
+}
+
 void ArenaView::drawEntities(ImDrawList* dl) {
   struct Item {
     float depth;
-    int kind;  // 0 player, 1 enemy, 2 pickup, 3 ship, 4 Nyx's CRT, 5 swarm
+    int kind;  // 0 player, 1 enemy, 2 pickup, 3 ship, 4 Nyx's CRT, 5 swarm,
+               // 6 Gravon's blade on a carrier's back
     const void* ptr;
     uint32_t id;
     float x, y;
@@ -1793,6 +2025,29 @@ void ArenaView::drawEntities(ImDrawList* dl) {
       if (swarm(view.state.kitMode) != SwarmHome) {
         const NyxView& nv = nyxViews[id];
         items.push_back({nv.swarmY + 30.0f, 5, &view, id, nv.swarmX, nv.swarmY});
+      }
+    }
+    if (view.state.characterId == Arena::CharacterId::Gravon) {
+      updateGravonView(view.state);
+      if (Arena::GravonMode::form(view.state.kitMode) == Arena::GravonMode::Carried) {
+        // On the carrier's back: in front of them when they face away.
+        uint32_t carrierId = static_cast<uint32_t>(view.state.kitX);
+        auto anim = playerAnim.find(carrierId);
+        int dir = anim == playerAnim.end() ? 0 : anim->second.direction;
+        bool facingAway = dir >= 3 && dir <= 5;
+        float cx = x, cy = y;
+        if (carrierId == me) {
+          cx = local.x;
+          cy = local.y;
+        } else {
+          auto carrier = arena->players().find(carrierId);
+          if (carrier != arena->players().end()) {
+            cx = carrier->second.x;
+            cy = carrier->second.y;
+          }
+        }
+        items.push_back({cy + (facingAway ? 0.5f : -0.5f), 6, &view, carrierId,
+                         cx, cy});
       }
     }
   }
@@ -1851,6 +2106,13 @@ void ArenaView::drawEntities(ImDrawList* dl) {
       case 5:
         drawNyxSwarm(dl, static_cast<const ArenaClient::PlayerView*>(item.ptr)->state);
         break;
+      case 6: {
+        auto anim = playerAnim.find(item.id);
+        int dir = anim == playerAnim.end() ? 0 : anim->second.direction;
+        drawGravonBlade(dl, *static_cast<const ArenaClient::PlayerView*>(item.ptr),
+                        toScreen(item.x, item.y), dir);
+        break;
+      }
     }
   }
 
