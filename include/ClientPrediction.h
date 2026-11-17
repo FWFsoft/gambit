@@ -34,6 +34,8 @@ class ClientPrediction {
                    const WorldConfig& world);
 
   const Player& getLocalPlayer() const { return localPlayer; }
+  // The map's solid shapes and terrain (null without a map).
+  const CollisionSystem* getCollisionSystem() const { return collisionSystem; }
   Player& getLocalPlayerMutable() { return localPlayer; }
 
   const std::unordered_map<uint32_t, WorldItem>& getWorldItems() const {

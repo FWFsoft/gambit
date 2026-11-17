@@ -183,6 +183,10 @@ class AbilitySystem {
   // All return the amount actually applied.
   float damageEnemy(uint32_t attackerId, Enemy& enemy, float amount,
                     uint32_t flags = DamageFlag::None);
+  // A hit that deals no damage (a Winger's or Playmaker's base kit):
+  // on-hit infusions still fire, so their damage comes from infusions only.
+  void touchEnemy(uint32_t attackerId, Enemy& enemy,
+                  uint32_t flags = DamageFlag::None);
   float damagePlayer(Player& player, float amount, uint32_t sourceEnemyId,
                      uint32_t flags = DamageFlag::None);
   // healerId == 0 for environment heals.
@@ -341,6 +345,8 @@ class AbilitySystem {
   float randomRange(float lo, float hi);
   // Clamp a point to the playable diamond.
   void clampToWorld(float& x, float& y) const;
+  // The map's solid shapes and terrain (null in tests without a map).
+  const CollisionSystem* collisionSystem() const { return collision; }
   bool isTargetable(const Player& player) const;
 
  private:

@@ -529,6 +529,15 @@ float AbilitySystem::damageEnemy(uint32_t attackerId, Enemy& enemy,
   return damage;
 }
 
+void AbilitySystem::touchEnemy(uint32_t attackerId, Enemy& enemy,
+                               uint32_t flags) {
+  assert(!(flags & (DamageFlag::Proc | DamageFlag::Dot)));
+  if (enemy.state == EnemyState::Dead) return;
+  Player* attacker = findPlayer(attackerId);
+  if (!attacker) return;
+  Infusions::onHitEnemy(*this, *attacker, enemy, 0.0f, flags);
+}
+
 float AbilitySystem::hitStopMsFor(float power, int hasteStacks) {
   assert(power >= 0.0f);
   assert(hasteStacks >= 0);

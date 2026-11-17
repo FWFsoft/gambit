@@ -16,6 +16,7 @@
 
 #include "ArenaDraw.h"
 #include "CharacterRegistry.h"
+#include "CollisionSystem.h"
 #include "ClientPrediction.h"
 #include "Effect.h"
 #include "EffectTracker.h"
@@ -460,6 +461,11 @@ std::string actionClip(const std::string& character, int slot,
   }
   if (character == "Nolan") {
     static const char* CLIPS[4] = {"sweep", "lotus", "blackout", "blink"};
+    return CLIPS[std::max(0, std::min(3, slot))];
+  }
+  if (character == "Isaac") {
+    // Lifeline's hold plays "lifeline_charge"; the cast is the release.
+    static const char* CLIPS[4] = {"ray", "lifeline", "blessing", "flash"};
     return CLIPS[std::max(0, std::min(3, slot))];
   }
   if (character == "Wade") {
@@ -1207,6 +1213,66 @@ void ArenaView::drawShip(ImDrawList* dl) {
   }
 }
 
+void ArenaView::drawRock(ImDrawList* dl, const CollisionShape& rock,
+                         bool inReach, bool bonding) {
+  const AABB& b = rock.aabb;
+  assert(b.width > 0.0f && b.height > 0.0f);
+  // Seeded by position so each rock keeps its own chipped outline.
+  uint32_t seed = static_cast<uint32_t>(b.x * 7.0f + b.y * 13.0f) * 2654435761u;
+  auto jitter = [&seed](float amount) {
+    seed = seed * 1664525u + 1013904223u;
+    return ((seed >> 8) & 0xFFFF) / 65535.0f * amount;
+  };
+  // The footprint as an octagon with chipped corners.
+  const float cut = std::min(b.width, b.height) * 0.28f;
+  ImVec2 foot[8] = {
+      toScreen(b.x + cut + jitter(6), b.y),
+      toScreen(b.x + b.width - cut - jitter(6), b.y),
+      toScreen(b.x + b.width, b.y + cut + jitter(5)),
+      toScreen(b.x + b.width, b.y + b.height - cut - jitter(5)),
+      toScreen(b.x + b.width - cut - jitter(6), b.y + b.height),
+      toScreen(b.x + cut + jitter(6), b.y + b.height),
+      toScreen(b.x, b.y + b.height - cut - jitter(5)),
+      toScreen(b.x, b.y + cut + jitter(5)),
+  };
+  // It stands up out of the ground: the top face is the footprint lifted.
+  const float rise = 18.0f + b.height * 0.55f;
+  ImVec2 top[8];
+  for (int i = 0; i < 8; i++) {
+    top[i] = ImVec2(foot[i].x, foot[i].y - rise - jitter(4));
+  }
+  ImVec2 base = toScreen(b.x + b.width * 0.5f, b.y + b.height);
+  drawShadow(dl, base, b.width * 0.62f, 0.45f);
+
+  // The dark, quiet world: cool grey stone, the face in shadow, inked.
+  const ImU32 face = IM_COL32(30, 32, 42, 255);
+  const ImU32 cap = IM_COL32(52, 56, 70, 255);
+  const ImU32 ink = IM_COL32(8, 8, 12, 255);
+  // The south-facing sides (foot vertices 2..7 seen from above the south).
+  for (int i = 2; i < 7; i++) {
+    ImVec2 q[4] = {foot[i], foot[i + 1], top[i + 1], top[i]};
+    dl->AddConvexPolyFilled(q, 4, face);
+  }
+  dl->AddConvexPolyFilled(top, 8, cap);
+  // A cooler rim along the top's north edge: the light comes from above.
+  dl->AddLine(top[7], top[0], IM_COL32(84, 92, 112, 255), 2.0f);
+  dl->AddLine(top[0], top[1], IM_COL32(84, 92, 112, 255), 2.0f);
+  dl->AddLine(top[1], top[2], IM_COL32(84, 92, 112, 255), 2.0f);
+  // Ink: the outer silhouette and the edge where the top meets the face.
+  ImVec2 outline[12] = {top[7],  top[0],  top[1],  top[2], top[3], foot[3],
+                        foot[4], foot[5], foot[6], top[6], top[7], top[7]};
+  dl->AddPolyline(outline, 11, ink, ImDrawFlags_Closed, 3.0f);
+  for (int i = 3; i < 6; i++) dl->AddLine(top[i], top[i + 1], ink, 2.0f);
+
+  if (inReach) {
+    // Isaac's light finds the rocks his Lifeline can reach.
+    float pulse = bonding ? 0.5f + 0.5f * std::sin(timeSeconds * 8.0f) : 0.0f;
+    int alpha = bonding ? static_cast<int>(120 + 100 * pulse) : 70;
+    dl->AddPolyline(top, 8, IM_COL32(255, 170, 60, alpha), ImDrawFlags_Closed,
+                    bonding ? 2.5f : 1.5f);
+  }
+}
+
 void ArenaView::drawPickup(ImDrawList* dl, uint32_t itemId, float worldX,
                            float worldY) {
   float bob = std::sin(timeSeconds * 4.0f + worldX * 0.05f) * 3.0f;
@@ -1476,6 +1542,10 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
     }
     if (!clip && charging && definition->name == "Nolan") {
       clip = actor->find("lotus_charge");
+      elapsed = view.animTime;
+    }
+    if (!clip && charging && definition->name == "Isaac") {
+      clip = actor->find("lifeline_charge");
       elapsed = view.animTime;
     }
     if (!clip && isGravon) {
@@ -2015,7 +2085,7 @@ void ArenaView::drawEntities(ImDrawList* dl) {
   struct Item {
     float depth;
     int kind;  // 0 player, 1 enemy, 2 pickup, 3 ship, 4 Nyx's CRT, 5 swarm,
-               // 6 Gravon's blade on a carrier's back
+               // 6 Gravon's blade on a carrier's back, 7 a terrain rock
     const void* ptr;
     uint32_t id;
     float x, y;
@@ -2091,8 +2161,17 @@ void ArenaView::drawEntities(ImDrawList* dl) {
   if (arena->hasMatch()) {
     items.push_back({arena->match().shipY + 30.0f, 3, nullptr, 0, 0, 0});
   }
+  // Terrain stands in the world like anything else: what is south of a rock
+  // is drawn over it, what is north is hidden behind it.
+  if (const CollisionSystem* solid = prediction->getCollisionSystem()) {
+    for (const CollisionShape& shape : solid->getShapes()) {
+      if (!CollisionSystem::isTerrain(shape)) continue;
+      items.push_back({shape.aabb.y + shape.aabb.height, 7, &shape, 0,
+                       shape.aabb.x, shape.aabb.y});
+    }
+  }
 
-  std::sort(items.begin(), items.end(),
+std::sort(items.begin(), items.end(),
             [](const Item& a, const Item& b) { return a.depth < b.depth; });
 
   // The look: every entity's shadow lies under every entity. Shadows go to
@@ -2127,6 +2206,23 @@ void ArenaView::drawEntities(ImDrawList* dl) {
       case 5:
         drawNyxSwarm(dl, static_cast<const ArenaClient::PlayerView*>(item.ptr)->state);
         break;
+      case 7: {
+        const auto& rock = *static_cast<const CollisionShape*>(item.ptr);
+        // Isaac sees which rocks his Lifeline can reach, and the one he holds.
+        bool isaac = local.characterId == Arena::CharacterId::Isaac;
+        float fx, fy;
+        CollisionSystem::closestPoint(rock.aabb, local.x, local.y, fx, fy);
+        bool inReach = isaac && std::hypot(fx - local.x, fy - local.y) <=
+                                    Arena::Tuning::LIFELINE_RANGE;
+        bool bonding = false;
+        if (inReach) {
+          auto mine = arena->players().find(me);
+          bonding = mine != arena->players().end() &&
+                    mine->second.state.chargeSlot == 1;
+        }
+        drawRock(dl, rock, inReach, bonding);
+        break;
+      }
       case 6: {
         auto anim = playerAnim.find(item.id);
         int dir = anim == playerAnim.end() ? 0 : anim->second.direction;

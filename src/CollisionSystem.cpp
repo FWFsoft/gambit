@@ -1,6 +1,7 @@
 #include "CollisionSystem.h"
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 
 CollisionSystem::CollisionSystem(
@@ -75,4 +76,51 @@ void CollisionSystem::resolveCollision(float oldX, float oldY, float& newX,
   // Both blocked, stay at old position
   newX = oldX;
   newY = oldY;
+}
+
+const CollisionShape* CollisionSystem::terrainNear(float x, float y,
+                                                   float maxDist) const {
+  assert(maxDist >= 0.0f);
+  const CollisionShape* best = nullptr;
+  float bestDist = maxDist;
+  for (const auto& shape : collisionShapes) {
+    if (!isTerrain(shape)) continue;
+    float cx, cy;
+    closestPoint(shape.aabb, x, y, cx, cy);
+    float d = std::hypot(cx - x, cy - y);
+    if (d <= bestDist) {
+      bestDist = d;
+      best = &shape;
+    }
+  }
+  return best;
+}
+
+void CollisionSystem::closestPoint(const AABB& box, float x, float y,
+                                   float& outX, float& outY) {
+  assert(box.width >= 0.0f && box.height >= 0.0f);
+  outX = std::clamp(x, box.x, box.x + box.width);
+  outY = std::clamp(y, box.y, box.y + box.height);
+}
+
+void CollisionSystem::pushOutOfTerrain(float& x, float& y, float radius) const {
+  for (const auto& shape : collisionShapes) {
+    if (!isTerrain(shape) || !intersects(x, y, radius, shape)) continue;
+    const AABB& b = shape.aabb;
+    // Distance to leave through each side; take the shortest.
+    float left = x + radius - b.x;
+    float right = b.x + b.width - (x - radius);
+    float up = y + radius - b.y;
+    float down = b.y + b.height - (y - radius);
+    float best = std::min(std::min(left, right), std::min(up, down));
+    if (best == left) {
+      x -= left + 0.01f;
+    } else if (best == right) {
+      x += right + 0.01f;
+    } else if (best == up) {
+      y -= up + 0.01f;
+    } else {
+      y += down + 0.01f;
+    }
+  }
 }

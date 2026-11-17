@@ -20,6 +20,20 @@ class CollisionSystem {
     return collisionShapes;
   }
 
+  // ---- Terrain: solid outcrops on the map (Collision objects whose Tiled
+  // type is "terrain"). Players and enemies go around them; Isaac's
+  // Lifeline anchors to them.
+  static bool isTerrain(const CollisionShape& shape) {
+    return shape.objectType == "terrain";
+  }
+  // The terrain piece whose edge is nearest (x, y), if within maxDist.
+  const CollisionShape* terrainNear(float x, float y, float maxDist) const;
+  // The point of `box` nearest (x, y) (the point itself when inside).
+  static void closestPoint(const AABB& box, float x, float y, float& outX,
+                           float& outY);
+  // Move (x, y) the shortest way out of every terrain piece it overlaps.
+  void pushOutOfTerrain(float& x, float& y, float radius) const;
+
  private:
   const std::vector<CollisionShape>& collisionShapes;
 

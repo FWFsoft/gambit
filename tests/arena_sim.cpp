@@ -185,6 +185,34 @@ class Simulation {
     }
   }
 
+  // Isaac's Lifeline needs an anchor: a rock in reach on the way to the
+  // fight, else a hurt ally in reach.
+  void lifelineAim(const Player& me, const Enemy& target,
+                   ClientInputPacket& input) {
+    const float reach = Arena::Tuning::LIFELINE_RANGE - 10.0f;
+    float best = 1e9f;
+    for (const CollisionShape& shape : collision->getShapes()) {
+      if (!CollisionSystem::isTerrain(shape)) continue;
+      float fx, fy;
+      CollisionSystem::closestPoint(shape.aabb, me.x, me.y, fx, fy);
+      if (dist(me.x, me.y, fx, fy) > reach) continue;
+      float score = dist(fx, fy, target.x, target.y);
+      if (score < best) {
+        best = score;
+        input.aimX = fx;
+        input.aimY = fy;
+      }
+    }
+    if (best < 1e9f) return;
+    for (const auto& [id, ally] : state->getPlayers()) {
+      if (id == me.id || !ally.isAlive()) continue;
+      if (dist(me.x, me.y, ally.x, ally.y) > reach) continue;
+      input.aimX = ally.x;
+      input.aimY = ally.y;
+      return;
+    }
+  }
+
   void driveBot(Bot& bot) {
     auto& players = state->getPlayers();
     auto it = players.find(bot.id);
@@ -384,6 +412,9 @@ class Simulation {
           float holdFor = kit->abilities[1].mode == Arena::AbilityMode::Channel
                               ? 1500.0f
                               : kit->abilities[1].maxChargeMs * 0.7f;
+          if (me.characterId == Arena::CharacterId::Isaac) {
+            lifelineAim(me, *target, input);
+          }
           if (bot.chargeHeldMs < holdFor) {
             input.buttons |= InputButtons::Secondary;
             input.buttons &= ~InputButtons::Primary;

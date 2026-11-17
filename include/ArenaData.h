@@ -292,6 +292,9 @@ enum class MatchPhase : uint8_t {
 };
 
 namespace Tuning {
+// Isaac's Lifeline: how far a bond reaches (Isaac to an ally, or to the
+// nearest face of a rock). The client rims rocks in reach.
+constexpr float LIFELINE_RANGE = 520.0f;
 constexpr int ROUND_COUNT = 3;  // regular rounds before the boss
 constexpr float ROUND_SECONDS[ROUND_COUNT] = {150.0f, 165.0f, 180.0f};
 // The zone is the round's reach: wide enough that each round opens a new

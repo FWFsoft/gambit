@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.10.2" orientation="isometric" renderorder="right-down" width="176" height="176" tilewidth="64" tileheight="64" infinite="0" nextlayerid="7" nextobjectid="72">
+<map version="1.10" tiledversion="1.10.2" orientation="isometric" renderorder="right-down" width="176" height="176" tilewidth="64" tileheight="64" infinite="0" nextlayerid="8" nextobjectid="123">
   <tileset firstgid="1" name="arena_tiles" tilewidth="64" tileheight="64" tilecount="20" columns="4">
     <image source="arena_tiles.png" width="256" height="320" />
   </tileset>
@@ -678,5 +678,58 @@
   </objectgroup>
   <objectgroup id="6" name="Collision">
     <object id="71" name="ShipHull" type="wall" x="-66.0" y="2773.0" width="132.0" height="46.0" />
+  </objectgroup>
+  <objectgroup id="7" name="Terrain">
+    <object id="72" name="Rock_1" type="terrain" x="11.6" y="271.9" width="110" height="64" />
+    <object id="73" name="Rock_2" type="terrain" x="-569.0" y="543.4" width="122" height="56" />
+    <object id="74" name="Rock_3" type="terrain" x="616.6" y="800.9" width="90" height="62" />
+    <object id="75" name="Rock_4" type="terrain" x="-1082.8" y="820.3" width="122" height="49" />
+    <object id="76" name="Rock_5" type="terrain" x="-48.5" y="973.2" width="98" height="46" />
+    <object id="77" name="Rock_6" type="terrain" x="1335.8" y="1087.0" width="90" height="57" />
+    <object id="78" name="Rock_7" type="terrain" x="-597.4" y="1109.3" width="109" height="54" />
+    <object id="79" name="Rock_8" type="terrain" x="-1819.1" y="1099.5" width="120" height="90" />
+    <object id="80" name="Rock_9" type="terrain" x="1922.4" y="1199.5" width="114" height="46" />
+    <object id="81" name="Rock_10" type="terrain" x="481.9" y="1438.4" width="70" height="66" />
+    <object id="82" name="Rock_11" type="terrain" x="-2532.2" y="1459.6" width="128" height="55" />
+    <object id="83" name="Rock_12" type="terrain" x="-930.9" y="1563.1" width="133" height="77" />
+    <object id="84" name="Rock_13" type="terrain" x="-1483.9" y="1603.6" width="89" height="74" />
+    <object id="85" name="Rock_14" type="terrain" x="-338.5" y="1638.7" width="134" height="80" />
+    <object id="86" name="Rock_15" type="terrain" x="2114.8" y="1719.5" width="126" height="75" />
+    <object id="87" name="Rock_16" type="terrain" x="-2041.2" y="1769.8" width="128" height="67" />
+    <object id="88" name="Rock_17" type="terrain" x="967.8" y="1768.0" width="120" height="72" />
+    <object id="89" name="Rock_18" type="terrain" x="1561.6" y="1864.9" width="89" height="62" />
+    <object id="90" name="Rock_19" type="terrain" x="-663.2" y="2195.8" width="78" height="77" />
+    <object id="91" name="Rock_20" type="terrain" x="-85.5" y="2223.6" width="78" height="82" />
+    <object id="92" name="Rock_21" type="terrain" x="-1435.7" y="2301.0" width="80" height="91" />
+    <object id="93" name="Rock_22" type="terrain" x="998.8" y="2357.5" width="95" height="74" />
+    <object id="94" name="Rock_23" type="terrain" x="-2019.0" y="2385.5" width="111" height="62" />
+    <object id="95" name="Rock_24" type="terrain" x="-2720.5" y="2403.4" width="76" height="50" />
+    <object id="96" name="Rock_25" type="terrain" x="2575.3" y="2457.5" width="145" height="94" />
+    <object id="97" name="Rock_26" type="terrain" x="394.9" y="2508.7" width="137" height="92" />
+    <object id="98" name="Rock_27" type="terrain" x="1913.5" y="2642.6" width="122" height="85" />
+    <object id="99" name="Rock_28" type="terrain" x="-1310.0" y="2899.9" width="73" height="84" />
+    <object id="100" name="Rock_29" type="terrain" x="2696.2" y="3017.1" width="90" height="93" />
+    <object id="101" name="Rock_30" type="terrain" x="-2751.6" y="3047.5" width="96" height="94" />
+    <object id="102" name="Rock_31" type="terrain" x="1258.1" y="3080.8" width="96" height="71" />
+    <object id="103" name="Rock_32" type="terrain" x="-831.3" y="3131.5" width="146" height="80" />
+    <object id="104" name="Rock_33" type="terrain" x="-1912.3" y="3225.0" width="121" height="64" />
+    <object id="105" name="Rock_34" type="terrain" x="1815.9" y="3251.7" width="104" height="57" />
+    <object id="106" name="Rock_35" type="terrain" x="242.4" y="3343.0" width="120" height="51" />
+    <object id="107" name="Rock_36" type="terrain" x="-1434.8" y="3567.2" width="147" height="56" />
+    <object id="108" name="Rock_37" type="terrain" x="2565.7" y="3585.4" width="101" height="66" />
+    <object id="109" name="Rock_38" type="terrain" x="-187.7" y="3679.3" width="75" height="80" />
+    <object id="110" name="Rock_39" type="terrain" x="-2658.8" y="3699.7" width="75" height="91" />
+    <object id="111" name="Rock_40" type="terrain" x="-780.1" y="3723.3" width="140" height="86" />
+    <object id="112" name="Rock_41" type="terrain" x="1420.2" y="3754.7" width="103" height="85" />
+    <object id="113" name="Rock_42" type="terrain" x="677.6" y="3789.2" width="109" height="45" />
+    <object id="114" name="Rock_43" type="terrain" x="2061.8" y="3867.2" width="91" height="63" />
+    <object id="115" name="Rock_44" type="terrain" x="-1246.9" y="4109.6" width="148" height="58" />
+    <object id="116" name="Rock_45" type="terrain" x="-1987.7" y="4280.9" width="113" height="84" />
+    <object id="117" name="Rock_46" type="terrain" x="282.6" y="4355.4" width="78" height="73" />
+    <object id="118" name="Rock_47" type="terrain" x="1315.8" y="4512.9" width="81" height="71" />
+    <object id="119" name="Rock_48" type="terrain" x="-477.8" y="4602.4" width="80" height="56" />
+    <object id="120" name="Rock_49" type="terrain" x="-1459.6" y="4626.7" width="106" height="73" />
+    <object id="121" name="Rock_50" type="terrain" x="338.8" y="4935.6" width="130" height="66" />
+    <object id="122" name="Rock_51" type="terrain" x="-316.2" y="5190.7" width="106" height="89" />
   </objectgroup>
 </map>

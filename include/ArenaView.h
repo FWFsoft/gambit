@@ -12,6 +12,8 @@
 #include "FogOfWar.h"
 #include "PresentationLayer.h"
 
+struct CollisionShape;
+
 class ClientPrediction;
 class EffectTracker;
 class Texture;
@@ -206,6 +208,9 @@ class ArenaView {
   void drawEnemy(ImDrawList* dl, const ArenaClient::EnemyView& view);
   void drawPickup(ImDrawList* dl, uint32_t itemId, float worldX, float worldY);
   void drawShip(ImDrawList* dl);
+  // A terrain rock: an inked block standing on its footprint.
+  void drawRock(ImDrawList* dl, const CollisionShape& rock, bool inReach,
+                bool bonding);
 
   // HUD
   void renderHud();

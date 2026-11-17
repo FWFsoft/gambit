@@ -123,6 +123,14 @@ them directly:
 | Secondary motion (hair, sashes, capes) | `FOLLOW = {joint: (drive, gain, stiffness, damping, drag)}` springs |
 | Weight and rhythm in idles | knee bend, bounce and shoulder roll driven together |
 
+**Toes point where the body travels.** Turned-out feet look natural in a
+stance or idle, but in a run, walk, dash or any travelling move they read
+as a waddle. Generated models usually stand with the feet turned out (Isaac:
+28°), and joint-angle clips inherit that, so turn the legs in at the hip
+during the move until the toes face the direction of travel. Measure it
+rather than eyeballing it: the toe direction is the ankle's rotation applied
+to the fit's ankle-to-toe vector.
+
 Twists add up down the spine. Keep the sum of hips + abdomen + chest
 rotations about a move's real twist (about ±30° for a punch), or the
 torso spins sideways.
@@ -251,6 +259,22 @@ out of the floor and onto his shoulder. Left alone a few seconds, he puts
 it back. Without a host the blade stands alone,
 point in the floor and taller than anyone in the arena (`GravonBlade`), or
 rides an ally's back on the same diagonal.
+
+**Isaac: the lantern on his back.**
+A brawler's body that never makes a fist. A rack of glowing amber
+canisters rides his right shoulder and a ragged white cape trails off his
+left, so his outline is lopsided from every side. He is the team's light:
+tall and calm, chin level, open palms held out from his sides. Everything
+he does comes out of open hands: a two-handed push of light (Ray), a hand
+held out on a rope of light while he leans back against it (Lifeline), a
+raised hand that comes down in blessing (Blessing), arms flung wide as he
+arrives (Flash). He moves big and deliberately, never twitchy.
+
+**Terrain: inked stone.** Rocks are dark, cool grey blocks with chipped
+octagonal tops and a solid ink outline, quieter than any character. They
+are drawn in code for now (`ArenaView::drawRock`) as a stand-in until
+there is concept art for terrain. When you play Isaac, rocks in Lifeline
+reach get a faint amber rim, and the one you are bonding to pulses.
 
 **Toxlith: the warty toad.** (No longer spawned: Venoxarid now fields the
 thugs described under Enemies. The actor is kept as a creature example.)
