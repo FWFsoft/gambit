@@ -21,6 +21,29 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-16: Main menu lets you pick a new character mid-match
+- **Decision:** Pause → Main Menu now takes you out of the fight on the
+  server (character 0). Your next pick is accepted and you drop in at the
+  ship like a late joiner. Leaving drops any scrap you carry and clears
+  your effects. Picking again in the same round starts the new kit with
+  every ability on full cooldown, and if you left while down you come back
+  down where you fell, waiting for a revive (the death is not counted
+  twice). Picks are still locked in the fight
+  otherwise. Before this, the server ignored the new pick and snapped you
+  back to your old character (a bug).
+- **Pillars:** Creative Builds (you can try a different hero without
+  restarting the match). Trades a little against Strategic Crunch: a
+  living player can still use the menu to leave a bad spot and reappear at
+  the ship. The price is full cooldowns and the walk back out; the
+  down-stays-down rule closes the worst escape (skipping a revive).
+- **Why:** Requested fix: the menu offered a character select that did
+  nothing. Rejected: only allowing swaps in the lobby/intermission (the
+  menu would still lie mid-round).
+- **Status:** Built, needs review
+- **Where:** `src/MatchDirector.cpp` (`leaveToMenu`, `onCharacterSelected`),
+  `src/ClientPrediction.cpp` (`resetCharacterSelection`),
+  `tests/test_character_swap.cpp`
+
 ## 2026-11-16: Hitstop on every melee hit, and Titan's Slash sweeps through a crowd
 - **Decision** (requested by Noah; numbers mine):
   - **Hitstop:** every melee hit (DamageFlag::Melee, not procs or damage

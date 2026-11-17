@@ -38,6 +38,8 @@ class MatchDirector {
   // ---- events from the rest of the server --------------------------------
   void onPlayerJoined(Player& player);
   void onPlayerLeft(uint32_t playerId);
+  // characterId 0 means the player went back to the main menu: they leave
+  // the fight and may pick any character again.
   void onCharacterSelected(Player& player, uint32_t characterId);
   void onReady(Player& player, bool ready);
   void onSlotInfusion(Player& player, Arena::Genus genus, int slot);
@@ -93,6 +95,16 @@ class MatchDirector {
   int infusionDropsThisRound = 0;
   std::unordered_map<uint32_t, int32_t> roundStartScore;
   std::unordered_map<uint32_t, bool> wasDead;
+  // Players who left for the main menu during a round. Picking again that
+  // round brings them back with abilities on cooldown, and still down if
+  // they left down, so the menu is no escape or free refresh.
+  struct MenuLeave {
+    int round;
+    bool down;
+  };
+  std::unordered_map<uint32_t, MenuLeave> leftForMenu;
+
+  void leaveToMenu(Player& player);
 
   std::mt19937 rng{4242};
 

@@ -111,6 +111,14 @@ void ClientPrediction::onLocalInput(const LocalInputEvent& e) {
   client->send(serialize(packet));
 }
 
+void ClientPrediction::resetCharacterSelection() {
+  sentCharacterSelection = false;
+  localPlayer.characterId = 0;
+  CharacterSelectedPacket leave;
+  leave.characterId = 0;
+  client->send(serialize(leave));
+}
+
 void ClientPrediction::onNetworkPacketReceived(
     const NetworkPacketReceivedEvent& e) {
   if (e.size == 0) return;

@@ -57,7 +57,9 @@ class ClientPrediction {
   void setupObjectiveEventHandlers();
 
   // Reset character selection state (for returning to character select)
-  void resetCharacterSelection() { sentCharacterSelection = false; }
+  // Back to the main menu: tell the server we left the fight (character 0)
+  // so the next pick is accepted, and send that pick again.
+  void resetCharacterSelection();
 
   uint32_t getLocalPlayerId() const { return localPlayerId; }
   // Cursor position in world space as last sent to the server.

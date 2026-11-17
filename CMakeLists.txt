@@ -541,6 +541,24 @@ add_executable(test_points_of_interest
 target_include_directories(test_points_of_interest PRIVATE include tests)
 target_link_libraries(test_points_of_interest PRIVATE spdlog::spdlog SDL2::SDL2)
 
+add_executable(test_character_swap
+    tests/test_character_swap.cpp
+    src/Logger.cpp
+    src/EnemySystem.cpp
+    src/Effect.cpp
+    src/EffectManager.cpp
+    src/ArenaData.cpp
+    src/AbilitySystem.cpp
+    src/CharacterKits.cpp
+    src/Infusions.cpp
+    src/CollisionSystem.cpp
+    src/ItemRegistry.cpp
+    src/AnimationController.cpp
+    src/MatchDirector.cpp
+)
+target_include_directories(test_character_swap PRIVATE include tests)
+target_link_libraries(test_character_swap PRIVATE spdlog::spdlog SDL2::SDL2)
+
 add_executable(test_nolan_kit
     tests/test_nolan_kit.cpp
     src/Logger.cpp
@@ -662,6 +680,7 @@ add_test(NAME NolanKit COMMAND test_nolan_kit)
 add_test(NAME NyxKit COMMAND test_nyx_kit)
 add_test(NAME GravonKit COMMAND test_gravon_kit)
 add_test(NAME PointsOfInterest COMMAND test_points_of_interest)
+add_test(NAME CharacterSwap COMMAND test_character_swap)
 
 # Full match on the real server with bot players (lobby -> 3 rounds -> boss).
 # God mode makes the outcome deterministic: it must reach Victory.
