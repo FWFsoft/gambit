@@ -154,22 +154,28 @@ static const KitInfo KITS[] = {
      "the Undying Blade",
      Archetype::Striker,
      240.0f,
-     255.0f,
+     205.0f,
      "Soulblade",
-     "Once per round a killing blow leaves only the blade. Survive 5s "
-     "(-1s per nearby enemy death) and the host rises again.",
+     "Gravon is the blade; the man is its host, with his own health. When "
+     "the host falls the blade lies exposed for 15s (-1s per nearby enemy "
+     "death), then raises him. An ally who touches the blade carries it "
+     "safely on their back.",
      {
-         {"Titan's Slash", "Swing in a wide arc for high damage.", 600.0f,
-          AbilityMode::Tap, 0.0f},
+         {"Titan's Slash",
+          "A slow, heavy, flat swing through the whole half-circle in front "
+          "of him. The first heaves the blade off his back.",
+          1000.0f, AbilityMode::Tap, 0.0f},
          {"Ravager's Edge",
-          "Hold: one devastating strike. Full charge grants Sharpened and a "
-          "guaranteed critical hit.",
-          4000.0f, AbilityMode::Charge, 1400.0f},
+          "Hold, rooted: throw the blade over into a wide area ahead; its "
+          "weight drags him down after it, and he must heave it out again. "
+          "Full charge "
+          "grants Sharpened and a guaranteed critical hit.",
+          5000.0f, AbilityMode::Charge, 1500.0f},
          {"Fury of the Blade",
           "Gain Empowered and Haste. While either is active, hits reduce "
           "Blade Rush's cooldown.",
           14000.0f, AbilityMode::Tap, 0.0f},
-         {"Blade Rush", "Lunge forward, stabbing everything in the way.",
+         {"Blade Rush", "Slide forward, then stab the first enemy ahead.",
           7000.0f, AbilityMode::Tap, 0.0f},
      }},
     {CharacterId::Isaac,

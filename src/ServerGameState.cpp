@@ -472,6 +472,11 @@ void ServerGameState::onUpdate(const UpdateEvent& e) {
   // hooks, objectives, and telling the clients.
   handleEnemyDeaths();
 
+  // Deaths from damage over time last tick reach the kits first: a kit
+  // that cheats death (Gravon's blade) must do so before the match counts
+  // the team as down.
+  abilitySystem->settleDeaths();
+
   // Match flow: phases, spawns, the zone, the ship, revives.
   director->update(e.deltaTime);
 

@@ -192,6 +192,32 @@ inline uint8_t pack(uint8_t swarm, uint8_t self) {
 }
 }  // namespace NyxMode
 
+// Gravon's mirrored state (Player::kitMode). The player is the blade: while
+// the host stands they are one; when he falls the player *is* the blade, on
+// the floor or on an ally's back. propX/propY is where the host fell, and
+// kitX holds the carrier's player id.
+namespace GravonMode {
+// Form (kitMode & 0x0F)
+constexpr uint8_t Host = 0;     // the man, blade in hand
+constexpr uint8_t Exposed = 1;  // the blade alone on the floor: can be hit
+constexpr uint8_t Carried = 2;  // the blade on an ally's back: safe
+constexpr uint8_t FuryBit = 0x10;     // Fury of the Blade is running
+constexpr uint8_t ChargedBit = 0x20;  // Ravager's Edge is at full charge
+constexpr uint8_t DrawnBit = 0x40;    // the blade is out (else on his back)
+inline uint8_t form(uint8_t mode) { return mode & 0x0F; }
+}  // namespace GravonMode
+
+// Gravon's ability forms (Player::castVariant, sent with AbilityCast).
+namespace GravonForm {
+// slot 0, Titan's Slash
+constexpr uint8_t SlashForehand = 0;  // two hands, right to left
+constexpr uint8_t SlashBackhand = 1;  // two hands, left to right
+constexpr uint8_t SlashHeave = 2;     // off his back, one hand, backhand
+constexpr uint8_t SlashHeaveRun = 3;  // up from the drag, one hand, forehand
+constexpr uint8_t RavagerFull = 1;    // slot 1: the fully charged slam
+constexpr uint8_t RushStab = 1;       // slot 3: the second beat, the thrust
+}  // namespace GravonForm
+
 // Wade's ability forms. The server picks one per cast (Player::castVariant)
 // and sends it with the AbilityCast event; the client maps it to a clip.
 // Boxing numbers: 1 jab, 2 cross, 3 lead hook, 4 rear hook, 5 lead

@@ -88,8 +88,8 @@ Inspirations: **Street Fighter III: 3rd Strike / Marvel vs Capcom 2**,
 - bold ink outlines;
 - a rim light in the hero's signature colour (`RIM`).
 
-Bodies are generated models (above). The five actors built before that
-decision (Wade, Gravon, Presidente, Suds, Toxlith) are still code-built
+Bodies are generated models (above). The four actors built before that
+decision (Wade, Presidente, Suds, Toxlith) are still code-built
 from `tube`s and blobs in the `toon` or pixel style. They are placeholders
 until each gets a model; their poses and clips carry over.
 
@@ -234,13 +234,23 @@ leaning back with his weight on one leg. His moves (toss, belch, a volley
 of brews, chug-and-flex) all come from the can arm.
 
 **Gravon: the blade.**
-Gravon is the sword; the man is its host. At rest the blade runs straight
-down his spine: pommel and grip above his head, crossguard across his
-shoulders, blade tapering past his legs. From the front his whole outline
-reads as a sword; from behind, the runed blade covers him. The host slumps
-under it, head bowed and arms hanging, like a vessel the sword is wearing.
-He draws it only to swing (slashes, the overhead smash, Fury, the lunge),
-then it returns to his back.
+Gravon is the sword; the man is its host. The blade is massive, 2.4 m
+against his 2.0 m, and worn on a diagonal across his back as in the splash
+art: the pommel over his left shoulder, the crossguard at head height and
+the point past his right calf. From behind, the runed blade covers him; from
+the front, the guard and grip stand over his shoulder and the point juts out
+by his right leg. The host slumps under it, shoulders rounded and arms
+hanging heavy, with his head bowed only a little so the violet face still
+reads. Everything about him is heavy. To fight he drops his left shoulder and
+heaves it off his back one-handed; then it stays out, both hands on the
+grip, braced over it with the point on the floor, or dragged behind him on
+the run with the point scraping. He swings it flat, through the whole
+half-circle in front of him, the body turning after it. Ravager's Edge
+throws him off his feet after it, flat in the air, and he has to haul it
+out of the floor and onto his shoulder. Left alone a few seconds, he puts
+it back. Without a host the blade stands alone,
+point in the floor and taller than anyone in the arena (`GravonBlade`), or
+rides an ally's back on the same diagonal.
 
 **Toxlith: the warty toad.** (No longer spawned: Venoxarid now fields the
 thugs described under Enemies. The actor is kept as a creature example.)

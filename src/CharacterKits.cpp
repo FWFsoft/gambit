@@ -179,111 +179,482 @@ class SudsKit : public Kit {
 
 // ===========================================================================
 // Gravon, the Undying Blade (Striker)
-//   kitCounter[0]  1 once Soulblade has been spent this round
-//   kitTimer[0]    time left in blade form
+//
+// Gravon is the sword; the man is its host. They have separate health. While
+// the host stands, Player::health is the host's and the blade's waits in
+// kitTimer[1]. When the host falls the player *becomes* the blade: health
+// and maxHealth are the blade's, it lies where it fell (or rides an ally's
+// back) and cannot move or act until the host rises again.
+//
+// The host is slow, and slower with the blade out. Any attack draws it; a
+// few seconds without one and he puts it back on his back. The first swing
+// is a one-handed heave (off his back, or up from where he was dragging it
+// on the run); after that he swings it back and forth in both hands.
+//
+//   kitCounter[0]  GravonMode form (mirrored in kitMode's low nibble)
+//   kitCounter[1]  host: ms he has been on the move since his last attack
+//   kitCounter[2]  host flags: SWING_BACK (the next swing is a backhand),
+//                  LANDING (Ravager's leap and recovery), FULL_SHOWN
+//   kitCounter[3]  epoch: bumped on every form change, so delayed strikes
+//                  from a past life do nothing
+//   kitTimer[0]    host: time until he sheathes (0 = on his back);
+//                  blade: time until the host rises
+//   kitTimer[1]    the blade's health while the host stands
+//   kitTimer[2]    Fury of the Blade time left
+//   kitTimer[3]    host: time left in a swing (slowed) or the Ravager's
+//                  landing (rooted); blade: pickup delay
+//   kitTarget      the ally carrying the blade
+//   propX, propY   where the host fell
+//   kitX           the carrier's id, for clients
 // ===========================================================================
 class GravonKit : public Kit {
  public:
+  static constexpr float BLADE_MAX_HEALTH = 120.0f;
+  static constexpr float REVIVE_MS = 15000.0f;
+  static constexpr float REVIVE_PER_KILL_MS = 1000.0f;
+  static constexpr float REVIVE_HEALTH_FRACTION = 0.6f;
+  static constexpr float PICKUP_RADIUS = 55.0f;
+  static constexpr float PICKUP_DELAY_MS = 600.0f;
+
+  // Moving with the blade out (dragging it), on top of the slow base speed.
+  static constexpr float DRAWN_SPEED_MULT = 0.85f;
+  static constexpr float SHEATHE_AFTER_MS = 4000.0f;
+  static constexpr int RUN_OPENER_MS = 250;  // on the move this long: heave
+
+  // Titan's Slash: one 180-degree horizontal arc in front of him. The
+  // one-handed heaves wind up longer than the two-handed swings.
+  static constexpr float HEAVE_WINDUP_MS = 420.0f;
+  static constexpr float HEAVE_RUN_WINDUP_MS = 380.0f;
+  static constexpr float SLASH_WINDUP_MS = 300.0f;
+  static constexpr float SLASH_RECOVER_MS = 260.0f;
+  static constexpr float HEAVE_DAMAGE = 46.0f;
+  static constexpr float SLASH_DAMAGE = 38.0f;
+  static constexpr float SLASH_RANGE = 135.0f;
+  static constexpr float SLASH_HALF_ANGLE = 90.0f;
+  static constexpr float SWING_SPEED_MULT = 0.35f;
+
+  // Ravager's Edge: he throws it over with his whole weight; once it is in
+  // front of him it drags him a short lurch forward (LEAP over LEAP_MS)
+  // and lands, and he spends the rest of LANDING_MS hauling it out of the
+  // floor and back onto his shoulder, rooted.
+  static constexpr float RAVAGER_REACH = 95.0f;
+  static constexpr float RAVAGER_LEAP = 15.0f;
+  static constexpr float RAVAGER_LEAP_MS = 300.0f;
+  static constexpr float RAVAGER_LANDING_MS = 1200.0f;
+  static constexpr float RAVAGER_RADIUS = 110.0f;
+  static constexpr float RAVAGER_RADIUS_CHARGED = 50.0f;
+  static constexpr float RAVAGER_DAMAGE = 35.0f;
+  static constexpr float RAVAGER_DAMAGE_CHARGED = 115.0f;
+
+  static constexpr float FURY_MS = 6000.0f;
+  static constexpr float FURY_RUSH_REFUND_MS = 700.0f;
+
+  static constexpr float RUSH_SLIDE = 190.0f;
+  static constexpr float RUSH_SLIDE_MS = 170.0f;
+  static constexpr float RUSH_BEAT_MS = 90.0f;  // the pause between the two
+  static constexpr float RUSH_STAB_LUNGE = 45.0f;
+  static constexpr float RUSH_STAB_MS = 70.0f;
+  static constexpr float RUSH_STAB_REACH = 95.0f;
+  static constexpr float RUSH_STAB_DAMAGE = 62.0f;
+
+  // kitCounter[2] flags (host)
+  static constexpr int SWING_BACK = 1 << 0;
+  static constexpr int LANDING = 1 << 1;
+  static constexpr int FULL_SHOWN = 1 << 2;
+
+  static float hostMaxHealth() {
+    const Arena::KitInfo* info = Arena::kitInfo(Gravon);
+    assert(info && "Gravon has a kit");
+    return info->maxHealth;
+  }
+  static float ravagerMaxChargeMs() {
+    const Arena::KitInfo* info = Arena::kitInfo(Gravon);
+    assert(info && "Gravon has a kit");
+    return info->abilities[1].maxChargeMs;
+  }
+  static int form(const Player& self) { return self.kitCounter[0]; }
+  static bool isBlade(const Player& self) {
+    return form(self) != Arena::GravonMode::Host;
+  }
+  static bool isDrawn(const Player& self) {
+    return !isBlade(self) && self.kitTimer[0] > 0.0f;
+  }
+  static bool isLanding(const Player& self) {
+    return !isBlade(self) && (self.kitCounter[2] & LANDING) != 0;
+  }
+
+  bool canCast(AbilitySystem&, const Player& self, int) override {
+    // A sword on the floor swings at nothing; a man pulling one out of the
+    // floor cannot either.
+    return !isBlade(self) && !isLanding(self);
+  }
+
+  float speedMultiplier(const Player& self) const override {
+    if (isBlade(self)) return 1.0f;
+    if (self.kitTimer[3] > 0.0f) return SWING_SPEED_MULT;
+    return isDrawn(self) ? DRAWN_SPEED_MULT : 1.0f;
+  }
+
+  void chargeTick(AbilityContext& ctx, int slot, float) override {
+    if (slot != 1) return;
+    Player& self = ctx.self;
+    self.kitAnchored = true;  // Ravager's Edge roots him while it builds
+    draw(self);
+    if (ctx.charge >= 1.0f && !(self.kitCounter[2] & FULL_SHOWN)) {
+      self.kitCounter[2] |= FULL_SHOWN;
+      ctx.sys.fxRing(self.x, self.y, 70.0f, VfxTheme::Blood);
+    }
+  }
+
   void cast(AbilityContext& ctx, int slot) override {
     AbilitySystem& sys = ctx.sys;
     Player& self = ctx.self;
+    assert(!isBlade(self) && "canCast refuses in blade form");
+    AbilitySystem* s = &sys;
     uint32_t selfId = self.id;
+    int epoch = self.kitCounter[3];
+    float dirX = ctx.dirX, dirY = ctx.dirY;
+    bool wasDrawn = isDrawn(self);
+    bool onTheRun = self.kitCounter[1] >= RUN_OPENER_MS;
+    self.kitCounter[1] = 0;
 
     if (slot == 0) {
-      // Titan's Slash
-      const float range = 125.0f;
-      sys.fxSlash(self.x, self.y, ctx.dirX, ctx.dirY, range, 140.0f,
-                  VfxTheme::Shadow);
-      sys.enemiesInCone(self.x, self.y, ctx.dirX, ctx.dirY, range, 70.0f,
-                        [&](Enemy& enemy) {
-                          sys.damageEnemy(selfId, enemy, 26.0f,
+      // Titan's Slash. Which swing: heave it off his back, heave it up from
+      // the drag, or swing it back and forth in both hands.
+      float windup = SLASH_WINDUP_MS;
+      float damage = SLASH_DAMAGE;
+      if (!wasDrawn) {
+        // Backhand off the back: it ends on his right, so a forehand next.
+        self.castVariant = Arena::GravonForm::SlashHeave;
+        windup = HEAVE_WINDUP_MS;
+        damage = HEAVE_DAMAGE;
+        self.kitCounter[2] &= ~SWING_BACK;
+      } else if (onTheRun) {
+        // Forehand up from behind: it ends on his left, so a backhand next.
+        self.castVariant = Arena::GravonForm::SlashHeaveRun;
+        windup = HEAVE_RUN_WINDUP_MS;
+        damage = HEAVE_DAMAGE;
+        self.kitCounter[2] |= SWING_BACK;
+      } else {
+        bool back = (self.kitCounter[2] & SWING_BACK) != 0;
+        self.castVariant = back ? Arena::GravonForm::SlashBackhand
+                                : Arena::GravonForm::SlashForehand;
+        self.kitCounter[2] ^= SWING_BACK;
+      }
+      draw(self);
+      self.actionLockMs =
+          std::max(self.actionLockMs, windup + SLASH_RECOVER_MS);
+      self.kitTimer[3] = windup + SLASH_RECOVER_MS;
+      sys.schedule(windup, [s, selfId, epoch, dirX, dirY, damage]() {
+        Player* me = strikingHost(*s, selfId, epoch);
+        if (!me) return;
+        s->fxSlash(me->x, me->y, dirX, dirY, SLASH_RANGE,
+                   SLASH_HALF_ANGLE * 2.0f, VfxTheme::Shadow);
+        float x = me->x, y = me->y;
+        s->enemiesInCone(x, y, dirX, dirY, SLASH_RANGE, SLASH_HALF_ANGLE,
+                         [&](Enemy& enemy) {
+                           uint32_t enemyId = enemy.id;
+                           s->damageEnemy(selfId, enemy, damage,
                                           DamageFlag::Basic | DamageFlag::Melee);
-                        });
+                           if (Enemy* still = s->findEnemy(enemyId)) {
+                             s->knockbackEnemy(*still, x, y, 22.0f);
+                           }
+                         });
+      });
     } else if (slot == 1) {
-      // Ravager's Edge
-      const float range = 165.0f;
-      bool full = ctx.charge >= 0.98f;
-      float damage = 30.0f + 85.0f * ctx.charge;
+      // Ravager's Edge: everything goes into the blade. Its weight pulls
+      // him over after it as it lands, and he has to heave it out again.
+      float charge = ctx.charge;
+      bool full = charge >= 0.98f;
+      float radius = RAVAGER_RADIUS + RAVAGER_RADIUS_CHARGED * charge;
+      float damage = RAVAGER_DAMAGE + RAVAGER_DAMAGE_CHARGED * charge;
       uint32_t flags = DamageFlag::Melee;
       if (full) {
         sys.applyToPlayer(self, EffectType::Sharpened, 1, selfId);
         flags |= DamageFlag::ForceCrit;
       }
-      sys.fxSlash(self.x, self.y, ctx.dirX, ctx.dirY, range, 50.0f,
-                  full ? VfxTheme::Blood : VfxTheme::Shadow);
-      sys.fxBeam(self.x, self.y, self.x + ctx.dirX * range,
-                 self.y + ctx.dirY * range, full ? 22.0f : 12.0f, 180.0f,
-                 VfxTheme::Shadow);
-      sys.enemiesInCone(self.x, self.y, ctx.dirX, ctx.dirY, range, 24.0f,
-                        [&](Enemy& enemy) {
-                          sys.damageEnemy(selfId, enemy, damage, flags);
-                        });
+      draw(self);
+      self.castVariant = full ? Arena::GravonForm::RavagerFull : 0;
+      self.kitCounter[2] = (self.kitCounter[2] & ~FULL_SHOWN) | LANDING;
+      self.kitAnchored = true;
+      self.kitTimer[3] = RAVAGER_LANDING_MS;
+      self.actionLockMs = std::max(self.actionLockMs, RAVAGER_LANDING_MS);
+      sys.dashPlayer(self, dirX, dirY, RAVAGER_LEAP, RAVAGER_LEAP_MS, false);
+      // Where it will land: the point ahead of where the lurch ends.
+      float x = self.x + dirX * (RAVAGER_LEAP + RAVAGER_REACH);
+      float y = self.y + dirY * (RAVAGER_LEAP + RAVAGER_REACH);
+      sys.clampToWorld(x, y);
+      sys.fxTelegraphCircle(x, y, radius, RAVAGER_LEAP_MS, VfxTheme::Shadow);
+      sys.schedule(RAVAGER_LEAP_MS,
+                   [s, selfId, epoch, x, y, radius, damage, flags, full]() {
+        if (!strikingHost(*s, selfId, epoch)) return;
+        s->fxBurst(x, y, radius, full ? VfxTheme::Blood : VfxTheme::Shadow);
+        s->fxRing(x, y, radius * 1.15f, VfxTheme::Shadow);
+        s->enemiesInCircle(x, y, radius, [&](Enemy& enemy) {
+          s->damageEnemy(selfId, enemy, damage, flags);
+        });
+      });
     } else if (slot == 2) {
       // Fury of the Blade
-      sys.applyToPlayer(self, EffectType::Empowered, 1, selfId, 6000.0f);
-      sys.applyToPlayer(self, EffectType::Haste, 1, selfId, 6000.0f);
-      sys.fxRing(self.x, self.y, 80.0f, VfxTheme::Blood);
+      draw(self);
+      sys.applyToPlayer(self, EffectType::Empowered, 1, selfId, FURY_MS);
+      sys.applyToPlayer(self, EffectType::Haste, 1, selfId, FURY_MS);
+      self.kitTimer[2] = FURY_MS;
+      sys.fxRing(self.x, self.y, 80.0f, VfxTheme::Shadow);
     } else if (slot == 3) {
-      // Blade Rush
-      const float distance = 270.0f;
-      float endX = self.x + ctx.dirX * distance;
-      float endY = self.y + ctx.dirY * distance;
+      // Blade Rush, in two beats: the slide, a breath, then the stab.
+      draw(self);
+      float endX = self.x + dirX * RUSH_SLIDE;
+      float endY = self.y + dirY * RUSH_SLIDE;
       sys.clampToWorld(endX, endY);
       sys.fxDashTrail(self.x, self.y, endX, endY, VfxTheme::Shadow);
-      sys.enemiesInLine(self.x, self.y, endX, endY, 36.0f, [&](Enemy& enemy) {
-        sys.damageEnemy(selfId, enemy, 42.0f, DamageFlag::Melee);
-      });
-      sys.dashPlayer(self, ctx.dirX, ctx.dirY, distance, 170.0f, true);
+      sys.dashPlayer(self, dirX, dirY, RUSH_SLIDE, RUSH_SLIDE_MS, true);
+      self.actionLockMs = std::max(
+          self.actionLockMs, RUSH_SLIDE_MS + RUSH_BEAT_MS + RUSH_STAB_MS + 120.0f);
+      sys.schedule(RUSH_SLIDE_MS + RUSH_BEAT_MS,
+                   [s, selfId, epoch, dirX, dirY]() {
+                     Player* me = strikingHost(*s, selfId, epoch);
+                     if (me) stab(*s, *me, dirX, dirY);
+                   });
     }
+  }
+
+  // The blade is out (or stays out) for a while.
+  static void draw(Player& self) {
+    self.kitTimer[0] = SHEATHE_AFTER_MS;
+  }
+
+  // The second beat of Blade Rush: a short lunge and one deep thrust into
+  // the first enemy on the line.
+  static void stab(AbilitySystem& sys, Player& self, float dirX, float dirY) {
+    draw(self);
+    float reach = RUSH_STAB_LUNGE + RUSH_STAB_REACH;
+    float tipX = self.x + dirX * reach;
+    float tipY = self.y + dirY * reach;
+    uint32_t firstId = 0;
+    float firstDist = reach * 2.0f;
+    sys.enemiesInLine(self.x, self.y, tipX, tipY, 30.0f, [&](Enemy& enemy) {
+      float d = dist(self.x, self.y, enemy.x, enemy.y);
+      if (d < firstDist) {
+        firstDist = d;
+        firstId = enemy.id;
+      }
+    });
+    sys.fxBeam(self.x, self.y, tipX, tipY, 14.0f, 140.0f, VfxTheme::Blood);
+    sys.dashPlayer(self, dirX, dirY, RUSH_STAB_LUNGE, RUSH_STAB_MS, true);
+
+    // Clients play the thrust as its own clip (GravonForm::RushStab).
+    GameEventPacket thrust;
+    thrust.kind = GameEventKind::AbilityCast;
+    thrust.sourceId = self.id;
+    thrust.x = self.x;
+    thrust.y = self.y;
+    thrust.x2 = self.x + dirX * 200.0f;
+    thrust.y2 = self.y + dirY * 200.0f;
+    thrust.value = 260.0f;
+    thrust.param = 3;
+    thrust.extraId = Arena::GravonForm::RushStab;
+    sys.emit(thrust);
+
+    if (Enemy* first = sys.findEnemy(firstId)) {
+      sys.damageEnemy(self.id, *first, RUSH_STAB_DAMAGE, DamageFlag::Melee);
+    }
+  }
+
+  // The host, if he is still the same living man who started the swing.
+  static Player* strikingHost(AbilitySystem& sys, uint32_t id, int epoch) {
+    Player* me = sys.findPlayer(id);
+    if (!me || me->isDead() || isBlade(*me) || me->kitCounter[3] != epoch) {
+      return nullptr;
+    }
+    return me;
   }
 
   void onDealDamage(AbilitySystem& sys, Player& self, Enemy&, float,
-                    uint32_t) override {
+                    uint32_t flags) override {
+    if (flags & DamageFlag::Dot) return;
     const ActiveEffects& fx = sys.effects().getPlayerEffects(self.id);
     if (fx.hasEffect(EffectType::Empowered) || fx.hasEffect(EffectType::Haste)) {
-      self.cooldownMs[3] = std::max(0.0f, self.cooldownMs[3] - 700.0f);
+      self.cooldownMs[3] = std::max(0.0f, self.cooldownMs[3] - FURY_RUSH_REFUND_MS);
     }
   }
 
-  // Soulblade: the host falls, the blade waits.
+  // Soulblade. The host falling exposes the blade; the blade breaking is
+  // death.
   bool onLethal(AbilitySystem& sys, Player& self) override {
-    if (self.kitCounter[0] != 0) return false;
-    self.kitCounter[0] = 1;
-    self.kitTimer[0] = 5000.0f;
-    self.health = 1.0f;
+    if (isBlade(self)) {
+      // The blade broke. He comes back (revived, or next round) as the host,
+      // with the blade half mended.
+      setForm(self, Arena::GravonMode::Host);
+      self.maxHealth = hostMaxHealth();
+      self.kitTimer[0] = 0.0f;
+      self.kitTimer[1] = BLADE_MAX_HEALTH * 0.5f;
+      self.kitTarget = 0;
+      self.kitAnchored = false;
+      return false;
+    }
+    float bladeHealth = self.kitTimer[1];
+    assert(bladeHealth > 0.0f && "the blade outlives its host");
+    setForm(self, Arena::GravonMode::Exposed);
+    self.propX = self.x;
+    self.propY = self.y;
+    self.maxHealth = BLADE_MAX_HEALTH;
+    self.health = bladeHealth;
+    self.kitTimer[0] = REVIVE_MS;
+    self.kitTimer[2] = 0.0f;
+    self.kitTimer[3] = PICKUP_DELAY_MS;
+    self.kitCounter[1] = 0;
+    self.kitCounter[2] = 0;
+    self.kitTarget = 0;
+    self.kitAnchored = true;
     self.chargeSlot = -1;
-    self.intangibleMs = std::max(self.intangibleMs, 200.0f);
-    self.hiddenMs = std::max(self.hiddenMs, 200.0f);
+    self.forcedMs = 0.0f;
+    self.shield = 0.0f;
+    self.shieldMs = 0.0f;
     sys.effects().clearEntity(self.id, false);
     sys.fxBurst(self.x, self.y, 90.0f, VfxTheme::Shadow);
     return true;
   }
 
   void tick(AbilitySystem& sys, Player& self, float dtMs) override {
-    self.resource = self.kitCounter[0] == 0 ? 255 : 0;
-    if (self.kitTimer[0] <= 0.0f) return;
-    self.kitTimer[0] -= dtMs;
-    if (self.kitTimer[0] > 0.0f) {
-      // Blade form: cannot move, act or be hit.
-      self.forcedVx = self.forcedVy = 0.0f;
-      self.forcedMs = std::max(self.forcedMs, 100.0f);
-      self.intangibleMs = std::max(self.intangibleMs, 100.0f);
-      self.hiddenMs = std::max(self.hiddenMs, 100.0f);
-      self.resource = static_cast<uint8_t>(
-          std::min(255.0f, 255.0f * (1.0f - self.kitTimer[0] / 5000.0f)));
+    if (!isBlade(self)) {
+      tickHost(self, dtMs);
     } else {
-      self.kitTimer[0] = 0.0f;
-      self.health = self.maxHealth * 0.5f;
-      sys.fxRing(self.x, self.y, 120.0f, VfxTheme::Blood);
-      sys.fxBurst(self.x, self.y, 70.0f, VfxTheme::Shadow);
+      tickBlade(sys, self, dtMs);
     }
+    uint8_t mode = static_cast<uint8_t>(form(self));
+    if (self.kitTimer[2] > 0.0f) mode |= Arena::GravonMode::FuryBit;
+    if (!isBlade(self) && self.chargeSlot == 1 &&
+        self.chargeMs >= ravagerMaxChargeMs()) {
+      mode |= Arena::GravonMode::ChargedBit;
+    }
+    if (isDrawn(self)) mode |= Arena::GravonMode::DrawnBit;
+    self.kitMode = mode;
   }
 
   void onEnemyDiedNearby(AbilitySystem&, Player& self, const Enemy&) override {
-    if (self.kitTimer[0] > 1000.0f) self.kitTimer[0] -= 1000.0f;
+    if (!isBlade(self)) return;
+    self.kitTimer[0] = std::max(0.0f, self.kitTimer[0] - REVIVE_PER_KILL_MS);
   }
 
-  void onRoundStart(Player& self) override { self.kitCounter[0] = 0; }
+  void onRoundStart(Player& self) override {
+    // Scratch state was just cleared, so he is the host again. If the round
+    // turned over while he was the blade, give the host his body back.
+    float hostMax = hostMaxHealth();
+    if (self.maxHealth != hostMax) {
+      self.maxHealth = hostMax;
+      if (self.isAlive()) self.health = hostMax * REVIVE_HEALTH_FRACTION;
+    }
+    self.kitTimer[1] = BLADE_MAX_HEALTH;
+  }
+
+ private:
+  static void setForm(Player& self, uint8_t next) {
+    self.kitCounter[0] = next;
+    self.kitCounter[3]++;
+    self.kitMode = static_cast<uint8_t>((self.kitMode & 0xF0) | next);
+  }
+
+  static void tickHost(Player& self, float dtMs) {
+    self.kitTimer[2] = std::max(0.0f, self.kitTimer[2] - dtMs);
+    self.kitTimer[3] = std::max(0.0f, self.kitTimer[3] - dtMs);
+    if (self.kitTimer[3] <= 0.0f) self.kitCounter[2] &= ~LANDING;
+    if (self.chargeSlot == 1) {
+      draw(self);  // the blade stays out while it builds
+    } else {
+      self.kitCounter[2] &= ~FULL_SHOWN;
+      if (self.kitTimer[0] > 0.0f && self.kitTimer[3] <= 0.0f) {
+        self.kitTimer[0] = std::max(0.0f, self.kitTimer[0] - dtMs);
+        if (self.kitTimer[0] <= 0.0f) self.kitCounter[2] &= ~SWING_BACK;
+      }
+    }
+    // Rooted while Ravager's Edge builds and while he pulls it back out.
+    self.kitAnchored = self.chargeSlot == 1 || isLanding(self);
+    // How long he has been on the move (a heave comes out of a run).
+    bool moving = self.vx * self.vx + self.vy * self.vy > 20.0f * 20.0f;
+    self.kitCounter[1] =
+        moving ? std::min(self.kitCounter[1] + static_cast<int>(dtMs), 60000)
+               : 0;
+    self.kitX = 0.0f;
+    // The meter is the blade's own health: what is left if the host falls.
+    self.resource = static_cast<uint8_t>(
+        std::clamp(255.0f * self.kitTimer[1] / BLADE_MAX_HEALTH, 0.0f, 255.0f));
+  }
+
+  void tickBlade(AbilitySystem& sys, Player& self, float dtMs) {
+    self.kitAnchored = true;
+    self.kitTimer[0] -= dtMs;
+    if (self.kitTimer[0] <= 0.0f) {
+      rise(sys, self);
+      return;
+    }
+    self.resource = static_cast<uint8_t>(std::clamp(
+        255.0f * (1.0f - self.kitTimer[0] / REVIVE_MS), 0.0f, 255.0f));
+
+    if (form(self) == Arena::GravonMode::Carried) {
+      Player* carrier = sys.findPlayer(self.kitTarget);
+      if (!carrier || carrier->isDead() || carrier->characterId == 0) {
+        // The carrier fell: the blade is on the floor again, where they were.
+        setForm(self, Arena::GravonMode::Exposed);
+        self.kitTarget = 0;
+        self.kitTimer[3] = PICKUP_DELAY_MS;
+        sys.fxBurst(self.x, self.y, 50.0f, VfxTheme::Shadow);
+      } else {
+        self.x = carrier->x;
+        self.y = carrier->y;
+        self.vx = self.vy = 0.0f;
+        // On an ally's back nothing can reach it.
+        self.intangibleMs = std::max(self.intangibleMs, 100.0f);
+        self.hiddenMs = std::max(self.hiddenMs, 100.0f);
+        self.kitX = static_cast<float>(carrier->id);
+      }
+      return;
+    }
+
+    // Exposed: the first ally to reach the blade takes it up.
+    self.kitX = 0.0f;
+    self.vx = self.vy = 0.0f;
+    self.kitTimer[3] = std::max(0.0f, self.kitTimer[3] - dtMs);
+    if (self.kitTimer[3] > 0.0f) return;
+    Player* nearest = nullptr;
+    float nearestDist = PICKUP_RADIUS;
+    for (auto& [id, other] : sys.allPlayers()) {
+      if (id == self.id || other.isDead() || other.characterId == 0) continue;
+      if (other.characterId == Gravon && isBlade(other)) continue;
+      float d = dist(self.x, self.y, other.x, other.y);
+      if (d <= nearestDist) {
+        nearestDist = d;
+        nearest = &other;
+      }
+    }
+    if (nearest) {
+      setForm(self, Arena::GravonMode::Carried);
+      self.kitTarget = nearest->id;
+      self.kitX = static_cast<float>(nearest->id);
+      sys.fxRing(self.x, self.y, 50.0f, VfxTheme::Shadow);
+    }
+  }
+
+  // The delay is over: the host stands up where the blade is.
+  void rise(AbilitySystem& sys, Player& self) {
+    float bladeHealth = self.health;
+    setForm(self, Arena::GravonMode::Host);
+    self.kitTimer[0] = 0.0f;
+    self.kitTimer[1] = bladeHealth;
+    self.kitTimer[3] = 0.0f;
+    self.kitTarget = 0;
+    self.kitX = 0.0f;
+    self.kitAnchored = false;
+    self.maxHealth = hostMaxHealth();
+    self.health = self.maxHealth * REVIVE_HEALTH_FRACTION;
+    self.intangibleMs = std::max(self.intangibleMs, 800.0f);
+    // One tick of forced motion: clients must not predict over the jump.
+    self.forcedVx = self.forcedVy = 0.0f;
+    self.forcedMs = std::max(self.forcedMs, 50.0f);
+    sys.effects().clearEntity(self.id, false);
+    sys.fxRing(self.x, self.y, 120.0f, VfxTheme::Shadow);
+    sys.fxBurst(self.x, self.y, 70.0f, VfxTheme::Blood);
+  }
 };
 
 // ===========================================================================

@@ -110,6 +110,25 @@ class ArenaView {
   void updateNyxView(const PlayerState& state);
   void drawNyxSwarm(ImDrawList* dl, const PlayerState& state);
   void drawNyxCrt(ImDrawList* dl, const PlayerState& state);
+  // Gravon: when the host last fell or rose (to play the fall, the fading
+  // body and the rise), where he fell and which way he faced.
+  struct GravonView {
+    uint8_t form = 0;
+    float formSince = -100.0f;
+    float riseAt = -100.0f;
+    float sheatheAt = -100.0f;  // the blade went back on his back
+    bool drawn = false;
+    float fallX = 0.0f, fallY = 0.0f;
+    int fallDirection = 0;
+    bool seen = false;
+  };
+  std::unordered_map<uint32_t, GravonView> gravonViews;
+  void updateGravonView(const PlayerState& state);
+  // The blade alone: stuck in the floor (direction < 0) or on a carrier's
+  // back facing `direction`.
+  void drawGravonBlade(ImDrawList* dl, const ArenaClient::PlayerView& view,
+                       ImVec2 feet, int direction);
+  void drawGravonFallen(ImDrawList* dl, const PlayerState& state);
   // Remembered per entity so a clip plays from its start and stopped
   // characters keep facing where they last looked.
   struct AnimState {
