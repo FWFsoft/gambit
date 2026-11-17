@@ -749,29 +749,83 @@ void MatchDirector::onPlayerJoined(Player& player) {
 void MatchDirector::onPlayerLeft(uint32_t playerId) {
   wasDead.erase(playerId);
   roundStartScore.erase(playerId);
+  leftForMenu.erase(playerId);
+}
+
+void MatchDirector::leaveToMenu(Player& player) {
+  if (!isParticipant(player)) return;
+  if (inCombat()) {
+    leftForMenu[player.id] = MenuLeave{currentRound, player.isDead()};
+  }
+  if (player.carryingScrap) {
+    player.carryingScrap = false;
+    if (hooks.spawnPickup) {
+      hooks.spawnPickup(Arena::PickupId::Scrap, player.x, player.y);
+    }
+  }
+  abilities->effects().clearEntity(player.id, false);
+  player.characterId = 0;
+  player.ready = false;
+  player.reviveProgress = 0.0f;
+  wasDead[player.id] = false;
+  Logger::info("Match: player " + std::to_string(player.id) +
+               " left for the main menu");
 }
 
 void MatchDirector::onCharacterSelected(Player& player, uint32_t characterId) {
+  if (characterId == 0) {
+    leaveToMenu(player);
+    return;
+  }
   if (!Arena::isPlayable(characterId)) {
     Logger::info("Match: character " + std::to_string(characterId) +
                  " has no kit yet, ignoring selection");
     return;
   }
-  // Characters are locked once a player is in the fight.
+  // Characters are locked once a player is in the fight. Going back to the
+  // main menu (characterId 0 above) takes them out of it.
   bool swappable = currentPhase == MatchPhase::Lobby || player.characterId == 0;
   if (!swappable) return;
 
   bool joiningLate = player.characterId == 0 && currentPhase != MatchPhase::Lobby;
+  float leftX = player.x;
+  float leftY = player.y;
   player.characterId = characterId;
   abilities->applyKitStats(player);
+  wasDead[player.id] = false;
   if (joiningLate) {
     // Late joiners drop in at the ship.
     player.x = shipX + randomRange(-100.0f, 100.0f);
     player.y = shipY + 130.0f;
     player.forcedMs = 100.0f;
-    roundStartScore[player.id] = player.score;
+    if (roundStartScore.find(player.id) == roundStartScore.end()) {
+      roundStartScore[player.id] = player.score;
+    }
   }
-  wasDead[player.id] = false;
+  auto left = leftForMenu.find(player.id);
+  if (left != leftForMenu.end()) {
+    bool sameRound = inCombat() && left->second.round == currentRound;
+    if (sameRound) {
+      // Back from the menu mid-round: the new kit starts on full cooldowns.
+      const Arena::KitInfo* kit = Arena::kitInfo(characterId);
+      for (int slot = 0; slot < Arena::KIT_SLOT_COUNT; slot++) {
+        player.cooldownMs[slot] = kit->abilities[slot].cooldownMs;
+      }
+    }
+    if (sameRound && left->second.down) {
+      // Left while down: come back down where they fell, waiting for a
+      // revive. The death was already counted.
+      player.x = leftX;
+      player.y = leftY;
+      player.health = 0.0f;
+      player.reviveProgress = 0.0f;
+      player.deathTime = 1.0f;
+      player.deathSeen = true;  // the new kit's on-death has no say
+      player.forcedMs = 0.0f;
+      wasDead[player.id] = true;
+    }
+    leftForMenu.erase(left);
+  }
 }
 
 void MatchDirector::onReady(Player& player, bool ready) {

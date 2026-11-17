@@ -136,6 +136,9 @@ class ArenaView {
     float startSeconds = 0.0f;
     uint32_t castCount = 0;
     int direction = 0;
+    // Players: the way they last faced (walking, or the cursor while
+    // casting). Starts facing south, toward the camera.
+    float faceX = 0.0f, faceY = 1.0f;
   };
   std::unordered_map<uint32_t, AnimState> playerAnim;
   // The local player's hitstop last frame: a rise means a hit just landed.

@@ -1322,13 +1322,21 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
   float speed = std::sqrt(vx * vx + vy * vy);
   bool moving = speed > 12.0f && !dead;
 
-  // Face the cursor; while just walking with no aim info, face the heading.
-  float faceX = aimX - worldX;
-  float faceY = aimY - worldY;
-  if (std::abs(faceX) + std::abs(faceY) < 1.0f) {
-    faceX = moving ? vx : 0.0f;
-    faceY = moving ? vy : 1.0f;
+  // Face the way you walk (W = N, W+A = NW, ...). Using an ability turns
+  // you to the cursor for the cast; standing still keeps the last facing.
+  AnimState& facing = playerAnim[state.playerId];
+  bool acting = !dead && (view.castMs > 0.0f || charging);
+  float aimDX = aimX - worldX;
+  float aimDY = aimY - worldY;
+  if (acting && std::abs(aimDX) + std::abs(aimDY) >= 1.0f) {
+    facing.faceX = aimDX;
+    facing.faceY = aimDY;
+  } else if (moving) {
+    facing.faceX = vx;
+    facing.faceY = vy;
   }
+  float faceX = facing.faceX;
+  float faceY = facing.faceY;
 
   // --- procedural animation -------------------------------------------------
   float scaleX = 1.0f, scaleY = 1.0f, rotation = 0.0f;
@@ -1453,9 +1461,7 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
   if (actor) {
     // Real animation: choose a clip from what the character is doing.
     AnimState& anim = playerAnim[state.playerId];
-    if (moving || view.castMs > 0.0f || aimX != worldX || aimY != worldY) {
-      anim.direction = directionFrame(faceX, faceY);
-    }
+    anim.direction = directionFrame(faceX, faceY);
     if (view.castCount != anim.castCount) {
       anim.castCount = view.castCount;
       anim.clip = actionClip(definition->name, view.castSlot, view.castCount,
