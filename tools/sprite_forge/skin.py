@@ -65,6 +65,40 @@ HUMANOID_DOWN = {
 # stay flat on the floor).
 HUMANOID_LEVEL = ("ankle_L", "ankle_R")
 
+# Opt-in hands that close (prepare/attach with hands=True): each hand splits
+# into a palm (the wrist joint), the fingers from the knuckles (fingers_L)
+# and their ends from the middle joints (tips_L). Folding both into the
+# palm makes a fist; one bend alone sticks the fingers straight out of the
+# palm like a bill. In a control the angles are "j:fingers_L", "j:tips_L".
+# The joints sit KNUCKLE and MID_FINGER of the way from the wrist to the
+# fingertips unless the fit places them.
+HUMANOID_HANDS = HUMANOID + [("fingers_L", "wrist_L"), ("tips_L", "fingers_L"),
+                             ("fingers_R", "wrist_R"), ("tips_R", "fingers_R")]
+HUMANOID_HANDS_TAILS = dict(HUMANOID_TAILS, wrist_L="fingers_L", wrist_R="fingers_R",
+                            fingers_L="tips_L", fingers_R="tips_R",
+                            tips_L="hand_L", tips_R="hand_R")
+KNUCKLE = 0.5
+MID_FINGER = 0.75
+
+# Opt-in collarbones (prepare/attach with collars=True): a joint on each side
+# between the chest and the shoulder, so a shoulder can shrug, roll forward
+# or pull back without bending the spine. In a control: "j:collar_L". The
+# joint sits on the chest, COLLAR_IN of the way from the centre line to the
+# shoulder, at the shoulder's height and depth, unless the fit places it.
+COLLAR_IN = 0.3
+
+
+def with_collars(skeleton, tails):
+    """The skeleton and tails with collar_L/R between chest and shoulders."""
+    out = []
+    for name, parent in skeleton:
+        if name in ("shoulder_L", "shoulder_R"):
+            out.append(("collar_" + name[-1], parent))
+            out.append((name, "collar_" + name[-1]))
+        else:
+            out.append((name, parent))
+    return out, dict(tails, collar_L="shoulder_L", collar_R="shoulder_R")
+
 MAX_TEXTURE = 1024      # px; sprites are ~100 px tall, more only aliases
 VOXEL_DIVISIONS = 110   # proxy voxels per model height
 WEIGHTS_PER_VERTEX = 4
@@ -532,12 +566,32 @@ class Skin:
 
 def prepare(path, height, fit=None, yaw=0.0, skeleton=HUMANOID,
             tails=HUMANOID_TAILS, down=HUMANOID_DOWN, level=HUMANOID_LEVEL,
-            cache=True, log=print, centre_x=0.0):
+            cache=True, log=print, centre_x=0.0, hands=False, collars=False):
     """Everything attach() does short of touching a Model. Returns a dict:
-    obj, imported (Nx3), fit, weights, rest (Nx3), rest_pos."""
+    obj, imported (Nx3), fit, weights, rest (Nx3), rest_pos, skeleton.
+    hands=True adds the fingers joints (HUMANOID_HANDS); collars=True adds
+    collarbones between chest and shoulders."""
+    humanoid = skeleton is HUMANOID
+    if hands:
+        assert humanoid, "hands=True extends the humanoid skeleton only"
+        skeleton, tails = HUMANOID_HANDS, HUMANOID_HANDS_TAILS
+    if collars:
+        assert humanoid, "collars=True extends the humanoid skeleton only"
+        skeleton, tails = with_collars(skeleton, tails)
     obj, v = load_mesh(path, height, yaw, centre_x)
-    guess = auto_fit(v, height) if skeleton is HUMANOID else {}
+    guess = auto_fit(v, height) if humanoid else {}
     full = complete_fit(fit, guess)
+    if hands:
+        for s in "LR":
+            wr, tip = np.array(full[f"wrist_{s}"]), np.array(full[f"hand_{s}"])
+            for joint, at in ((f"fingers_{s}", KNUCKLE), (f"tips_{s}", MID_FINGER)):
+                if joint not in full:
+                    full[joint] = tuple(wr + at * (tip - wr))
+    if collars:
+        for s in "LR":
+            if f"collar_{s}" not in full:
+                sh = full[f"shoulder_{s}"]
+                full[f"collar_{s}"] = (COLLAR_IN * sh[0], sh[1], sh[2])
     missing = [n for n, _ in skeleton if n not in full]
     assert not missing, f"{path}: fit has no position for {missing}"
     cache_path = path + ".weights.npz" if cache else None
@@ -552,16 +606,16 @@ def prepare(path, height, fit=None, yaw=0.0, skeleton=HUMANOID,
     rest[:, 2] += lift
     rest_pos = {n: p + np.array((0, 0, lift)) for n, p in rest_pos.items()}
     return {"obj": obj, "imported": v, "fit": full, "weights": w,
-            "rest": rest, "rest_pos": rest_pos, "names": names}
+            "rest": rest, "rest_pos": rest_pos, "names": names,
+            "skeleton": skeleton}
 
 
 def attach(model, path, height, fit=None, material="mesh", **options):
     """Put a model file on `model` as its body. Creates the skeleton's joints
     (do not also call _body.skeleton) and returns the Skin. Add props and
     costume parts to the joints afterwards, as with any forge model."""
-    skeleton = options.get("skeleton", HUMANOID)
     data = prepare(path, height, fit, **options)
-    for name, parent in skeleton:
+    for name, parent in data["skeleton"]:
         model.joint(name, parent, tuple(float(c) for c in data["rest_pos"][name]))
     model.material(material, (128, 128, 128))
     model.materials[material].textured = True

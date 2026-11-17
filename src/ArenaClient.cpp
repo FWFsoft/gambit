@@ -224,6 +224,19 @@ void ArenaClient::onGameEvent(const GameEventPacket& p) {
     }
 
     case GameEventKind::ProjectileSpawn: {
+      // A spawn for a shot we already have is its new course (it struck one
+      // of Kade's mirrors).
+      bool turned = false;
+      for (Projectile& known : shots) {
+        if (known.id != p.extraId) continue;
+        known.x = p.x;
+        known.y = p.y;
+        known.vx = p.x2;
+        known.vy = p.y2;
+        known.lifeMs = known.ageMs + p.value2;
+        turned = true;
+      }
+      if (turned) break;
       Projectile shot;
       shot.id = p.extraId;
       shot.x = p.x;
@@ -270,6 +283,9 @@ void ArenaClient::onGameEvent(const GameEventPacket& p) {
       zone.theme = theme;
       zone.variant = p.param;
       zone.fromEnemy = p.sourceIsEnemy;
+      zone.ownerId = p.sourceId;
+      zone.dirX = p.x2;
+      zone.dirY = p.y2;
       groundZones.push_back(zone);
       break;
     }

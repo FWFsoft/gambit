@@ -1234,11 +1234,26 @@ uint32_t AbilitySystem::spawnZone(Zone spec) {
   spawn.param = spec.variant;
   spawn.param2 = static_cast<uint8_t>(spec.theme);
   spawn.extraId = spec.id;
+  spawn.x2 = spec.dirX;
+  spawn.y2 = spec.dirY;
   emit(spawn);
 
   uint32_t id = spec.id;
   zones.push_back(std::move(spec));
   return id;
+}
+
+const AbilitySystem::Zone* AbilitySystem::findZone(uint32_t zoneId) const {
+  for (const Zone& zone : zones) {
+    if (zone.id == zoneId && zone.lifeMs > 0.0f) return &zone;
+  }
+  return nullptr;
+}
+
+void AbilitySystem::endZone(uint32_t zoneId) {
+  for (Zone& zone : zones) {
+    if (zone.id == zoneId) zone.lifeMs = 0.0f;
+  }
 }
 
 void AbilitySystem::schedule(float delayMs, std::function<void()> fn) {
@@ -1304,6 +1319,37 @@ void AbilitySystem::updateProjectiles(float dtMs) {
           break;
         }
       } else {
+        // Kade's mirrors turn the players' shots straight out of the glass.
+        for (const Zone& mirror : zones) {
+          if (mirror.variant != Arena::KadeMode::MirrorZone) continue;
+          if (mirror.id == p.lastMirror || mirror.lifeMs <= 0.0f) continue;
+          float mx = p.x - mirror.x, my = p.y - mirror.y;
+          float reach = mirror.radius + p.radius;
+          if (mx * mx + my * my > reach * reach) continue;
+          float speed = std::sqrt(p.vx * p.vx + p.vy * p.vy);
+          p.x = mirror.x;
+          p.y = mirror.y;
+          p.vx = mirror.dirX * speed;
+          p.vy = mirror.dirY * speed;
+          p.lastMirror = mirror.id;
+          fxBurst(mirror.x, mirror.y, 26.0f, VfxTheme::Optic);
+          // Clients take a spawn for a shot they already have as its new
+          // course.
+          GameEventPacket turn;
+          turn.kind = GameEventKind::ProjectileSpawn;
+          turn.sourceId = p.ownerId;
+          turn.x = p.x;
+          turn.y = p.y;
+          turn.x2 = p.vx;
+          turn.y2 = p.vy;
+          turn.value = p.radius;
+          turn.value2 = p.lifeMs;
+          turn.param = p.sprite;
+          turn.param2 = static_cast<uint8_t>(p.theme);
+          turn.extraId = p.id;
+          emit(turn);
+          break;
+        }
         for (uint32_t id : enemyIdsNear(p.x, p.y, p.radius)) {
           if (std::find(p.alreadyHit.begin(), p.alreadyHit.end(), id) !=
               p.alreadyHit.end()) {

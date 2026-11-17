@@ -593,6 +593,23 @@ add_executable(test_isaac_kit
 target_include_directories(test_isaac_kit PRIVATE include tests)
 target_link_libraries(test_isaac_kit PRIVATE spdlog::spdlog SDL2::SDL2)
 
+add_executable(test_kade_kit
+    tests/test_kade_kit.cpp
+    src/Logger.cpp
+    src/EnemySystem.cpp
+    src/Effect.cpp
+    src/EffectManager.cpp
+    src/ArenaData.cpp
+    src/AbilitySystem.cpp
+    src/CharacterKits.cpp
+    src/Infusions.cpp
+    src/CollisionSystem.cpp
+    src/ItemRegistry.cpp
+    src/AnimationController.cpp
+)
+target_include_directories(test_kade_kit PRIVATE include tests)
+target_link_libraries(test_kade_kit PRIVATE spdlog::spdlog SDL2::SDL2)
+
 add_executable(test_nyx_kit
     tests/test_nyx_kit.cpp
     src/Logger.cpp
@@ -695,6 +712,7 @@ add_test(NAME GameLoop COMMAND test_gameloop)
 add_test(NAME WadeKit COMMAND test_wade_kit)
 add_test(NAME NolanKit COMMAND test_nolan_kit)
 add_test(NAME IsaacKit COMMAND test_isaac_kit)
+add_test(NAME KadeKit COMMAND test_kade_kit)
 add_test(NAME NyxKit COMMAND test_nyx_kit)
 add_test(NAME GravonKit COMMAND test_gravon_kit)
 add_test(NAME PointsOfInterest COMMAND test_points_of_interest)

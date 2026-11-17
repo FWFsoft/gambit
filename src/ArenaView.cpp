@@ -463,6 +463,13 @@ std::string actionClip(const std::string& character, int slot,
     static const char* CLIPS[4] = {"sweep", "lotus", "blackout", "blink"};
     return CLIPS[std::max(0, std::min(3, slot))];
   }
+  if (character == "Kade") {
+    // Focused Blast's hold plays "beam_charge" then "beam_hold"; the cast is
+    // the release. Full Release plays from his mode ("release_hold", then
+    // "spent"), not from the cast.
+    static const char* CLIPS[4] = {"slap", "beam", "", "step"};
+    return CLIPS[std::max(0, std::min(3, slot))];
+  }
   if (character == "Isaac") {
     // Lifeline's hold plays "lifeline_charge"; the cast is the release.
     static const char* CLIPS[4] = {"ray", "lifeline", "blessing", "flash"};
@@ -597,6 +604,127 @@ void drawNaniteDissolve(ImDrawList* dl, ImVec2 feet, float t, float amount,
 // A swarm: pixels orbiting a centre `lift` above (x, y) on flattened rings,
 // glitching in and out. `onEnemy`/`onAlly` tint it toward the coat's
 // magenta (infection) or the screen's cyan (help).
+// Kade's visor sits about this far above his feet on screen; his charge-up
+// crouch lowers it.
+constexpr float KADE_VISOR_HEIGHT = 64.0f;
+constexpr float KADE_CROUCH_DROP = 12.0f;
+
+// Focused Blast's charge (KADE RMB reference sheet): the visor brightens, a
+// dashed ring builds around his head, and energy arcs crackle on his body
+// from a third of the charge. At full charge the ring closes and flashes.
+void drawKadeCharge(ImDrawList* dl, ImVec2 feet, float progress, float t) {
+  const float p = std::max(0.0f, std::min(1.0f, progress));
+  const bool full = p >= 0.995f;
+  ImVec2 visor(feet.x, feet.y - KADE_VISOR_HEIGHT + KADE_CROUCH_DROP * p);
+
+  // Visor glow: a soft halo that grows with the charge.
+  for (int i = 3; i >= 1; --i) {
+    float r = (6.0f + 10.0f * p) * static_cast<float>(i) * 0.6f;
+    dl->AddCircleFilled(visor, r, themeColor(VfxTheme::Optic, 0.10f + 0.12f * p), 20);
+  }
+  dl->AddCircleFilled(visor, 3.0f + 3.0f * p, themeHot(VfxTheme::Optic, 0.5f + 0.5f * p), 12);
+
+  // Dashed ring around the head, closing as the charge builds.
+  const int dashes = 12;
+  float radius = 18.0f + 10.0f * p;
+  float spin = t * (1.5f + 3.0f * p);
+  float gap = 0.55f * (1.0f - p) + 0.12f;          // dashes join up at full charge
+  for (int i = 0; i < dashes; ++i) {
+    if (static_cast<float>(i) > p * dashes + 0.5f && !full) break;   // builds round
+    float a0 = spin + (2.0f * PI / dashes) * i;
+    float a1 = a0 + (2.0f * PI / dashes) * (1.0f - gap);
+    dl->PathArcTo(visor, radius, a0, a1, 6);
+    dl->PathStroke(full ? themeHot(VfxTheme::Optic, 0.6f + 0.4f * std::sin(t * 30.0f))
+                        : themeColor(VfxTheme::Optic, 0.45f + 0.5f * p),
+                   0, 2.0f + 1.5f * p);
+  }
+
+  // Energy arcs on the body: short jagged sparks from a third of the charge.
+  if (p > 0.33f) {
+    int arcs = 1 + static_cast<int>((p - 0.33f) * 6.0f);
+    for (int k = 0; k < arcs; ++k) {
+      float seed = std::floor(t * 14.0f) * 1.37f + k * 2.11f;
+      float ox = std::sin(seed * 3.1f) * 16.0f;
+      float oy = -KADE_VISOR_HEIGHT * (0.25f + 0.5f * (0.5f + 0.5f * std::sin(seed * 1.7f)));
+      ImVec2 a(feet.x + ox, feet.y + oy);
+      ImVec2 pts[4];
+      pts[0] = a;
+      for (int s = 1; s < 4; ++s) {
+        pts[s] = ImVec2(pts[s - 1].x + std::sin(seed * (5.0f + s)) * 6.0f,
+                        pts[s - 1].y + std::cos(seed * (3.0f + s)) * 6.0f);
+      }
+      dl->AddPolyline(pts, 4, themeHot(VfxTheme::Optic, 0.8f), 0, 1.5f);
+    }
+  }
+}
+
+// Focused Blast's beam: from the visor, a tapered blue wedge with a white
+// core and magenta streaks (KADE RMB reference: "Optic Beam, core +
+// volumetric"). `halfWidth` is in world units.
+// `lift0` / `lift1`: how high above the floor each end is on screen (the
+// visor for a beam from Kade, a mirror's centre for one off a mirror).
+constexpr float KADE_BEAM_LIFT = KADE_VISOR_HEIGHT - KADE_CROUCH_DROP;
+// Kade's mirrors stand as tall as he does; beams cross at their middle.
+constexpr float KADE_MIRROR_BEAM_LIFT = 36.0f;
+template <typename ToScreen>
+void drawOpticBeam(ImDrawList* dl, ToScreen toScreen, float x0, float y0,
+                   float x1, float y1, float halfWidth, float t, float fade,
+                   float lift0 = KADE_BEAM_LIFT, float lift1 = KADE_BEAM_LIFT) {
+  float dx = x1 - x0, dy = y1 - y0;
+  float len = std::sqrt(dx * dx + dy * dy);
+  if (len < 1.0f) return;
+  float nx = -dy / len, ny = dx / len;
+  auto at = [&](float u, float side) {
+    ImVec2 g = toScreen(x0 + dx * u + nx * side, y0 + dy * u + ny * side);
+    return ImVec2(g.x, g.y - (lift0 + (lift1 - lift0) * u));
+  };
+  // The beam snaps out fast, then thins as it fades.
+  float grow = std::min(1.0f, t * 6.0f);
+  float w = halfWidth * (0.55f + 0.45f * fade);
+  auto wedge = [&](float scale, ImU32 colour) {
+    ImVec2 q[4] = {at(0.0f, -w * scale * 0.25f), at(grow, -w * scale),
+                   at(grow, w * scale), at(0.0f, w * scale * 0.25f)};
+    dl->AddConvexPolyFilled(q, 4, colour);
+  };
+  wedge(1.25f, themeColor(VfxTheme::Optic, 0.25f * fade));
+  wedge(0.85f, themeColor(VfxTheme::Optic, 0.60f * fade));
+  wedge(0.40f, themeHot(VfxTheme::Optic, 0.90f * fade));
+  wedge(0.14f, IM_COL32(255, 255, 255, static_cast<int>(240 * fade)));
+  // Magenta streaks racing along the beam.
+  for (int k = 0; k < 4; ++k) {
+    float side = (k % 2 ? 1.0f : -1.0f) * w * (0.35f + 0.15f * k);
+    float u0 = std::fmod(t * 3.0f + k * 0.23f, 1.0f) * grow;
+    float u1 = std::min(grow, u0 + 0.18f);
+    dl->AddLine(at(u0, side), at(u1, side),
+                IM_COL32(255, 90, 210, static_cast<int>(210 * fade)), 2.5f);
+  }
+}
+
+// Spent after Full Release: smoke curls off his shoulders and head, purple
+// going grey as it rises (the human's reference for the end of his Q).
+void drawKadeSmoke(ImDrawList* dl, ImVec2 feet, float t, uint32_t salt) {
+  for (int i = 0; i < 22; i++) {
+    uint32_t seed = static_cast<uint32_t>(i) * 7919u + salt * 131u;
+    float h0 = nanoHash(seed), h1 = nanoHash(seed + 1), h2 = nanoHash(seed + 2);
+    float u = fract(t * (0.40f + 0.30f * h0) + h1);  // 0 born .. 1 gone
+    // Born on the hunched back and head, curling up and drifting.
+    float baseX = feet.x + (h2 - 0.5f) * 34.0f;
+    float baseY = feet.y - 38.0f - 16.0f * nanoHash(seed + 3);
+    float curl = std::sin(t * 2.2f + h0 * 6.0f + u * 4.0f) * (4.0f + 14.0f * u);
+    ImVec2 p(baseX + curl, baseY - 64.0f * u);
+    float r = 4.0f + 11.0f * u;
+    float a = (u < 0.12f ? u / 0.12f : 1.0f - (u - 0.12f) / 0.88f);
+    // Violet near him, ash grey as it rises; a lighter core so it reads on
+    // the dark floor.
+    int red = static_cast<int>(175 - 25 * u), green = static_cast<int>(130 + 30 * u);
+    int blue = static_cast<int>(220 - 50 * u);
+    dl->AddCircleFilled(p, r, IM_COL32(red, green, blue, static_cast<int>(120 * a)),
+                        14);
+    dl->AddCircleFilled(ImVec2(p.x - r * 0.2f, p.y - r * 0.2f), r * 0.5f,
+                        IM_COL32(230, 215, 245, static_cast<int>(90 * a)), 10);
+  }
+}
+
 void drawNaniteCloud(ImDrawList* dl, ImVec2 at, float t, int count,
                      float radius, float lift, float bias, uint32_t salt) {
   ImVec2 centre(at.x, at.y - lift);
@@ -1128,7 +1256,12 @@ void ArenaView::drawGround(ImDrawList* dl) {
     ImU32 edge = zone.fromEnemy ? themeColor(VfxTheme::Danger, 0.8f * alpha)
                                 : themeColor(zone.theme, 0.7f * alpha);
 
-    if (zone.variant == 0) {
+    if (zone.variant == Arena::KadeMode::MirrorZone) {
+      // Kade's mirror stands in the world (drawEntities); on the floor only
+      // a faint blue footprint.
+      dl->AddEllipse(centre, ImVec2(zone.radius, zone.radius * 0.45f),
+                     themeColor(zone.theme, 0.35f * alpha), 0.0f, 24, 1.5f);
+    } else if (zone.variant == 0) {
       // Cloud: drifting blobs
       for (int i = 0; i < 7; i++) {
         float a = i * 0.9f + timeSeconds * (0.3f + 0.05f * i);
@@ -1391,9 +1524,18 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
   // Face the way you walk (W = N, W+A = NW, ...). Using an ability turns
   // you to the cursor for the cast; standing still keeps the last facing.
   AnimState& facing = playerAnim[state.playerId];
-  bool acting = !dead && (view.castMs > 0.0f || charging);
+  bool acting = !dead && (view.castMs > 0.0f || charging ||
+                         (state.characterId == Arena::CharacterId::Kade &&
+                          state.kitMode == Arena::KadeMode::Releasing));
   float aimDX = aimX - worldX;
   float aimDY = aimY - worldY;
+  // Refraction Wall faces the pinned mirror (its cursor turns the glass),
+  // through the dash and the slap.
+  if (!dead && state.characterId == Arena::CharacterId::Kade &&
+      (state.chargeSlot == 0 || (view.castMs > 0.0f && view.castSlot == 0))) {
+    aimDX = state.kitX - worldX;
+    aimDY = state.kitY - worldY;
+  }
   if (acting && std::abs(aimDX) + std::abs(aimDY) >= 1.0f) {
     facing.faceX = aimDX;
     facing.faceY = aimDY;
@@ -1466,8 +1608,12 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
                    24, 1.5f);
   }
 
+  // Kade holding Refraction Wall is aiming a mirror, not charging: the
+  // hologram shows it (drawKadeHologram).
+  const bool kadePlacing = state.characterId == Arena::CharacterId::Kade &&
+                           state.chargeSlot == 0;
   // Charge ring
-  if (charging && !dead) {
+  if (charging && !dead && !kadePlacing) {
     float progress = state.charge / 255.0f;
     dl->PathArcTo(ImVec2(feet.x, feet.y), 26.0f, -PI * 0.5f,
                   -PI * 0.5f + 2.0f * PI * progress, 32);
@@ -1479,6 +1625,10 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
   ImVec2 at(feet.x + offsetX, feet.y + offsetY);
   const CharacterDefinition* definition =
       CharacterRegistry::instance().getCharacter(state.characterId);
+  if (charging && !dead && state.characterId == Arena::CharacterId::Kade &&
+      !kadePlacing) {
+    drawKadeCharge(dl, feet, state.charge / 255.0f, timeSeconds);
+  }
   const ActorSheet* actor = definition ? actorFor(definition->name) : nullptr;
 
   // Gravon is the blade. When the host has fallen there is no body to draw:
@@ -1543,6 +1693,33 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
     if (!clip && charging && definition->name == "Nolan") {
       clip = actor->find("lotus_charge");
       elapsed = view.animTime;
+    }
+    if (!clip && charging && kadePlacing) {
+      // Crouched, ready to dash and slap the mirror up.
+      clip = actor->find("slap");
+      elapsed = 0.0f;
+    }
+    if (!clip && charging && definition->name == "Kade") {
+      // The charge-up follows how long the button has been held; at full
+      // charge he holds, trembling.
+      float progress = state.charge / 255.0f;
+      const ActorAnim* up = actor->find("beam_charge");
+      if (up && progress < 0.995f) {
+        clip = up;
+        elapsed = progress * static_cast<float>(up->frames - 1) / up->fps;
+      } else {
+        clip = actor->find("beam_hold");
+        elapsed = view.animTime;
+      }
+    }
+    if (!clip && !dead && state.characterId == Arena::CharacterId::Kade &&
+        state.kitMode != Arena::KadeMode::Ready) {
+      // Full Release: the beam held, trembling; then spent, heaving.
+      clip = actor->find(state.kitMode == Arena::KadeMode::Releasing
+                             ? "release_hold"
+                             : "spent");
+      elapsed = view.animTime;
+      anim.clip.clear();
     }
     if (!clip && charging && definition->name == "Isaac") {
       clip = actor->find("lifeline_charge");
@@ -1654,6 +1831,11 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
     // No sprite at all: a labelled capsule so the game stays playable.
     dl->AddRectFilled(ImVec2(at.x - 12, at.y - 56), ImVec2(at.x + 12, at.y),
                       IM_COL32(state.r, state.g, state.b, 255), 10.0f);
+  }
+
+  if (state.characterId == Arena::CharacterId::Kade && !dead &&
+      state.kitMode == Arena::KadeMode::Spent) {
+    drawKadeSmoke(dl, feet, timeSeconds, state.playerId);
   }
 
   if (isNyx && !dead) {
@@ -1781,6 +1963,173 @@ void ArenaView::drawNyxCrt(ImDrawList* dl, const PlayerState& state) {
                               std::sin(timeSeconds * 7.0f);
   dl->AddCircleFilled(ImVec2(feet.x, feet.y - 14.0f), 22.0f,
                       themeColor(VfxTheme::Wind, 0.12f * flicker), 20);
+}
+
+namespace {
+// A short arrow on the floor out of a mirror's glass: where whatever strikes
+// it will go.
+void drawMirrorFacing(ImDrawList* dl, ImVec2 feet, float dirX, float dirY,
+                      float alpha) {
+  if (std::abs(dirX) + std::abs(dirY) < 0.01f) return;
+  ImVec2 a(feet.x + dirX * 16.0f, feet.y + dirY * 16.0f);
+  ImVec2 b(feet.x + dirX * 40.0f, feet.y + dirY * 40.0f);
+  ImU32 c = themeHot(VfxTheme::Optic, alpha);
+  dl->AddLine(a, b, c, 2.0f);
+  float nx = -dirY, ny = dirX;
+  ImVec2 head[3] = {ImVec2(b.x + dirX * 8.0f, b.y + dirY * 8.0f),
+                    ImVec2(b.x + nx * 5.0f, b.y + ny * 5.0f),
+                    ImVec2(b.x - nx * 5.0f, b.y - ny * 5.0f)};
+  dl->AddConvexPolyFilled(head, 3, c);
+}
+
+// A Kade mirror's partners: the mirrors of the same owner, oldest first.
+std::vector<const ArenaClient::Zone*> kadeMirrorsOf(
+    const std::vector<ArenaClient::Zone>& zones, uint32_t ownerId) {
+  std::vector<const ArenaClient::Zone*> out;
+  for (const ArenaClient::Zone& zone : zones) {
+    if (zone.variant == Arena::KadeMode::MirrorZone && zone.ownerId == ownerId) {
+      out.push_back(&zone);
+    }
+  }
+  std::sort(out.begin(), out.end(),
+            [](const ArenaClient::Zone* a, const ArenaClient::Zone* b) {
+              return a->id < b->id;
+            });
+  return out;
+}
+}  // namespace
+
+bool ArenaView::isKadeMirrorAt(float x, float y) const {
+  for (const ArenaClient::Zone& zone : arena->zones()) {
+    if (zone.variant != Arena::KadeMode::MirrorZone) continue;
+    if (std::abs(zone.x - x) < 2.0f && std::abs(zone.y - y) < 2.0f) return true;
+  }
+  return false;
+}
+
+void ArenaView::drawKadeMirror(ImDrawList* dl, const ArenaClient::Zone& zone) {
+  ImVec2 feet = toScreen(zone.x, zone.y);
+  if (!inView(feet, 80, 120, 80, 40)) return;
+  // The glass faces the way Kade turned it: what strikes it leaves that way.
+  int direction = std::abs(zone.dirX) + std::abs(zone.dirY) > 0.01f
+                      ? directionFrame(zone.dirX, zone.dirY)
+                      : 0;
+  // At the limit, the mirror that goes next flickers while he aims another.
+  float going = 1.0f;
+  auto owner = arena->players().find(zone.ownerId);
+  if (owner != arena->players().end() && owner->second.state.chargeSlot == 0) {
+    auto chain = kadeMirrorsOf(arena->zones(), zone.ownerId);
+    if (static_cast<int>(chain.size()) >= Arena::KadeMode::MAX_MIRRORS &&
+        chain.front()->id == zone.id) {
+      going = 0.45f + 0.35f * std::sin(timeSeconds * 14.0f);
+    }
+  }
+  const ActorSheet* sheet = actorFor("KadeMirror");
+  const ActorAnim* deploy = sheet ? sheet->find("deploy") : nullptr;
+  const ActorAnim* still = sheet ? sheet->find("idle") : nullptr;
+  float age = zone.ageMs / 1000.0f;
+  float fadeIn = std::min(1.0f, zone.ageMs / 120.0f);
+  if (!sheet || !still) {
+    // Unbaked: a tall pane so the spot still reads.
+    dl->AddRectFilled(ImVec2(feet.x - 10, feet.y - 74), ImVec2(feet.x + 10, feet.y),
+                      themeColor(VfxTheme::Optic, 0.55f * fadeIn), 3.0f);
+    dl->AddRect(ImVec2(feet.x - 10, feet.y - 74), ImVec2(feet.x + 10, feet.y),
+                IM_COL32(220, 214, 200, static_cast<int>(255 * fadeIn)), 3.0f, 0,
+                2.0f);
+    return;
+  }
+  drawShadow(dl, feet, 14.0f);
+  bool dropping =
+      deploy && age < static_cast<float>(deploy->frames) / deploy->fps;
+  drawActorFrame(dl, *sheet, dropping ? *deploy : *still, direction,
+                 dropping ? age : 0.0f, feet, 1.0f,
+                 withAlpha(IM_COL32(255, 255, 255, 255), fadeIn * going), true, -1,
+                 0.0f, true);
+  drawMirrorFacing(dl, feet, zone.dirX, zone.dirY, 0.35f * fadeIn);
+  // The glass holds a little light, breathing.
+  float glow = 0.75f + 0.25f * std::sin(timeSeconds * 2.4f + zone.id * 1.3f);
+  dl->AddCircleFilled(ImVec2(feet.x, feet.y - KADE_MIRROR_BEAM_LIFT), 16.0f,
+                      themeColor(VfxTheme::Optic, 0.10f * glow * fadeIn), 16);
+}
+
+void ArenaView::drawKadeHolograms(ImDrawList* dl) {
+  uint32_t me = localId();
+  for (const auto& [id, view] : arena->players()) {
+    const PlayerState& state = view.state;
+    if (state.characterId != Arena::CharacterId::Kade) continue;
+    if (state.chargeSlot != 0 || state.health <= 0.0f) continue;
+    float kx = view.x, ky = view.y, ax = state.aimX, ay = state.aimY;
+    if (id == me) {
+      // The local cursor and body, without the round trip.
+      const Player& local = prediction->getLocalPlayer();
+      kx = local.x;
+      ky = local.y;
+      ax = prediction->getAimX();
+      ay = prediction->getAimY();
+    }
+    float fx, fy;
+    Arena::KadeMode::mirrorFacing(state.kitX, state.kitY, ax, ay, kx, ky, fx, fy);
+    ImVec2 feet = toScreen(state.kitX, state.kitY);
+    float pulse = 0.8f + 0.2f * std::sin(timeSeconds * 6.0f);
+    // The barrier it will join: a faint line to his newest mirror.
+    auto chain = kadeMirrorsOf(arena->zones(), id);
+    if (!chain.empty()) {
+      size_t newest = chain.size() - 1;
+      ImVec2 to = toScreen(chain[newest]->x, chain[newest]->y);
+      ImVec2 from(feet.x, feet.y - KADE_MIRROR_BEAM_LIFT);
+      to.y -= KADE_MIRROR_BEAM_LIFT;
+      const int dashes = 14;
+      for (int i = 0; i < dashes; i += 2) {
+        float u0 = static_cast<float>(i) / dashes, u1 = (i + 1.0f) / dashes;
+        dl->AddLine(ImVec2(from.x + (to.x - from.x) * u0, from.y + (to.y - from.y) * u0),
+                    ImVec2(from.x + (to.x - from.x) * u1, from.y + (to.y - from.y) * u1),
+                    themeColor(VfxTheme::Optic, 0.45f * pulse), 2.0f);
+      }
+    }
+    // Its footprint and the way out of the glass.
+    dl->AddEllipse(feet, ImVec2(26.0f, 11.0f), themeColor(VfxTheme::Optic, 0.6f * pulse),
+                   0.0f, 24, 1.5f);
+    drawMirrorFacing(dl, feet, fx, fy, 0.9f * pulse);
+    const ActorSheet* sheet = actorFor("KadeMirror");
+    const ActorAnim* still = sheet ? sheet->find("idle") : nullptr;
+    if (sheet && still) {
+      // The mirror itself, as blue light.
+      drawActorFrame(dl, *sheet, *still, directionFrame(fx, fy), 0.0f, feet, 1.0f,
+                     IM_COL32(110, 170, 255, static_cast<int>(120 * pulse)), true,
+                     -1, 0.0f, false);
+      // Scan lines across it, rising.
+      for (int i = 0; i < 4; i++) {
+        float u = fract(timeSeconds * 0.8f + i * 0.25f);
+        float y = feet.y - 4.0f - 66.0f * u;
+        dl->AddLine(ImVec2(feet.x - 14.0f, y), ImVec2(feet.x + 14.0f, y),
+                    themeHot(VfxTheme::Optic, 0.35f * (1.0f - u)), 1.0f);
+      }
+    } else {
+      dl->AddRectFilled(ImVec2(feet.x - 10, feet.y - 74), ImVec2(feet.x + 10, feet.y),
+                        themeColor(VfxTheme::Optic, 0.30f * pulse), 3.0f);
+    }
+  }
+}
+
+void ArenaView::drawKadeBarriers(ImDrawList* dl) {
+  // One chain per Kade whose body is up: a down Kade's barrier is off.
+  for (const auto& [id, view] : arena->players()) {
+    if (view.state.characterId != Arena::CharacterId::Kade) continue;
+    if (view.state.health <= 0.0f) continue;
+    auto chain = kadeMirrorsOf(arena->zones(), id);
+    for (size_t i = 0; i + 1 < chain.size(); i++) {
+      const ArenaClient::Zone& a = *chain[i];
+      const ArenaClient::Zone& b = *chain[i + 1];
+      // It joins once the newer mirror has landed.
+      float on = std::min(1.0f, std::max(0.0f, (b.ageMs - 150.0f) / 200.0f));
+      if (on <= 0.0f) continue;
+      float shimmer = 0.75f + 0.25f * std::sin(timeSeconds * 9.0f + a.id);
+      drawOpticBeam(dl, [&](float x, float y) { return toScreen(x, y); }, a.x,
+                    a.y, b.x, b.y, 9.0f, timeSeconds * 0.35f + 1.0f,
+                    0.55f * on * shimmer, KADE_MIRROR_BEAM_LIFT,
+                    KADE_MIRROR_BEAM_LIFT);
+    }
+  }
 }
 
 void ArenaView::drawEnemy(ImDrawList* dl, const ArenaClient::EnemyView& view) {
@@ -2085,7 +2434,8 @@ void ArenaView::drawEntities(ImDrawList* dl) {
   struct Item {
     float depth;
     int kind;  // 0 player, 1 enemy, 2 pickup, 3 ship, 4 Nyx's CRT, 5 swarm,
-               // 6 Gravon's blade on a carrier's back, 7 a terrain rock
+               // 6 Gravon's blade on a carrier's back, 7 a terrain rock,
+               // 8 Kade's mirror
     const void* ptr;
     uint32_t id;
     float x, y;
@@ -2154,6 +2504,10 @@ void ArenaView::drawEntities(ImDrawList* dl) {
                                                              : view.y;
     items.push_back({depth, 1, &view, id, view.x, view.y});
   }
+  for (const ArenaClient::Zone& zone : arena->zones()) {
+    if (zone.variant != Arena::KadeMode::MirrorZone) continue;
+    items.push_back({zone.y, 8, &zone, zone.id, zone.x, zone.y});
+  }
   for (const auto& [id, item] : prediction->getWorldItems()) {
     if (!wasSeen(item.x, item.y)) continue;
     items.push_back({item.y - 1.0f, 2, nullptr, item.itemId, item.x, item.y});
@@ -2206,6 +2560,9 @@ std::sort(items.begin(), items.end(),
       case 5:
         drawNyxSwarm(dl, static_cast<const ArenaClient::PlayerView*>(item.ptr)->state);
         break;
+      case 8:
+        drawKadeMirror(dl, *static_cast<const ArenaClient::Zone*>(item.ptr));
+        break;
       case 7: {
         const auto& rock = *static_cast<const CollisionShape*>(item.ptr);
         // Isaac sees which rocks his Lifeline can reach, and the one he holds.
@@ -2244,6 +2601,8 @@ std::sort(items.begin(), items.end(),
 // ---------------------------------------------------------------------------
 
 void ArenaView::drawAir(ImDrawList* dl) {
+  drawKadeBarriers(dl);
+  drawKadeHolograms(dl);
   effectFx.drawVerbs(
       dl, [this](float x, float y) { return toScreen(x, y); },
       [this](uint32_t id, bool isEnemy, float& x, float& y) {
@@ -2360,6 +2719,15 @@ void ArenaView::drawAir(ImDrawList* dl) {
         break;
       }
       case GameEventKind::Beam: {
+        if (f.theme == VfxTheme::Optic) {
+          drawOpticBeam(dl, [&](float x, float y) { return toScreen(x, y); },
+                        f.x, f.y, f.x2, f.y2, f.value, t, fade,
+                        isKadeMirrorAt(f.x, f.y) ? KADE_MIRROR_BEAM_LIFT
+                                                 : KADE_BEAM_LIFT,
+                        isKadeMirrorAt(f.x2, f.y2) ? KADE_MIRROR_BEAM_LIFT
+                                                   : KADE_BEAM_LIFT);
+          break;
+        }
         ImVec2 a = toScreen(f.x, f.y - PROJECTILE_HEIGHT);
         ImVec2 b = toScreen(f.x2, f.y2 - PROJECTILE_HEIGHT);
         dl->AddLine(a, b, themeColor(f.theme, 0.5f * fade), f.value * 1.8f);

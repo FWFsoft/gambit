@@ -26,6 +26,7 @@ namespace {
 
 using Arena::CharacterId::Gravon;
 using Arena::CharacterId::Isaac;
+using Arena::CharacterId::Kade;
 using Arena::CharacterId::Mina;
 using Arena::CharacterId::Nolan;
 using Arena::CharacterId::Nyx;
@@ -920,6 +921,474 @@ class IsaacKit : public Kit {
 
   void tick(AbilitySystem&, Player& self, float) override {
     self.resource = self.kitCounter[0] != 0 ? 255 : 0;
+  }
+};
+
+// ===========================================================================
+// Kade, the Prism (Playmaker)
+//   kitCounter[0..2]  his mirrors' zone ids, oldest first (0 = none)
+//   kitTimer[0]       time left on Full Release
+//   kitTimer[1]       time left spent after it
+//   kitTimer[2]       Full Release's beam heading (radians)
+//   kitTimer[3]       pulse clock for the barrier and the beam
+//   kitTimer[4]       Refraction Wall: time until the next charge is back
+//   kitCounter[3]     Refraction Wall charges spent (0 = all 3 ready)
+//   resource          charges and recharge, mirrored (KadeMode::charges)
+//   kitMode           Arena::KadeMode (Ready / Releasing / Spent)
+//   kitX/kitY         Refraction Wall held: where the mirror is pinned
+// Mirrors are zones (variant KadeMode::MirrorZone) so every client sees and
+// draws them; the barrier between them is drawn by the client from the
+// same zones, and enforced here on the pulse.
+// ===========================================================================
+class KadeKit : public Kit {
+ public:
+  // Focused Blast: an optic beam from the visor along the aim. Reach,
+  // width and push grow with the charge; a full charge also Stuns.
+  static constexpr float BLAST_REACH_MIN = 200.0f;
+  static constexpr float BLAST_REACH_MAX = 430.0f;
+  static constexpr float BLAST_HALF_WIDTH_MIN = 16.0f;
+  static constexpr float BLAST_HALF_WIDTH_MAX = 46.0f;
+  static constexpr float BLAST_PUSH_MIN = 70.0f;
+  static constexpr float BLAST_PUSH_MAX = 240.0f;
+  static constexpr float BLAST_STUN_MS = 1000.0f;
+  static constexpr float FULL_CHARGE = 0.999f;
+
+  // Mirrors and Refraction Wall.
+  // The mirror goes where his hand slaps the floor: he dashes to arm's
+  // length of the pin.
+  static constexpr float MIRROR_RANGE = 240.0f;
+  static constexpr float SLAP_REACH = 46.0f;
+  static constexpr float SLAP_DASH_MS = 150.0f;  // the "slap" clip's frame 3
+  static constexpr float MIRROR_RADIUS = 26.0f;  // its footprint
+  static constexpr float MIRROR_LIFE_MS = 1.0e9f;  // until replaced
+  static constexpr float DEPLOY_DELAY_MS = 180.0f;  // just after the slap
+  static constexpr float LINK_HALF_WIDTH = 22.0f;
+  static constexpr float LINK_PUSH = 160.0f;
+  static constexpr float BARRIER_HALF_WIDTH = 16.0f;
+  static constexpr float BARRIER_PUSH = 120.0f;
+  static constexpr float BARRIER_REHIT_MS = 900.0f;
+  static constexpr float PULSE_MS = 100.0f;
+
+  // Full Release.
+  static constexpr float RELEASE_MS = 3000.0f;
+  static constexpr float SPENT_MS = 1200.0f;
+  static constexpr float RELEASE_RANGE = 620.0f;
+  static constexpr float RELEASE_EXIT_MIN = 320.0f;  // past the last mirror
+  static constexpr float RELEASE_HALF_WIDTH = 40.0f;
+  static constexpr float RELEASE_CATCH = 36.0f;  // how close counts as a hit
+  static constexpr float RELEASE_TURN_DEG_PER_S = 200.0f;
+  static constexpr float RELEASE_STUN_MS = 800.0f;
+  static constexpr float RELEASE_RESTUN_MS = 500.0f;
+  static constexpr float RELEASE_MOVE_MULT = 0.3f;
+
+  // Mirror Step.
+  static constexpr float STEP_LAND_PAST = 34.0f;  // lands just through it
+
+  struct Mirror {
+    uint32_t id;
+    float x, y;
+  };
+
+  // Live mirrors, oldest first. Drops ids whose zone has gone (round end).
+  static std::vector<Mirror> mirrors(AbilitySystem& sys, Player& self) {
+    std::vector<Mirror> out;
+    int kept = 0;
+    for (int i = 0; i < Arena::KadeMode::MAX_MIRRORS; i++) {
+      uint32_t id = static_cast<uint32_t>(self.kitCounter[i]);
+      const AbilitySystem::Zone* zone = id ? sys.findZone(id) : nullptr;
+      if (!zone) continue;
+      out.push_back({id, zone->x, zone->y});
+      self.kitCounter[kept++] = static_cast<int>(id);
+    }
+    for (int i = kept; i < Arena::KadeMode::MAX_MIRRORS; i++) {
+      self.kitCounter[i] = 0;
+    }
+    return out;
+  }
+
+  // Set a mirror down; at the limit the oldest one (other than `keep`)
+  // goes. Returns the new mirror.
+  static Mirror placeMirror(AbilitySystem& sys, Player& self, float x, float y,
+                            float dirX, float dirY, uint32_t keep = 0) {
+    std::vector<Mirror> live = mirrors(sys, self);
+    if (static_cast<int>(live.size()) >= Arena::KadeMode::MAX_MIRRORS) {
+      auto gone = live.begin();
+      if (gone->id == keep) ++gone;
+      sys.fxBurst(gone->x, gone->y, 30.0f, VfxTheme::Optic);
+      sys.endZone(gone->id);
+      live.erase(gone);
+    }
+    AbilitySystem::Zone zone;
+    zone.ownerId = self.id;
+    zone.x = x;
+    zone.y = y;
+    zone.radius = MIRROR_RADIUS;
+    zone.lifeMs = MIRROR_LIFE_MS;
+    zone.tickMs = MIRROR_LIFE_MS;
+    zone.theme = VfxTheme::Optic;
+    zone.variant = Arena::KadeMode::MirrorZone;
+    zone.dirX = dirX;
+    zone.dirY = dirY;
+    uint32_t id = sys.spawnZone(zone);
+    for (int i = 0; i < Arena::KadeMode::MAX_MIRRORS; i++) {
+      self.kitCounter[i] =
+          i < static_cast<int>(live.size()) ? static_cast<int>(live[i].id) : 0;
+    }
+    self.kitCounter[std::min<int>(static_cast<int>(live.size()),
+                                  Arena::KadeMode::MAX_MIRRORS - 1)] =
+        static_cast<int>(id);
+    return {id, x, y};
+  }
+
+  // Push an enemy off a line, to the side it is on.
+  static void pushOffLine(AbilitySystem& sys, Enemy& enemy, float x0, float y0,
+                          float x1, float y1, float distance) {
+    float lx = x1 - x0, ly = y1 - y0;
+    float len2 = std::max(1.0f, lx * lx + ly * ly);
+    float t = ((enemy.x - x0) * lx + (enemy.y - y0) * ly) / len2;
+    t = std::max(0.0f, std::min(1.0f, t));
+    float px = x0 + lx * t, py = y0 + ly * t;
+    if (dist(px, py, enemy.x, enemy.y) < 1.0f) {
+      // Dead on the line: push along its normal.
+      float len = std::sqrt(len2);
+      px = enemy.x + ly / len;
+      py = enemy.y - lx / len;
+    }
+    sys.knockbackEnemy(enemy, px, py, distance);
+  }
+
+  // A beam's path: straight on until it strikes a mirror (any Kade's),
+  // then straight out of that mirror's glass, and so on. Each mirror turns
+  // it once. After a turn at least `minAfterTurn` of reach is left.
+  struct Segment {
+    float x0, y0, x1, y1;
+  };
+  static std::vector<Segment> tracePath(AbilitySystem& sys, float x, float y,
+                                        float dx, float dy, float reach,
+                                        float minAfterTurn) {
+    std::vector<Segment> path;
+    std::vector<uint32_t> used;
+    for (int bounce = 0; bounce <= 8; bounce++) {
+      const AbilitySystem::Zone* struck = nullptr;
+      float best = reach;
+      for (const AbilitySystem::Zone& zone : sys.allZones()) {
+        if (zone.variant != Arena::KadeMode::MirrorZone || zone.lifeMs <= 0.0f) {
+          continue;
+        }
+        if (std::find(used.begin(), used.end(), zone.id) != used.end()) continue;
+        float t = (zone.x - x) * dx + (zone.y - y) * dy;
+        // A mirror he is standing in does not catch the beam leaving him.
+        float nearest = bounce == 0 ? MIRROR_RADIUS + 8.0f : 0.0f;
+        if (t <= nearest || t >= best) continue;
+        float off = std::fabs((zone.x - x) * dy - (zone.y - y) * dx);
+        if (off <= RELEASE_CATCH) {
+          best = t;
+          struck = &zone;
+        }
+      }
+      if (!struck) {
+        float ex = x + dx * reach, ey = y + dy * reach;
+        sys.clampToWorld(ex, ey);
+        path.push_back({x, y, ex, ey});
+        break;
+      }
+      path.push_back({x, y, struck->x, struck->y});
+      used.push_back(struck->id);
+      x = struck->x;
+      y = struck->y;
+      dx = struck->dirX;
+      dy = struck->dirY;
+      reach = std::max(minAfterTurn, reach - best);
+    }
+    return path;
+  }
+
+  bool canCast(AbilitySystem& sys, const Player& self, int slot) override {
+    if (self.kitMode != Arena::KadeMode::Ready) return false;
+    if (slot == 0) return self.kitCounter[3] < Arena::KadeMode::MAX_MIRRORS;
+    if (slot == 3) {
+      // Mirror Step needs a mirror to step to.
+      for (int i = 0; i < Arena::KadeMode::MAX_MIRRORS; i++) {
+        uint32_t id = static_cast<uint32_t>(self.kitCounter[i]);
+        if (id && sys.findZone(id)) return true;
+      }
+      return false;
+    }
+    return slot >= 0 && slot <= 3;
+  }
+
+  // Refraction Wall held: the press pins the mirror at the target.
+  void chargeTick(AbilityContext& ctx, int slot, float dtMs) override {
+    if (slot != 0) return;
+    if (ctx.self.chargeMs <= dtMs + 0.01f) {
+      aimPoint(ctx, MIRROR_RANGE, ctx.self.kitX, ctx.self.kitY);
+    }
+  }
+
+  float speedMultiplier(const Player& self) const override {
+    if (self.kitMode == Arena::KadeMode::Releasing) return RELEASE_MOVE_MULT;
+    if (self.kitMode == Arena::KadeMode::Spent) return 0.0f;
+    return 1.0f;
+  }
+
+  void onRoundStart(Player& self) override {
+    self.kitMode = Arena::KadeMode::Ready;
+    self.kitAnchored = false;
+    self.kitCounter[3] = 0;
+    self.kitTimer[4] = 0.0f;
+  }
+
+  void cast(AbilityContext& ctx, int slot) override {
+    switch (slot) {
+      case 0:
+        refractionWall(ctx);
+        break;
+      case 1:
+        focusedBlast(ctx);
+        break;
+      case 2:
+        fullRelease(ctx);
+        break;
+      case 3:
+        mirrorStep(ctx);
+        break;
+      default:
+        break;
+    }
+  }
+
+  void tick(AbilitySystem& sys, Player& self, float dtMs) override {
+    using namespace Arena::KadeMode;
+    // Refraction Wall's charges come back one at a time.
+    if (self.kitCounter[3] > 0) {
+      self.kitTimer[4] -= dtMs;
+      if (self.kitTimer[4] <= 0.0f) {
+        self.kitCounter[3]--;
+        self.kitTimer[4] = self.kitCounter[3] > 0 ? CHARGE_MS : 0.0f;
+      }
+    }
+    {
+      int ready = MAX_MIRRORS - self.kitCounter[3];
+      float progress =
+          self.kitCounter[3] > 0 ? 1.0f - self.kitTimer[4] / CHARGE_MS : 0.0f;
+      self.resource = static_cast<uint8_t>(
+          ready * 64 + static_cast<int>(std::max(0.0f, std::min(1.0f, progress)) * 63.0f));
+    }
+    self.kitTimer[3] += dtMs;
+    bool pulse = self.kitTimer[3] >= PULSE_MS;
+    if (pulse) self.kitTimer[3] -= PULSE_MS;
+
+    if (self.kitMode == Releasing) {
+      self.actionLockMs = std::max(self.actionLockMs, 60.0f);
+      // The beam follows the cursor, at a turn rate a player can read.
+      float want = std::atan2(self.aimY - self.y, self.aimX - self.x);
+      float diff = want - self.kitTimer[2];
+      while (diff > 3.14159265f) diff -= 6.2831853f;
+      while (diff < -3.14159265f) diff += 6.2831853f;
+      float step = RELEASE_TURN_DEG_PER_S * 3.14159265f / 180.0f * dtMs / 1000.0f;
+      self.kitTimer[2] += std::max(-step, std::min(step, diff));
+      if (pulse) releasePulse(sys, self);
+      self.kitTimer[0] -= dtMs;
+      if (self.kitTimer[0] <= 0.0f) {
+        self.kitMode = Spent;
+        self.kitTimer[1] = SPENT_MS;
+        self.kitAnchored = true;
+      }
+    } else if (self.kitMode == Spent) {
+      self.actionLockMs = std::max(self.actionLockMs, 60.0f);
+      self.kitTimer[1] -= dtMs;
+      if (self.kitTimer[1] <= 0.0f) {
+        self.kitMode = Ready;
+        self.kitAnchored = false;
+      }
+    }
+
+    if (pulse) barrierPulse(sys, self);
+  }
+
+ private:
+  // Barrier hits remembered per enemy (all Kades share the kit object, so
+  // the key carries the owner).
+  std::unordered_map<uint64_t, float> lastBarrierHit;
+  std::unordered_map<uint64_t, float> lastReleaseHit;
+
+  static uint64_t hitKey(uint32_t ownerId, uint32_t enemyId) {
+    return (static_cast<uint64_t>(ownerId) << 32) | enemyId;
+  }
+
+  void focusedBlast(AbilityContext& ctx) {
+    AbilitySystem& sys = ctx.sys;
+    Player& self = ctx.self;
+    const uint32_t selfId = self.id;
+    const float c = std::max(0.0f, std::min(1.0f, ctx.charge));
+    const bool full = c >= FULL_CHARGE;
+    const float reach = BLAST_REACH_MIN + (BLAST_REACH_MAX - BLAST_REACH_MIN) * c;
+    const float half =
+        BLAST_HALF_WIDTH_MIN + (BLAST_HALF_WIDTH_MAX - BLAST_HALF_WIDTH_MIN) * c;
+    const float push = BLAST_PUSH_MIN + (BLAST_PUSH_MAX - BLAST_PUSH_MIN) * c;
+    const float dx = ctx.dirX, dy = ctx.dirY;
+    float endX = self.x + dx * reach;
+    float endY = self.y + dy * reach;
+    sys.clampToWorld(endX, endY);
+
+    (void)endX;
+    (void)endY;
+    if (full) sys.fxRing(self.x, self.y, 70.0f, VfxTheme::Optic);
+    std::vector<uint32_t> hit;
+    for (const Segment& seg :
+         tracePath(sys, self.x, self.y, dx, dy, reach, BLAST_REACH_MIN)) {
+      sys.fxBeam(seg.x0, seg.y0, seg.x1, seg.y1, half, 260.0f + 160.0f * c,
+                 VfxTheme::Optic);
+      float sl = std::max(1.0f, dist(seg.x0, seg.y0, seg.x1, seg.y1));
+      float sx = (seg.x1 - seg.x0) / sl, sy = (seg.y1 - seg.y0) / sl;
+    sys.enemiesInLine(seg.x0, seg.y0, seg.x1, seg.y1, half, [&](Enemy& enemy) {
+      if (std::find(hit.begin(), hit.end(), enemy.id) != hit.end()) return;
+      hit.push_back(enemy.id);
+      // Pushed along the beam.
+      sys.knockbackEnemy(enemy, enemy.x - sx * 10.0f, enemy.y - sy * 10.0f,
+                         push);
+      sys.fxBurst(enemy.x, enemy.y, 22.0f + 18.0f * c, VfxTheme::Optic);
+      // Playmakers deal no base damage (ARCHETYPES.md); the blast still
+      // counts as a hit for infusions.
+      sys.touchEnemy(selfId, enemy, DamageFlag::Basic);
+      if (full) {
+        sys.applyToEnemy(enemy, EffectType::Stunned, 1, selfId, BLAST_STUN_MS);
+      }
+    });
+    }
+  }
+
+  // LMB released: a short dash with his hand out, a slap on the floor, and
+  // the mirror stands up where it was pinned, its glass the way the cursor
+  // turned it; a beam leaps to it from his last mirror and stays as the
+  // barrier.
+  void refractionWall(AbilityContext& ctx) {
+    AbilitySystem& sys = ctx.sys;
+    const float tx = ctx.self.kitX, ty = ctx.self.kitY;
+    // Spend a charge; the first one spent starts the recharge clock.
+    if (ctx.self.kitCounter[3] == 0) ctx.self.kitTimer[4] = Arena::KadeMode::CHARGE_MS;
+    ctx.self.kitCounter[3]++;
+    float fx, fy;
+    Arena::KadeMode::mirrorFacing(tx, ty, ctx.aimX, ctx.aimY, ctx.self.x,
+                                  ctx.self.y, fx, fy);
+    float dx = tx - ctx.self.x, dy = ty - ctx.self.y;
+    float d = std::sqrt(dx * dx + dy * dy);
+    if (d > SLAP_REACH + 1.0f) {
+      float ex = ctx.self.x + dx / d * (d - SLAP_REACH);
+      float ey = ctx.self.y + dy / d * (d - SLAP_REACH);
+      sys.fxDashTrail(ctx.self.x, ctx.self.y, ex, ey, VfxTheme::Optic);
+      sys.dashPlayer(ctx.self, dx / d, dy / d, d - SLAP_REACH, SLAP_DASH_MS,
+                     false);
+    }
+    const uint32_t selfId = ctx.self.id;
+    sys.schedule(DEPLOY_DELAY_MS, [&sys, selfId, tx, ty, fx, fy]() {
+      Player* self = sys.findPlayer(selfId);
+      if (!self || self->isDead()) return;
+      std::vector<Mirror> before = mirrors(sys, *self);
+      placeMirror(sys, *self, tx, ty, fx, fy);
+      // The slap: a ring out of the floor where the mirror stands up.
+      sys.fxBurst(tx, ty, 26.0f, VfxTheme::Optic);
+      sys.fxRing(tx, ty, 46.0f, VfxTheme::Optic);
+      if (before.empty()) return;
+      const Mirror& prev = before.back();
+      sys.fxBeam(prev.x, prev.y, tx, ty, LINK_HALF_WIDTH, 260.0f,
+                 VfxTheme::Optic);
+      sys.enemiesInLine(prev.x, prev.y, tx, ty, LINK_HALF_WIDTH,
+                        [&](Enemy& enemy) {
+                          pushOffLine(sys, enemy, prev.x, prev.y, tx, ty,
+                                      LINK_PUSH);
+                          sys.fxBurst(enemy.x, enemy.y, 24.0f, VfxTheme::Optic);
+                          sys.touchEnemy(selfId, enemy, DamageFlag::Basic);
+                        });
+    });
+  }
+
+  // The barrier: consecutive mirrors (oldest to newest) are joined.
+  void barrierPulse(AbilitySystem& sys, Player& self) {
+    std::vector<Mirror> live = mirrors(sys, self);
+    if (live.size() < 2) return;
+    const float now = sys.nowMs();
+    const uint32_t selfId = self.id;
+    for (size_t i = 0; i + 1 < live.size(); i++) {
+      const Mirror a = live[i], b = live[i + 1];
+      sys.enemiesInLine(a.x, a.y, b.x, b.y, BARRIER_HALF_WIDTH,
+                        [&](Enemy& enemy) {
+                          float& last = lastBarrierHit[hitKey(selfId, enemy.id)];
+                          if (last > 0.0f && now - last < BARRIER_REHIT_MS) return;
+                          last = now;
+                          pushOffLine(sys, enemy, a.x, a.y, b.x, b.y,
+                                      BARRIER_PUSH);
+                          sys.fxBurst(enemy.x, enemy.y, 20.0f, VfxTheme::Optic);
+                          sys.applyToEnemy(enemy, EffectType::Expose, 1, selfId);
+                          sys.touchEnemy(selfId, enemy);
+                        });
+    }
+  }
+
+  // Q: limiters off. The beam runs for RELEASE_MS, then he is spent.
+  void fullRelease(AbilityContext& ctx) {
+    Player& self = ctx.self;
+    self.kitMode = Arena::KadeMode::Releasing;
+    self.kitTimer[0] = RELEASE_MS;
+    self.kitTimer[2] = std::atan2(ctx.dirY, ctx.dirX);
+    self.kitTimer[3] = PULSE_MS;  // first pulse on the next tick
+    ctx.sys.fxRing(self.x, self.y, 90.0f, VfxTheme::Optic);
+  }
+
+  void releasePulse(AbilitySystem& sys, Player& self) {
+    const float now = sys.nowMs();
+    const uint32_t selfId = self.id;
+    for (const Segment& seg :
+         tracePath(sys, self.x, self.y, std::cos(self.kitTimer[2]),
+                   std::sin(self.kitTimer[2]), RELEASE_RANGE, RELEASE_EXIT_MIN)) {
+      // Each pulse's beam outlives the pulse a little, so it reads as one.
+      sys.fxBeam(seg.x0, seg.y0, seg.x1, seg.y1, RELEASE_HALF_WIDTH,
+                 PULSE_MS * 1.8f, VfxTheme::Optic);
+      sys.enemiesInLine(seg.x0, seg.y0, seg.x1, seg.y1, RELEASE_HALF_WIDTH,
+                        [&](Enemy& enemy) {
+                          float& last = lastReleaseHit[hitKey(selfId, enemy.id)];
+                          if (last > 0.0f && now - last < RELEASE_RESTUN_MS) return;
+                          last = now;
+                          sys.applyToEnemy(enemy, EffectType::Stunned, 1, selfId,
+                                           RELEASE_STUN_MS);
+                          sys.touchEnemy(selfId, enemy);
+                        });
+    }
+  }
+
+  // LSHIFT: a mirror where he stands, and he comes out of the one nearest
+  // the cursor.
+  void mirrorStep(AbilityContext& ctx) {
+    AbilitySystem& sys = ctx.sys;
+    Player& self = ctx.self;
+    std::vector<Mirror> live = mirrors(sys, self);
+    if (live.empty()) return;
+    const Mirror* target = &live.front();
+    for (const Mirror& m : live) {
+      if (dist(m.x, m.y, ctx.aimX, ctx.aimY) <
+          dist(target->x, target->y, ctx.aimX, ctx.aimY)) {
+        target = &m;
+      }
+    }
+    const Mirror to = *target;
+    const float fromX = self.x, fromY = self.y;
+    float dx = to.x - fromX, dy = to.y - fromY;
+    // The mirror he leaves faces the way he went.
+    float fx, fy;
+    Arena::KadeMode::mirrorFacing(fromX, fromY, to.x, to.y, fromX - dx,
+                                  fromY - dy, fx, fy);
+    placeMirror(sys, self, fromX, fromY, fx, fy, to.id);
+    float d = std::sqrt(dx * dx + dy * dy);
+    float landX = to.x, landY = to.y;
+    if (d > 0.001f) {
+      landX += dx / d * STEP_LAND_PAST;
+      landY += dy / d * STEP_LAND_PAST;
+    }
+    sys.clampToWorld(landX, landY);
+    sys.fxDashTrail(fromX, fromY, landX, landY, VfxTheme::Optic);
+    sys.fxBurst(fromX, fromY, 34.0f, VfxTheme::Optic);
+    sys.blinkPlayer(self, landX, landY);
+    sys.fxBurst(landX, landY, 34.0f, VfxTheme::Optic);
   }
 };
 
@@ -2621,6 +3090,8 @@ std::unique_ptr<Kit> makeKit(uint32_t characterId) {
       return std::make_unique<IsaacKit>();
     case Zephyr:
       return std::make_unique<ZephyrKit>();
+    case Kade:
+      return std::make_unique<KadeKit>();
     case Mina:
       return std::make_unique<MinaKit>();
     case Volgore:

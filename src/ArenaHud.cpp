@@ -324,7 +324,41 @@ void ArenaView::drawAbilityBar() {
     }
 
     bool charging = state.chargeSlot == slot;
-    if (charging) {
+    const bool kade = state.characterId == Arena::CharacterId::Kade;
+    if (kade && slot == 0) {
+      // Prismatic Advantage: his mirror charges, on the box's top edge.
+      // Lit for a charge ready; the next one fills from the bottom as it
+      // comes back.
+      const int ready = Arena::KadeMode::charges(state.resource);
+      const float progress = Arena::KadeMode::rechargeProgress(state.resource);
+      const float pw = 9.0f, ph = 13.0f, pg = 5.0f;
+      float x0 = a.x + box * 0.5f - (3.0f * pw + 2.0f * pg) * 0.5f;
+      for (int i = 0; i < Arena::KadeMode::MAX_MIRRORS; i++) {
+        ImVec2 p0(x0 + i * (pw + pg), a.y - ph * 0.5f);
+        ImVec2 p1(p0.x + pw, p0.y + ph);
+        dl->AddRectFilled(p0, p1, IM_COL32(10, 12, 24, 240), 2.0f);
+        float fill = i < ready ? 1.0f : (i == ready ? progress : 0.0f);
+        if (fill > 0.0f) {
+          float top = p1.y - 1.5f - (ph - 3.0f) * fill;
+          dl->AddRectFilled(ImVec2(p0.x + 1.5f, top), ImVec2(p1.x - 1.5f, p1.y - 1.5f),
+                            i < ready ? IM_COL32(90, 160, 255, 255)
+                                      : IM_COL32(60, 100, 170, 200),
+                            1.5f);
+        }
+        dl->AddRect(p0, p1, IM_COL32(220, 214, 200, 255), 2.0f, 0, 1.5f);
+      }
+      if (ready == 0 && progress < 1.0f) {
+        // Out of charges: the box reads as cooling down.
+        float left = (1.0f - progress) * Arena::KadeMode::CHARGE_MS;
+        dl->AddRectFilled(a, ImVec2(b.x, a.y + box * (1.0f - progress)),
+                          IM_COL32(0, 0, 0, 170), 6.0f);
+        char secs[8];
+        std::snprintf(secs, sizeof(secs), "%.0f", std::ceil(left / 1000.0f));
+        text(dl, ImVec2(a.x + box * 0.5f, a.y + 38.0f), IM_COL32(255, 255, 255, 255),
+             16.0f, secs);
+      }
+    }
+    if (charging && !(kade && slot == 0)) {
       float progress = state.charge / 255.0f;
       dl->AddRectFilled(ImVec2(a.x, b.y - 6.0f),
                         ImVec2(a.x + box * progress, b.y),

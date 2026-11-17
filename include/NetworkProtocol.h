@@ -388,7 +388,8 @@ enum class VfxTheme : uint8_t {
   Shadow = 10,  // violet
   Heal = 11,    // mint
   Danger = 12,  // enemy telegraph red
-  Nanite = 13   // magenta pixels: Nyx's swarm
+  Nanite = 13,  // magenta pixels: Nyx's swarm
+  Optic = 14    // VHS blue with magenta streaks: Kade's visor and mirrors
 };
 
 enum class Announcement : uint8_t {

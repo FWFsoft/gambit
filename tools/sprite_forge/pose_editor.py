@@ -19,6 +19,13 @@ art/models/<Name>.anim.json. The steps are in
 The actor module needs: build(), rig(), current() returning the animation
 dictionary, MODEL, FIT, NAME. Add --check to embed the rig's own answers so
 the page's solver can be compared with it (window.__pose.verify()).
+
+Reference poses: --ref "<clip>:<frame>=<model file>[=<label>]" (repeatable)
+adds a posed model (an image-to-3D render of the key, say) as a
+see-through ghost in all three views. It shows on that key by default; the
+page's Reference card picks any ghost for any key and sets its size,
+position and opacity. Ghosts are stored at 1.0 tall and sized on the page
+to the rig's height in the key, so a crouch is compared with a crouch.
 """
 
 import base64
@@ -117,7 +124,36 @@ def tips(model, fit):
     return out
 
 
+def ref_payload(spec):
+    """One --ref: the posed model as a light, untextured ghost mesh."""
+    key, path = spec.split("=", 1)
+    label = None
+    if "=" in path:
+        path, label = path.split("=", 1)
+    clip, frame = key.rsplit(":", 1)
+    obj, v = skin.load_mesh(path, 1.0)
+    mesh = obj.data
+    mesh.calc_loop_triangles()
+    tris = np.empty(len(mesh.loop_triangles) * 3, dtype=np.int32)
+    mesh.loop_triangles.foreach_get("vertices", tris)
+    bpy.data.objects.remove(obj, do_unlink=True)
+    return {"clip": clip, "frame": int(frame),
+            "label": label or f"{clip} {frame}",
+            "position": b64(v.astype(np.float32)),
+            "index": b64(tris.astype(np.uint32)),
+            "count": int(len(v))}
+
+
 def main():
+    refs = []
+    argv = []
+    it = iter(sys.argv[1:])
+    for a in it:
+        if a == "--ref":
+            refs.append(next(it))
+        else:
+            argv.append(a)
+    sys.argv = [sys.argv[0]] + argv
     actor, out = sys.argv[1], sys.argv[2]
     mod = importlib.import_module(actor)
     bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -133,6 +169,7 @@ def main():
     payload = {
         "name": mod.NAME, "model_id": model_id, "height": mod.HEIGHT,
         "elevation": forge.CAMERA_ELEVATION_DEG,
+        "max_reach": getattr(rig, "max_reach", 0.997),
         "joints": [{"name": n, "parent": model.parent_of[n],
                     "rest": [round(float(c), 5) for c in model.rest_world(n)]}
                    for n in model.joints],
@@ -140,6 +177,7 @@ def main():
         "mesh": mesh_payload(s),
         "texture": texture_uri(s),
         "anim": data,
+        "refs": [ref_payload(r) for r in refs],
     }
     if "--check" in sys.argv:
         payload["check"] = {}

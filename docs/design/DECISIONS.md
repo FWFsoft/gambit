@@ -21,6 +21,135 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-17: Kade's mirrors: held placement, out-of-the-glass reflection, Full Release, Mirror Step
+- **Decision:** The rest of Kade's kit.
+  - **Mirrors (passive):** person-high (1.9 m, his height) panes that stand
+    until replaced, 3 at most; a 4th replaces the oldest. Each faces one
+    of 8 ways. Anything that strikes one leaves **straight out of its
+    glass**: his beams (RMB and Q) and allies' projectiles. Each mirror
+    turns a beam once.
+  - **LMB, Refraction Wall:** held. The press pins a blue hologram of the
+    mirror at the cursor (reach 240), and circling the cursor around it
+    turns the glass, snapped to 8 ways. A floor arrow shows where struck
+    things will go. On release he dashes (150 ms) to arm's length, slaps
+    the floor, and the mirror swings up out of it.
+    - The new mirror joins his previous one with a beam (push 160) that
+      stays as a barrier between consecutive mirrors, oldest to newest.
+      Crossing it gives Knockback 120 and +1 Expose, at most once per
+      enemy every 0.9 s.
+    - **Charges, not a cooldown** (the human's call): 3 charges, one per
+      mirror, with a 350 ms lockout between drops, so three can go down
+      almost at once. A spent charge comes back after 5 s, one at a time.
+      With 3 mirrors standing, the next drop replaces the oldest, but only
+      once a charge is back. He moves slowly while aiming.
+  - **Q, Full Release:** a 3 s beam that follows the cursor at 200°/s,
+    reach 620. After each mirror it turns, at least 320 is left. Stuns
+    whatever it touches (0.8 s, refreshed every 0.5 s). He moves at 30%
+    while it runs and can cast nothing.
+    - Then he is **spent** for 1.2 s: rooted, hunched over his knees,
+      violet smoke curling off him. Cooldown 16 s.
+  - **LSHIFT, Mirror Step:** needs a mirror. He leaves a mirror where he
+    stands (facing the way he went) and comes out just past the mirror
+    nearest the cursor. That mirror is never the one replaced. Cooldown
+    8 s.
+  - **HUD:** three charge pips on the LMB box. A lit pip is a charge
+    ready, and the next charge fills from the bottom as it comes back. With
+    none left, the box greys out with a countdown. While he aims a 4th
+    mirror, the one it will replace flickers in the world.
+  - A mirror Kade is standing in does not catch his own beam as it leaves
+    him; the human's playtest showed that confusing.
+- **Pillars:**
+  - Creative Builds: mirror angles make a geometry puzzle. Beams can be
+    routed round corners and allies' shots bounced. The barrier, the Q and
+    the step all depend on where the mirrors stand.
+  - Comradery: teammates' projectiles use his mirrors too, so placing them
+    for the team is "when I win, we win".
+  - Clarity: the hologram, the facing arrows, the slot pips and the
+    "next to go" flicker. The Q telegraphs its whole bent path.
+  - Strategic Crunch: the spent window is a real cost after the Q, and
+    Mirror Step spends a mirror slot.
+- **Why:**
+  - **Pinned by the human:** reflection out of the glass, the held
+    hologram with 8 facings, the slot indicator, the dash-and-slap, the
+    mirror's height, and the Q's recovery with smoke.
+  - **Trade-off, flagged:** the slap puts the mirror where his hand lands,
+    so placement reach dropped from 380 to 240 and placing moves him
+    toward it. That is less safe and less far, and takes him toward
+    danger. Raise MIRROR_RANGE in KadeKit if it feels cramped; the dash
+    lengthens to match.
+  - **My calls, not asked for:**
+    - the barrier joins consecutive mirrors whatever their facing;
+    - enemy projectiles pass through mirrors (only the players' turn);
+    - mirrors cannot be destroyed yet, although the passive says "until
+      destroyed";
+    - a mirror whose Kade is down keeps standing, but its barrier stops.
+  - **Replaced:** my first Q relayed light through every mirror,
+    nearest-next. The human's facing rule is predictable and gives the
+    player control, so it replaced that.
+  - Numbers are prototype tuning.
+  - **Checks:**
+    - `silhouette.py --legacy` flags no look-alike for the mirror.
+    - It does flag Kade himself against VenoxaridGrunt (0.85), Wade and
+      old Presidente. That comes from his idle pose, not this change, and
+      weakens Clarity until his idle gets a stronger shape.
+    - ArenaSim's bots do not play Kade, so there is no balance run.
+- **Status:** Built, needs review
+- **Where:**
+  - `src/CharacterKits.cpp` (KadeKit), `src/AbilitySystem.cpp`
+    (findZone/endZone, mirror-turned projectiles),
+    `include/ArenaData.h` (KadeMode, mirrorFacing), `src/ArenaData.cpp`;
+  - `src/ArenaView.cpp` (mirrors, hologram, barrier, smoke, clips),
+    `src/ArenaHud.cpp` (pips), `src/ArenaClient.cpp`;
+  - `tests/test_kade_kit.cpp`, including the human's mirror-to-mirror
+    bounce;
+  - sprites from `tools/sprite_forge/actors/kade.py` (slap, release_hold,
+    spent, step, all code-posed, for the human to polish) and
+    `kade_mirror.py` (model `art/models/KadeMirror.glb`);
+  - `docs/prototype/kade_kit.gif`.
+
+## 2026-11-17: Kade joins the roster with Focused Blast (RMB) only
+- **Decision:** Kade (the Prism) is playable as a **Playmaker** (240 HP,
+  255 speed), with the human's kit text on the HUD. Only **Focused Blast**
+  works: hold up to 1.5s, release an optic beam from the visor along the
+  aim. Reach 200 to 430, half-width 16 to 46, push 70 to 240, all growing
+  with the charge; a full charge also Stuns for 1s. Cooldown 6s. No
+  damage (Playmakers deal none); hits still count for on-hit infusions.
+  Refraction Wall, Full Release and Mirror Step are listed but refuse to
+  cast ("Not in the game yet"), as is the passive (mirrors). (Since built:
+  see "Kade's mirrors" above.)
+- **Pillars:** Clarity: the charge reads at a glance (his pose follows
+  the charge level, a dashed ring builds round his head, the visor
+  brightens, arcs crackle) and the beam shows its reach and width before
+  it pushes. Strategic Crunch: a 6s cooldown and a 1.5s hold make the
+  full-charge stun a commitment. Creative Builds / Comradery are **weak
+  until the mirrors exist**: the kit's identity (beams reflecting off
+  mirrors, barriers) is not built, so today he is a pusher with a stun.
+- **Why:** The human asked for the RMB in the game first. "Blast radius"
+  follows the KADE RMB reference sheet: a wider, longer beam, not an
+  explosion at the cursor. Playmaker because the kit is all crowd control
+  (knockback, stun, barriers), per ARCHETYPES.md. The numbers are
+  prototype tuning. A new effect colour, Optic (VHS blue, magenta
+  streaks), keeps his light distinct from Wind and Ice.
+- **Status:** Built, needs review
+- **Where:** `src/CharacterKits.cpp` (KadeKit), `src/ArenaData.cpp`,
+  `src/ArenaView.cpp` (clips, charge effects, optic beam),
+  `include/NetworkProtocol.h`, `include/ArenaDraw.h`; sprite
+  `assets/sprites/actors/Kade.png` (poses posed by hand in the pose
+  editor; run, hit and death are code-built stand-ins);
+  `docs/prototype/kade_focused_blast.gif`
+
+## 2026-11-17: Kade's rig gets collarbones and closing fists (opt-in)
+- **Decision:** The sprite forge's skin can add finger joints (hands that
+  close into fists) and collarbones (shoulders that shrug and roll) for an
+  actor that asks for them. Only Kade uses them; no other actor changes.
+- **Pillars:** Clarity: fists and shoulder posture read in the silhouette
+  (a clenched charge, a hunched brace).
+- **Why:** The human could not pose Kade's release key without moving the
+  shoulders, and asked for fists that close as the move charges.
+- **Status:** Built, needs review
+- **Where:** `tools/sprite_forge/skin.py`, `tools/sprite_forge/actors/_rig.py`,
+  `tools/sprite_forge/pose_editor.html`
+
 ## 2026-11-17: Terrain on the arena; Isaac's Lifeline anchors to it
 - **Decision** (requested by Noah, who picked Isaac to force terrain in):
   the arena has terrain: 51 rock outcrops (rectangles of Tiled type

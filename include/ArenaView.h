@@ -111,6 +111,16 @@ class ArenaView {
   std::unordered_map<uint32_t, NyxView> nyxViews;
   void updateNyxView(const PlayerState& state);
   void drawNyxSwarm(ImDrawList* dl, const PlayerState& state);
+  // Kade's mirrors: a person-high pane standing where he set it, its glass
+  // turned to the mirror it is joined to.
+  void drawKadeMirror(ImDrawList* dl, const ArenaClient::Zone& zone);
+  // The barriers between each Kade's mirrors (oldest to newest).
+  void drawKadeBarriers(ImDrawList* dl);
+  // Refraction Wall held: the mirror as a blue hologram where it is pinned,
+  // turned the way the cursor says.
+  void drawKadeHolograms(ImDrawList* dl);
+  // Kade's mirror (if any) standing at this point.
+  bool isKadeMirrorAt(float x, float y) const;
   void drawNyxCrt(ImDrawList* dl, const PlayerState& state);
   // Gravon: when the host last fell or rose (to play the fall, the fading
   // body and the rise), where he fell and which way he faced.

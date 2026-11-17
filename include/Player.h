@@ -70,7 +70,7 @@ struct Player : public Animatable {
   uint8_t stateFlags = 0;      // PlayerFlags, mirrored
   uint8_t resource = 0;        // kit meter (0-255)
   // Scratch state for the active kit (meaning is per character).
-  float kitTimer[4] = {0, 0, 0, 0};
+  float kitTimer[6] = {0, 0, 0, 0, 0, 0};
   int kitCounter[4] = {0, 0, 0, 0};
   uint32_t kitTarget = 0;
   // Mirrored to clients: a point the kit owns, a prop it set down, and a

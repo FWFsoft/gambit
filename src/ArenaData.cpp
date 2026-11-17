@@ -224,6 +224,39 @@ static const KitInfo KITS[] = {
          {"Tempest Dash", "Dash a long distance through enemies.", 6000.0f,
           AbilityMode::Tap, 0.0f},
      }},
+    {CharacterId::Kade,
+     "Kade",
+     "the Prism",
+     Archetype::Playmaker,
+     240.0f,
+     255.0f,
+     "Prismatic Advantage",
+     "Deploys reflective prismatic mirrors that remain active until "
+     "destroyed or replaced (maximum 3 active).",
+     {
+         {"Refraction Wall",
+          "Hold: a hologram of the mirror appears at the target; circle the "
+          "cursor around it to turn the glass. Release: dash to it and slap "
+          "the floor, and the mirror stands up. "
+          "Anything that strikes a mirror leaves straight out of its glass. "
+          "If another mirror exists, a beam joins them into a barrier of "
+          "light: Knockback, and +1 Expose to enemies crossing it. "
+          "3 charges, each back 5s after use.",
+          350.0f, AbilityMode::Charge, 2500.0f, "Refract Wall"},
+         {"Focused Blast",
+          "Hold: charge an optic blast from the visor and release it toward "
+          "the target. Its reach, width and knockback grow with the charge. "
+          "Full charge also Stuns for 1s.",
+          6000.0f, AbilityMode::Charge, 1500.0f, "Focused Blast"},
+         {"Full Release",
+          "Remove your beam limiters for 3s: a huge beam you aim freely, "
+          "turned by every mirror it strikes. Everything it strikes is Stunned. "
+          "Afterwards you are spent: rooted for a moment.",
+          16000.0f, AbilityMode::Tap, 0.0f, "Full Release"},
+         {"Mirror Step",
+          "Leave a mirror where you stand and teleport through the mirror nearest the target.",
+          8000.0f, AbilityMode::Tap, 0.0f, "Mirror Step"},
+     }},
     {CharacterId::Mina,
      "Mina",
      "the Professional",

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cmath>
 #include <cstdint>
 
 // Shared (client + server) game data for the playable prototype: genera,
@@ -157,6 +158,7 @@ bool isPlayable(uint32_t characterId);
 namespace CharacterId {
 constexpr uint32_t Gravon = 3;
 constexpr uint32_t Isaac = 4;
+constexpr uint32_t Kade = 6;
 constexpr uint32_t Mina = 9;
 constexpr uint32_t Nolan = 12;
 constexpr uint32_t Nyx = 13;
@@ -191,6 +193,46 @@ inline uint8_t pack(uint8_t swarm, uint8_t self) {
   return static_cast<uint8_t>((self << 4) | (swarm & 0x0F));
 }
 }  // namespace NyxMode
+
+// Kade's mirrored state (Player::kitMode). His mirrors are zones of
+// variant KadeMode::MirrorZone owned by him; the barrier joins them in the
+// order they were set down (oldest to newest).
+namespace KadeMode {
+constexpr uint8_t Ready = 0;
+constexpr uint8_t Releasing = 1;  // Full Release: the beam is running
+constexpr uint8_t Spent = 2;      // after it: hunched, recovering
+constexpr uint8_t MirrorZone = 3;  // Zone variant for a mirror
+constexpr int MAX_MIRRORS = 3;
+// Refraction Wall is charge based: one charge per mirror, MAX_MIRRORS of
+// them, each recharging in turn. Mirrored in Player::resource as
+// charges * 64 + the next charge's progress (0-63).
+constexpr float CHARGE_MS = 5000.0f;
+inline int charges(uint8_t resource) { return resource / 64; }
+inline float rechargeProgress(uint8_t resource) {
+  return static_cast<float>(resource % 64) / 63.0f;
+}
+// Refraction Wall is held: the press pins the mirror at the target, and the
+// cursor's direction from that point turns its glass (8 ways, as the sprite
+// has). With the cursor on the pin the glass faces on, away from Kade.
+// Whatever strikes a mirror leaves it straight out of the glass.
+constexpr float AIM_DEADZONE = 24.0f;
+inline void mirrorFacing(float pinX, float pinY, float aimX, float aimY,
+                         float kadeX, float kadeY, float& dirX, float& dirY) {
+  float dx = aimX - pinX, dy = aimY - pinY;
+  if (dx * dx + dy * dy < AIM_DEADZONE * AIM_DEADZONE) {
+    dx = pinX - kadeX;
+    dy = pinY - kadeY;
+  }
+  if (dx * dx + dy * dy < 1.0e-4f) {
+    dx = 0.0f;
+    dy = 1.0f;
+  }
+  const float step = 0.78539816f;  // 45 degrees
+  float a = std::round(std::atan2(dy, dx) / step) * step;
+  dirX = std::cos(a);
+  dirY = std::sin(a);
+}
+}  // namespace KadeMode
 
 // Gravon's mirrored state (Player::kitMode). The player is the blade: while
 // the host stands they are one; when he falls the player *is* the blade, on
