@@ -126,7 +126,9 @@ void test_TitansSlash_HeavesOffHisBack_ThenAFlatHalfCircle() {
   w.run(300.0f);
   assert(w.lost(ahead) == 0.0f);
   assert(w.gravon().speedMult < 0.5f);
-  w.run(200.0f);
+  // The blade meets the one ahead first and holds on it (hitstop) before
+  // it reaches the one out wide.
+  w.run(450.0f);
   assert(w.lost(ahead) > 40.0f);
   assert(w.lost(wide) > 40.0f);
   assert(w.lost(behind) == 0.0f);
@@ -134,13 +136,98 @@ void test_TitansSlash_HeavesOffHisBack_ThenAFlatHalfCircle() {
   assert(w.gravon().kitMode & Mode::DrawnBit);
   // Then two hands, back and forth: forehand, backhand, forehand.
   for (int i = 0; i < 3; i++) {
-    w.run(1050.0f);  // past the cooldown
+    w.run(1500.0f);  // past the cooldown, which waits out each hold
     w.tap(LMB);
   }
   w.run(400.0f);
   assert(w.castsOf(0, Arena::GravonForm::SlashForehand) == 2);
   assert(w.castsOf(0, Arena::GravonForm::SlashBackhand) == 1);
   assert(w.castsOf(0, Arena::GravonForm::SlashHeave) == 1);
+}
+
+// The tick (in ms since the swing) each foe first lost health, swinging
+// once at a fan of foes. -1 for a foe never struck.
+std::vector<float> sweepOrder(World &w, const std::vector<uint32_t> &foes) {
+  std::vector<float> struckAt(foes.size(), -1.0f);
+  for (float t = 0.0f; t < 1000.0f; t += TICK_MS) {
+    w.run(TICK_MS);
+    for (size_t i = 0; i < foes.size(); i++) {
+      if (struckAt[i] < 0.0f && w.lost(foes[i]) > 0.0f) struckAt[i] = t;
+    }
+  }
+  return struckAt;
+}
+
+void test_TitansSlash_SweepsThroughACrowd_HoldingOnEach() {
+  World w;
+  // Facing east (y points down the screen): his left is north, his right
+  // is south. Left, ahead and right.
+  uint32_t left = w.foe(30.0f, -100.0f);
+  uint32_t ahead = w.foe(100.0f, 0.0f);
+  uint32_t right = w.foe(30.0f, 100.0f);
+  // The heave off his back is a backhand: left to right.
+  w.tap(LMB);
+  std::vector<float> at = sweepOrder(w, {left, ahead, right});
+  assert(at[0] >= 0.0f && at[1] > at[0] && at[2] > at[1]);
+  // Each gap is at least the hold on the foe before it.
+  float hold = AbilitySystem::hitStopMsFor(46.0f, 0);
+  assert(at[1] - at[0] >= hold - TICK_MS);
+  assert(at[2] - at[1] >= hold - TICK_MS);
+  // Every foe was held in turn, and the swing held with them.
+  int stops = 0;
+  for (const auto &e : w.events) {
+    if (e.kind == GameEventKind::HitStop && e.sourceId == GRAVON_ID) {
+      assert(e.value > 0.0f && e.value2 > 0.0f);
+      stops++;
+    }
+  }
+  assert(stops == 3);
+
+  // The next is a forehand: right to left.
+  w.run(1200.0f);
+  for (uint32_t id : {left, ahead, right}) w.enemy(id).health = 5000.0f;
+  w.tap(LMB);
+  assert(w.castsOf(0, Arena::GravonForm::SlashForehand) == 1);
+  at = sweepOrder(w, {left, ahead, right});
+  assert(at[2] >= 0.0f && at[1] > at[2] && at[0] > at[1]);
+}
+
+void test_HitStop_HoldsTheTarget_AndTheSwingsClock() {
+  World w;
+  uint32_t ahead = w.foe(100.0f, 0.0f);
+  w.tap(LMB);
+  while (w.lost(ahead) == 0.0f) w.run(TICK_MS);
+  // Both are held for the same beat; the foe's windup would wait too.
+  float held = w.gravon().hitStopMs;
+  assert(held > 0.0f);
+  assert(w.enemy(ahead).hitStopMs > 0.0f);
+  // This world does not run enemy AI; tick it here to watch the foe.
+  auto tickFoes = [&w](float ms) {
+    for (float t = 0.0f; t < ms; t += TICK_MS) {
+      w.enemies.update(TICK_MS, w.players, &w.effects);
+    }
+  };
+  float x = w.enemy(ahead).x;
+  float knockMs = w.enemy(ahead).knockMs;
+  assert(knockMs > 0.0f);
+  tickFoes(w.enemy(ahead).hitStopMs * 0.5f);
+  // The knockback waits for the hold.
+  assert(w.enemy(ahead).x == x);
+  assert(w.enemy(ahead).knockMs == knockMs);
+  tickFoes(w.enemy(ahead).hitStopMs + TICK_MS * 2.0f);
+  assert(w.enemy(ahead).hitStopMs == 0.0f);
+  assert(w.enemy(ahead).x > x);  // then it goes
+}
+
+void test_HitStop_LongerForHeavierHits_ShorterWithHaste() {
+  float light = AbilitySystem::hitStopMsFor(15.0f, 0);
+  float heavy = AbilitySystem::hitStopMsFor(46.0f, 0);
+  float hasted = AbilitySystem::hitStopMsFor(46.0f, 5);
+  assert(light > 0.0f && heavy > light);
+  assert(hasted < heavy * 0.5f);
+  // Capped: a huge hit holds, it does not stop the fight.
+  assert(AbilitySystem::hitStopMsFor(10000.0f, 0) ==
+         Arena::Tuning::HITSTOP_MAX_MS);
 }
 
 void test_TitansSlash_TwoHandedSwingIsQuickerThanTheHeave() {
@@ -440,6 +527,9 @@ int main() {
   Logger::init();
   test_Selectable_StartsAsTheHost();
   test_TitansSlash_HeavesOffHisBack_ThenAFlatHalfCircle();
+  test_TitansSlash_SweepsThroughACrowd_HoldingOnEach();
+  test_HitStop_HoldsTheTarget_AndTheSwingsClock();
+  test_HitStop_LongerForHeavierHits_ShorterWithHaste();
   test_TitansSlash_TwoHandedSwingIsQuickerThanTheHeave();
   test_TitansSlash_OutOfARun_HeavesItUpFromTheDrag();
   test_Slow_SlowerWithTheBladeOut_AndHePutsItAway();

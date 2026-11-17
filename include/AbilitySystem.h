@@ -194,6 +194,13 @@ class AbilitySystem {
   void applyToPlayer(Player& player, EffectType type, int stacks,
                      uint32_t sourceId, float durationMs = -1.0f);
   void grantShield(Player& player, float amount, float durationMs);
+  // Hitstop length for a melee hit of `power` damage by an attacker with
+  // `hasteStacks` Haste (Arena::Tuning::HITSTOP_*).
+  static float hitStopMsFor(float power, int hasteStacks);
+  // Hold the attacker's swing and the target for a melee hit. Called by
+  // damageEnemy for every Melee hit that is not a proc or damage over time.
+  // Returns the attacker's hold in ms.
+  float hitStop(Player& attacker, Enemy& target, float power);
 
   // ---- effect verbs ------------------------------------------------------
   // The effect manipulations builds are made of. Each one also sends an
@@ -298,8 +305,11 @@ class AbilitySystem {
 
   // ---- VFX (broadcast to clients) ----------------------------------------
   void emit(const GameEventPacket& packet);
+  // ownerId: the player swinging, so the trail holds with their hitstop.
+  // reverse: the trail sweeps from the swinger's right to their left.
   void fxSlash(float x, float y, float dirX, float dirY, float radius,
-               float arcDeg, VfxTheme theme);
+               float arcDeg, VfxTheme theme, uint32_t ownerId = 0,
+               bool reverse = false);
   void fxCone(float x, float y, float dirX, float dirY, float radius,
               float arcDeg, VfxTheme theme);
   void fxBurst(float x, float y, float radius, VfxTheme theme);
@@ -356,7 +366,8 @@ class AbilitySystem {
 
   void updatePlayer(Player& player, float dtMs);
   void settleDeath(Player& player);
-  void updateAbilityInput(Player& player, float dtMs);
+  // actionDtMs is dtMs less any hitstop: channels keep that rhythm.
+  void updateAbilityInput(Player& player, float dtMs, float actionDtMs);
   void fire(Player& player, int slot, float charge);
   void updateForcedMotion(Player& player, float dtMs);
   void updateProjectiles(float dtMs);

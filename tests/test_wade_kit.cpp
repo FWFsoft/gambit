@@ -119,6 +119,47 @@ void test_SimplePunches_ThirdPunchGrantsHasteAndResetsRoll() {
   assert(wade.cooldownMs[3] == 0.0f);
 }
 
+// Game time of each punch thrown while holding LMB for `ms`.
+std::vector<float> punchTimes(World &world, float ms) {
+  std::vector<float> at;
+  size_t seen = 0;
+  for (float t = 0.0f; t < ms; t += TICK_MS) {
+    world.run(TICK_MS, LMB);
+    size_t now = world.casts(0).size();
+    for (; seen < now; seen++) at.push_back(t);
+  }
+  return at;
+}
+
+void test_SimplePunches_HoldOnEachHit_AndSpeedUpWithHaste() {
+  // Into the air: nothing to hold on.
+  World air;
+  std::vector<float> whiff = punchTimes(air, 900.0f);
+  assert(whiff.size() >= 2);
+  float whiffGap = whiff[1] - whiff[0];
+
+  // Into a foe: every punch holds for a beat (boom, pause, boom).
+  World world;
+  world.spawnEnemy(50.0f, 0.0f);
+  std::vector<float> hits = punchTimes(world, 6000.0f);
+  assert(hits.size() >= 12);
+  float firstGap = hits[1] - hits[0];
+  assert(firstGap > whiffGap);
+
+  // Every third punch adds Haste, and Haste cuts both the cooldown and the
+  // hold: by the end he is going bap-bap-bap.
+  float lastGap = hits[hits.size() - 1] - hits[hits.size() - 2];
+  assert(lastGap < firstGap * 0.65f);
+  std::vector<float> holds;
+  for (const GameEventPacket &p : world.events) {
+    if (p.kind == GameEventKind::HitStop && p.sourceId == WADE_ID) {
+      holds.push_back(p.value);
+    }
+  }
+  assert(holds.size() == hits.size());
+  assert(holds.back() < holds.front() * 0.5f);
+}
+
 void test_Uppercuts_AlternateHandsAndPlantFeet() {
   World world;
   world.run(1500.0f, RMB);
@@ -238,6 +279,7 @@ int main() {
   Logger::init();
   test_SimplePunches_ThrowValidCombinations();
   test_SimplePunches_ThirdPunchGrantsHasteAndResetsRoll();
+  test_SimplePunches_HoldOnEachHit_AndSpeedUpWithHaste();
   test_Uppercuts_AlternateHandsAndPlantFeet();
   test_Uppercuts_SpeedUpWithHaste();
   test_Slip_CountersWithDelayedHaymakerTowardAttacker();

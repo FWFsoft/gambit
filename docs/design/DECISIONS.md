@@ -21,6 +21,58 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-16: Hitstop on every melee hit, and Titan's Slash sweeps through a crowd
+- **Decision** (requested by Noah; numbers mine):
+  - **Hitstop:** every melee hit (DamageFlag::Melee, not procs or damage
+    over time) holds both sides for a beat:
+    `min(250, 60 + 2 × power) / (1 + 0.3 × Haste stacks)` ms, where power
+    is the hit's damage after crit and Empowered, before armour. Wade's
+    punch (15) holds 90 ms, 36 ms at 5 Haste; Gravon's slash (38) 136 ms,
+    heave (46) 152 ms, a crit slash 192 ms; capped at 250 ms. (First
+    built at roughly half this; Noah could barely see it in play.)
+  - **The attacker:** cooldowns, the action lock and channel rhythm stand
+    still, the attack clip freezes on the client, and so does the swing's
+    slash trail (which also now sweeps the way the blade does). Your own
+    hits kick the camera a little (2-3.5 px). Movement does not
+    stop (stopping it would fight client prediction). Several targets hit
+    in the same instant hold once, not once each.
+  - **The target:** frozen in place: AI, windup, knockback and air time all
+    wait, then resume. On the client it freezes, shudders and stays lit
+    for the whole hold. The boss
+    holds a quarter as long, so four players cannot pin it.
+  - **Titan's Slash** no longer hits the whole cone at once. The blade
+    crosses the half-circle in 120 ms, centred on the old impact time,
+    and meets each enemy in order (forehand and run heave right to left,
+    backhand and back heave left to right), holding on each: a crowd goes
+    boom, boom, boom. The swing's slow lasts as long as the holds.
+- **Pillars:**
+  - Clarity serves: every hit lands with weight, and heavy hits read as
+    heavier than light ones.
+  - Creative Builds serves: Haste now changes the feel of a melee kit,
+    not just its numbers (Wade accelerates from boom-pause to
+    bap-bap-bap as he stacks it).
+  - Crunch serves slightly: a sweep through a crowd is a longer
+    commitment.
+  - Comradery: neutral to watch. Enemy hold is short (max 250 ms, and 25%
+    on the boss), but four melee players chain-holding regular enemies
+    could stun-lock them.
+- **Why:** Gravon lacked hit feedback. Holds make melee DPS fall
+  slightly, because cooldowns wait out each hold. A crowd costs Gravon
+  most (a 3-enemy slash adds ~450 ms). Wade's rhythm early in a fight
+  slows ~24% before Haste. ArenaSim (at the first, shorter numbers) (Gravon, Wade, Suds, Zephyr, seeds
+  1-3) won all runs before and after. Wade's score fell (avg 1639 → 986)
+  but the sim varies a lot between runs, so it needs more runs before
+  anyone tunes on it. Not yet checked in a running client.
+  Rejected: holding per target at the same instant (stacks into
+  long freezes on wide hits); freezing the attacker's movement (rubber
+  bands against prediction).
+- **Status:** Built, needs review (playtest the feel; watch Wade's damage
+  and enemy stun-lock with several melee players)
+- **Where:** `include/ArenaData.h` (HITSTOP_*), `src/AbilitySystem.cpp`
+  (`hitStop`, `damageEnemy`), `src/EnemySystem.cpp`,
+  `src/CharacterKits.cpp` (Gravon sweep), `src/ArenaClient.cpp`,
+  `src/ArenaView.cpp`
+
 ## 2026-11-16: Gravon made heavy: the blade out, a flat half-circle, a slam that throws him
 - **Decision** (requested by Noah; numbers mine):
   - **Slow:** base speed 205 (it was 255; the cast is 250-260), and 15%

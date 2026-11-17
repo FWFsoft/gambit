@@ -196,6 +196,22 @@ void ArenaClient::onGameEvent(const GameEventPacket& p) {
       break;
     }
 
+    case GameEventKind::HitStop: {
+      auto attacker = playerViews.find(p.sourceId);
+      if (attacker != playerViews.end()) {
+        attacker->second.hitStopMs =
+            std::max(attacker->second.hitStopMs, p.value);
+      }
+      auto target = enemyViews.find(p.extraId);
+      if (target != enemyViews.end()) {
+        EnemyView& held = target->second;
+        held.hitStopMs = std::max(held.hitStopMs, p.value2);
+        // Lit up for the whole hold, then the usual short flash.
+        held.hitFlashMs = std::max(held.hitFlashMs, p.value2 + 80.0f);
+      }
+      break;
+    }
+
     case GameEventKind::EnemyAttack: {
       auto it = enemyViews.find(p.sourceId);
       if (it == enemyViews.end()) break;
@@ -436,6 +452,7 @@ void ArenaClient::onGameEvent(const GameEventPacket& p) {
       effect.param = p.param;
       effect.theme = theme;
       effect.lifeMs = lifetimeFor(p);
+      if (p.kind == GameEventKind::Slash) effect.ownerId = p.sourceId;
       fx.push_back(effect);
       break;
     }
@@ -456,7 +473,11 @@ void ArenaClient::onUpdate(const UpdateEvent& e) {
     }
     view.x += (view.state.x - view.x) * blend;
     view.y += (view.state.y - view.y) * blend;
-    view.castMs = std::max(0.0f, view.castMs - dtMs);
+    // Hitstop: the attack clip and its cast timer hold for the beat.
+    float heldMs = std::min(view.hitStopMs, dtMs);
+    view.hitStopMs -= heldMs;
+    view.actionSeconds += (dtMs - heldMs) / 1000.0f;
+    view.castMs = std::max(0.0f, view.castMs - (dtMs - heldMs));
     view.hitMs += dtMs;
     if (view.state.health <= 0.0f) {
       view.deadMs += dtMs;
@@ -492,6 +513,14 @@ void ArenaClient::onUpdate(const UpdateEvent& e) {
     }
     view.x += (view.state.x - view.x) * blend;
     view.y += (view.state.y - view.y) * blend;
+    if (view.hitStopMs > 0.0f) {
+      // Held by a hit: the pose, the windup and the flinch all freeze.
+      view.hitStopMs = std::max(0.0f, view.hitStopMs - dtMs);
+      view.hitFlashMs = std::max(0.0f, view.hitFlashMs - dtMs);
+      view.strikeMs = std::max(0.0f, view.strikeMs - dtMs);
+      ++it;
+      continue;
+    }
     if (view.attackMs > 0.0f) {
       view.attackMs -= dtMs;
       if (view.attackMs <= 0.0f) {
@@ -512,7 +541,16 @@ void ArenaClient::onUpdate(const UpdateEvent& e) {
     ++it;
   }
 
-  for (auto& effect : fx) effect.ageMs += dtMs;
+  for (auto& effect : fx) {
+    // A swing's trail holds while its swinger is held by a hit.
+    if (effect.ownerId != 0) {
+      auto owner = playerViews.find(effect.ownerId);
+      if (owner != playerViews.end() && owner->second.hitStopMs > 0.0f) {
+        continue;
+      }
+    }
+    effect.ageMs += dtMs;
+  }
   fx.erase(std::remove_if(fx.begin(), fx.end(),
                           [](const Fx& f) { return f.ageMs >= f.lifeMs; }),
            fx.end());

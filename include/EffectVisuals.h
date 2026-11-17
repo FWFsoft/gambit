@@ -90,6 +90,8 @@ public:
 
   // Camera shake from big moments; add to every world vertex.
   ImVec2 shakeOffset() const;
+  // A short kick (your own melee hit landing). Never weakens a bigger shake.
+  void kick(float amp);
 
 private:
   struct Track {

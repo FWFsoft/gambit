@@ -232,6 +232,10 @@ class GravonKit : public Kit {
   static constexpr float SLASH_RANGE = 135.0f;
   static constexpr float SLASH_HALF_ANGLE = 90.0f;
   static constexpr float SWING_SPEED_MULT = 0.35f;
+  // The blade takes this long to cross the half-circle, centred on the
+  // windup's end (the clip's impact frame). It meets each enemy in turn
+  // and holds on each one (hitstop), so a crowd goes boom, boom, boom.
+  static constexpr float SLASH_SWEEP_MS = 120.0f;
 
   // Ravager's Edge: he throws it over with his whole weight; once it is in
   // front of him it drags him a short lurch forward (LEAP over LEAP_MS)
@@ -341,25 +345,47 @@ class GravonKit : public Kit {
                                 : Arena::GravonForm::SlashForehand;
         self.kitCounter[2] ^= SWING_BACK;
       }
+      // A forehand (and the run heave) travels from his right to his
+      // left; a backhand (and the heave off his back) from left to right.
+      bool rightToLeft = self.castVariant == Arena::GravonForm::SlashForehand ||
+                         self.castVariant == Arena::GravonForm::SlashHeaveRun;
       draw(self);
       self.actionLockMs =
           std::max(self.actionLockMs, windup + SLASH_RECOVER_MS);
       self.kitTimer[3] = windup + SLASH_RECOVER_MS;
-      sys.schedule(windup, [s, selfId, epoch, dirX, dirY, damage]() {
+      sys.schedule(windup - SLASH_SWEEP_MS * 0.5f,
+                   [s, selfId, epoch, dirX, dirY, damage, rightToLeft]() {
         Player* me = strikingHost(*s, selfId, epoch);
         if (!me) return;
         s->fxSlash(me->x, me->y, dirX, dirY, SLASH_RANGE,
-                   SLASH_HALF_ANGLE * 2.0f, VfxTheme::Shadow);
+                   SLASH_HALF_ANGLE * 2.0f, VfxTheme::Shadow, selfId,
+                   rightToLeft);
+        auto sweep = std::make_shared<Sweep>();
+        sweep->selfId = selfId;
+        sweep->epoch = epoch;
+        sweep->damage = damage;
+        sweep->dirX = dirX;
+        sweep->dirY = dirY;
         float x = me->x, y = me->y;
+        // His right, facing (dirX, dirY) with y pointing down the screen.
+        float rightX = -dirY, rightY = dirX;
         s->enemiesInCone(x, y, dirX, dirY, SLASH_RANGE, SLASH_HALF_ANGLE,
                          [&](Enemy& enemy) {
-                           uint32_t enemyId = enemy.id;
-                           s->damageEnemy(selfId, enemy, damage,
-                                          DamageFlag::Basic | DamageFlag::Melee);
-                           if (Enemy* still = s->findEnemy(enemyId)) {
-                             s->knockbackEnemy(*still, x, y, 22.0f);
-                           }
+          float ex = enemy.x - x, ey = enemy.y - y;
+          // -1 at his left .. +1 at his right.
+          float side = std::atan2(ex * rightX + ey * rightY,
+                                  ex * dirX + ey * dirY) /
+                       (SLASH_HALF_ANGLE * kDegToRad);
+          side = std::max(-1.0f, std::min(1.0f, side));
+          float along = rightToLeft ? (1.0f - side) * 0.5f
+                                    : (side + 1.0f) * 0.5f;
+          sweep->targets.push_back({enemy.id, along});
+        });
+        std::stable_sort(sweep->targets.begin(), sweep->targets.end(),
+                         [](const Sweep::Target& a, const Sweep::Target& b) {
+                           return a.along < b.along;
                          });
+        sweepNext(*s, sweep);
       });
     } else if (slot == 1) {
       // Ravager's Edge: everything goes into the blade. Its weight pulls
@@ -416,6 +442,67 @@ class GravonKit : public Kit {
                      Player* me = strikingHost(*s, selfId, epoch);
                      if (me) stab(*s, *me, dirX, dirY);
                    });
+    }
+  }
+
+  // Titan's Slash in flight: who it will meet, in order, and how far
+  // across the arc (0-1) it has travelled.
+  struct Sweep {
+    struct Target {
+      uint32_t enemyId;
+      float along;  // 0 where the blade starts .. 1 where it ends
+    };
+    uint32_t selfId = 0;
+    int epoch = 0;
+    float damage = 0.0f;
+    float dirX = 1.0f, dirY = 0.0f;
+    std::vector<Target> targets;
+    size_t next = 0;
+    float along = 0.0f;
+  };
+  static constexpr float kDegToRad = 3.14159265f / 180.0f;
+
+  // Wait for the blade to reach the next enemy, strike it, hold, repeat.
+  static void sweepNext(AbilitySystem& sys, std::shared_ptr<Sweep> sweep) {
+    assert(sweep->next <= sweep->targets.size());
+    if (sweep->next == sweep->targets.size()) return;
+    const Sweep::Target& target = sweep->targets[sweep->next];
+    assert(target.along >= sweep->along);
+    float travelMs = (target.along - sweep->along) * SLASH_SWEEP_MS;
+    AbilitySystem* s = &sys;
+    auto strike = [s, sweep]() {
+      Player* me = strikingHost(*s, sweep->selfId, sweep->epoch);
+      if (!me) return;
+      const Sweep::Target& t = sweep->targets[sweep->next];
+      sweep->along = t.along;
+      sweep->next++;
+      float holdMs = 0.0f;
+      Enemy* enemy = s->findEnemy(t.enemyId);
+      // It may have stepped out of reach while the blade was held up.
+      if (enemy && enemy->state != EnemyState::Dead &&
+          dist(me->x, me->y, enemy->x, enemy->y) <=
+              SLASH_RANGE + enemy->radius) {
+        float x = me->x, y = me->y;
+        s->damageEnemy(sweep->selfId, *enemy, sweep->damage,
+                       DamageFlag::Basic | DamageFlag::Melee);
+        if (Enemy* still = s->findEnemy(t.enemyId)) {
+          s->knockbackEnemy(*still, x, y, 22.0f);
+        }
+        holdMs = me->hitStopMs;
+        // The swing (and its slow) lasts as long as the blade was held.
+        me->kitTimer[3] += holdMs;
+      }
+      if (sweep->next == sweep->targets.size()) return;
+      if (holdMs > 0.0f) {
+        s->schedule(holdMs, [s, sweep]() { sweepNext(*s, sweep); });
+      } else {
+        sweepNext(*s, sweep);
+      }
+    };
+    if (travelMs <= 0.0f) {
+      strike();
+    } else {
+      sys.schedule(travelMs, strike);
     }
   }
 
@@ -1016,7 +1103,7 @@ class VolgoreKit : public Kit {
       // Hamstring
       const float range = 108.0f;
       sys.fxSlash(self.x, self.y, ctx.dirX, ctx.dirY, range, 100.0f,
-                  VfxTheme::Blood);
+                  VfxTheme::Blood, self.id);
       sys.enemiesInCone(self.x, self.y, ctx.dirX, ctx.dirY, range, 50.0f,
                         [&](Enemy& enemy) {
                           sys.applyToEnemy(enemy, EffectType::Weakened, 1,
@@ -1409,7 +1496,8 @@ public:
       float dy = ctx.dirY + ctx.dirX * side;
       float d = std::sqrt(dx * dx + dy * dy);
       sys.fxSlash(self.x, self.y, dx / d, dy / d, range, hook ? 110.0f : 50.0f,
-                  VfxTheme::Steel);
+                  VfxTheme::Steel, self.id,
+                  punch == Arena::WadeForm::RearHook);
       sys.enemiesInCone(
           self.x, self.y, ctx.dirX, ctx.dirY, range, 45.0f, [&](Enemy &enemy) {
             sys.damageEnemy(selfId, enemy, 15.0f,
@@ -1433,7 +1521,7 @@ public:
       float dy = ctx.dirY + ctx.dirX * side;
       float d = std::sqrt(dx * dx + dy * dy);
       sys.fxSlash(self.x, self.y, dx / d, dy / d, range, 60.0f,
-                  VfxTheme::Steel);
+                  VfxTheme::Steel, self.id);
       sys.enemiesInCone(
           self.x, self.y, ctx.dirX, ctx.dirY, range, 42.0f, [&](Enemy &enemy) {
             sys.damageEnemy(selfId, enemy, 13.0f, DamageFlag::Melee);
@@ -1646,7 +1734,7 @@ class PresidenteKit : public Kit {
         uint32_t foeId = foe->id;
         sys.fxRing(self.x, self.y, radius, VfxTheme::Holy);
         sys.fxSlash(self.x, self.y, ctx.dirX, ctx.dirY, radius, 340.0f,
-                    VfxTheme::Holy);
+                    VfxTheme::Holy, self.id);
         sys.enemiesInCircle(self.x, self.y, radius, [&](Enemy& enemy) {
           if (enemy.id == foeId) return;
           sys.knockbackEnemy(enemy, self.x, self.y, 120.0f);
@@ -1689,7 +1777,7 @@ class PresidenteKit : public Kit {
                           }
                         });
       sys.fxSlash(self.x, self.y, ctx.dirX, ctx.dirY, 100.0f, 90.0f,
-                  VfxTheme::Holy);
+                  VfxTheme::Holy, self.id);
       if (best) {
         uint32_t id = best->id;
         sys.damageEnemy(selfId, *best, 10.0f, DamageFlag::Basic |

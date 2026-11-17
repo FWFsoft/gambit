@@ -302,6 +302,8 @@ enum class GameEventKind : uint8_t {
   // value = animation lock in ms.
   AbilityCast = 1,
   // Melee arc: x,y origin; x2,y2 direction; value radius; value2 arc degrees.
+  // sourceId = the swinging player (0 = none): the trail holds with their
+  // hitstop. param 1 = sweeps from their right to their left.
   Slash = 2,
   // Filled sector: same fields as Slash.
   Cone = 3,
@@ -353,6 +355,10 @@ enum class GameEventKind : uint8_t {
   // Corrupt / Purify: extraId = the EffectType it was before.
   // Detonate: value = stacks consumed, value2 = blast radius.
   EffectVerb = 23,
+  // A melee hit held for a beat. sourceId = attacker (a player), extraId =
+  // the enemy hit. value = how long the attacker's swing holds (ms), value2
+  // = how long the target holds.
+  HitStop = 24,
   // Client-only (never sent): impact flash where a hit landed.
   HitSpark = 200
 };

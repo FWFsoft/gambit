@@ -222,6 +222,13 @@ void EffectVisuals::onUpdate(float dtMs) {
   shakeMs = std::max(0.0f, shakeMs - dtMs);
 }
 
+void EffectVisuals::kick(float amp) {
+  if (amp >= shakeAmp * (shakeMs / 220.0f)) {
+    shakeAmp = amp;
+    shakeMs = 220.0f;
+  }
+}
+
 ImVec2 EffectVisuals::shakeOffset() const {
   if (shakeMs <= 0.0f)
     return ImVec2(0, 0);
