@@ -94,6 +94,8 @@ class ArenaClient {
     VfxTheme theme;
     uint8_t variant;
     bool fromEnemy;
+    uint32_t ownerId = 0;
+    float dirX = 0.0f, dirY = 0.0f;  // facing (Kade's mirrors)
   };
 
   struct FloatText {

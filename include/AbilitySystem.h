@@ -286,6 +286,7 @@ class AbilitySystem {
     std::function<void(Projectile&, Player&)> onHitPlayer;
     std::function<void(Projectile&)> onEnd;  // expiry or first non-pierce hit
     std::vector<uint32_t> alreadyHit;
+    uint32_t lastMirror = 0;  // the mirror it last left (Kade)
   };
 
   struct Zone {
@@ -298,7 +299,8 @@ class AbilitySystem {
     float tickMs = 500.0f;
     float tickTimer = 0.0f;
     VfxTheme theme = VfxTheme::Neutral;
-    uint8_t variant = 0;  // 0 cloud, 1 pool, 2 domain ring
+    uint8_t variant = 0;  // 0 cloud, 1 pool, 2 domain ring, 3 Kade's mirror
+    float dirX = 0.0f, dirY = 0.0f;  // which way it faces (mirrors)
     std::function<void(Zone&, Enemy&)> onEnemyTick;
     std::function<void(Zone&, Player&)> onPlayerTick;
     std::function<void(Zone&)> onEnd;
@@ -306,6 +308,11 @@ class AbilitySystem {
 
   uint32_t spawnProjectile(Projectile spec);
   uint32_t spawnZone(Zone spec);
+  // A live zone by id (null once it has ended or is ending).
+  const Zone* findZone(uint32_t zoneId) const;
+  const std::vector<Zone>& allZones() const { return zones; }
+  // End a zone on the next tick (its onEnd runs and clients are told).
+  void endZone(uint32_t zoneId);
   void schedule(float delayMs, std::function<void()> fn);
 
   // ---- VFX (broadcast to clients) ----------------------------------------

@@ -30,6 +30,21 @@ anim Isaac blessing 400 12 20 0
 anim Isaac flash 496 10 24 0
 anim Isaac hit 576 6 20 0
 anim Isaac death 624 12 12 0
+actor Kade assets/sprites/actors/Kade.png 176 156 88 128 28 1 smooth
+anim Kade idle 0 12 8 1
+anim Kade beam_charge 96 14 12 0
+anim Kade beam_hold 208 4 12 1
+anim Kade beam 240 12 20 0
+anim Kade slap 336 12 20 0
+anim Kade release_hold 432 4 12 1
+anim Kade spent 464 12 10 1
+anim Kade step 560 8 20 0
+anim Kade run 624 10 14 1
+anim Kade hit 704 6 20 0
+anim Kade death 752 12 12 0
+actor KadeMirror assets/sprites/actors/KadeMirror.png 176 156 88 128 16 1 smooth
+anim KadeMirror idle 0 1 1 1
+anim KadeMirror deploy 8 8 20 0
 actor Nolan assets/sprites/actors/Nolan.png 176 156 88 128 26 1 smooth
 anim Nolan idle 0 12 10 1
 anim Nolan run 96 10 15 1
@@ -82,6 +97,8 @@ anim Presidente hit 888 4 16 0
 socket Presidente hit 0,-36,0,1 1,-38,0,1 0,-33,0,1 0,-36,0,1 2,-36,0,1 5,-39,0,1 4,-34,0,1 2,-36,0,1 2,-37,0,1 6,-41,0,1 5,-36,0,0 2,-37,0,1 2,-38,0,0 4,-43,0,0 3,-37,0,0 2,-38,0,0 0,-38,0,0 -1,-44,0,0 -0,-38,0,0 0,-38,0,0 -2,-38,0,0 -5,-43,0,0 -4,-37,0,0 -2,-38,0,0 -2,-37,0,1 -6,-40,0,1 -5,-35,0,1 -2,-37,0,1 -2,-36,0,1 -4,-38,0,1 -3,-33,0,1 -2,-36,0,1
 anim Presidente death 920 9 12 0
 socket Presidente death 1,-37,0,1 1,-29,0,1 0,-18,0,1 -0,-15,0,1 -1,-24,0,1 -6,-52,0,1 -12,-47,0,0 -12,-46,0,0 -12,-45,0,0 5,-39,0,1 6,-31,0,1 4,-19,0,1 3,-15,0,1 -2,-24,0,1 -28,-45,0,1 -52,-34,0,1 -52,-33,0,1 -52,-32,0,1 7,-41,0,1 8,-34,0,1 6,-21,0,0 4,-17,0,0 -1,-23,0,1 -33,-33,0,1 -62,-10,0,1 -62,-9,0,1 -62,-8,0,1 5,-43,0,0 5,-36,0,0 4,-23,0,0 3,-18,0,0 -0,-23,0,0 -19,-22,0,1 -35,10,0,1 -35,11,0,1 -35,12,0,1 -1,-44,0,0 -1,-37,0,0 -0,-23,0,0 0,-18,0,0 1,-23,0,0 6,-19,0,1 12,15,0,1 12,16,0,1 12,17,0,1 -5,-43,0,0 -6,-36,0,0 -4,-22,0,0 -3,-18,0,0 2,-23,0,0 28,-26,0,1 52,2,0,1 52,3,0,1 52,3,0,1 -7,-40,0,1 -8,-33,0,1 -6,-20,0,0 -4,-17,0,0 1,-24,0,0 33,-39,0,1 62,-22,0,0 62,-21,0,0 62,-20,0,0 -5,-38,0,1 -5,-30,0,1 -4,-18,0,1 -3,-15,0,1 0,-24,0,1 19,-50,0,1 35,-42,0,0 35,-41,0,0 35,-40,0,0
+actor Ship assets/sprites/actors/Ship.png 640 560 320 440 8 1 smooth
+anim Ship idle 0 1 1 1
 actor Suds assets/sprites/actors/Suds.png 130 130 65 111 23 1.35
 anim Suds idle 0 8 8 1
 anim Suds run 64 8 12 1

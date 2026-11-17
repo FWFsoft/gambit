@@ -98,7 +98,11 @@ def ease(kind, u):
 
 
 class Rig:
-    def __init__(self, table):
+    def __init__(self, table, max_reach=0.997):
+        """max_reach: the furthest a limb extends, as a share of its length.
+        Below 1 so a straight limb never flips; a body that locks its knees
+        (a power stance) can ask for closer to 1."""
+        self.max_reach = max_reach
         self.order = [n for n, _, _ in table]
         self.parent = {n: p for n, p, _ in table}
         self.rest = {n: Vector(pos) for n, _, pos in table}
@@ -164,7 +168,7 @@ class Rig:
         u0, l0 = self.local[mid], self.local[end]
         t = Vector(target) - origin
         reach = u0.length + l0.length
-        d = max(0.12 * reach, min(0.997 * reach, t.length))
+        d = max(0.12 * reach, min(self.max_reach * reach, t.length))
         if t.length < 1e-6:
             t = Vector((0, -1, 0))
 
@@ -190,10 +194,13 @@ class Rig:
         angles stay continuous."""
         near = near or {}
         pose = {n: tuple(c[n]) for n in SPINE}
+        for k, v in c.items():                  # extra joints (collars, fingers) first:
+            if k.startswith("j:") and k[2:] in self.parent:   # a collar moves the shoulder
+                pose[k[2:]] = tuple(v)
         w = self.fk(pose, c["offset"])
         for s in SIDES:
             sh, el, wr = f"shoulder_{s}", f"elbow_{s}", f"wrist_{s}"
-            rp, origin = w["chest"][0], w[sh][1]
+            rp, origin = w[self.parent[sh]][0], w[sh][1]
             ang, bend, _ = self._two_bone(rp, origin, c[f"hand_{s}"],
                                           c[f"elbow_{s}"], el, wr, -1,
                                           near.get(sh))
