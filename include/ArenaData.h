@@ -366,10 +366,12 @@ constexpr float RAID_INTERVAL_MS = 45000.0f;
 constexpr float SHIP_DAMAGE_SCALE = 0.5f;  // hull armor vs. enemy hits
 
 constexpr float SHIP_MAX_HEALTH = 1500.0f;
-constexpr float SHIP_RADIUS = 110.0f;       // enemies attack inside this
-constexpr float SHIP_SAFE_RADIUS = 300.0f;  // "inside for the night"
+// The ship is a crashed RV about 11 m long (some 510 px on screen, 256 to
+// either side of its centre): these reach just past its hull.
+constexpr float SHIP_RADIUS = 240.0f;       // enemies attack inside this
+constexpr float SHIP_SAFE_RADIUS = 420.0f;  // "inside for the night"
 // Walk anything you are hauling (scrap, a probe) inside this to deliver it.
-constexpr float SHIP_DROP_RADIUS = 190.0f;
+constexpr float SHIP_DROP_RADIUS = 300.0f;
 constexpr float SHIP_REPAIR_PER_SCRAP = 180.0f;
 constexpr int SHIP_TURRET_SCRAP = 3;  // scrap banked before turrets come online
 

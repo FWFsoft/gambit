@@ -982,6 +982,8 @@ def render_actor(spec: ActorSpec, out_png: str, rel_png: str, log=print):
     # Roughly square sheets stay inside GPU texture limits for big casts.
     cols = max(SHEET_COLUMNS,
                math.ceil(math.sqrt(total * spec.cell_h / spec.cell_w)))
+    # A sheet with fewer cells than a row (a big prop) is one row.
+    cols = min(cols, total)
     rows = (total + cols - 1) // cols
     assert cols * spec.cell_w <= MAX_SHEET and rows * spec.cell_h <= MAX_SHEET, \
         f"{spec.name}: sheet would be {cols * spec.cell_w}x{rows * spec.cell_h}"

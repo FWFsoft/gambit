@@ -21,6 +21,33 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-17: The ship is a crashed RV with rockets, at true scale
+- **Decision:** The ship is now the human's model (`art/models/Ship.glb`, a
+  crashed RV-turned-spaceship nose down in rubble). It is baked by the
+  sprite forge at the heroes' scale: about 11 m bumper to nozzles, some
+  510 px on screen, against heroes under 2 m. The old flat sprite was a
+  192 px sailing ship and stays only as a fallback. The ship's radii grow
+  to reach past the bigger hull:
+  - enemies attack it within 240 (was 110);
+  - drop-off within 300 (was 190);
+  - "inside for the night" within 420 (was 300).
+- **Pillars:**
+  - Clarity: home base is unmistakable and in the same inked style as the
+    cast.
+  - Strategic Crunch, slightly weakened: the bigger safe and drop-off
+    circles make the trip home a little shorter. Revisit the numbers if
+    rounds feel loose.
+- **Why:** The human said the ship was far too small and the wrong kind of
+  ship, and supplied the model. The radii had to grow, or drop-off would
+  sit inside the hull's image. Nothing blocks movement yet: players and
+  enemies walk over the hull, which reads worse now that it is big. That
+  needs a collision footprint next.
+- **Status:** Built, needs review
+- **Where:** `tools/sprite_forge/actors/ship.py`,
+  `assets/sprites/actors/Ship.png`, `src/ArenaView.cpp` (drawShip),
+  `include/ArenaData.h` (SHIP_* radii), `tools/sprite_forge/forge.py`
+  (one-row sheets for big props)
+
 ## 2026-11-17: Kade's mirrors: held placement, out-of-the-glass reflection, Full Release, Mirror Step
 - **Decision:** The rest of Kade's kit.
   - **Mirrors (passive):** person-high (1.9 m, his height) panes that stand

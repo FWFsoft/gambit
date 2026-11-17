@@ -32,7 +32,8 @@ using namespace ArenaDraw;
 namespace {
 
 constexpr float PROJECTILE_HEIGHT = 24.0f;  // drawn this far above the ground
-constexpr float SHIP_DRAW_SIZE = 192.0f;
+constexpr float SHIP_DRAW_SIZE = 192.0f;  // the old flat sprite (fallback)
+constexpr int SHIP_DIRECTION = 0;  // the ship sheet's column: nose down, rockets up
 
 ImTextureID textureId(const Texture* texture) {
   return (ImTextureID)(intptr_t)texture->getID();
@@ -1327,14 +1328,29 @@ void ArenaView::drawGround(ImDrawList* dl) {
 void ArenaView::drawShip(ImDrawList* dl) {
   if (!arena->hasMatch()) return;
   const MatchStatePacket& match = arena->match();
+  // Wrecked and listing; tinted as it takes damage.
+  float damage = 1.0f - match.shipHealth / std::max(1.0f, match.shipMaxHealth);
+  ImU32 tint = IM_COL32(255, static_cast<int>(255 - 90 * damage),
+                        static_cast<int>(255 - 110 * damage), 255);
+  // The crashed RV, at the heroes' scale (tools/sprite_forge/actors/ship.py).
+  const ActorSheet* sheet = actorFor("Ship");
+  const ActorAnim* still = sheet ? sheet->find("idle") : nullptr;
+  if (sheet && still) {
+    ImVec2 centre = toScreen(match.shipX, match.shipY);
+    drawShadow(dl, centre, 220.0f, 0.30f);
+    drawActorFrame(dl, *sheet, *still, SHIP_DIRECTION, 0.0f, centre, 1.0f, tint,
+                   true, -1, 0.0f, true);
+    if (match.turretsOnline) {
+      ImVec2 top(centre.x + 150.0f, centre.y - 260.0f);
+      float pulse = 0.5f + 0.5f * std::sin(timeSeconds * 6.0f);
+      dl->AddCircleFilled(top, 6.0f + 2.0f * pulse, IM_COL32(150, 255, 190, 230));
+    }
+    return;
+  }
   ImVec2 base = toScreen(match.shipX, match.shipY + 34.0f);
   drawShadow(dl, ImVec2(base.x, base.y - 16.0f), 62.0f, 0.35f);
   if (shipTexture) {
     float scale = SHIP_DRAW_SIZE / shipTexture->getWidth();
-    // Wrecked and listing; shudders when it is being hit.
-    float damage = 1.0f - match.shipHealth / std::max(1.0f, match.shipMaxHealth);
-    ImU32 tint = IM_COL32(255, static_cast<int>(255 - 90 * damage),
-                          static_cast<int>(255 - 110 * damage), 255);
     drawSprite(dl, shipTexture, 0, 0, shipTexture->getWidth(),
                shipTexture->getHeight(), base, scale, scale, -0.05f, false,
                tint);
@@ -2513,7 +2529,7 @@ void ArenaView::drawEntities(ImDrawList* dl) {
     items.push_back({item.y - 1.0f, 2, nullptr, item.itemId, item.x, item.y});
   }
   if (arena->hasMatch()) {
-    items.push_back({arena->match().shipY + 30.0f, 3, nullptr, 0, 0, 0});
+    items.push_back({arena->match().shipY, 3, nullptr, 0, 0, 0});
   }
   // Terrain stands in the world like anything else: what is south of a rock
   // is drawn over it, what is north is hidden behind it.
