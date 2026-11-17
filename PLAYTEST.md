@@ -20,9 +20,13 @@ built to be cheap to change.
    After about a third of the round the **Blue Zone** starts closing on the
    ship; outside it you take damage. When the timer runs out, anyone not
    near the ship is lost for the night.
-3. **Night (intermission).** Open the suit screen. Your first infusion
-   becomes your **core** ability (E). The rest go into Offense / Defense /
-   Mobility / Genealogy trees, where same-genus infusions level up. Press
+3. **Night (intermission).** Open the suit screen. Infusions are items
+   (a genus and a body part, like "Venoxarid Talon"); the part gives a
+   small stat wherever it goes. Your first infusion becomes your **core**
+   ability (E). The rest go into the Offense / Defense / Mobility /
+   Genealogy trees, four tiers deep: each slot gives its talent plus the
+   infusion's genus effect for that tree (same-genus infusions in a tree
+   level it up), and each tier past the first is a choice of one. Press
    **R** to ready up.
 4. **Final stand.** After round 3 the ship is lost and **The Matriarch**
    arrives. Kill her to win. If the whole crew is down at once, or the ship
@@ -57,7 +61,7 @@ Stand over a downed teammate for 3 seconds to revive them. Standing near
 the ship slowly heals you.
 
 **Playtest cheats** (for poking at things, not for real tests):
-F5 skip phase, F6 +2 of every infusion, F7 spawn a pack near you,
+F5 skip phase, F6 one of every infusion item, F7 spawn a pack near you,
 F8 god mode, F9 kill everything, F10 spawn the boss, F11 spawn a swarm
 of Toxliths where you are aiming.
 F12 opens the effect lab: training allies plus number keys that
@@ -83,7 +87,8 @@ as concept-only.
 
 Every hit goes through the effects system from the spec (Guard, Wound,
 Stunned, Berserk, Vulnerable, and so on), and the 16 infusion effects plus
-4 core abilities from the Genera and Infusion spec are all implemented.
+4 core abilities from the Genera and Infusion spec are all implemented,
+along with 28 suit talents (`SUIT_NODES` in `src/ArenaData.cpp`).
 
 ## Running it
 

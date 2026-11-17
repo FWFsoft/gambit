@@ -64,6 +64,16 @@ float MatchDirector::randomRange(float lo, float hi) {
   return std::uniform_real_distribution<float>(lo, hi)(rng);
 }
 
+Genus MatchDirector::randomGenus() {
+  return static_cast<Genus>(
+      std::uniform_int_distribution<int>(1, Arena::GENUS_COUNT)(rng));
+}
+
+Arena::InfusionPart MatchDirector::randomPart() {
+  return static_cast<Arena::InfusionPart>(
+      std::uniform_int_distribution<int>(0, Arena::PART_COUNT - 1)(rng));
+}
+
 bool MatchDirector::insideWorld(float x, float y) const {
   float halfWidth = worldWidth / 2.0f;
   float halfHeight = worldHeight / 2.0f;
@@ -182,8 +192,7 @@ void MatchDirector::endRound() {
     }
   }
   if (mvp != 0 && participantCount() > 1) {
-    int genus = std::uniform_int_distribution<int>(0, Arena::GENUS_COUNT - 1)(rng);
-    players[mvp].infusionInventory[genus]++;
+    Infusions::addToInventory(players[mvp], randomGenus(), randomPart());
   }
 
   if (currentRound >= Tuning::ROUND_COUNT) {
@@ -287,13 +296,7 @@ void MatchDirector::resetMatch() {
     player.deaths = 0;
     player.ready = false;
     player.carryingScrap = false;
-    player.coreGenus = Genus::None;
-    for (int i = 0; i < Arena::TREE_COUNT; i++) {
-      player.treeGenus[i] = Genus::None;
-      player.treeLevel[i] = 0;
-      player.infusionCounter[i] = 0;
-    }
-    for (uint8_t& count : player.infusionInventory) count = 0;
+    Infusions::resetLoadout(player);
     if (isParticipant(player)) abilities->applyKitStats(player);
   }
   bringPlayersHome(true);
@@ -832,7 +835,8 @@ void MatchDirector::onReady(Player& player, bool ready) {
   player.ready = ready;
 }
 
-void MatchDirector::onSlotInfusion(Player& player, Genus genus, int slot) {
+void MatchDirector::onSlotInfusion(Player& player, Genus genus,
+                                   Arena::InfusionPart part, int node) {
   // The suit can only be opened up back at the ship.
   if (currentPhase == MatchPhase::Round ||
       currentPhase == MatchPhase::BossFight) {
@@ -840,10 +844,13 @@ void MatchDirector::onSlotInfusion(Player& player, Genus genus, int slot) {
       return;
     }
   }
-  if (Infusions::slotInfusion(player, genus, slot)) {
+  if (Infusions::slotInfusion(player, genus, part, node)) {
+    std::string where = node == Arena::CORE_NODE
+                            ? std::string("the core")
+                            : std::string(Arena::suitNode(node).name);
     Logger::info("Match: player " + std::to_string(player.id) + " slotted " +
-                 Arena::genusName(genus) + " into slot " +
-                 std::to_string(slot));
+                 Arena::genusName(genus) + " " + Arena::partInfo(part).name +
+                 " into " + where);
   }
 }
 
@@ -886,9 +893,8 @@ void MatchDirector::dropLoot(const Enemy& enemy) {
 
   if (random01() < chance) {
     infusionDropsThisRound++;
-    hooks.spawnPickup(
-        Arena::PickupId::InfusionBase + static_cast<uint32_t>(lootGenus),
-        enemy.x, enemy.y);
+    hooks.spawnPickup(Arena::PickupId::infusion(lootGenus, randomPart()),
+                      enemy.x, enemy.y);
   }
   // Scrap comes off the pack's heavy: a brute, or a thug pack's elite.
   bool heavy = def.tier == EnemyTier::Brute || (thug && enemy.elite);
@@ -903,9 +909,11 @@ bool MatchDirector::onPickup(Player& player, uint32_t itemId) {
   if (!isParticipant(player) || player.isDead()) return false;
 
   if (Arena::PickupId::isInfusion(itemId)) {
-    int genus = static_cast<int>(Arena::PickupId::infusionGenus(itemId));
-    if (player.infusionInventory[genus - 1] >= 99) return false;
-    player.infusionInventory[genus - 1]++;
+    if (!Infusions::addToInventory(player,
+                                   Arena::PickupId::infusionGenus(itemId),
+                                   Arena::PickupId::infusionPart(itemId))) {
+      return false;
+    }
     player.score += 15;
     return true;
   }
@@ -939,9 +947,8 @@ void MatchDirector::onObjectiveCompleted(Player& player, bool salvagedScrap,
     bool far = dist(objectiveX, objectiveY, shipX, shipY) >=
                Tuning::FAR_OBJECTIVE_DISTANCE;
     for (int i = 0; i < (far ? 2 : 1); i++) {
-      hooks.spawnPickup(
-          Arena::PickupId::InfusionBase + static_cast<uint32_t>(genus),
-          player.x + 30.0f - 60.0f * i, player.y);
+      hooks.spawnPickup(Arena::PickupId::infusion(genus, randomPart()),
+                        player.x + 30.0f - 60.0f * i, player.y);
     }
   }
 }
@@ -1089,7 +1096,13 @@ void MatchDirector::onDebugCommand(Player& player, DebugCommandKind command,
       }
       break;
     case DebugCommandKind::GiveInfusions:
-      for (uint8_t& count : player.infusionInventory) count += 2;
+      // One of every item.
+      for (int g = 1; g <= Arena::GENUS_COUNT; g++) {
+        for (int p = 0; p < Arena::PART_COUNT; p++) {
+          Infusions::addToInventory(player, static_cast<Genus>(g),
+                                    static_cast<Arena::InfusionPart>(p));
+        }
+      }
       break;
     case DebugCommandKind::SpawnWave: {
       // arg 1-4: a swarm of that genus's smallest alien, in the direction
@@ -1152,12 +1165,15 @@ MatchStatePacket MatchDirector::buildState() const {
     p.deaths = player.deaths;
     p.ready = player.ready ? 1 : 0;
     p.coreGenus = static_cast<uint8_t>(player.coreGenus);
-    for (int i = 0; i < Arena::TREE_COUNT; i++) {
-      p.treeGenus[i] = static_cast<uint8_t>(player.treeGenus[i]);
-      p.treeLevel[i] = player.treeLevel[i];
+    p.corePart = static_cast<uint8_t>(player.corePart);
+    for (int i = 0; i < Arena::suitNodeCount(); i++) {
+      p.nodeGenus[i] = static_cast<uint8_t>(player.nodeGenus[i]);
+      p.nodePart[i] = static_cast<uint8_t>(player.nodePart[i]);
     }
-    for (int i = 0; i < Arena::GENUS_COUNT; i++) {
-      p.inventory[i] = player.infusionInventory[i];
+    for (int g = 0; g < Arena::GENUS_COUNT; g++) {
+      for (int part = 0; part < Arena::PART_COUNT; part++) {
+        p.inventory[g][part] = player.infusionInventory[g][part];
+      }
     }
     p.carryingScrap = player.carryingScrap ? 1 : 0;
     p.reviveProgress = player.reviveProgress;

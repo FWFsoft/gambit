@@ -21,6 +21,70 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-17: Infusions are items; the suit is a core plus four tiered trees
+- **Decision** (requested by a human, from the Genera and Infusion doc):
+  - **Items.** An infusion is a genus plus a body part: Talon (+6%
+    damage), Hide (+12 max health), Eye (abilities recharge 6% faster),
+    Sinew (+4% move speed). Drops roll the part at random; the genus still
+    follows the territory. The part's effect applies wherever the item is
+    slotted (core or tree), per copy. Items in the pack do nothing yet.
+  - **Core.** The first infusion must go in the core and gives that
+    genus's core ability (E), as before. Permanent for the match.
+  - **Trees.** Offense, Defense, Mobility and Genealogy are each four tiers
+    deep. Tier 1 is one slot (the "leg" out of the core); tiers 2 to 4 are
+    two options each, and taking one closes the other. A tier opens once
+    the tier above is filled. Every slot gives its **talent** plus the
+    infusion's **genus effect for that tree**; each infusion of the same
+    genus in the same tree raises that effect's level. Different genera can
+    now share a tree (both effects run); nothing is ever overwritten.
+    Slots are permanent for the match (no respec).
+  - **28 talents** (`SUIT_NODES` in `src/ArenaData.cpp`): Offense: Killer
+    Instinct; Opening Strike / Relentless; Affliction / Executioner;
+    Bloodlust / Focus Fire. Defense: Plating; Second Wind / Regrowth;
+    Guardian / Thorns; Last Stand / Share the Load. Mobility: Light Frame;
+    Quick Recovery / Slipstream; Hit and Run / Tailwind; Blitz / Escape
+    Artist. Genealogy: Bloodline; Purebred / Hybrid Vigor; Overcharge /
+    Shared Gift; Apex Mutation / Feedback Loop. Numbers are first guesses.
+  - **Built to grow.** The layout is one data table; adding options to a
+    tier (width) or tiers to a tree (depth) is a table row plus the
+    talent's code. Up to 64 nodes fit without changing the network format.
+  - **Suit screen** follows the doc's sketch: core in the middle, each tree
+    growing into its own corner, pack on the left, a "your suit" summary on
+    the right. Hovering a pack item shows the doc's tooltip (the item's own
+    effect, then the genus effect for each tree with its next level).
+- **Pillars:**
+  - Crunch: serves. Each tier is a permanent either/or, and with about 0
+    to 6 tree slots filled per match in the bot sims, where to spend
+    scarce infusions is a real choice.
+  - Comradery: serves. Five talents pay off for the team (Focus Fire,
+    Guardian, Share the Load, Tailwind, Shared Gift); none can hurt an
+    ally. Share the Load can bring its owner down, by their own choice.
+  - Creative Builds: serves, with a caveat. Genera now mix inside a tree,
+    and Purebred vs Hybrid Vigor makes mono-genus vs mixed suits a real
+    fork. But a third of the talents are flat numbers (Plating, Light
+    Frame, Killer Instinct, Bloodline...), and the doc asks for talents
+    "really impactful like League runes": those are the first to replace.
+  - Clarity: mostly serves on the suit screen (open slots pulse in the
+    selected item's colour; closed options grey out). In combat, the
+    damage talents (Opening Strike, Executioner, Affliction, Relentless,
+    Blitz) have no hit feedback of their own yet, and Share the Load's
+    beam borrows the ice colour.
+- **Why:** The doc decided "BOTH" (talent plus genus effect per slot) and
+  showed per-item stat lines; the earlier build had neither. Against the
+  doc: (1) the doc's example items carry specials (Talon: on-hit
+  Lacerate; Eye: reveal a key location; Hide: on-hit 5% effective health)
+  that are not built; parts are stats only. (2) Two options per tier, as
+  in the doc's "pick 1 of 2" diagram (the paper sketch shows three).
+  (3) The doc does not say whether items help while still in the pack; we
+  chose slotted-only so the ship trip stays the moment you power up.
+  Rejected: one talent tree per genus (too many trees to read); free
+  respec (removes the weight of each pick).
+- **Status:** Accepted (requested by a human); talent list and numbers
+  Built, needs review
+- **Where:** `include/ArenaData.h`, `src/ArenaData.cpp` (items, layout),
+  `src/Infusions.cpp` (rules, talents), `src/ArenaHud.cpp` (suit screen),
+  `tests/test_infusions.cpp`
+
 ## 2026-11-17: Terrain on the arena; Isaac's Lifeline anchors to it
 - **Decision** (requested by Noah, who picked Isaac to force terrain in):
   the arena has terrain: 51 rock outcrops (rectangles of Tiled type
@@ -1264,6 +1328,8 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 - **Where:** `src/InputSystem.cpp`, `src/RenderSystem.cpp`
 
 ## 2026-11-11: Infusions give genus effects only, with no slot talents
+- **Superseded** on 2026-11-17 by "Infusions are items; the suit is a core
+  plus four tiered trees".
 - **Decision:** Each infusion applies its genus effect in the tree you put
   it in (Offense, Defense, Mobility or Genealogy). More infusions of the
   same genus level it up.

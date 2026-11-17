@@ -42,7 +42,9 @@ class MatchDirector {
   // the fight and may pick any character again.
   void onCharacterSelected(Player& player, uint32_t characterId);
   void onReady(Player& player, bool ready);
-  void onSlotInfusion(Player& player, Arena::Genus genus, int slot);
+  // node: an Arena::suitNode index, or Arena::CORE_NODE.
+  void onSlotInfusion(Player& player, Arena::Genus genus,
+                      Arena::InfusionPart part, int node);
   void onEnemyKilled(const Enemy& enemy, uint32_t killerId);
   // Returns true if the pickup was consumed.
   bool onPickup(Player& player, uint32_t itemId);
@@ -149,5 +151,7 @@ class MatchDirector {
   }
   float random01();
   float randomRange(float lo, float hi);
+  Arena::Genus randomGenus();
+  Arena::InfusionPart randomPart();
   bool insideWorld(float x, float y) const;
 };

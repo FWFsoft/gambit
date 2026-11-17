@@ -124,9 +124,13 @@ TEST(ArenaPacketsRoundTrip) {
     a.deaths = 2;
     a.ready = 1;
     a.coreGenus = 4;
-    a.treeGenus[2] = 3;
-    a.treeLevel[2] = 2;
-    a.inventory[0] = 7;
+    a.corePart = 2;
+    a.nodeGenus[0] = 3;
+    a.nodePart[0] = 1;
+    a.nodeGenus[Arena::MAX_SUIT_NODES - 1] = 1;
+    a.nodePart[Arena::MAX_SUIT_NODES - 1] = 3;
+    a.inventory[0][2] = 7;
+    a.inventory[3][3] = 99;
     a.carryingScrap = 1;
     a.reviveProgress = 0.5f;
     m.players.push_back(a);
@@ -139,19 +143,27 @@ TEST(ArenaPacketsRoundTrip) {
     assert(out.scrapBanked == 4 && out.turretsOnline == 1 && out.bossId == 31);
     assert(out.players.size() == 2);
     assert(out.players[0].score == -150 && out.players[0].kills == 300);
-    assert(out.players[0].coreGenus == 4);
-    assert(out.players[0].treeGenus[2] == 3 && out.players[0].treeLevel[2] == 2);
-    assert(out.players[0].inventory[0] == 7);
+    assert(out.players[0].coreGenus == 4 && out.players[0].corePart == 2);
+    assert(out.players[0].nodeGenus[0] == 3 && out.players[0].nodePart[0] == 1);
+    assert(out.players[0].nodeGenus[Arena::MAX_SUIT_NODES - 1] == 1);
+    assert(out.players[0].nodePart[Arena::MAX_SUIT_NODES - 1] == 3);
+    for (int i = 1; i < Arena::MAX_SUIT_NODES - 1; i++) {
+      assert(out.players[0].nodeGenus[i] == 0);
+    }
+    assert(out.players[0].inventory[0][2] == 7);
+    assert(out.players[0].inventory[3][3] == 99);
+    assert(out.players[1].coreGenus == 0 && out.players[1].nodeGenus[0] == 0);
     assert(out.players[0].carryingScrap == 1);
     assert(out.players[0].reviveProgress == 0.5f);
   }
   {
     InfusionSlotPacket slot;
     slot.genus = 2;
-    slot.slot = 4;
+    slot.part = 3;
+    slot.node = Arena::CORE_NODE;
     auto bytes = serialize(slot);
     auto out = deserializeInfusionSlot(bytes.data(), bytes.size());
-    assert(out.genus == 2 && out.slot == 4);
+    assert(out.genus == 2 && out.part == 3 && out.node == Arena::CORE_NODE);
 
     PlayerReadyPacket ready;
     ready.ready = 1;

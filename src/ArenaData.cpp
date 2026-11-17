@@ -1,5 +1,6 @@
 #include "ArenaData.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 
@@ -478,6 +479,127 @@ static const InfusionText INFUSION_TEXT[GENUS_COUNT + 1][TREE_COUNT] = {
          "Core ability damage leaves molten ground that burns enemies."},
     },
 };
+
+static const InfusionPartInfo PARTS[PART_COUNT] = {
+    {"Talon", "+6% damage", 0.06f, 0.0f, 0.0f, 0.0f},
+    {"Hide", "+12 max health", 0.0f, 12.0f, 0.0f, 0.0f},
+    {"Eye", "Abilities recharge 6% faster", 0.0f, 0.0f, 0.06f, 0.0f},
+    {"Sinew", "+4% move speed", 0.0f, 0.0f, 0.0f, 0.04f},
+};
+
+const InfusionPartInfo& partInfo(InfusionPart part) {
+  int index = static_cast<int>(part);
+  assert(index >= 0 && index < PART_COUNT);
+  return PARTS[index];
+}
+
+// The suit layout: one entry per node, in Talent order. Tier 1 is the single
+// "leg" out of the core into each tree; every later tier is a choice.
+// Talent behaviour lives in src/Infusions.cpp.
+static const SuitNode SUIT_NODES[] = {
+    // ---- Offense -----------------------------------------------------------
+    {InfusionTree::Offense, 1, Talent::KillerInstinct, "Killer Instinct",
+     "+5% critical strike chance."},
+    {InfusionTree::Offense, 2, Talent::OpeningStrike, "Opening Strike",
+     "Hits on enemies at full health deal 50% more damage."},
+    {InfusionTree::Offense, 2, Talent::Relentless, "Relentless",
+     "Each basic attack hit adds 3% damage for 2 s, up to 15%."},
+    {InfusionTree::Offense, 3, Talent::Affliction, "Affliction",
+     "20% more damage to enemies carrying Poison, Wound, Slow, Snare, Stun "
+     "or Confusion."},
+    {InfusionTree::Offense, 3, Talent::Executioner, "Executioner",
+     "35% more damage to enemies below 30% health."},
+    {InfusionTree::Offense, 4, Talent::Bloodlust, "Bloodlust",
+     "Kills Empower you for 3 s (stacks up to 3)."},
+    {InfusionTree::Offense, 4, Talent::FocusFire, "Focus Fire",
+     "Your hits make enemies Vulnerable for 2 s, so the whole team hits "
+     "them harder."},
+    // ---- Defense -----------------------------------------------------------
+    {InfusionTree::Defense, 1, Talent::Plating, "Plating",
+     "Take 8% less damage."},
+    {InfusionTree::Defense, 2, Talent::SecondWind, "Second Wind",
+     "Dropping below 35% health grants a shield of 25% max health. Once "
+     "every 30 s."},
+    {InfusionTree::Defense, 2, Talent::Regrowth, "Regrowth",
+     "After 3 s without taking damage, regenerate 3% max health per second."},
+    {InfusionTree::Defense, 3, Talent::Guardian, "Guardian",
+     "Allies within 250 take 10% less damage."},
+    {InfusionTree::Defense, 3, Talent::Thorns, "Thorns",
+     "Melee attackers take 8 damage back."},
+    {InfusionTree::Defense, 4, Talent::LastStand, "Last Stand",
+     "Once per round, a killing blow leaves you at 1 health and untouchable "
+     "for 1.5 s."},
+    {InfusionTree::Defense, 4, Talent::ShareTheLoad, "Share the Load",
+     "You take a quarter of the damage dealt to allies within 300."},
+    // ---- Mobility ----------------------------------------------------------
+    {InfusionTree::Mobility, 1, Talent::LightFrame, "Light Frame",
+     "+6% move speed."},
+    {InfusionTree::Mobility, 2, Talent::QuickRecovery, "Quick Recovery",
+     "Your SHIFT ability recharges 25% faster."},
+    {InfusionTree::Mobility, 2, Talent::Slipstream, "Slipstream",
+     "Using your SHIFT ability Hastes you for 2 s."},
+    {InfusionTree::Mobility, 3, Talent::HitAndRun, "Hit and Run",
+     "Kills give 20% move speed for 2 s."},
+    {InfusionTree::Mobility, 3, Talent::Tailwind, "Tailwind",
+     "Using your SHIFT ability Hastes allies within 250 for 2 s."},
+    {InfusionTree::Mobility, 4, Talent::Blitz, "Blitz",
+     "After your SHIFT ability, your next hit within 2 s deals 60% more "
+     "damage and Slows."},
+    {InfusionTree::Mobility, 4, Talent::EscapeArtist, "Escape Artist",
+     "Dropping below 40% health Hastes you twice and makes you immune to "
+     "crowd control for 3 s. Once every 20 s."},
+    // ---- Genealogy ---------------------------------------------------------
+    {InfusionTree::Genealogy, 1, Talent::Bloodline, "Bloodline",
+     "Your core ability recharges 15% faster."},
+    {InfusionTree::Genealogy, 2, Talent::Purebred, "Purebred",
+     "+3% damage for every slotted infusion of your core's genus."},
+    {InfusionTree::Genealogy, 2, Talent::HybridVigor, "Hybrid Vigor",
+     "+4% damage and 4% less damage taken for every different genus in your "
+     "suit."},
+    {InfusionTree::Genealogy, 3, Talent::Overcharge, "Overcharge",
+     "Your core ability deals 30% more damage."},
+    {InfusionTree::Genealogy, 3, Talent::SharedGift, "Shared Gift",
+     "Casting your core ability heals allies within 300 for 8% of their max "
+     "health."},
+    {InfusionTree::Genealogy, 4, Talent::ApexMutation, "Apex Mutation",
+     "Genus effects of your core's genus count one level higher."},
+    {InfusionTree::Genealogy, 4, Talent::FeedbackLoop, "Feedback Loop",
+     "Kills take 0.5 s off your core ability's cooldown."},
+};
+static_assert(sizeof(SUIT_NODES) / sizeof(SUIT_NODES[0]) == TALENT_COUNT,
+              "one suit node per talent");
+
+int suitNodeCount() { return TALENT_COUNT; }
+
+const SuitNode& suitNode(int index) {
+  assert(index >= 0 && index < TALENT_COUNT);
+  const SuitNode& node = SUIT_NODES[index];
+  assert(static_cast<int>(node.talent) == index);
+  return node;
+}
+
+int treeTierCount(InfusionTree tree) {
+  int tiers = 0;
+  for (const SuitNode& node : SUIT_NODES) {
+    if (node.tree == tree) tiers = std::max(tiers, static_cast<int>(node.tier));
+  }
+  return tiers;
+}
+
+NodeState nodeState(const Genus* nodeGenus, bool coreFilled, int node) {
+  assert(nodeGenus != nullptr);
+  const SuitNode& self = suitNode(node);
+  if (nodeGenus[node] != Genus::None) return NodeState::Filled;
+  if (!coreFilled) return NodeState::Locked;
+  bool parentFilled = self.tier == 1;
+  for (int i = 0; i < TALENT_COUNT; i++) {
+    const SuitNode& other = SUIT_NODES[i];
+    if (other.tree != self.tree || nodeGenus[i] == Genus::None) continue;
+    if (other.tier == self.tier) return NodeState::Closed;
+    if (other.tier + 1 == self.tier) parentFilled = true;
+  }
+  return parentFilled ? NodeState::Open : NodeState::Locked;
+}
 
 const AbilityInfo& coreAbility(Genus g) {
   int index = static_cast<int>(g);

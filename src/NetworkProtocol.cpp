@@ -921,7 +921,10 @@ GameEventPacket deserializeGameEvent(const uint8_t* data, size_t size) {
 }
 
 static constexpr size_t MATCH_HEADER_BYTES = 36;
-static constexpr size_t MATCH_PLAYER_BYTES = 31;
+// Fixed part of a player entry; then 2 bytes per filled suit node.
+static constexpr size_t MATCH_PLAYER_BYTES =
+    4 + 1 + 4 + 2 + 1 + 1 + 1 + 1 + Arena::GENUS_COUNT * Arena::PART_COUNT + 1 +
+    1 + 4;
 
 std::vector<uint8_t> serialize(const MatchStatePacket& packet) {
   std::vector<uint8_t> buffer;
@@ -950,14 +953,24 @@ std::vector<uint8_t> serialize(const MatchStatePacket& packet) {
     writeUint8(buffer, p.deaths);
     writeUint8(buffer, p.ready);
     writeUint8(buffer, p.coreGenus);
-    for (uint8_t v : p.treeGenus) writeUint8(buffer, v);
-    for (uint8_t v : p.treeLevel) writeUint8(buffer, v);
-    for (uint8_t v : p.inventory) writeUint8(buffer, v);
+    writeUint8(buffer, p.corePart);
+    for (const auto& row : p.inventory) {
+      for (uint8_t v : row) writeUint8(buffer, v);
+    }
+    // Filled nodes only: index, then genus (high nibble) and part (low).
+    uint8_t filled = 0;
+    for (uint8_t g : p.nodeGenus) filled += g != 0 ? 1 : 0;
+    writeUint8(buffer, filled);
+    for (int i = 0; i < Arena::MAX_SUIT_NODES; i++) {
+      if (p.nodeGenus[i] == 0) continue;
+      assert(p.nodeGenus[i] < 16 && p.nodePart[i] < 16);
+      writeUint8(buffer, static_cast<uint8_t>(i));
+      writeUint8(buffer,
+                 static_cast<uint8_t>((p.nodeGenus[i] << 4) | p.nodePart[i]));
+    }
     writeUint8(buffer, p.carryingScrap);
     writeFloat(buffer, p.reviveProgress);
   }
-  assert(buffer.size() ==
-         MATCH_HEADER_BYTES + packet.players.size() * MATCH_PLAYER_BYTES);
   return buffer;
 }
 
@@ -979,6 +992,7 @@ MatchStatePacket deserializeMatchState(const uint8_t* data, size_t size) {
   packet.bossId = readUint32(data + 31);
   uint8_t count = readUint8(data + 35);
   assert(size >= MATCH_HEADER_BYTES + count * MATCH_PLAYER_BYTES);
+  (void)size;
 
   size_t offset = MATCH_HEADER_BYTES;
   for (uint8_t i = 0; i < count; ++i) {
@@ -995,11 +1009,20 @@ MatchStatePacket deserializeMatchState(const uint8_t* data, size_t size) {
     offset += 1;
     p.ready = readUint8(data + offset);
     offset += 1;
-    p.coreGenus = readUint8(data + offset);
-    offset += 1;
-    for (uint8_t& v : p.treeGenus) v = readUint8(data + offset++);
-    for (uint8_t& v : p.treeLevel) v = readUint8(data + offset++);
-    for (uint8_t& v : p.inventory) v = readUint8(data + offset++);
+    p.coreGenus = readUint8(data + offset++);
+    p.corePart = readUint8(data + offset++);
+    for (auto& row : p.inventory) {
+      for (uint8_t& v : row) v = readUint8(data + offset++);
+    }
+    uint8_t filled = readUint8(data + offset++);
+    assert(size >= offset + filled * 2u);
+    for (uint8_t n = 0; n < filled; n++) {
+      uint8_t index = readUint8(data + offset++);
+      uint8_t item = readUint8(data + offset++);
+      assert(index < Arena::MAX_SUIT_NODES);
+      p.nodeGenus[index] = static_cast<uint8_t>(item >> 4);
+      p.nodePart[index] = static_cast<uint8_t>(item & 0x0F);
+    }
     p.carryingScrap = readUint8(data + offset);
     offset += 1;
     p.reviveProgress = readFloat(data + offset);
@@ -1013,16 +1036,18 @@ std::vector<uint8_t> serialize(const InfusionSlotPacket& packet) {
   std::vector<uint8_t> buffer;
   writeUint8(buffer, static_cast<uint8_t>(packet.type));
   writeUint8(buffer, packet.genus);
-  writeUint8(buffer, packet.slot);
+  writeUint8(buffer, packet.part);
+  writeUint8(buffer, packet.node);
   return buffer;
 }
 
 InfusionSlotPacket deserializeInfusionSlot(const uint8_t* data, size_t size) {
-  assert(size >= 3);
+  assert(size >= 4);
   assert(data[0] == static_cast<uint8_t>(PacketType::InfusionSlot));
   InfusionSlotPacket packet;
   packet.genus = readUint8(data + 1);
-  packet.slot = readUint8(data + 2);
+  packet.part = readUint8(data + 2);
+  packet.node = readUint8(data + 3);
   return packet;
 }
 
