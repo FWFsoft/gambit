@@ -29,6 +29,7 @@ constexpr uint32_t Proc = 1 << 3;       // triggered by another hit: no procs
 constexpr uint32_t ForceCrit = 1 << 4;  // guaranteed critical
 constexpr uint32_t Melee = 1 << 5;      // attacker was adjacent
 constexpr uint32_t Explosion = 1 << 6;
+constexpr uint32_t Shared = 1 << 7;  // passed on to an ally: not shared again
 }  // namespace DamageFlag
 
 // What a kit gets when one of its abilities fires.

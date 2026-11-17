@@ -241,37 +241,32 @@ class Simulation {
       if (bot.slotTimerMs <= 0.0f) {
         bot.slotTimerMs = 300.0f;
         bool slotted = false;
-        for (int g = 0; g < Arena::GENUS_COUNT && !slotted; g++) {
-          if (me.infusionInventory[g] == 0) continue;
-          InfusionSlotPacket slot;
-          slot.genus = static_cast<uint8_t>(g + 1);
-          if (me.coreGenus == Arena::Genus::None) {
-            slot.slot = 0;
-          } else {
-            // Prefer upgrading a matching tree, else an empty one, else any.
-            int choice = -1;
-            for (int t = 0; t < Arena::TREE_COUNT; t++) {
-              if (static_cast<int>(me.treeGenus[t]) == g + 1 &&
-                  me.treeLevel[t] < Arena::MAX_TREE_LEVEL) {
-                choice = t;
-              }
-            }
-            if (choice < 0) {
-              for (int t = 0; t < Arena::TREE_COUNT; t++) {
-                if (me.treeGenus[t] == Arena::Genus::None) {
-                  choice = t;
-                  break;
-                }
-              }
-            }
-            if (choice < 0) {
-              choice = std::uniform_int_distribution<int>(
-                  0, Arena::TREE_COUNT - 1)(rng);
-            }
-            slot.slot = static_cast<uint8_t>(choice + 1);
+        // Core first, then a random open node in any tree.
+        std::vector<int> open;
+        for (int n = 0; n < Arena::suitNodeCount(); n++) {
+          if (Arena::nodeState(me.nodeGenus, me.coreGenus != Arena::Genus::None,
+                               n) == Arena::NodeState::Open) {
+            open.push_back(n);
           }
-          sendPacket(bot.id, serialize(slot));
-          slotted = true;
+        }
+        bool wantsCore = me.coreGenus == Arena::Genus::None;
+        for (int g = 0; g < Arena::GENUS_COUNT && !slotted; g++) {
+          for (int p = 0; p < Arena::PART_COUNT && !slotted; p++) {
+            if (me.infusionInventory[g][p] == 0) continue;
+            if (!wantsCore && open.empty()) continue;
+            InfusionSlotPacket slot;
+            slot.genus = static_cast<uint8_t>(g + 1);
+            slot.part = static_cast<uint8_t>(p);
+            if (wantsCore) {
+              slot.node = Arena::CORE_NODE;
+            } else {
+              int pick = std::uniform_int_distribution<int>(
+                  0, static_cast<int>(open.size()) - 1)(rng);
+              slot.node = static_cast<uint8_t>(open[pick]);
+            }
+            sendPacket(bot.id, serialize(slot));
+            slotted = true;
+          }
         }
         if (!slotted && !me.ready) {
           PlayerReadyPacket ready;
@@ -527,12 +522,16 @@ int main(int argc, char** argv) {
                     director.shipHealth(),
                     sim.game().getEnemySystem()->livingCount());
         for (const auto& [id, player] : sim.game().getPlayers()) {
+          int nodes = 0;
+          for (int n = 0; n < Arena::suitNodeCount(); n++) {
+            nodes += player.nodeGenus[n] != Arena::Genus::None ? 1 : 0;
+          }
           std::printf(
               "           p%u %-8s hp %3.0f/%3.0f score %5d kills %3d deaths "
-              "%d core %s\n",
+              "%d core %s +%d nodes\n",
               id, sim.allBots()[id - 1].name.c_str(), player.health,
               player.maxHealth, player.score, player.kills, player.deaths,
-              Arena::genusName(player.coreGenus));
+              Arena::genusName(player.coreGenus), nodes);
         }
       }
       lastPhase = phase;
