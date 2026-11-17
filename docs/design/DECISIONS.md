@@ -21,6 +21,21 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-16: Heroes face where they walk, and turn to the cursor to cast
+- **Decision** (requested by Noah): a hero's sprite faces their movement
+  direction in 8 ways (W = N, W+A = NW, A = W, ...). While an ability is
+  casting or charging they face the cursor instead. Standing still keeps the
+  last facing. Before, heroes always faced the cursor. Visual only: aim and
+  ability direction on the server are unchanged.
+- **Pillars:** Clarity serves: you read where a hero is going from the
+  sprite, and the turn to the cursor at cast time shows what an attack is
+  aimed at. Small trade against Clarity: an idle hero no longer shows where
+  their player is aiming between casts.
+- **Why:** Human direction. Movement and aim are separate inputs, and the
+  body following the cursor while walking the other way read as sliding.
+- **Status:** Accepted (requested by a human)
+- **Where:** `src/ArenaView.cpp` (`drawPlayer`), `include/ArenaView.h`
+
 ## 2026-11-16: Main menu lets you pick a new character mid-match
 - **Decision:** Pause → Main Menu now takes you out of the fight on the
   server (character 0). Your next pick is accepted and you drop in at the
