@@ -750,9 +750,10 @@ class GravonKit : public Kit {
 // ===========================================================================
 // Isaac, the Beacon (Winger)
 //   kitCounter[0]  player id carrying the Blessing (0 = nobody)
-//   kitCounter[1]  Lifeline anchor: 0 none, 1 an ally, 2 terrain
-//   kitTarget      Lifeline ally id
-//   kitTimer[1,2]  Lifeline terrain anchor point (on the rock's face)
+//   kitCounter[1]  Lifeline anchor: 0 none, 1 an ally, 2 terrain (a rock or
+//                  the ship's hull), 3 one of Kade's mirrors
+//   kitTarget      Lifeline ally id, or the mirror's zone id
+//   kitTimer[1,2]  Lifeline terrain or mirror anchor point (on its face)
 //   kitTimer[3]    Lifeline heal/tether pulse accumulator
 // ===========================================================================
 class IsaacKit : public Kit {
@@ -763,7 +764,7 @@ class IsaacKit : public Kit {
   static constexpr float LIFELINE_TERRAIN_SNAP = 140.0f;
   // With nothing to bond to, the cooldown mostly comes back.
   static constexpr float LIFELINE_MISS_COOLDOWN_MS = 1500.0f;
-  enum Anchor { None = 0, Ally = 1, Terrain = 2 };
+  enum Anchor { None = 0, Ally = 1, Terrain = 2, Mirror = 3 };
 
   void cast(AbilityContext& ctx, int slot) override {
     AbilitySystem& sys = ctx.sys;
@@ -810,10 +811,16 @@ class IsaacKit : public Kit {
         }
         tx = ally->x;
         ty = ally->y;
+      } else if (anchor == Mirror && !sys.findZone(self.kitTarget)) {
+        self.kitTarget = 0;
+        return;  // the bond broke when the mirror went
       }
       float d = dist(self.x, self.y, tx, ty);
-      // Stop beside an ally; against a rock, the rock stops him.
-      float stopShort = anchor == Ally ? 34.0f : 0.0f;
+      // Stop beside an ally or against a mirror's glass (mirrors do not
+      // block); against a rock or the hull, the solid stops him.
+      float stopShort = anchor == Ally     ? 34.0f
+                        : anchor == Mirror ? Arena::Tuning::PLAYER_RADIUS
+                                           : 0.0f;
       float travel = std::min(LIFELINE_RANGE, std::max(0.0f, d - stopShort));
       if (travel > 10.0f) {
         float dx = (tx - self.x) / d;
@@ -853,7 +860,8 @@ class IsaacKit : public Kit {
 
     if (self.chargeMs <= dtMs + 0.01f) {
       // First tick: pick the anchor. An ally near the cursor first, then
-      // the rock nearest the cursor; both within reach of Isaac.
+      // whichever terrain is nearest the cursor: a rock, the ship's hull or
+      // one of Kade's mirrors (anyone's); all within reach of Isaac.
       self.kitTarget = 0;
       self.kitCounter[1] = None;
       self.kitTimer[3] = 400.0f;  // pulse immediately
@@ -862,17 +870,43 @@ class IsaacKit : public Kit {
       if (ally && dist(self.x, self.y, ally->x, ally->y) <= LIFELINE_RANGE) {
         self.kitTarget = ally->id;
         self.kitCounter[1] = Ally;
-      } else if (const CollisionSystem* solid = sys.collisionSystem()) {
-        const CollisionShape* rock =
-            solid->terrainNear(ctx.aimX, ctx.aimY, LIFELINE_TERRAIN_SNAP);
-        if (rock) {
-          float fx, fy;  // the face of the rock that looks at Isaac
-          CollisionSystem::closestPoint(rock->aabb, self.x, self.y, fx, fy);
-          if (dist(self.x, self.y, fx, fy) <= LIFELINE_RANGE) {
-            self.kitTimer[1] = fx;
-            self.kitTimer[2] = fy;
-            self.kitCounter[1] = Terrain;
+      } else {
+        float best = LIFELINE_TERRAIN_SNAP;  // cursor to the anchor's edge
+        int found = None;
+        uint32_t mirrorId = 0;
+        float fx = 0.0f, fy = 0.0f;  // the face that looks at Isaac
+        if (const CollisionSystem* solid = sys.collisionSystem()) {
+          if (const CollisionShape* rock =
+                  solid->terrainNear(ctx.aimX, ctx.aimY, best)) {
+            float cx, cy;
+            CollisionSystem::closestPoint(rock->aabb, ctx.aimX, ctx.aimY, cx,
+                                          cy);
+            best = dist(ctx.aimX, ctx.aimY, cx, cy);
+            CollisionSystem::closestPoint(rock->aabb, self.x, self.y, fx, fy);
+            found = Terrain;
           }
+        }
+        for (const AbilitySystem::Zone& zone : sys.allZones()) {
+          if (zone.variant != Arena::KadeMode::MirrorZone ||
+              zone.lifeMs <= 0.0f) {
+            continue;
+          }
+          float edge = std::max(
+              0.0f, dist(ctx.aimX, ctx.aimY, zone.x, zone.y) - zone.radius);
+          if (edge > best) continue;
+          best = edge;
+          float d = dist(self.x, self.y, zone.x, zone.y);
+          float k = d > zone.radius ? zone.radius / d : 0.0f;
+          fx = zone.x + (self.x - zone.x) * k;
+          fy = zone.y + (self.y - zone.y) * k;
+          mirrorId = zone.id;
+          found = Mirror;
+        }
+        if (found != None && dist(self.x, self.y, fx, fy) <= LIFELINE_RANGE) {
+          self.kitTimer[1] = fx;
+          self.kitTimer[2] = fy;
+          self.kitTarget = found == Mirror ? mirrorId : 0;
+          self.kitCounter[1] = found;
         }
       }
       if (self.kitCounter[1] == None) {
@@ -894,6 +928,10 @@ class IsaacKit : public Kit {
         self.kitTarget = 0;
         return;
       }
+    } else if (self.kitCounter[1] == Mirror && !sys.findZone(self.kitTarget)) {
+      self.kitCounter[1] = None;  // the mirror is gone: the bond breaks
+      self.kitTarget = 0;
+      return;
     }
     float tx = ally ? ally->x : self.kitTimer[1];
     float ty = ally ? ally->y : self.kitTimer[2];
@@ -902,7 +940,7 @@ class IsaacKit : public Kit {
       sys.healPlayer(self.id, self, 4.0f);
       sys.healPlayer(self.id, *ally, 5.0f);
     } else {
-      // Terrain gives Isaac himself more.
+      // Terrain (a rock, the hull or a mirror) gives Isaac himself more.
       sys.healPlayer(self.id, self, 7.0f);
     }
   }

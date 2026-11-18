@@ -1,8 +1,9 @@
 // Isaac's kit on the real combat systems, with terrain on the map: the Ray
 // slows and heals but deals no damage (Wingers have no base damage), and
-// Lifeline bonds to an ally, a rock or the ship's hull near the cursor,
-// heals, and pulls him there on release. With nothing in reach it does nothing
-// and most of the cooldown comes back. Enemies slide off terrain.
+// Lifeline bonds to an ally, a rock, the ship's hull or one of Kade's
+// mirrors near the cursor, heals, and pulls him there on release. With nothing
+// in reach it does nothing and most of the cooldown comes back. Enemies slide
+// off terrain.
 
 #include <cassert>
 #include <cmath>
@@ -158,6 +159,43 @@ void test_Lifeline_OnlyTheShipsCurrentTier() {
   assert(up.isaac().y > 200.0f);
 }
 
+uint32_t mirrorAt(World& w, float x, float y) {
+  AbilitySystem::Zone zone;
+  zone.ownerId = WADE_ID;  // anyone's mirror will do
+  zone.x = x;
+  zone.y = y;
+  zone.radius = 26.0f;
+  zone.lifeMs = 1.0e9f;
+  zone.tickMs = 1.0e9f;
+  zone.variant = Arena::KadeMode::MirrorZone;
+  return w.combat.spawnZone(zone);
+}
+
+void test_Lifeline_BondsToAKadeMirror() {
+  World w;
+  mirrorAt(w, -300.0f, 0.0f);
+  w.isaac().health = 50.0f;
+  w.aimX = -300.0f;
+  w.aimY = 0.0f;
+  w.run(1000.0f, RMB);
+  assert(w.isaac().health > 50.0f);  // heals like terrain
+  w.run(700.0f, 0);
+  // Pulled to the mirror's glass, stopping against it, not through it.
+  assert(w.isaac().x < -200.0f && w.isaac().x > -300.0f);
+}
+
+void test_Lifeline_BreaksWhenTheMirrorGoes() {
+  World w;
+  uint32_t mirror = mirrorAt(w, -300.0f, 0.0f);
+  w.aimX = -300.0f;
+  w.aimY = 0.0f;
+  w.run(500.0f, RMB);
+  w.combat.endZone(mirror);  // Kade set a fourth one down elsewhere
+  w.run(500.0f, RMB);
+  w.run(700.0f, 0);
+  assert(std::abs(w.isaac().x) < 1.0f);  // nothing to be pulled to
+}
+
 void test_Lifeline_TerrainHealsIsaacMoreThanAnAlly() {
   World onRock;
   onRock.isaac().health = 50.0f;
@@ -235,6 +273,8 @@ int main() {
   test_Lifeline_TerrainHealsIsaacMoreThanAnAlly();
   test_Lifeline_BondsToTheShipHull();
   test_Lifeline_OnlyTheShipsCurrentTier();
+  test_Lifeline_BondsToAKadeMirror();
+  test_Lifeline_BreaksWhenTheMirrorGoes();
   test_Lifeline_BondsToAnAllyAndHealsThemToo();
   test_Lifeline_NothingInReach_StaysAndRefunds();
   test_Lifeline_RockOutOfReach();

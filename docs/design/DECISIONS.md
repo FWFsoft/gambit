@@ -21,6 +21,25 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-18: Isaac's Lifeline anchors to Kade's mirrors
+- **Decision:** Kade's mirrors (anyone's) count as terrain for Lifeline.
+  Isaac bonds to whichever rock, hull face or mirror is nearest the
+  cursor (an ally near the cursor still comes first), heals as he would
+  from a rock, and on release is pulled to the mirror's glass, stopping
+  against it. If the mirror goes while he is bonded (Kade sets a fourth
+  one down, or the round ends), the bond breaks and there is no pull.
+- **Pillars:**
+  - Creative Builds: serves. A cross-kit combo: Kade places anchors
+    where Isaac needs them, in open ground with no rock.
+  - Comradery in Competition: serves, with a small risk. It rewards the
+    two players working together, but Kade replacing his oldest mirror
+    can break Isaac's bond mid-cast. That is a side effect, not a way to
+    grief, but watch for it in playtests.
+  - Clarity: slightly weaker. As with the ship, mirrors in reach are not
+    rimmed for Isaac the way rocks are.
+- **Status:** Accepted (requested by a human)
+- **Where:** `src/CharacterKits.cpp` (IsaacKit), `tests/test_isaac_kit.cpp`
+
 ## 2026-11-18: Isaac's Lifeline anchors to the ship
 - **Decision:** The ship's hull counts as terrain for Lifeline: aim at
   the ship and Isaac bonds to the nearest face of its current tier's
