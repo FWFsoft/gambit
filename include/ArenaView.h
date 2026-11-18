@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -11,8 +12,11 @@
 #include "EffectVisuals.h"
 #include "FogOfWar.h"
 #include "PresentationLayer.h"
+#include "TerrainGrid.h"
+#include "ArenaDraw.h"
 
 struct CollisionShape;
+struct ClientObjective;
 
 class ClientPrediction;
 class EffectTracker;
@@ -40,6 +44,8 @@ class ArenaView {
   // world is drawn into its scene target, actors cast shadows, effects
   // light the ground and bloom, and the HUD is drawn after the resolve.
   void setPresentation(PresentationLayer* layer);
+  // The map's set dressing (TiledMap::getProps); must outlive the view.
+  void setProps(const std::vector<MapProp>* mapProps) { props = mapProps; }
 
   // Sprite lookup shared with the character select screen.
   struct CharacterSprite {
@@ -230,6 +236,31 @@ class ArenaView {
   void drawShipWreckage(ImDrawList* dl, ImVec2 centre, float damage, int tier,
                         bool smoke);
   void drawRoofTurrets(ImDrawList* dl, ImVec2 anchor, int tier, ImU32 tint);
+  // ---- The planet's scenery (ArenaWorld.cpp) -----------------------------
+  // Set dressing from the map's Props layer (not owned; may be null).
+  const std::vector<MapProp>* props = nullptr;
+  // Beyond this a place's beacon is not seen (world pixels from the hero).
+  static constexpr float BEACON_RANGE = 2600.0f;
+  int tourStop = -1;  // N: the last scenery stop the camera jumped to
+  void footprintBox(float x, float y, float alongX, float alongY, float angle,
+                    ImVec2 out[4]) const;
+  void footprintRound(float x, float y, float radius, int n, ImVec2* out,
+                      float jitter = 0.0f, uint32_t seed = 0) const;
+  Arena::Genus regionGenusAt(float x, float y) const;
+  // Draws the art in an asset slot if it exists; false = draw a placeholder.
+  bool drawSlotArt(ImDrawList* dl, const std::string& slot, float x, float y,
+                   int variant, float scale);
+  void drawProp(ImDrawList* dl, const MapProp& prop, uint32_t index);
+  void drawFlora(ImDrawList* dl, const MapProp& prop, Arena::Genus genus,
+                 uint32_t seed);
+  void drawCityBlock(ImDrawList* dl, const MapProp& prop, uint32_t seed);
+  void drawLandmark(ImDrawList* dl, const MapProp& prop, uint32_t seed);
+  void drawObjectiveSite(ImDrawList* dl, const ClientObjective& objective,
+                         uint32_t id);
+  void drawDistant(ImDrawList* dl);
+  void sceneryLights(const std::function<void(float, float, float,
+                                              ArenaDraw::Rgb, float)>& add) const;
+
   // A terrain rock: an inked block standing on its footprint.
   void drawRock(ImDrawList* dl, const CollisionShape& rock, bool inReach,
                 bool bonding);
@@ -255,6 +286,8 @@ class ArenaView {
   // drawn afterwards at their final position with toZoomedScreen so they
   // stay crisp.
   ImVec2 toScreen(float worldX, float worldY) const;
+  float liftAt(float worldX, float worldY) const;
+  const TerrainGrid* terrain() const;
   ImVec2 toZoomedScreen(float worldX, float worldY) const;
   // Culling for world layers: is a 1x layout position (toScreen) inside the
   // view once magnified, with this much room around it (layout pixels)?

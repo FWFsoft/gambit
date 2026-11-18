@@ -107,7 +107,7 @@ int main(int argc, char* argv[]) {
   TiledMap map;
   assert(map.load("assets/maps/test_map.tmx") && "Failed to load required map");
 
-  CollisionSystem collisionSystem(map.getCollisionShapes());
+  CollisionSystem collisionSystem(map.getCollisionShapes(), &map.terrain());
   Logger::info("Client collision system initialized");
 
   Camera camera(Config::Screen::WIDTH, Config::Screen::HEIGHT);

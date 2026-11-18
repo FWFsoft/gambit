@@ -11,6 +11,7 @@
 #include "MusicZone.h"
 #include "Objective.h"
 #include "PlayerSpawn.h"
+#include "TerrainGrid.h"
 
 class TiledMap {
  public:
@@ -36,6 +37,12 @@ class TiledMap {
     return playerSpawns;
   }
   const std::vector<Objective>& getObjectives() const { return objectives; }
+  // Height, walkability and regions (flat and open on maps without them).
+  const TerrainGrid& terrain() const { return terrainGrid; }
+  // Set dressing from the "Props" object layer.
+  const std::vector<MapProp>& getProps() const { return props; }
+  // A float map property (Tiled: Map > Map Properties), or `fallback`.
+  float getMapFloat(const std::string& name, float fallback) const;
   bool hasShipPosition() const { return hasShip; }
   float getShipX() const { return shipX; }
   float getShipY() const { return shipY; }
@@ -58,6 +65,8 @@ class TiledMap {
   std::vector<EnemySpawn> enemySpawns;
   std::vector<PlayerSpawn> playerSpawns;
   std::vector<Objective> objectives;
+  TerrainGrid terrainGrid;
+  std::vector<MapProp> props;
   float shipX = 0.0f;
   float shipY = 0.0f;
   bool hasShip = false;
@@ -67,4 +76,6 @@ class TiledMap {
   void extractPlayerSpawns();
   void extractShip();
   void extractObjectives();
+  void extractTerrain();
+  void extractProps();
 };

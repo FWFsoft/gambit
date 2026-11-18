@@ -75,7 +75,7 @@ TEST(HeadlessMovement_RightMovement) {
   TiledMap map;
   assert(map.load("assets/maps/test_map.tmx"));
 
-  CollisionSystem collisionSystem(map.getCollisionShapes());
+  CollisionSystem collisionSystem(map.getCollisionShapes(), &map.terrain());
   Camera camera(Config::Screen::WIDTH, Config::Screen::HEIGHT);
   camera.setWorldBounds(map.getWorldWidth(), map.getWorldHeight());
 
@@ -175,7 +175,7 @@ TEST(HeadlessMovement_DiagonalMovement) {
   TiledMap map;
   assert(map.load("assets/maps/test_map.tmx"));
 
-  CollisionSystem collisionSystem(map.getCollisionShapes());
+  CollisionSystem collisionSystem(map.getCollisionShapes(), &map.terrain());
   Camera camera(Config::Screen::WIDTH, Config::Screen::HEIGHT);
   camera.setWorldBounds(map.getWorldWidth(), map.getWorldHeight());
 

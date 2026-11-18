@@ -29,6 +29,20 @@ constexpr float FLOOR_VIGNETTE = 0.40f;
 constexpr float FLOOR_VIGNETTE_START = 0.35f;
 constexpr float FLOOR_VIGNETTE_POWER = 1.5f;
 
+// Terrain slope light (TileRenderer::slopeShade). Per world pixel the
+// ground's lift changes per step down / across the screen.
+// A face dropping toward the camera (a cliff seen head on) darkens fast, so
+// high ground reads as high at a glance (Clarity).
+constexpr float TERRAIN_FACE_SHADE = 0.060f;
+// The top of a rise (ground climbing away from the camera) lightens a little.
+constexpr float TERRAIN_BACK_SHADE = 0.012f;
+// Ground rising to the right faces the light (upper left).
+constexpr float TERRAIN_SIDE_SHADE = 0.020f;
+// Per world pixel of lift: high ground lighter, low ground darker.
+constexpr float TERRAIN_HEIGHT_SHADE = 0.0045f;
+constexpr float TERRAIN_SHADE_MIN = 0.22f;
+constexpr float TERRAIN_SHADE_MAX = 1.9f;
+
 // --------------------------------------------------------------------------
 // 2. Grounding: one fixed key light for every shadow in the game.
 //    Must match KEY_LIGHT and CAMERA_ELEVATION_DEG in

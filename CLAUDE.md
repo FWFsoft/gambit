@@ -65,6 +65,9 @@ version:
   bakes the sheets. Follow the `/character-art` skill.
 - **Look at what you make.** Render previews and read the images before
   claiming anything about how art looks.
+- **Maps and scenery** come from a generator, not hand painting:
+  `docs/design/MAP_PIPELINE.md` (asset slots for props, landmarks and
+  objective set pieces; regenerate with `tools/maps/generate_planet.py`).
 
 ## Project Architecture
 

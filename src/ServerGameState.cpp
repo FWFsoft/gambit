@@ -72,6 +72,10 @@ ServerGameState::ServerGameState(NetworkServer* server,
   director = std::make_unique<MatchDirector>(
       players, enemySystem.get(), abilitySystem.get(), shipX, shipY,
       worldWidth, worldHeight, hooks);
+  if (world.tiledMap != nullptr) {
+    director->setTerrain(&world.tiledMap->terrain());
+    director->setZoneScale(world.tiledMap->getMapFloat("zone_scale", 1.0f));
+  }
 
   // Damage-over-time ticks show numbers and count toward the source's score.
   effectManager->setDotCallback([this](const EffectManager::DotTick& tick) {

@@ -3,10 +3,14 @@
 #include <vector>
 
 #include "CollisionShape.h"
+#include "TerrainGrid.h"
 
 class CollisionSystem {
  public:
-  CollisionSystem(const std::vector<CollisionShape>& collisionShapes);
+  // `terrain` (optional): the map's blocked cells (sea, peaks, city blocks)
+  // stop movement like the shapes do.
+  CollisionSystem(const std::vector<CollisionShape>& collisionShapes,
+                  const TerrainGrid* terrain = nullptr);
 
   // Returns true if movement is allowed, false if blocked
   // If blocked, adjusts newX/newY to slide along collision boundaries
@@ -15,6 +19,8 @@ class CollisionSystem {
 
   // Simple point-in-shapes test (for spawning, teleporting, etc.)
   bool isPositionValid(float x, float y, float playerRadius = 16.0f) const;
+
+  const TerrainGrid* getTerrain() const { return terrain; }
 
   const std::vector<CollisionShape>& getShapes() const {
     return collisionShapes;
@@ -60,7 +66,12 @@ class CollisionSystem {
 
  private:
   const std::vector<CollisionShape>& collisionShapes;
+  const TerrainGrid* terrain = nullptr;
   int hullTier = 0;
+
+  bool terrainBlocks(float x, float y, float radius) const {
+    return terrain && terrain->blocksBody(x, y, radius);
+  }
 
   // Check if player AABB intersects with collision shape
   bool intersects(float px, float py, float radius,

@@ -79,7 +79,7 @@ int main(int argc, char* argv[]) {
     return EXIT_FAILURE;
   }
 
-  CollisionSystem collisionSystem(map.getCollisionShapes());
+  CollisionSystem collisionSystem(map.getCollisionShapes(), &map.terrain());
   Logger::info("Collision system initialized");
 
   Camera camera(Config::Screen::WIDTH, Config::Screen::HEIGHT);
@@ -129,6 +129,7 @@ int main(int argc, char* argv[]) {
   uiSystem.setArenaView(&arenaView);
   // The look: dark world, light pools, cast shadows, bloom and grade.
   arenaView.setPresentation(renderSystem.getPresentation());
+  arenaView.setProps(&map.getProps());
   uiSystem.setPresentation(renderSystem.getPresentation());
   renderSystem.setLegacyEntityRendering(false);
 

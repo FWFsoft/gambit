@@ -139,7 +139,7 @@ void MatchDirector::startRound(int round) {
   currentPhase = MatchPhase::Round;
   phaseTimeLeft = Tuning::ROUND_SECONDS[round - 1];
   phaseElapsed = 0.0f;
-  zone = Tuning::ZONE_START_RADIUS[round - 1];
+  zone = Tuning::ZONE_START_RADIUS[round - 1] * zoneScale;
   spawnTimer = 800.0f;
   raidTimer = Tuning::RAID_FIRST_MS;
   zoneTickTimer = 0.0f;
@@ -285,7 +285,8 @@ void MatchDirector::resetMatch() {
   for (RoofTurret& turret : roofTurrets) turret = RoofTurret();
   bossId = 0;
   bossSpawned = false;
-  zone = Tuning::ZONE_START_RADIUS[0];
+  zone = Tuning::ZONE_START_RADIUS[0] * zoneScale;
+  dealRegions();
   enemies->despawnAll();
   abilities->effects().clearAllEnemies();
   if (hooks.resetWorld) hooks.resetWorld();
@@ -371,7 +372,7 @@ void MatchDirector::updateRound(float dtMs) {
 
   // The Blue Zone holds, then closes in on the ship.
   float total = Tuning::ROUND_SECONDS[currentRound - 1];
-  float startRadius = Tuning::ZONE_START_RADIUS[currentRound - 1];
+  float startRadius = Tuning::ZONE_START_RADIUS[currentRound - 1] * zoneScale;
   float holdUntil = total * Tuning::ZONE_HOLD_FRACTION;
   if (phaseElapsed <= holdUntil) {
     zone = startRadius;
@@ -514,7 +515,7 @@ void MatchDirector::spawnPack(float x, float y, int size, bool targetShip,
   Genus genus =
       genusOverride != Genus::None
           ? genusOverride
-          : Arena::fieldedGenus(Arena::genusForDirection(x - shipX, y - shipY));
+          : Arena::fieldedGenus(genusAt(x, y));
   int round = std::min(currentRound, Tuning::ROUND_COUNT);
 
   // Later rounds mix in more casters and brutes.
@@ -982,8 +983,7 @@ void MatchDirector::dropLoot(const Enemy& enemy) {
   // The infusion is the territory's, not the body's: with one genus fielded
   // everywhere, where you fight still decides what you can build.
   Genus lootGenus =
-      thug ? Arena::genusForDirection(enemy.x - shipX, enemy.y - shipY)
-           : def.genus;
+      thug ? genusAt(enemy.x, enemy.y) : def.genus;
   // Pity: every round hands out its first infusion early so there is always
   // something to slot at the first intermission.
   int participants = std::max(1, participantCount());
@@ -1043,10 +1043,9 @@ void MatchDirector::onObjectiveCompleted(Player& player, bool salvagedScrap,
   if (hooks.spawnPickup) {
     // Objectives always pay out an infusion from the local genus, and the
     // far ones pay two: the trip out is the price.
-    Genus genus =
-        Arena::genusForDirection(objectiveX - shipX, objectiveY - shipY);
+    Genus genus = genusAt(objectiveX, objectiveY);
     bool far = dist(objectiveX, objectiveY, shipX, shipY) >=
-               Tuning::FAR_OBJECTIVE_DISTANCE;
+               Tuning::FAR_OBJECTIVE_DISTANCE * zoneScale;
     for (int i = 0; i < (far ? 2 : 1); i++) {
       hooks.spawnPickup(Arena::PickupId::infusion(genus, randomPart()),
                         player.x + 30.0f - 60.0f * i, player.y);
@@ -1251,8 +1250,47 @@ void MatchDirector::onDebugCommand(Player& player, DebugCommandKind command,
   }
 }
 
+void MatchDirector::setTerrain(const TerrainGrid* grid) {
+  terrain = grid;
+  dealRegions();
+}
+
+void MatchDirector::setZoneScale(float scale) {
+  assert(scale >= 0.25f && scale <= 8.0f);
+  zoneScale = scale;
+  if (currentPhase == MatchPhase::Lobby) {
+    zone = Tuning::ZONE_START_RADIUS[0] * zoneScale;
+  }
+}
+
+void MatchDirector::dealRegions() {
+  // Deal the genera in shuffled hands of four, so every genus holds about
+  // the same share of the planet and no two matches lay it out alike.
+  int slot = 1;
+  while (slot < Arena::REGION_SLOTS) {
+    uint8_t hand[Arena::GENUS_COUNT];
+    for (int g = 0; g < Arena::GENUS_COUNT; g++) {
+      hand[g] = static_cast<uint8_t>(g + 1);
+    }
+    std::shuffle(hand, hand + Arena::GENUS_COUNT, regionRng);
+    for (int g = 0; g < Arena::GENUS_COUNT && slot < Arena::REGION_SLOTS;
+         g++) {
+      regionGenera[slot++] = hand[g];
+    }
+  }
+  regionGenera[0] = 0;
+}
+
+Arena::Genus MatchDirector::genusAt(float x, float y) const {
+  int region = terrain ? terrain->regionAt(x, y) : 0;
+  return Arena::regionGenus(regionGenera, region, x - shipX, y - shipY);
+}
+
 MatchStatePacket MatchDirector::buildState() const {
   MatchStatePacket packet;
+  for (int i = 0; i < Arena::REGION_SLOTS; i++) {
+    packet.regionGenus[i] = regionGenera[i];
+  }
   packet.phase = static_cast<uint8_t>(currentPhase);
   packet.round = static_cast<uint8_t>(currentRound);
   packet.roundCount = static_cast<uint8_t>(Tuning::ROUND_COUNT);

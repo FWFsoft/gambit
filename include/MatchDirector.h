@@ -5,6 +5,8 @@
 #include <random>
 #include <unordered_map>
 
+#include "TerrainGrid.h"
+
 #include "ArenaData.h"
 #include "Enemy.h"
 #include "NetworkProtocol.h"
@@ -37,6 +39,15 @@ class MatchDirector {
                 Hooks hooks);
 
   void update(float dtMs);
+
+  // The map's regions: each is dealt a genus per match (Arena::regionGenus).
+  void setTerrain(const TerrainGrid* terrain);
+  // A bigger map has a bigger storm: the zone's radii and the "far"
+  // objective distance are the Tuning values times this (map property
+  // "zone_scale"; 1 on the prototype arena).
+  void setZoneScale(float scale);
+  // The genus that holds this spot of the planet this match.
+  Arena::Genus genusAt(float x, float y) const;
 
   // ---- events from the rest of the server --------------------------------
   void onPlayerJoined(Player& player);
@@ -86,6 +97,13 @@ class MatchDirector {
 
  private:
   std::unordered_map<uint32_t, Player>& players;
+  const TerrainGrid* terrain = nullptr;
+  uint8_t regionGenera[Arena::REGION_SLOTS] = {};
+  float zoneScale = 1.0f;
+  // Its own stream, seeded fresh per server: the layout differs between
+  // runs, while everything rng drives stays reproducible.
+  std::mt19937 regionRng{std::random_device{}()};
+  void dealRegions();
   EnemySystem* enemies;
   AbilitySystem* abilities;
   float shipX, shipY;

@@ -33,6 +33,8 @@ bool TiledMap::load(const std::string& filepath) {
   extractPlayerSpawns();
   extractShip();
   extractObjectives();
+  extractTerrain();
+  extractProps();
 
   // Calculate map centering offset for music zones
   float centerTileX = (mapWidth - 1) / 2.0f;
@@ -142,8 +144,10 @@ void TiledMap::extractCollisionShapes() {
       const auto& objectLayer = layer->getLayerAs<tmx::ObjectGroup>();
 
       // Skip Music/MusicZones layers (they're for music zones, not collision)
+      // and the set dressing (Props: looks only).
       if (objectLayer.getName() == "Music" ||
-          objectLayer.getName() == "MusicZones") {
+          objectLayer.getName() == "MusicZones" ||
+          objectLayer.getName() == "Props") {
         continue;
       }
 
@@ -169,6 +173,7 @@ void TiledMap::extractCollisionShapes() {
           shape.aabb.height = aabb.height;
 
           collisionShapes.push_back(shape);
+          if (shape.objectType == "terrain") continue;  // dozens: no log
 
           Logger::info("Loaded collision rect: " + shape.name + " at (" +
                        std::to_string(shape.aabb.x) + ", " +
@@ -501,4 +506,97 @@ void TiledMap::extractObjectives() {
 
   Logger::info("Loaded " + std::to_string(objectives.size()) +
                " objectives from map");
+}
+
+void TiledMap::extractTerrain() {
+  terrainGrid.reset(mapWidth, mapHeight, tileWidth, tileHeight);
+  // The hidden data layers index the "terrain_data" tileset.
+  uint32_t dataGid = 0;
+  for (const auto& tileset : tmxMap.getTilesets()) {
+    if (tileset.getName() == "terrain_data") dataGid = tileset.getFirstGID();
+  }
+  const tmx::TileLayer* heightLayer = nullptr;
+  const tmx::TileLayer* regionLayer = nullptr;
+  const tmx::TileLayer* blockedLayer = nullptr;
+  for (const auto& layer : tmxMap.getLayers()) {
+    if (layer->getType() != tmx::Layer::Type::Tile) continue;
+    const auto* tiles = dynamic_cast<const tmx::TileLayer*>(layer.get());
+    if (layer->getName() == "Height") heightLayer = tiles;
+    if (layer->getName() == "Region") regionLayer = tiles;
+    if (layer->getName() == "Blocked") blockedLayer = tiles;
+  }
+  if (dataGid == 0 || !heightLayer) return;  // an old, flat map
+
+  const size_t cells = static_cast<size_t>(mapWidth * mapHeight);
+  assert(heightLayer->getTiles().size() == cells);
+  assert(!regionLayer || regionLayer->getTiles().size() == cells);
+  assert(!blockedLayer || blockedLayer->getTiles().size() == cells);
+  auto value = [&](const tmx::TileLayer* layer, size_t i, int fallback,
+                   int limit) {
+    if (!layer) return fallback;
+    uint32_t gid = layer->getTiles()[i].ID;
+    if (gid < dataGid) return fallback;
+    return std::clamp(static_cast<int>(gid - dataGid), 0, limit - 1);
+  };
+  for (int ty = 0; ty < mapHeight; ty++) {
+    for (int tx = 0; tx < mapWidth; tx++) {
+      size_t i = static_cast<size_t>(ty * mapWidth + tx);
+      int level = value(heightLayer, i, TerrainGrid::BASE_LEVEL,
+                        TerrainGrid::LEVEL_COUNT);
+      int region = value(regionLayer, i, 0, TerrainGrid::REGION_COUNT);
+      bool solid =
+          blockedLayer && blockedLayer->getTiles()[i].ID != 0;
+      terrainGrid.setCell(tx, ty, level, region, solid);
+    }
+  }
+  terrainGrid.finish();
+  Logger::info("Loaded terrain: heights, regions and blocked cells");
+}
+
+void TiledMap::extractProps() {
+  props.clear();
+  float centerTileX = (mapWidth - 1) / 2.0f;
+  float centerTileY = (mapHeight - 1) / 2.0f;
+  float centerWorldX = (centerTileX - centerTileY) * tileWidth / 2.0f;
+  float centerWorldY = (centerTileX + centerTileY) * tileHeight / 4.0f;
+  for (const auto& layer : tmxMap.getLayers()) {
+    if (layer->getType() != tmx::Layer::Type::Object) continue;
+    const auto& group = layer->getLayerAs<tmx::ObjectGroup>();
+    if (group.getName() != "Props") continue;
+    for (const auto& object : group.getObjects()) {
+      MapProp prop;
+      prop.kind = object.getType().empty() ? object.getName() : object.getType();
+      prop.x = object.getPosition().x - centerWorldX;
+      prop.y = object.getPosition().y - centerWorldY;
+      for (const auto& p : object.getProperties()) {
+        const std::string& name = p.getName();
+        float f = p.getType() == tmx::Property::Type::Float
+                      ? p.getFloatValue()
+                      : p.getType() == tmx::Property::Type::Int
+                            ? static_cast<float>(p.getIntValue())
+                            : 0.0f;
+        if (name == "scale") prop.scale = f;
+        else if (name == "variant") prop.variant = static_cast<int>(f);
+        else if (name == "width") prop.width = f;
+        else if (name == "depth") prop.depth = f;
+        else if (name == "tall") prop.tall = f;
+      }
+      prop.region = terrainGrid.regionAt(prop.x, prop.y);
+      props.push_back(prop);
+    }
+  }
+  if (!props.empty()) {
+    Logger::info("Loaded " + std::to_string(props.size()) + " props");
+  }
+}
+
+float TiledMap::getMapFloat(const std::string& name, float fallback) const {
+  for (const auto& p : tmxMap.getProperties()) {
+    if (p.getName() != name) continue;
+    if (p.getType() == tmx::Property::Type::Float) return p.getFloatValue();
+    if (p.getType() == tmx::Property::Type::Int) {
+      return static_cast<float>(p.getIntValue());
+    }
+  }
+  return fallback;
 }
