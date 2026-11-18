@@ -920,8 +920,10 @@ GameEventPacket deserializeGameEvent(const uint8_t* data, size_t size) {
   return packet;
 }
 
+static constexpr size_t MATCH_REGION_OFFSET =
+    36 + 2 * Arena::Tuning::ROOF_TURRET_COUNT;
 static constexpr size_t MATCH_HEADER_BYTES =
-    36 + 1 + 2 * Arena::Tuning::ROOF_TURRET_COUNT;
+    MATCH_REGION_OFFSET + Arena::REGION_SLOTS / 2 + 1;
 // Fixed part of a player entry; then 2 bytes per filled suit node.
 static constexpr size_t MATCH_PLAYER_BYTES =
     4 + 1 + 4 + 2 + 1 + 1 + 1 + 1 + Arena::GENUS_COUNT * Arena::PART_COUNT + 1 +
@@ -946,6 +948,12 @@ std::vector<uint8_t> serialize(const MatchStatePacket& packet) {
   for (int i = 0; i < Arena::Tuning::ROOF_TURRET_COUNT; i++) {
     writeUint8(buffer, packet.roofAim[i]);
     writeUint8(buffer, packet.roofRecoil[i]);
+  }
+  assert(buffer.size() == MATCH_REGION_OFFSET);
+  for (int i = 0; i < Arena::REGION_SLOTS; i += 2) {
+    assert(packet.regionGenus[i] < 16 && packet.regionGenus[i + 1] < 16);
+    writeUint8(buffer, static_cast<uint8_t>((packet.regionGenus[i] << 4) |
+                                            packet.regionGenus[i + 1]));
   }
   assert(packet.players.size() <= 255);
   writeUint8(buffer, static_cast<uint8_t>(packet.players.size()));
@@ -1000,6 +1008,11 @@ MatchStatePacket deserializeMatchState(const uint8_t* data, size_t size) {
   for (int i = 0; i < Arena::Tuning::ROOF_TURRET_COUNT; i++) {
     packet.roofAim[i] = readUint8(data + 36 + 2 * i);
     packet.roofRecoil[i] = readUint8(data + 37 + 2 * i);
+  }
+  for (int i = 0; i < Arena::REGION_SLOTS; i += 2) {
+    uint8_t pair = readUint8(data + MATCH_REGION_OFFSET + i / 2);
+    packet.regionGenus[i] = pair >> 4;
+    packet.regionGenus[i + 1] = pair & 15;
   }
   uint8_t count = readUint8(data + MATCH_HEADER_BYTES - 1);
   assert(size >= MATCH_HEADER_BYTES + count * MATCH_PLAYER_BYTES);

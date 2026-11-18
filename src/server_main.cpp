@@ -23,7 +23,7 @@ int main(int argc, char* argv[]) {
   Logger::init();
 
   //   --map <path.tmx>    map to host (clients must load the same one)
-  std::string mapPath = "assets/maps/arena.tmx";
+  std::string mapPath = "assets/maps/planet.tmx";
   for (int i = 1; i < argc; i++) {
     std::string arg = argv[i];
     if (arg == "--map" && i + 1 < argc) mapPath = argv[++i];
@@ -49,7 +49,7 @@ int main(int argc, char* argv[]) {
   }
   Logger::info("Hosting map " + mapPath);
 
-  CollisionSystem collisionSystem(map.getCollisionShapes());
+  CollisionSystem collisionSystem(map.getCollisionShapes(), &map.terrain());
   Logger::info("Collision system initialized with " +
                std::to_string(map.getCollisionShapes().size()) + " shapes");
 

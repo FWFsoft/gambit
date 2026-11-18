@@ -137,6 +137,33 @@ void ArenaView::handleHotkeys() {
     prediction->sendToServer(serialize(ShipUpgradePacket()));
   }
 
+  // N: tour the planet. Frees the camera and jumps it to the next
+  // landmark, the city and the far places, so the map can be looked at
+  // without walking it (for reviewing the scenery; Y takes the camera back).
+  if (ImGui::IsKeyPressed(ImGuiKey_N, false) && props) {
+    std::vector<std::pair<float, float>> stops;
+    float cityX = 0.0f, cityY = 0.0f;
+    int city = 0;
+    for (const MapProp& p : *props) {
+      if (p.kind == "city_block") {
+        cityX += p.x;
+        cityY += p.y;
+        city++;
+      } else if (p.kind == "monolith" || p.kind == "spire" ||
+                 p.kind == "ribcage" || p.kind == "crater" ||
+                 p.kind == "freighter") {
+        stops.push_back({p.x, p.y});
+      }
+    }
+    if (city > 0) stops.insert(stops.begin(), {cityX / city, cityY / city});
+    if (!stops.empty()) {
+      tourStop = (tourStop + 1) % static_cast<int>(stops.size());
+      if (camera->isLocked()) camera->toggleMode();
+      camera->x = stops[tourStop].first;
+      camera->y = stops[tourStop].second - liftAt(stops[tourStop].first,
+                                                   stops[tourStop].second);
+    }
+  }
   // F3: fog of war on / off, to compare.
   if (ImGui::IsKeyPressed(ImGuiKey_F3, false)) fogEnabled = !fogEnabled;
   // F4: the look on / off, to compare with the plain render.
@@ -777,13 +804,43 @@ void ArenaView::drawMinimap() {
 
   dl->AddCircleFilled(centre, radius, IM_COL32(12, 14, 24, 200), 48);
 
-  // Faint quadrant tints so the map teaches which genus lives where.
-  static const VfxTheme QUADS[4] = {VfxTheme::Fire, VfxTheme::Poison,
-                                    VfxTheme::Psychic, VfxTheme::Ice};
-  for (int i = 0; i < 4; i++) {
-    float mid = i * PI * 0.5f;  // east, south, west, north
-    sector(dl, centre, radius - 1.0f, mid, PI * 0.25f,
-           themeColor(QUADS[i], 0.10f), 0);
+  const TerrainGrid* grid = terrain();
+  const bool planet = grid && grid->active();
+  if (planet) {
+    // The planet as the crew has seen it: explored land, tinted by the
+    // genus that holds it this match. Unexplored is blank: what lives out
+    // there is found by going (Clarity once seen, discovery before).
+    const int cells = 30;
+    const float step = 2.0f * radius / cells;
+    for (int j = 0; j < cells; j++) {
+      for (int i = 0; i < cells; i++) {
+        ImVec2 p(centre.x - radius + (i + 0.5f) * step,
+                 centre.y - radius + (j + 0.5f) * step);
+        if (!inside(p)) continue;
+        float wx = match.shipX + (p.x - centre.x) / scale;
+        float wy = match.shipY + (p.y - centre.y) / scale;
+        if (!wasSeen(wx, wy)) continue;
+        if (grid->regionAt(wx, wy) == 0) continue;  // sea
+        Arena::Genus genus = regionGenusAt(wx, wy);
+        ImU32 col = grid->blockedAt(wx, wy)
+                        ? IM_COL32(70, 72, 86, 200)
+                        : (genus == Arena::Genus::None
+                               ? IM_COL32(60, 64, 76, 170)
+                               : themeColor(genusTheme(genus), 0.30f));
+        dl->AddRectFilled(ImVec2(p.x - step * 0.5f, p.y - step * 0.5f),
+                          ImVec2(p.x + step * 0.5f, p.y + step * 0.5f), col);
+      }
+    }
+  } else {
+    // The prototype arena: faint quadrant tints teach which genus lives
+    // where.
+    static const VfxTheme QUADS[4] = {VfxTheme::Fire, VfxTheme::Poison,
+                                      VfxTheme::Psychic, VfxTheme::Ice};
+    for (int i = 0; i < 4; i++) {
+      float mid = i * PI * 0.5f;  // east, south, west, north
+      sector(dl, centre, radius - 1.0f, mid, PI * 0.25f,
+             themeColor(QUADS[i], 0.10f), 0);
+    }
   }
 
   // Zone
@@ -857,7 +914,9 @@ void ArenaView::drawMinimap() {
     dl->AddCircle(p, id == me ? 4.0f : 3.5f, IM_COL32(0, 0, 0, 255), 12, 1.0f);
   }
 
-  // Compass labels: which genus lives in which direction.
+  // Compass labels: which genus lives in which direction (the prototype
+  // arena only; on the planet it changes every match).
+  if (planet) return;
   text(dl, ImVec2(centre.x, centre.y - radius + 6.0f), themeHot(VfxTheme::Ice, 0.9f),
        10.0f, "ICE");
   text(dl, ImVec2(centre.x + radius - 20.0f, centre.y - 5.0f),

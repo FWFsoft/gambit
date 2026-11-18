@@ -1,5 +1,7 @@
 #include "TileRenderer.h"
 
+#include <algorithm>
+
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "Logger.h"
@@ -17,8 +19,10 @@ const char* batchTileVertexShader =
     R"(
 layout (location = 0) in vec2 aPos;
 layout (location = 1) in vec2 aTexCoord;
+layout (location = 2) in float aShade;
 
 out vec2 TexCoord;
+out float Shade;
 
 uniform mat4 projection;
 uniform vec2 cameraPos;
@@ -27,6 +31,7 @@ uniform float zoom;
 
 void main() {
     TexCoord = aTexCoord;
+    Shade = aShade;
 
     // gridToWorld already converted to isometric, so just apply the camera
     // offset and magnify around the screen centre
@@ -46,6 +51,7 @@ const char* batchTileFragmentShader =
     GAMBIT_GLSL_PRECISION_HIGH
     R"(
 in vec2 TexCoord;
+in float Shade;  // the terrain's slope light: < 1 on faces turned away
 out vec4 FragColor;
 
 uniform sampler2D image;
@@ -61,7 +67,7 @@ void main() {
     vec4 tile = texture(image, TexCoord);
     float lum = dot(tile.rgb, vec3(0.299, 0.587, 0.114));
     vec3 base = mix(vec3(lum), tile.rgb, floorValue.z);
-    base = (floorValue.x + base * floorValue.y) * floorTint;
+    base = (floorValue.x + base * floorValue.y) * floorTint * Shade;
 
     vec2 screenUv = gl_FragCoord.xy / viewportSize;
     vec3 light = texture(lightMap, screenUv).rgb * floorLight.x;
@@ -72,7 +78,7 @@ void main() {
     lit *= 1.0 - floorVignette.x *
            pow(clamp(edge - floorVignette.y, 0.0, 1.0), floorVignette.z);
 
-    FragColor = vec4(mix(tile.rgb, lit, look), tile.a);
+    FragColor = vec4(mix(tile.rgb * Shade, lit, look), tile.a);
 }
 )";
 
@@ -137,12 +143,20 @@ void TileRenderer::initBatchRenderer() {
 
   // Position attribute
   glEnableVertexAttribArray(0);
-  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, FLOATS_PER_VERTEX * sizeof(float),
+                        (void*)0);
 
   // Texture coord attribute
   glEnableVertexAttribArray(1);
-  glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float),
+  glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE,
+                        FLOATS_PER_VERTEX * sizeof(float),
                         (void*)(2 * sizeof(float)));
+
+  // Shade attribute (slope light)
+  glEnableVertexAttribArray(2);
+  glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE,
+                        FLOATS_PER_VERTEX * sizeof(float),
+                        (void*)(4 * sizeof(float)));
 
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   glBindVertexArray(0);
@@ -200,6 +214,7 @@ void TileRenderer::buildTileBatch(const TiledMap& map) {
   }
 
   const tmx::TileLayer* layer = tileLayers[0];
+  const TerrainGrid& terrain = map.terrain();
   const auto& tiles = layer->getTiles();
 
   int tileWidth = map.getTileWidth();
@@ -247,40 +262,83 @@ void TileRenderer::buildTileBatch(const TiledMap& map) {
         v2 = (srcY + tileHeight) / (float)tilesetTexture->getHeight();
       }
 
+      if (terrain.active()) {
+        addTerrainTile(terrain, tileX, tileY, worldX, worldY, tileWidth,
+                       tileHeight, u1, v1, u2, v2);
+        continue;
+      }
+
       // Build 6 vertices (2 triangles) for this tile
+      auto push = [&](float px, float py, float pu, float pv) {
+        batchVertices.insert(batchVertices.end(), {px, py, pu, pv, 1.0f});
+      };
       // Triangle 1: top-left, bottom-right, bottom-left
-      batchVertices.push_back(x);
-      batchVertices.push_back(y + tileHeight);
-      batchVertices.push_back(u1);
-      batchVertices.push_back(v2);
-
-      batchVertices.push_back(x + tileWidth);
-      batchVertices.push_back(y);
-      batchVertices.push_back(u2);
-      batchVertices.push_back(v1);
-
-      batchVertices.push_back(x);
-      batchVertices.push_back(y);
-      batchVertices.push_back(u1);
-      batchVertices.push_back(v1);
-
+      push(x, y + tileHeight, u1, v2);
+      push(x + tileWidth, y, u2, v1);
+      push(x, y, u1, v1);
       // Triangle 2: top-left, top-right, bottom-right
-      batchVertices.push_back(x);
-      batchVertices.push_back(y + tileHeight);
-      batchVertices.push_back(u1);
-      batchVertices.push_back(v2);
-
-      batchVertices.push_back(x + tileWidth);
-      batchVertices.push_back(y + tileHeight);
-      batchVertices.push_back(u2);
-      batchVertices.push_back(v2);
-
-      batchVertices.push_back(x + tileWidth);
-      batchVertices.push_back(y);
-      batchVertices.push_back(u2);
-      batchVertices.push_back(v1);
+      push(x, y + tileHeight, u1, v2);
+      push(x + tileWidth, y + tileHeight, u2, v2);
+      push(x + tileWidth, y, u2, v1);
     }
   }
+}
+
+void TileRenderer::addTerrainTile(const TerrainGrid& terrain, int tileX,
+                                  int tileY, float worldX, float worldY,
+                                  int tileWidth, int tileHeight, float u1,
+                                  float v1, float u2, float v2) {
+  // The tile is drawn as its diamond, each corner lifted to the ground's
+  // height there: one smooth surface, so slopes and cliffs are the mesh
+  // itself. The diamond sits in the middle half of its 64x64 cell.
+  const float hw = tileWidth / 2.0f, qh = tileHeight / 4.0f;
+  const float um = (u1 + u2) / 2.0f, vm = (v1 + v2) / 2.0f;
+  const float vq = (v2 - v1) / 4.0f;
+  struct Corner {
+    float x, y, u, v;
+    int cx, cy;
+  };
+  const Corner corners[4] = {
+      {worldX, worldY - qh, um, vm - vq, tileX, tileY},              // top
+      {worldX + hw, worldY, u2, vm, tileX + 1, tileY},               // right
+      {worldX, worldY + qh, um, vm + vq, tileX + 1, tileY + 1},      // bottom
+      {worldX - hw, worldY, u1, vm, tileX, tileY + 1},               // left
+  };
+  auto push = [&](const Corner& c) {
+    float lift = terrain.cornerLift(c.cx, c.cy);
+    batchVertices.insert(batchVertices.end(),
+                         {c.x, c.y - lift, c.u, c.v, slopeShade(terrain, c.cx, c.cy)});
+  };
+  push(corners[0]);
+  push(corners[1]);
+  push(corners[2]);
+  push(corners[0]);
+  push(corners[2]);
+  push(corners[3]);
+}
+
+float TileRenderer::slopeShade(const TerrainGrid& terrain, int cx, int cy) {
+  // Slope light at a corner. Down the screen is +cx and +cy together; to
+  // the right is +cx, -cy. A face that drops toward the camera is a cliff
+  // seen head on: dark. A face rising to the right is turned to the light
+  // (from the upper left): a little brighter.
+  auto lift = [&](int x, int y) {
+    x = std::clamp(x, 0, terrain.width());
+    y = std::clamp(y, 0, terrain.height());
+    return terrain.cornerLift(x, y);
+  };
+  float dcx = (lift(cx + 1, cy) - lift(cx - 1, cy)) * 0.5f;
+  float dcy = (lift(cx, cy + 1) - lift(cx, cy - 1)) * 0.5f;
+  float down = (dcx + dcy) * 0.5f;   // lift change per step down the screen
+  float right = (dcx - dcy) * 0.5f;  // ... per step to the right
+  using namespace Config::Look;
+  // High ground is a little lighter, low ground darker: plateaus separate
+  // into value bands even under the look's dark floor.
+  float height = TERRAIN_HEIGHT_SHADE * lift(cx, cy);
+  float shade = 1.0f + height + TERRAIN_FACE_SHADE * std::min(0.0f, down) +
+                TERRAIN_BACK_SHADE * std::max(0.0f, down) +
+                TERRAIN_SIDE_SHADE * right;
+  return std::clamp(shade, TERRAIN_SHADE_MIN, TERRAIN_SHADE_MAX);
 }
 
 void TileRenderer::renderBatch() {
@@ -338,7 +396,8 @@ void TileRenderer::renderBatch() {
 
       Logger::info(
           "TileRenderer: Allocated GPU buffer for " +
-          std::to_string(requiredCapacity / 24) + " tiles (" +
+          std::to_string(requiredCapacity / (6 * FLOATS_PER_VERTEX)) +
+          " tiles (" +
           std::to_string(requiredCapacity * sizeof(float) / 1024 / 1024) +
           " MB)");
     } else {
@@ -352,7 +411,8 @@ void TileRenderer::renderBatch() {
 
   // Draw all tiles in one call
   glBindVertexArray(VAO);
-  glDrawArrays(GL_TRIANGLES, 0, batchVertices.size() / 4);
+  glDrawArrays(GL_TRIANGLES, 0,
+               static_cast<GLsizei>(batchVertices.size() / FLOATS_PER_VERTEX));
   glBindVertexArray(0);
 
   OpenGLUtils::checkGLError("TileRenderer::renderBatch");

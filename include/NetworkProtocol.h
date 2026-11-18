@@ -470,6 +470,9 @@ struct MatchStatePacket {
   uint8_t roofTurrets = 0;
   uint8_t roofAim[Arena::Tuning::ROOF_TURRET_COUNT] = {};
   uint8_t roofRecoil[Arena::Tuning::ROOF_TURRET_COUNT] = {};
+  // Which genus holds each region of the planet this match (0 = none);
+  // see Arena::regionGenus. Sent as nibbles.
+  uint8_t regionGenus[Arena::REGION_SLOTS] = {};
   std::vector<MatchPlayerState> players;
 };
 

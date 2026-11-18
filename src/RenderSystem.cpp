@@ -103,7 +103,13 @@ void RenderSystem::onRender(const RenderEvent& e) {
   const Player& localPlayer = clientPrediction->getLocalPlayer();
   // Locked (or Space held): centred on the hero as predicted this frame.
   // Unlocked: the camera stays where InputSystem panned it.
-  if (camera->isFollowing()) camera->follow(localPlayer.x, localPlayer.y);
+  // On high ground the hero is drawn lifted: centre on where they are drawn.
+  if (camera->isFollowing()) {
+    float lift = tiledMap ? tiledMap->terrain().liftAt(localPlayer.x,
+                                                       localPlayer.y)
+                          : 0.0f;
+    camera->follow(localPlayer.x, localPlayer.y - lift);
+  }
 
   // With the look on, the world goes to the presentation layer's scene
   // target and reaches the screen when ArenaView / UISystem resolve it.

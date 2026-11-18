@@ -43,7 +43,8 @@ std::unique_ptr<GameSession> GameSession::create() {
 
   // Create collision system
   session->collisionSystem =
-      std::make_unique<CollisionSystem>(session->map->getCollisionShapes());
+      std::make_unique<CollisionSystem>(
+          session->map->getCollisionShapes(), &session->map->terrain());
   Logger::info("GameSession: Collision system initialized with " +
                std::to_string(session->map->getCollisionShapes().size()) +
                " shapes");

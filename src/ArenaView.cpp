@@ -824,15 +824,30 @@ const ArenaView::EnemySprite* ArenaView::enemySprite(Arena::EnemyKind kind) {
 // Helpers
 // ---------------------------------------------------------------------------
 
+float ArenaView::liftAt(float worldX, float worldY) const {
+  const TerrainGrid* grid = terrain();
+  return grid ? grid->liftAt(worldX, worldY) : 0.0f;
+}
+
+const TerrainGrid* ArenaView::terrain() const {
+  const CollisionSystem* solid = prediction->getCollisionSystem();
+  return solid ? solid->getTerrain() : nullptr;
+}
+
+// Everything in the world stands on the ground: lifted by its height there
+// (TerrainGrid). One place, so every sprite, ring and effect follows the
+// hills without knowing about them.
 ImVec2 ArenaView::toScreen(float worldX, float worldY) const {
   return ImVec2(worldX - camera->x + Config::Screen::WIDTH / 2.0f,
-                worldY - camera->y + Config::Screen::HEIGHT / 2.0f);
+                worldY - liftAt(worldX, worldY) - camera->y +
+                    Config::Screen::HEIGHT / 2.0f);
 }
 
 ImVec2 ArenaView::toZoomedScreen(float worldX, float worldY) const {
   return ImVec2(
       (worldX - camera->x) * camera->zoom + Config::Screen::WIDTH / 2.0f,
-      (worldY - camera->y) * camera->zoom + Config::Screen::HEIGHT / 2.0f);
+      (worldY - liftAt(worldX, worldY) - camera->y) * camera->zoom +
+          Config::Screen::HEIGHT / 2.0f);
 }
 
 bool ArenaView::inView(ImVec2 layout, float left, float top, float right,
@@ -884,6 +899,7 @@ void ArenaView::renderWorld(ImDrawList* dl) {
   drawEntities(dl);
   drawAir(dl);
   drawFog(dl);
+  drawDistant(dl);
   const float zoom = camera->zoom;
   if (zoom != 1.0f) {
     const float cx = Config::Screen::WIDTH / 2.0f;
@@ -1033,8 +1049,10 @@ void ArenaView::collectLights(
   const float halfW = Config::Screen::WIDTH * 0.5f / camera->zoom;
   const float halfH = Config::Screen::HEIGHT * 0.5f / camera->zoom;
   // Most important first: once the list is full the rest is dropped.
+  // Pools are placed where the ground is drawn: lifted by its height.
   auto add = [&](float x, float y, float radius, Rgb c, float strength) {
     if (strength <= 0.02f || radius < 1.0f) return;
+    y -= liftAt(x, y);
     if (std::abs(x - camera->x) > halfW + radius ||
         std::abs(y - camera->y) > halfH + radius) {
       return;
@@ -1070,7 +1088,8 @@ void ArenaView::collectLights(
           std::abs(source.y - camera->y) > halfH + radius) {
         continue;
       }
-      out.push_back({source.x, source.y, radius, C::SIGHT_LIGHT_R,
+      out.push_back({source.x, source.y - liftAt(source.x, source.y), radius,
+                     C::SIGHT_LIGHT_R,
                      C::SIGHT_LIGHT_G, C::SIGHT_LIGHT_B,
                      C::SIGHT_LIGHT_STRENGTH, 1.0f});
     }
@@ -1197,6 +1216,9 @@ void ArenaView::collectLights(
           L::ENEMY_WINDUP_POOL_STRENGTH * windup);
     }
   }
+
+  // The scenery's own lights: landmarks, neon, genus flora, the places.
+  sceneryLights(add);
 }
 
 // ---------------------------------------------------------------------------
@@ -1283,10 +1305,24 @@ void ArenaView::drawGround(ImDrawList* dl) {
     }
   }
 
-  // Objectives
+  // Objectives: the set piece (drawEntities) says what it is; the ring says
+  // where to stand. Faint from afar, full once you are close or it is in
+  // play, so the ground is not a field of identical reticles.
+  float meX = 0.0f, meY = 0.0f;
+  localPosition(meX, meY);
   for (const auto& [id, objective] : prediction->getObjectives()) {
     ImVec2 centre = toScreen(objective.x, objective.y);
     if (!inView(centre, 200, 200, 200, 200)) continue;
+    bool near = std::hypot(objective.x - meX, objective.y - meY) <
+                objective.radius + 260.0f;
+    bool live = objective.state != ObjectiveState::Inactive;
+    if (!near && !live) {
+      ImU32 faint = objective.state == ObjectiveState::Completed
+                        ? IM_COL32(110, 230, 130, 40)
+                        : IM_COL32(255, 220, 90, 55);
+      dl->AddCircle(centre, objective.radius, faint, 48, 1.5f);
+      continue;
+    }
     ImU32 colour = IM_COL32(255, 220, 90, 150);
     if (objective.state == ObjectiveState::InProgress) {
       colour = IM_COL32(90, 190, 255, 190);
@@ -1306,8 +1342,6 @@ void ArenaView::drawGround(ImDrawList* dl) {
                          centre.y + std::sin(a) * (objective.radius + 8)),
                   colour, 3.0f);
     }
-    dl->AddRectFilled(ImVec2(centre.x - 9, centre.y - 9),
-                      ImVec2(centre.x + 9, centre.y + 9), colour, 2.0f);
   }
 
   // Ground zones: clouds, pools, vortex
@@ -1642,11 +1676,20 @@ void ArenaView::drawRock(ImDrawList* dl, const CollisionShape& rock,
       toScreen(b.x, b.y + b.height - cut - jitter(5)),
       toScreen(b.x, b.y + cut + jitter(5)),
   };
-  // It stands up out of the ground: the top face is the footprint lifted.
+  // It stands up out of the ground: the top face is the footprint lifted,
+  // drawn in toward the middle and broken, so it reads as an outcrop of
+  // rock rather than a cut block.
   const float rise = 18.0f + b.height * 0.55f;
+  ImVec2 mid(0.0f, 0.0f);
+  for (const ImVec2& f : foot) {
+    mid.x += f.x * 0.125f;
+    mid.y += f.y * 0.125f;
+  }
   ImVec2 top[8];
   for (int i = 0; i < 8; i++) {
-    top[i] = ImVec2(foot[i].x, foot[i].y - rise - jitter(4));
+    float in = 0.62f + jitter(0.18f);
+    top[i] = ImVec2(mid.x + (foot[i].x - mid.x) * in,
+                    mid.y + (foot[i].y - mid.y) * in - rise - jitter(16));
   }
   ImVec2 base = toScreen(b.x + b.width * 0.5f, b.y + b.height);
   drawShadow(dl, base, b.width * 0.62f, 0.45f);
@@ -1660,7 +1703,7 @@ void ArenaView::drawRock(ImDrawList* dl, const CollisionShape& rock,
     ImVec2 q[4] = {foot[i], foot[i + 1], top[i + 1], top[i]};
     dl->AddConvexPolyFilled(q, 4, face);
   }
-  dl->AddConvexPolyFilled(top, 8, cap);
+  dl->AddConcavePolyFilled(top, 8, cap);
   // A cooler rim along the top's north edge: the light comes from above.
   dl->AddLine(top[7], top[0], IM_COL32(84, 92, 112, 255), 2.0f);
   dl->AddLine(top[0], top[1], IM_COL32(84, 92, 112, 255), 2.0f);
@@ -2720,7 +2763,7 @@ void ArenaView::drawEntities(ImDrawList* dl) {
     float depth;
     int kind;  // 0 player, 1 enemy, 2 pickup, 3 ship, 4 Nyx's CRT, 5 swarm,
                // 6 Gravon's blade on a carrier's back, 7 a terrain rock,
-               // 8 Kade's mirror
+               // 8 Kade's mirror, 9 a prop, 10 an objective's set piece
     const void* ptr;
     uint32_t id;
     float x, y;
@@ -2800,6 +2843,32 @@ void ArenaView::drawEntities(ImDrawList* dl) {
   if (arena->hasMatch()) {
     items.push_back({arena->match().shipY, 3, nullptr, 0, 0, 0});
   }
+  // The planet's scenery and the objectives' set pieces stand in the world
+  // too (ArenaWorld.cpp). Only what is near the view is sorted.
+  {
+    const float reachX = Config::Screen::WIDTH * 0.5f / camera->zoom + 500.0f;
+    const float reachY = Config::Screen::HEIGHT * 0.5f / camera->zoom + 700.0f;
+    if (props) {
+      for (size_t i = 0; i < props->size(); i++) {
+        const MapProp& prop = (*props)[i];
+        if (std::abs(prop.x - camera->x) > reachX ||
+            std::abs(prop.y - camera->y) > reachY) {
+          continue;
+        }
+        if (prop.kind == "skyline") continue;  // drawn in the distance
+        items.push_back({prop.y, 9, &prop, static_cast<uint32_t>(i), prop.x,
+                         prop.y});
+      }
+    }
+    for (const auto& [id, objective] : prediction->getObjectives()) {
+      if (std::abs(objective.x - camera->x) > reachX ||
+          std::abs(objective.y - camera->y) > reachY) {
+        continue;
+      }
+      items.push_back({objective.y, 10, &objective, id, objective.x,
+                       objective.y});
+    }
+  }
   // Terrain stands in the world like anything else: what is south of a rock
   // is drawn over it, what is north is hidden behind it.
   if (const CollisionSystem* solid = prediction->getCollisionSystem()) {
@@ -2818,7 +2887,7 @@ void ArenaView::drawEntities(ImDrawList* dl) {
     if (const CollisionSystem* solid = prediction->getCollisionSystem()) {
       float shipY = arena->match().shipY;
       for (Item& item : items) {
-        if (item.kind == 3 || item.kind == 7) continue;
+        if (item.kind == 3 || item.kind == 7 || item.kind == 9) continue;
         for (const CollisionShape& shape : solid->getShapes()) {
           if (!solid->isActiveHull(shape)) continue;
           const AABB& b = shape.aabb;
@@ -2874,6 +2943,13 @@ void ArenaView::drawEntities(ImDrawList* dl) {
         break;
       case 8:
         drawKadeMirror(dl, *static_cast<const ArenaClient::Zone*>(item.ptr));
+        break;
+      case 9:
+        drawProp(dl, *static_cast<const MapProp*>(item.ptr), item.id);
+        break;
+      case 10:
+        drawObjectiveSite(dl, *static_cast<const ClientObjective*>(item.ptr),
+                          item.id);
         break;
       case 7: {
         const auto& rock = *static_cast<const CollisionShape*>(item.ptr);

@@ -14,6 +14,6 @@ class MapSelectionState {
   void reset() { selectedMapPath = ""; }
 
  private:
-  MapSelectionState() : selectedMapPath("assets/maps/arena.tmx") {}
-  std::string selectedMapPath;  // Default to the prototype arena
+  MapSelectionState() : selectedMapPath("assets/maps/planet.tmx") {}
+  std::string selectedMapPath;  // Default to the planet (arena.tmx: the old prototype)
 };

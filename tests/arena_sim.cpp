@@ -128,7 +128,8 @@ class Simulation {
       std::fprintf(stderr, "failed to load map %s\n", mapPath.c_str());
       std::exit(2);
     }
-    collision = std::make_unique<CollisionSystem>(map.getCollisionShapes());
+    collision = std::make_unique<CollisionSystem>(map.getCollisionShapes(),
+                                                    &map.terrain());
     WorldConfig world(map.getWorldWidth(), map.getWorldHeight(),
                       collision.get(), &map);
     state = std::make_unique<ServerGameState>(server.get(), world);

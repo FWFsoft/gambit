@@ -21,6 +21,89 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-18: The planet replaces the arena: a place, not a training room
+- **Decision:** The default map is now a generated planet
+  (`assets/maps/planet.tmx`, from `tools/maps/generate_planet.py`), built
+  against the first-pass "SPEC: Map Design" and "On Setting" docs. The
+  prototype arena stays loadable with `--map`.
+  - **Bigger and not round:** an island in a dark sea, about 2.2 times the
+    arena across (380 tiles), with fingers and a bay. The storm's radii
+    scale with the map (`zone_scale` 1.75: 3,500 / 4,375 / 5,075 by round),
+    and so does the "far objective" distance (3,325). Some far places sit
+    in fingers past round 3's storm.
+  - **Elevation:** terraced hills and ridged mountain ranges, drawn as a
+    lifted, slope-shaded ground mesh. Gameplay-neutral as the spec defines
+    elevation: free to climb, attacks unaffected. Peaks, lakes and the sea
+    are impassable and shape the routes; passes are carved so all land
+    connects to the ship.
+  - **Discovery:** the compass of genus quadrants is gone. The planet has a
+    fixed zone template (a crash basin, seven wild regions, the city) and
+    the server deals the four genera to the regions in shuffled hands
+    **every match**. Drops, camps and objective rewards follow the region.
+    The minimap shows only explored land, tinted by the genus that holds
+    it. Unvisited places and landmarks glow through the fog as columns of
+    light (amber for far places).
+  - **Objectives are places:** each type has a set piece instead of the
+    reticle (outpost watchtower, med pod, scrap heap and crane, probe in a
+    dent, frog pond, spore vents, sealed gate, turret). Their ring is faint
+    until you are close or it is in play. Placement follows context: frogs
+    and spores by water, outposts on high ground, scrap in the crash field
+    and the city. 30 places in three rings (8 near, 12 mid, 10 far), 73
+    camp guards.
+  - **Rhyme and reason:** a scorched crash trench, trails from the ship to
+    every place (merging into roads home), five landmarks on sight lines,
+    the city's outskirts on the north-east shore with neon in the district
+    genus's colour and the real city's skyline past the shore, and about
+    1,900 props (flora dressed per genus, boulders, ruins, bones, debris,
+    lamps, signs) kept off pads and trails.
+  - **Rocks** (Isaac's Lifeline anchors) keep their rules and spacing but
+    are drawn as broken outcrops instead of cut octagonal blocks.
+  - **Asset slots:** every prop kind, landmark and objective type draws
+    real art from the sprite manifest if it exists (`Prop_<kind>`,
+    `Prop_flora_<genus>`, `Objective_<type>`), else a code placeholder.
+  - **N** jumps a free camera between the city and the landmarks, for
+    reviewing the scenery.
+- **Pillars:**
+  - **Clarity** and **Creative Builds & Dynamic Play** decided it. The
+    human's problems: flat, tiny, round, the genus layout given away, every
+    objective the same reticle, no reason to the layout, "a dead training
+    room". Objectives now say what they are by silhouette (Clarity), and
+    the per-match genus deal means no two runs route alike (Dynamic Play).
+  - **Strategic Crunch serves and weakens.** Serves: far places beyond the
+    storm are a real gamble, and the genus deal makes "where do we go for
+    the build we want" a fresh decision each match. **Weakens:** the
+    2026-11-15 decision kept places 600 to 900 px apart to limit dead
+    time; on the planet they are at least 850 px apart and often 1,200 or
+    more, with trails, props and beacons along the way but no fights. Watch
+    walking time in playtests; the fixes are more places per ring, patrols
+    on trails, or traversal (zip lines, Lifeline-style tools).
+  - **Clarity, small costs:** city towers can hide a hero behind them (they
+    fade to a ghost when one is); mountain faces do not fade yet. The fog
+    image is drawn flat, so its edge sits a little low on high ground.
+  - **Comradery in Competition:** neutral; a bigger map makes splitting up
+    a stronger option.
+  - **Art direction:** the world stays dark and low in value, with genus
+    colour arriving as light (flora glow, neon, landmark pools), as
+    `ART_DIRECTION.md` asks. The placeholders are inked prisms, not the
+    comic look; real art comes through the slots. The old PixelLab tiles
+    and WFC generator (pixel art) are not used.
+- **Why:** The human asked to fix the map's feel now and be set up to
+  layer in art in parallel, AI-first, with Tiled kept as an option for hand
+  fixes. A generator gives a whole planet from rules in one command, so
+  improving a rule improves every place at once. Verticality (cliffs that
+  block melee but not shots) was not built: enemies have no pathfinding and
+  would snag on cliffs. Per-match objective site selection and several
+  seeds per map are the next steps for variety. Checked: full bot matches
+  on the planet finish (god mode reaches Victory; a normal match finishes),
+  unit tests pass, frames from the WASM client reviewed.
+- **Status:** Built, needs review
+- **Where:** `tools/maps/generate_planet.py`, `assets/maps/planet.tmx`,
+  `include/TerrainGrid.h`, `src/TileRenderer.cpp` (height mesh),
+  `src/ArenaWorld.cpp` (scenery, set pieces, beacons), `src/ArenaView.cpp`
+  (`toScreen` lift, rings, rocks), `src/ArenaHud.cpp` (minimap, N tour),
+  `src/MatchDirector.cpp` (region deal, zone scale), `src/CollisionSystem.cpp`
+  (blocked cells), `docs/design/MAP_PIPELINE.md`
+
 ## 2026-11-18: Jeff (G3F-0427, the Recycler Bot), a ranged Striker
 - **Decision:** Jeff is playable, with the kit as the human specified it.
   Prototype numbers: 260 health, 240 speed.

@@ -30,6 +30,19 @@ const char* genusName(Genus g);
 // Angle is atan2(dy, dx) from the ship in screen space (y down).
 Genus genusForDirection(float dx, float dy);
 
+// The planet's regions (TerrainGrid "Region" layer, 1..REGION_SLOTS-1) are
+// dealt a genus at the start of every match, so where each genus lives is
+// a discovery, not a fact you learn once. Region 0 (sea, void, maps
+// without regions) falls back to genusForDirection around the ship.
+constexpr int REGION_SLOTS = 16;
+inline Genus regionGenus(const uint8_t* table, int region, float dxFromShip,
+                         float dyFromShip) {
+  if (region > 0 && region < REGION_SLOTS && table[region] != 0) {
+    return static_cast<Genus>(table[region]);
+  }
+  return genusForDirection(dxFromShip, dyFromShip);
+}
+
 // The genus whose aliens actually spawn in a genus's territory. Only genera
 // with real models are fielded; until the other three get theirs, every
 // territory is held by Venoxarid thugs. The territory still decides which

@@ -5,8 +5,9 @@
 #include <cmath>
 
 CollisionSystem::CollisionSystem(
-    const std::vector<CollisionShape>& collisionShapes)
-    : collisionShapes(collisionShapes) {}
+    const std::vector<CollisionShape>& collisionShapes,
+    const TerrainGrid* terrain)
+    : collisionShapes(collisionShapes), terrain(terrain) {}
 
 bool CollisionSystem::checkMovement(float oldX, float oldY, float& newX,
                                     float& newY, float playerRadius) const {
@@ -22,6 +23,19 @@ bool CollisionSystem::checkMovement(float oldX, float oldY, float& newX,
     }
   }
 
+  // Blocked ground: slide along it like a wall, one axis at a time.
+  if (terrainBlocks(newX, newY, playerRadius)) {
+    collided = true;
+    if (!terrainBlocks(newX, oldY, playerRadius)) {
+      newY = oldY;
+    } else if (!terrainBlocks(oldX, newY, playerRadius)) {
+      newX = oldX;
+    } else {
+      newX = oldX;
+      newY = oldY;
+    }
+  }
+
   return !collided;  // true if no collision
 }
 
@@ -32,7 +46,7 @@ bool CollisionSystem::isPositionValid(float x, float y,
       return false;
     }
   }
-  return true;
+  return !terrainBlocks(x, y, playerRadius);
 }
 
 bool CollisionSystem::intersects(float px, float py, float radius,
@@ -139,4 +153,5 @@ void CollisionSystem::pushOutOfTerrain(float& x, float& y, float radius) const {
       y += down + 0.01f;
     }
   }
+  if (terrain) terrain->nearestOpen(x, y, radius, 400.0f);
 }

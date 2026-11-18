@@ -64,8 +64,13 @@ void ClientPrediction::onLocalInput(const LocalInputEvent& e) {
   // centred on: the local player while the camera follows them (exact, even
   // between rendered frames), the camera itself once it has been unlocked.
   float zoom = Config::Screen::WORLD_ZOOM;
+  const TerrainGrid* terrain =
+      collisionSystem ? collisionSystem->getTerrain() : nullptr;
+  auto lift = [terrain](float x, float y) {
+    return terrain ? terrain->liftAt(x, y) : 0.0f;
+  };
   float viewX = localPlayer.x;
-  float viewY = localPlayer.y;
+  float viewY = localPlayer.y - lift(localPlayer.x, localPlayer.y);
   if (camera) {
     zoom = camera->zoom;
     if (!camera->isFollowing()) {
@@ -74,7 +79,13 @@ void ClientPrediction::onLocalInput(const LocalInputEvent& e) {
     }
   }
   aimX = viewX + (e.mouseX - Config::Screen::WIDTH / 2.0f) / zoom;
-  aimY = viewY + (e.mouseY - Config::Screen::HEIGHT / 2.0f) / zoom + AIM_HEIGHT;
+  // The ground under the cursor is drawn lifted by its height: find the
+  // spot whose lifted image is under the cursor (converges in a few steps
+  // on slopes this gentle).
+  const float flatY = viewY + (e.mouseY - Config::Screen::HEIGHT / 2.0f) / zoom;
+  float groundY = flatY;
+  for (int i = 0; i < 3; i++) groundY = flatY + lift(aimX, groundY);
+  aimY = groundY + AIM_HEIGHT;
   localPlayer.aimX = aimX;
   localPlayer.aimY = aimY;
 
