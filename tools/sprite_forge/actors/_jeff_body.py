@@ -38,8 +38,9 @@ CELL = (192, 176, 136)               # wide: the nozzle arm and the tank on his 
 class Body:
     """One of Jeff's bodies: a model, its fit and its rig."""
 
-    def __init__(self, name, model, height, treads, centre_x=0.0):
+    def __init__(self, name, model, height, treads, centre_x=0.0, rigid=()):
         self.name = name
+        self.rigid = tuple(rigid)
         self.centre_x = centre_x
         self.model = model
         self.height = height
@@ -53,14 +54,14 @@ class Body:
         base = self.stance()
         m = Model(self.name)
         skin.attach(m, os.path.join(REPO, self.model), self.height, self.fit,
-                    centre_x=self.centre_x)
+                    centre_x=self.centre_x, rigid=self.rigid)
         return m, base
 
     def joint_table(self):
         if self._table is None:
             data = skin.prepare(os.path.join(REPO, self.model), self.height,
                                 self.fit, log=lambda *a: None,
-                                centre_x=self.centre_x)
+                                centre_x=self.centre_x, rigid=self.rigid)
             bpy.data.objects.remove(data["obj"], do_unlink=True)
             self._table = [(n, p, tuple(float(c) for c in data["rest_pos"][n]))
                            for n, p in skin.HUMANOID]
@@ -124,6 +125,13 @@ class Body:
             c[f"footrot_{s}"] = tuple(foot.get("rot", (0, 0, 0)))
             c[f"knee_{s}"] = _rig.aim(r.joint_at(c, f"hip_{s}"),
                                       foot.get("knee", (0, -1, 0)))
+        if self.treads:
+            # The legs exactly as modelled: the rest pose's own foot, foot
+            # turn and knee, so the treads never twist.
+            rest = r.control({}, (0, 0, 0))
+            for s in ("L", "R"):
+                for k in ("foot", "footrot", "knee"):
+                    c[f"{k}_{s}"] = rest[f"{k}_{s}"]
         return c
 
     def stance(self):

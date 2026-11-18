@@ -566,11 +566,17 @@ class Skin:
 
 def prepare(path, height, fit=None, yaw=0.0, skeleton=HUMANOID,
             tails=HUMANOID_TAILS, down=HUMANOID_DOWN, level=HUMANOID_LEVEL,
-            cache=True, log=print, centre_x=0.0, hands=False, collars=False):
+            cache=True, log=print, centre_x=0.0, hands=False, collars=False,
+            rigid=()):
     """Everything attach() does short of touching a Model. Returns a dict:
     obj, imported (Nx3), fit, weights, rest (Nx3), rest_pos, skeleton.
     hands=True adds the fingers joints (HUMANOID_HANDS); collars=True adds
-    collarbones between chest and shoulders."""
+    collarbones between chest and shoulders.
+
+    rigid: boxes of the imported mesh bolted to one joint, overriding the
+    automatic weights, for hard parts that are not limbs (Jeff's tank
+    treads). Each is (joint, z_max, abs_x_max): every vertex below z_max
+    and within abs_x_max of the centre line follows `joint` alone."""
     humanoid = skeleton is HUMANOID
     if hands:
         assert humanoid, "hands=True extends the humanoid skeleton only"
@@ -596,6 +602,13 @@ def prepare(path, height, fit=None, yaw=0.0, skeleton=HUMANOID,
     assert not missing, f"{path}: fit has no position for {missing}"
     cache_path = path + ".weights.npz" if cache else None
     w = bind_weights(obj, v, skeleton, tails, full, height, cache_path, log)
+    names_ = [n for n, _ in skeleton]
+    for joint, z_max, x_max in rigid:
+        assert joint in names_, f"rigid: no joint {joint}"
+        inside = (v[:, 2] < z_max) & (np.abs(v[:, 0]) <= x_max)
+        w = w.copy()
+        w[inside] = 0.0
+        w[inside, names_.index(joint)] = 1.0
     xf, rest_pos = straighten(skeleton, full, down or {}, level or ())
     names = [n for n, _ in skeleton]
     order = np.argsort(-w, axis=1)[:, :WEIGHTS_PER_VERTEX]
