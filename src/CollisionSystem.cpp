@@ -14,6 +14,7 @@ bool CollisionSystem::checkMovement(float oldX, float oldY, float& newX,
 
   // Check against all collision shapes
   for (const auto& shape : collisionShapes) {
+    if (!isSolid(shape)) continue;
     if (intersects(newX, newY, playerRadius, shape)) {
       collided = true;
       // Resolve collision by sliding along edges
@@ -27,7 +28,7 @@ bool CollisionSystem::checkMovement(float oldX, float oldY, float& newX,
 bool CollisionSystem::isPositionValid(float x, float y,
                                       float playerRadius) const {
   for (const auto& shape : collisionShapes) {
-    if (intersects(x, y, playerRadius, shape)) {
+    if (isSolid(shape) && intersects(x, y, playerRadius, shape)) {
       return false;
     }
   }
@@ -76,6 +77,21 @@ void CollisionSystem::resolveCollision(float oldX, float oldY, float& newX,
   // Both blocked, stay at old position
   newX = oldX;
   newY = oldY;
+}
+
+int CollisionSystem::hullTierOf(const CollisionShape& shape) {
+  const std::string& type = shape.objectType;
+  if (type == "hull") return 0;
+  if (type.size() == 5 && type.compare(0, 4, "hull") == 0 && type[4] >= '1' &&
+      type[4] <= '9') {
+    return type[4] - '0';
+  }
+  return -1;
+}
+
+void CollisionSystem::setHullTier(int tier) {
+  assert(tier >= 0 && tier <= 9);
+  hullTier = tier;
 }
 
 const CollisionShape* CollisionSystem::terrainNear(float x, float y,

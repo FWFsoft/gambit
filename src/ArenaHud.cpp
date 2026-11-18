@@ -85,8 +85,15 @@ void ArenaView::renderHud() {
   if (phase == MatchPhase::Victory || phase == MatchPhase::Defeat) {
     drawEndScreen();
   }
+  // A new ship tier: step back from the suit for a moment so everyone sees
+  // what the scrap built.
+  if (arena->hasMatch()) {
+    int tier = arena->match().shipTier;
+    if (tier > lastShipTier) shipRevealUntil = timeSeconds + 3.5f;
+    lastShipTier = tier;
+  }
   if (phase == MatchPhase::Intermission) {
-    drawSuitScreen(true);
+    if (timeSeconds >= shipRevealUntil) drawSuitScreen(true);
   } else if (suitScreenOpen) {
     drawSuitScreen(false);
   }
@@ -125,6 +132,10 @@ void ArenaView::handleHotkeys() {
     prediction->sendToServer(serialize(packet));
   }
   if (ImGui::IsKeyPressed(ImGuiKey_B, false)) suitScreenOpen = !suitScreenOpen;
+  // U: spend the crew's banked scrap on the ship's next tier (intermission).
+  if (ImGui::IsKeyPressed(ImGuiKey_U, false) && canUpgradeShip()) {
+    prediction->sendToServer(serialize(ShipUpgradePacket()));
+  }
 
   // F3: fog of war on / off, to compare.
   if (ImGui::IsKeyPressed(ImGuiKey_F3, false)) fogEnabled = !fogEnabled;
@@ -485,16 +496,22 @@ void ArenaView::drawStatusBar() {
                           : IM_COL32(255, 110, 80, 255));
   text(dl, ImVec2(a.x + 12.0f, a.y + 32.0f), IM_COL32(220, 230, 255, 255), 13.0f,
        "SHIP", false);
-  char scrap[48];
-  if (match.turretsOnline) {
-    std::snprintf(scrap, sizeof(scrap), "Scrap %d  TURRETS ON", match.scrapBanked);
+  // Banked scrap against the next tier's price; green when it can be bought
+  // (between rounds).
+  char scrap[64];
+  int tier = std::min<int>(match.shipTier, Arena::Tuning::SHIP_TIER_COUNT - 1);
+  bool upgradable = canUpgradeShip();
+  if (tier + 1 >= Arena::Tuning::SHIP_TIER_COUNT) {
+    std::snprintf(scrap, sizeof(scrap), "Scrap %d  FORT", match.scrapBanked);
+  } else if (upgradable) {
+    std::snprintf(scrap, sizeof(scrap), "Scrap %d/%d  [U] UPGRADE",
+                  match.scrapBanked, Arena::Tuning::SHIP_TIER_COST[tier + 1]);
   } else {
     std::snprintf(scrap, sizeof(scrap), "Scrap %d/%d", match.scrapBanked,
-                  Arena::Tuning::SHIP_TURRET_SCRAP);
+                  Arena::Tuning::SHIP_TIER_COST[tier + 1]);
   }
   text(dl, ImVec2(a.x + 272.0f, a.y + 32.0f),
-       match.turretsOnline ? IM_COL32(150, 255, 190, 255)
-                           : IM_COL32(255, 220, 150, 255),
+       upgradable ? IM_COL32(150, 255, 190, 255) : IM_COL32(255, 220, 150, 255),
        13.0f, scrap, false);
 
   // Distance to the ship and whether we are inside the zone
@@ -992,6 +1009,24 @@ void ArenaView::drawSuitScreen(bool intermission) {
   ImGui::SetWindowFontScale(1.5f);
   ImGui::Text("SUIT INFUSIONS");
   ImGui::SetWindowFontScale(1.0f);
+  if (intermission) {
+    // The crew's scrap builds the ship's next tier: anyone can spend it.
+    int tier =
+        std::min<int>(match.shipTier, Arena::Tuning::SHIP_TIER_COUNT - 1);
+    ImGui::SameLine(520.0f);
+    if (tier + 1 < Arena::Tuning::SHIP_TIER_COUNT) {
+      char label[64];
+      std::snprintf(label, sizeof(label), "UPGRADE SHIP  %d/%d scrap  [U]",
+                    match.scrapBanked, Arena::Tuning::SHIP_TIER_COST[tier + 1]);
+      ImGui::BeginDisabled(!canUpgradeShip());
+      if (ImGui::Button(label, ImVec2(260.0f, 28.0f))) {
+        prediction->sendToServer(serialize(ShipUpgradePacket()));
+      }
+      ImGui::EndDisabled();
+    } else {
+      ImGui::TextDisabled("Ship fully upgraded  (scrap %d)", match.scrapBanked);
+    }
+  }
   ImGui::SameLine(860.0f);
   if (intermission) {
     ImGui::Text("Next round in %s", formatTime(match.timeRemaining).c_str());
@@ -1549,11 +1584,25 @@ void ArenaView::drawPrompts() {
     }
     float dx = px - match.shipX, dy = py - match.shipY;
     if (unslotted > 0 &&
-        dx * dx + dy * dy <= Arena::Tuning::SHIP_SAFE_RADIUS *
-                                 Arena::Tuning::SHIP_SAFE_RADIUS) {
+        dx * dx + dy * dy <= shipSafeRadius() * shipSafeRadius()) {
       prompt = "[B] You have an infusion: open your suit beside the ship";
       colour = IM_COL32(150, 255, 190, 255);
     }
   }
   if (prompt) text(dl, ImVec2(SCREEN_W * 0.5f, y), colour, 16.0f, prompt);
+}
+
+bool ArenaView::canUpgradeShip() const {
+  if (!arena->hasMatch()) return false;
+  const MatchStatePacket& match = arena->match();
+  int tier = match.shipTier;
+  return match.phase == static_cast<uint8_t>(Arena::MatchPhase::Intermission) &&
+         tier + 1 < Arena::Tuning::SHIP_TIER_COUNT &&
+         match.scrapBanked >= Arena::Tuning::SHIP_TIER_COST[tier + 1];
+}
+
+float ArenaView::shipSafeRadius() const {
+  int tier = arena->hasMatch() ? arena->match().shipTier : 0;
+  return Arena::Tuning::SHIP_TIER_SAFE_RADIUS[std::min<int>(
+      tier, Arena::Tuning::SHIP_TIER_COUNT - 1)];
 }

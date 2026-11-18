@@ -33,7 +33,21 @@ namespace {
 
 constexpr float PROJECTILE_HEIGHT = 24.0f;  // drawn this far above the ground
 constexpr float SHIP_DRAW_SIZE = 192.0f;  // the old flat sprite (fallback)
-constexpr int SHIP_DIRECTION = 0;  // the ship sheet's column: nose down, rockets up
+// How each ship tier (Arena::Tuning::SHIP_TIER_*) is drawn: its forge sheet,
+// the sheet column (direction) that matches the crash (cab lower left,
+// rockets upper right), and where its ground centre stands relative to the
+// ship's centre, so the dug-out ship sits on the crash site.
+struct ShipTierLook {
+  const char* actor;
+  int direction;
+  float offsetX, offsetY;
+  float shadowRadius;
+};
+constexpr ShipTierLook SHIP_TIER_LOOK[Arena::Tuning::SHIP_TIER_COUNT] = {
+    {"Ship", 0, 0.0f, 0.0f, 220.0f},
+    {"ShipPatched", 1, -20.0f, -90.0f, 230.0f},
+    {"ShipFort", 1, -20.0f, -90.0f, 270.0f},
+};
 
 ImTextureID textureId(const Texture* texture) {
   return (ImTextureID)(intptr_t)texture->getID();
@@ -1154,7 +1168,9 @@ void ArenaView::drawGround(ImDrawList* dl) {
     // Around the ship: where you need to be when the round ends.
     if (phase == Arena::MatchPhase::Round) {
       float pulse = 0.5f + 0.5f * std::sin(timeSeconds * 2.0f);
-      dl->AddCircle(ship, Arena::Tuning::SHIP_SAFE_RADIUS,
+      dl->AddCircle(ship,
+                    Arena::Tuning::SHIP_TIER_SAFE_RADIUS[std::min<int>(
+                        match.shipTier, Arena::Tuning::SHIP_TIER_COUNT - 1)],
                     IM_COL32(120, 255, 170, static_cast<int>(40 + 30 * pulse)),
                     72, 2.0f);
     }
@@ -1327,22 +1343,46 @@ void ArenaView::drawGround(ImDrawList* dl) {
 
 namespace {
 
-// Where the wreck burns, as offsets from the ship's centre on Ship.png:
-// the two rocket nozzles, the torn roof, the crushed cab and the rear.
-// `from` is the hull damage (0 = full health) at which the spot starts to
-// burn; below it, it only smokes, and the smoke thickens as damage grows.
+// Where each tier burns, as offsets from where that tier is drawn. `from`
+// is the hull damage (0 = full health) at which a spot catches fire.
+// `always` spots are the crash itself: they burn a little even at full
+// health. Up a tier, nothing burns until the hull is hurt again.
 struct WreckSpot {
   float x, y;
   float from;  // hull damage that sets it alight
   float size;
+  bool always;
 };
-constexpr WreckSpot WRECK_SPOTS[] = {
-    {195.0f, -268.0f, 0.0f, 1.2f},   // upper nozzle: always smoulders
-    {-215.0f, -70.0f, 0.0f, 0.9f},   // crushed cab, in the rubble
-    {-70.0f, -150.0f, 0.25f, 1.0f},  // torn roof
-    {205.0f, -205.0f, 0.45f, 1.1f},  // lower nozzle
-    {95.0f, -175.0f, 0.65f, 1.0f},   // rear quarter
-    {-150.0f, -110.0f, 0.8f, 0.9f},  // windows
+constexpr int WRECK_SPOTS_PER_TIER = 6;
+constexpr WreckSpot
+    WRECK_SPOTS[Arena::Tuning::SHIP_TIER_COUNT][WRECK_SPOTS_PER_TIER] = {
+        {
+            // The crash (Ship.png)
+            {195.0f, -268.0f, 0.0f, 1.2f, true},  // upper nozzle
+            {-215.0f, -70.0f, 0.0f, 0.9f, true},  // crushed cab, in the rubble
+            {-70.0f, -150.0f, 0.25f, 1.0f, false},  // torn roof
+            {205.0f, -205.0f, 0.45f, 1.1f, false},  // lower nozzle
+            {95.0f, -175.0f, 0.65f, 1.0f, false},   // rear quarter
+            {-150.0f, -110.0f, 0.8f, 0.9f, false},  // windows
+        },
+        {
+            // Dug out and patched (ShipPatched.png)
+            {180.0f, -200.0f, 0.1f, 1.1f, false},   // nozzles
+            {-170.0f, 0.0f, 0.15f, 0.9f, false},    // cab
+            {-10.0f, -40.0f, 0.3f, 1.0f, false},    // the patched breach
+            {-30.0f, -110.0f, 0.5f, 1.0f, false},   // roof
+            {110.0f, -100.0f, 0.65f, 1.0f, false},  // rear
+            {-110.0f, -30.0f, 0.8f, 0.9f, false},   // windows
+        },
+        {
+            // The fort (ShipFort.png)
+            {210.0f, -220.0f, 0.15f, 1.1f, false},  // tarped nozzles
+            {-200.0f, 0.0f, 0.2f, 0.9f, false},     // cab
+            {-80.0f, -110.0f, 0.35f, 1.0f, false},  // roof deck
+            {20.0f, -50.0f, 0.5f, 1.0f, false},     // flank
+            {160.0f, -150.0f, 0.65f, 1.0f, false},  // rocket tarps
+            {80.0f, 20.0f, 0.8f, 0.9f, false},      // stairs and sandbags
+        },
 };
 
 // A column of smoke: born at `at`, rising and drifting with the wind,
@@ -1419,22 +1459,21 @@ void ArenaView::drawShip(ImDrawList* dl) {
   damage = std::clamp(damage, 0.0f, 1.0f);
   ImU32 tint = IM_COL32(255, static_cast<int>(255 - 90 * damage),
                         static_cast<int>(255 - 110 * damage), 255);
-  // The crashed RV, at the heroes' scale (tools/sprite_forge/actors/ship.py).
-  const ActorSheet* sheet = actorFor("Ship");
+  // The ship at its tier, at the heroes' scale (tools/sprite_forge/actors/
+  // ship.py, ship_patched.py, ship_fort.py).
+  int tier = std::min<int>(match.shipTier, Arena::Tuning::SHIP_TIER_COUNT - 1);
+  const ShipTierLook& look = SHIP_TIER_LOOK[tier];
+  const ActorSheet* sheet = actorFor(look.actor);
   const ActorAnim* still = sheet ? sheet->find("idle") : nullptr;
   if (sheet && still) {
-    ImVec2 centre = toScreen(match.shipX, match.shipY);
-    drawShadow(dl, centre, 220.0f, 0.30f);
-    drawActorFrame(dl, *sheet, *still, SHIP_DIRECTION, 0.0f, centre, 1.0f, tint,
+    ImVec2 anchor = toScreen(match.shipX, match.shipY);
+    ImVec2 centre(anchor.x + look.offsetX, anchor.y + look.offsetY);
+    drawShadow(dl, centre, look.shadowRadius, 0.30f);
+    drawActorFrame(dl, *sheet, *still, look.direction, 0.0f, centre, 1.0f, tint,
                    true, -1, 0.0f, true);
-    drawShipWreckage(dl, centre, damage, false);
-    drawRoofTurrets(dl, centre, tint);
-    drawShipWreckage(dl, centre, damage, true);
-    if (match.turretsOnline) {
-      ImVec2 top(centre.x + 150.0f, centre.y - 260.0f);
-      float pulse = 0.5f + 0.5f * std::sin(timeSeconds * 6.0f);
-      dl->AddCircleFilled(top, 6.0f + 2.0f * pulse, IM_COL32(150, 255, 190, 230));
-    }
+    drawShipWreckage(dl, centre, damage, tier, false);
+    drawRoofTurrets(dl, anchor, tier, tint);
+    drawShipWreckage(dl, centre, damage, tier, true);
     return;
   }
   ImVec2 base = toScreen(match.shipX, match.shipY + 34.0f);
@@ -1445,27 +1484,24 @@ void ArenaView::drawShip(ImDrawList* dl) {
                shipTexture->getHeight(), base, scale, scale, -0.05f, false,
                tint);
   }
-  if (match.turretsOnline) {
-    ImVec2 top = toScreen(match.shipX, match.shipY - 30.0f);
-    float pulse = 0.5f + 0.5f * std::sin(timeSeconds * 6.0f);
-    dl->AddCircleFilled(top, 5.0f + 2.0f * pulse, IM_COL32(150, 255, 190, 230));
-  }
 }
 
-// Smoke and fire on the wreck. The crash still burns at the cab and a
+// Smoke and fire on the ship. The crash still burns at the cab and a
 // nozzle; as the hull takes damage the smoke thickens and more of it
-// catches fire, so the ship's health reads at a glance. Fire is drawn first (on
-// the hull), the smoke over it and over the roof turrets.
+// catches fire, so the ship's health reads at a glance. A new tier is
+// repaired in full, so its fires are out until raiders hurt it again. Fire is
+// drawn first (on the hull), the smoke over it and over the roof turrets.
 void ArenaView::drawShipWreckage(ImDrawList* dl, ImVec2 centre, float damage,
-                                 bool smoke) {
+                                 int tier, bool smoke) {
   assert(damage >= 0.0f && damage <= 1.0f);
+  assert(tier >= 0 && tier < Arena::Tuning::SHIP_TIER_COUNT);
   uint32_t salt = 1;
-  for (const WreckSpot& spot : WRECK_SPOTS) {
+  for (const WreckSpot& spot : WRECK_SPOTS[tier]) {
     salt++;
     ImVec2 at(centre.x + spot.x, centre.y + spot.y);
     // The crash spots always burn a little; the rest catch as damage grows.
     float heat = std::clamp((damage - spot.from) / 0.25f, 0.0f, 1.0f);
-    if (spot.from == 0.0f) heat = 0.6f + 0.4f * damage;
+    if (spot.always) heat = 0.6f + 0.4f * damage;
     if (heat <= 0.0f) continue;
     if (smoke) {
       drawWreckSmoke(dl, ImVec2(at.x, at.y - 10.0f), timeSeconds,
@@ -1479,7 +1515,8 @@ void ArenaView::drawShipWreckage(ImDrawList* dl, ImVec2 centre, float damage,
 // The roof turrets the crew stood up by repairing Derelict Turrets: a bolted
 // foot and a head that swivels on it (16 headings from two baked sheets),
 // kicking back and flashing at the muzzle when it fires.
-void ArenaView::drawRoofTurrets(ImDrawList* dl, ImVec2 centre, ImU32 tint) {
+void ArenaView::drawRoofTurrets(ImDrawList* dl, ImVec2 anchor, int tier,
+                                ImU32 tint) {
   const MatchStatePacket& match = arena->match();
   if (match.roofTurrets == 0) return;
   const ActorSheet* base = actorFor("ShipTurretBase");
@@ -1493,8 +1530,8 @@ void ArenaView::drawRoofTurrets(ImDrawList* dl, ImVec2 centre, ImU32 tint) {
   namespace T = Arena::Tuning;
   for (int i = 0; i < T::ROOF_TURRET_COUNT; i++) {
     if (!(match.roofTurrets & (1u << i))) continue;
-    ImVec2 foot(centre.x + T::ROOF_TURRET_MOUNT_X[i],
-                centre.y + T::ROOF_TURRET_MOUNT_Y[i]);
+    ImVec2 foot(anchor.x + T::ROOF_TURRET_MOUNT_X[tier][i],
+                anchor.y + T::ROOF_TURRET_MOUNT_Y[tier][i]);
     float aim = match.roofAim[i] / 256.0f * 2.0f * PI;  // cw from down
     float recoil = match.roofRecoil[i] / 255.0f;
     float dirX = std::sin(aim), dirY = std::cos(aim) * 0.5f;
@@ -2701,21 +2738,25 @@ void ArenaView::drawEntities(ImDrawList* dl) {
   }
 
   // The hull is a long diagonal, so one depth cannot place everything
-  // around it: anything standing south of the hull's footprint (the "hull"
-  // boxes under it) is in front of the whole ship, even north of its centre.
+  // around it: anything standing south of the hull's footprint (the current
+  // tier's "hull" boxes under it) is in front of the whole ship, even north
+  // of its centre, and anything north of it is behind, even south of it.
   if (arena->hasMatch()) {
     if (const CollisionSystem* solid = prediction->getCollisionSystem()) {
       float shipY = arena->match().shipY;
       for (Item& item : items) {
-        if (item.kind == 3 || item.kind == 7 || item.depth > shipY) continue;
+        if (item.kind == 3 || item.kind == 7) continue;
         for (const CollisionShape& shape : solid->getShapes()) {
-          if (!CollisionSystem::isHull(shape)) continue;
+          if (!solid->isActiveHull(shape)) continue;
           const AABB& b = shape.aabb;
           if (item.x < b.x || item.x > b.x + b.width) continue;
-          if (item.y >= b.y + b.height) {
-            // Keeps their order among themselves, all after the ship.
+          // Only things on the wrong side of the ship's depth move; both
+          // keep their order among themselves.
+          if (item.y >= b.y + b.height && item.depth <= shipY) {
             item.depth =
                 shipY + 1.0f + (item.depth - (shipY - 1000.0f)) * 0.001f;
+          } else if (item.y <= b.y && item.depth >= shipY) {
+            item.depth = shipY - 1.0f - (shipY + 1000.0f - item.depth) * 0.001f;
           }
           break;
         }

@@ -26,7 +26,7 @@ const std::unordered_map<std::string, SDL_Scancode> TestInputReader::keyMap = {
     {"7", SDL_SCANCODE_7},           {"8", SDL_SCANCODE_8},
     {"9", SDL_SCANCODE_9},           {"0", SDL_SCANCODE_0},
     {"Minus", SDL_SCANCODE_MINUS},   {"Equals", SDL_SCANCODE_EQUALS},
-    {"F2", SDL_SCANCODE_F2},
+    {"F2", SDL_SCANCODE_F2},         {"U", SDL_SCANCODE_U},
 };
 
 TestInputReader::TestInputReader(const std::string& commandFilePath)

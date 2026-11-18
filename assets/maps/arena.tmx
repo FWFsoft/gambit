@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.10.2" orientation="isometric" renderorder="right-down" width="176" height="176" tilewidth="64" tileheight="64" infinite="0" nextlayerid="8" nextobjectid="134">
+<map version="1.10" tiledversion="1.10.2" orientation="isometric" renderorder="right-down" width="176" height="176" tilewidth="64" tileheight="64" infinite="0" nextlayerid="8" nextobjectid="157">
   <tileset firstgid="1" name="arena_tiles" tilewidth="64" tileheight="64" tilecount="20" columns="4">
     <image source="arena_tiles.png" width="256" height="320" />
   </tileset>
@@ -688,6 +688,29 @@
     <object id="130" name="ShipHull_9" type="hull" x="100.0" y="2527.0" width="48" height="150" />
     <object id="131" name="ShipHull_10" type="hull" x="148.0" y="2498.0" width="48" height="150" />
     <object id="132" name="ShipHull_11" type="hull" x="196.0" y="2482.0" width="39" height="136" />
+    <object id="134" name="ShipPatchedHull_1" type="hull1" x="-245.0" y="2757.0" width="40" height="47" />
+    <object id="135" name="ShipPatchedHull_2" type="hull1" x="-205.0" y="2740.0" width="40" height="79" />
+    <object id="136" name="ShipPatchedHull_3" type="hull1" x="-165.0" y="2717.0" width="40" height="102" />
+    <object id="137" name="ShipPatchedHull_4" type="hull1" x="-125.0" y="2698.0" width="40" height="108" />
+    <object id="138" name="ShipPatchedHull_5" type="hull1" x="-85.0" y="2676.0" width="40" height="109" />
+    <object id="139" name="ShipPatchedHull_6" type="hull1" x="-45.0" y="2656.0" width="40" height="109" />
+    <object id="140" name="ShipPatchedHull_7" type="hull1" x="-5.0" y="2637.0" width="40" height="110" />
+    <object id="141" name="ShipPatchedHull_8" type="hull1" x="35.0" y="2631.0" width="40" height="96" />
+    <object id="142" name="ShipPatchedHull_9" type="hull1" x="75.0" y="2622.0" width="40" height="83" />
+    <object id="143" name="ShipPatchedHull_10" type="hull1" x="115.0" y="2650.0" width="40" height="36" />
+    <object id="144" name="ShipFortHull_1" type="hull2" x="-283.0" y="2754.0" width="40" height="52" />
+    <object id="145" name="ShipFortHull_2" type="hull2" x="-243.0" y="2736.0" width="40" height="91" />
+    <object id="146" name="ShipFortHull_3" type="hull2" x="-203.0" y="2710.0" width="40" height="126" />
+    <object id="147" name="ShipFortHull_4" type="hull2" x="-163.0" y="2693.0" width="40" height="145" />
+    <object id="148" name="ShipFortHull_5" type="hull2" x="-123.0" y="2669.0" width="40" height="169" />
+    <object id="149" name="ShipFortHull_6" type="hull2" x="-83.0" y="2646.0" width="40" height="176" />
+    <object id="150" name="ShipFortHull_7" type="hull2" x="-43.0" y="2623.0" width="40" height="175" />
+    <object id="151" name="ShipFortHull_8" type="hull2" x="-3.0" y="2614.0" width="40" height="171" />
+    <object id="152" name="ShipFortHull_9" type="hull2" x="37.0" y="2601.0" width="40" height="182" />
+    <object id="153" name="ShipFortHull_10" type="hull2" x="77.0" y="2601.0" width="40" height="182" />
+    <object id="154" name="ShipFortHull_11" type="hull2" x="117.0" y="2607.0" width="40" height="152" />
+    <object id="155" name="ShipFortHull_12" type="hull2" x="157.0" y="2633.0" width="40" height="79" />
+    <object id="156" name="ShipFortHull_13" type="hull2" x="197.0" y="2649.0" width="26" height="35" />
   </objectgroup>
   <objectgroup id="7" name="Terrain">
     <object id="72" name="Rock_1" type="terrain" x="11.6" y="271.9" width="110" height="64" />

@@ -417,8 +417,11 @@ void ArenaClient::onGameEvent(const GameEventPacket& p) {
           pushBanner("SHIP UNDER ATTACK", "", 0xFF5060FF, 2200.0f);
           break;
         case Announcement::ShipTurretsOnline:
-          pushBanner("SHIP TURRETS ONLINE", "The ship can defend itself now",
-                     0xFF90FF90);
+          break;  // retired
+        case Announcement::ShipUpgraded:
+          pushBanner("SHIP UPGRADED",
+                     "Tougher hull, a wider safe zone, harder-hitting turrets",
+                     0xFF90FF90, 4000.0f);
           break;
         case Announcement::RoofTurretOnline:
           pushBanner("ROOF TURRET ONLINE",

@@ -469,30 +469,51 @@ constexpr float RAID_FIRST_MS = 45000.0f;
 constexpr float RAID_INTERVAL_MS = 45000.0f;
 constexpr float SHIP_DAMAGE_SCALE = 0.5f;  // hull armor vs. enemy hits
 
-constexpr float SHIP_MAX_HEALTH = 1500.0f;
+// Ship tiers. The crew upgrades the ship between rounds with banked scrap:
+//   0  the crash: nose down in the rubble (Ship.png)
+//   1  dug out, set level and loosely patched (ShipPatched.png)
+//   2  more fort than ship: sandbags, stairs, solar, a dish (ShipFort.png),
+//      a hint that there may be no way off this planet
+// Each tier raises the hull's max health and repairs it fully, widens the
+// safe zone and its healing, and makes the roof turrets hit harder and
+// reach further. Each tier's collision footprint is in arena.tmx (Tiled
+// type "hull", "hull1", "hull2").
+constexpr int SHIP_TIER_COUNT = 3;
+// Scrap spent (at intermission) to reach each tier from the one before.
+constexpr int SHIP_TIER_COST[SHIP_TIER_COUNT] = {0, 3, 5};
+constexpr float SHIP_TIER_MAX_HEALTH[SHIP_TIER_COUNT] = {1500.0f, 2000.0f,
+                                                         2600.0f};
+// "Inside for the night", and where standing heals you.
+constexpr float SHIP_TIER_SAFE_RADIUS[SHIP_TIER_COUNT] = {420.0f, 480.0f,
+                                                          560.0f};
+// Standing by the ship patches you up (fraction of max health a second),
+// at the cost of time on the clock.
+constexpr float SHIP_TIER_HEAL_PER_SECOND[SHIP_TIER_COUNT] = {0.04f, 0.05f,
+                                                              0.06f};
 // The match opens just after the crash: the hull is badly damaged and
 // burning, and scrap hauled home is what patches it up.
-constexpr float SHIP_START_HEALTH = SHIP_MAX_HEALTH * 0.35f;
-// The ship is a crashed RV about 11 m long (some 510 px on screen, 256 to
-// either side of its centre): these reach just past its hull.
-constexpr float SHIP_RADIUS = 240.0f;       // enemies attack inside this
-constexpr float SHIP_SAFE_RADIUS = 420.0f;  // "inside for the night"
+constexpr float SHIP_START_HEALTH = SHIP_TIER_MAX_HEALTH[0] * 0.35f;
+// The crashed RV is about 11 m long (some 510 px on screen, 256 to either
+// side of its centre): these reach just past its hull.
+constexpr float SHIP_RADIUS = 240.0f;  // enemies attack inside this
 // Walk anything you are hauling (scrap, a probe) inside this to deliver it.
 constexpr float SHIP_DROP_RADIUS = 300.0f;
 constexpr float SHIP_REPAIR_PER_SCRAP = 180.0f;
-constexpr int SHIP_TURRET_SCRAP = 3;  // scrap banked before turrets come online
 
 // Roof turrets. Each Derelict Turret objective the crew repairs stands one
 // up on the ship's roof. It swivels on its round base to the nearest enemy
 // in range and fires hard; a kill goes to whoever last hit the enemy, so it
 // backs up the crew's fights instead of stealing them. Mounts are offsets
 // from the ship's centre to the turret's foot on the roof as drawn
-// (assets/sprites/actors/ShipTurret*.png on Ship.png).
+// (assets/sprites/actors/ShipTurret*.png on each tier's sheet).
 constexpr int ROOF_TURRET_COUNT = 2;
-constexpr float ROOF_TURRET_MOUNT_X[ROOF_TURRET_COUNT] = {-140.0f, -10.0f};
-constexpr float ROOF_TURRET_MOUNT_Y[ROOF_TURRET_COUNT] = {-168.0f, -214.0f};
-constexpr float ROOF_TURRET_RANGE = 560.0f;  // from the mount
-constexpr float ROOF_TURRET_DAMAGE = 75.0f;  // a grunt (70) in one shot
+constexpr float ROOF_TURRET_MOUNT_X[SHIP_TIER_COUNT][ROOF_TURRET_COUNT] = {
+    {-140.0f, -10.0f}, {-100.0f, 20.0f}, {-130.0f, 20.0f}};
+constexpr float ROOF_TURRET_MOUNT_Y[SHIP_TIER_COUNT][ROOF_TURRET_COUNT] = {
+    {-168.0f, -214.0f}, {-195.0f, -250.0f}, {-230.0f, -295.0f}};
+// From the mount. Tier 0 kills a grunt (70 health) in one shot.
+constexpr float ROOF_TURRET_RANGE[SHIP_TIER_COUNT] = {560.0f, 620.0f, 680.0f};
+constexpr float ROOF_TURRET_DAMAGE[SHIP_TIER_COUNT] = {75.0f, 95.0f, 115.0f};
 constexpr float ROOF_TURRET_INTERVAL_MS = 1100.0f;
 constexpr float ROOF_TURRET_TURN_DEG_PER_S = 300.0f;
 constexpr float ROOF_TURRET_AIM_TOLERANCE_DEG = 12.0f;  // fires once this close
@@ -501,9 +522,6 @@ constexpr float ROOF_TURRET_AIM_TOLERANCE_DEG = 12.0f;  // fires once this close
 // ground (halved in y by the 30 degree camera) and height above the foot.
 constexpr float ROOF_TURRET_BARREL_PX = 89.0f;
 constexpr float ROOF_TURRET_MUZZLE_LIFT_PX = 46.0f;
-
-// Standing by the ship patches you up, at the cost of time on the clock.
-constexpr float SHIP_HEAL_PER_SECOND = 0.04f;  // fraction of max health
 
 constexpr float REVIVE_SECONDS = 3.0f;
 constexpr float REVIVE_RADIUS = 70.0f;

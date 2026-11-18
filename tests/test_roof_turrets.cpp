@@ -1,7 +1,8 @@
-// The ship's roof turrets and its hull, on the real server systems:
+// The ship's roof turrets, hull and tiers, on the real server systems:
 // repairing a Derelict Turret stands one up; it swivels to the nearest enemy
-// in range, hits hard, and a kill goes to whoever last hit the enemy; and
-// the hull is solid, with raiders chewing on its nearest face.
+// in range, hits hard, and a kill goes to whoever last hit the enemy; the
+// hull is solid, with raiders chewing on its nearest face; and banked scrap
+// buys the ship's next tier between rounds.
 
 #include <cassert>
 #include <cmath>
@@ -33,11 +34,13 @@ struct World {
   MatchDirector director;
   std::vector<EnemySystem::EnemyDeath> deaths;
 
+  std::vector<int> tiersSet;
+
   explicit World(const CollisionSystem* solid = nullptr)
       : combat(players, &enemies, &effects, solid, 8000.0f, 4000.0f,
                [this](const GameEventPacket& p) { events.push_back(p); }),
         director(players, &enemies, &combat, 0.0f, 0.0f, 8000.0f, 4000.0f,
-                 MatchDirector::Hooks{}) {
+                 hooks()) {
     enemies.setCombat(&combat);
     Player hero;
     hero.id = HERO;
@@ -52,9 +55,15 @@ struct World {
     players[HERO].y = 3000.0f;
   }
 
+  MatchDirector::Hooks hooks() {
+    MatchDirector::Hooks h;
+    h.setShipTier = [this](int tier) { tiersSet.push_back(tier); };
+    return h;
+  }
   Player& hero() { return players[HERO]; }
-  float mountX(int i) const { return T::ROOF_TURRET_MOUNT_X[i]; }
-  float mountY(int i) const { return T::ROOF_TURRET_MOUNT_Y[i]; }
+  int tier() const { return director.shipTier(); }
+  float mountX(int i) const { return T::ROOF_TURRET_MOUNT_X[tier()][i]; }
+  float mountY(int i) const { return T::ROOF_TURRET_MOUNT_Y[tier()][i]; }
   void run(float ms, bool moveEnemies = false) {
     for (float t = 0.0f; t < ms; t += TICK_MS) {
       combat.update(TICK_MS);
@@ -89,7 +98,7 @@ void turretSwivelsAndKillCreditGoesToTheLastHitter() {
   uint32_t id = w.enemies.spawn(Arena::EnemyKind::VenoxaridGrunt,
                                 w.mountX(0) + 300.0f, w.mountY(0));
   Enemy* grunt = w.enemies.find(id);
-  assert(grunt && grunt->health <= T::ROOF_TURRET_DAMAGE);
+  assert(grunt && grunt->health <= T::ROOF_TURRET_DAMAGE[0]);
   w.combat.damageEnemy(HERO, *grunt, 1.0f, 0);
   int killsBefore = w.hero().kills;
 
@@ -121,7 +130,7 @@ void outOfRangeIsLeftAlone() {
   w.director.onTurretRepaired(w.hero());
   w.director.onTurretRepaired(w.hero());
   uint32_t id = w.enemies.spawn(Arena::EnemyKind::VenoxaridGrunt,
-                                T::ROOF_TURRET_RANGE + 400.0f, 0.0f);
+                                T::ROOF_TURRET_RANGE[0] + 400.0f, 0.0f);
   float health = w.enemies.find(id)->health;
   w.run(3000.0f);
   assert(w.deaths.empty());
@@ -138,7 +147,8 @@ void hullIsSolidAndRaidersChewOnIt() {
   hull.objectType = "hull";
   std::vector<CollisionShape> shapes = {hull};
   CollisionSystem solid(shapes);
-  assert(CollisionSystem::isHull(hull) && !CollisionSystem::isTerrain(hull));
+  assert(CollisionSystem::hullTierOf(hull) == 0 &&
+         !CollisionSystem::isTerrain(hull));
 
   // Players stop at it.
   float x = 0.0f, y = -100.0f;
@@ -167,6 +177,96 @@ void hullIsSolidAndRaidersChewOnIt() {
   std::cout << "  hull: solid to players and raiders; raiders hit its face\n";
 }
 
+void hullFootprintFollowsTheTier() {
+  auto box = [](const char* type, float x) {
+    CollisionShape s;
+    s.type = CollisionShape::Type::Rectangle;
+    s.aabb = {x, 0.0f, 50.0f, 50.0f};
+    s.objectType = type;
+    return s;
+  };
+  std::vector<CollisionShape> shapes = {box("hull", 0.0f), box("hull1", 200.0f),
+                                        box("hull2", 400.0f),
+                                        box("terrain", 600.0f)};
+  CollisionSystem solid(shapes);
+  assert(CollisionSystem::hullTierOf(shapes[2]) == 2);
+  assert(CollisionSystem::hullTierOf(shapes[3]) == -1);
+  for (int tier = 0; tier < T::SHIP_TIER_COUNT; tier++) {
+    solid.setHullTier(tier);
+    for (int i = 0; i < 3; i++) {
+      bool blocked = !solid.isPositionValid(shapes[i].aabb.x + 25.0f, 25.0f);
+      assert(blocked == (i == tier));
+    }
+    assert(!solid.isPositionValid(625.0f, 25.0f));  // terrain always
+  }
+  std::cout << "  hull: only the current tier's footprint is solid\n";
+}
+
+void scrapBuysTiersBetweenRounds() {
+  World w;
+  w.hero().x = 0.0f;
+  w.hero().y = 150.0f;  // home for the night
+  assert(w.tier() == 0);
+  assert(w.director.shipHealth() == T::SHIP_START_HEALTH);
+  // The playtest cheat banks enough scrap for both tiers.
+  w.director.onDebugCommand(w.hero(), DebugCommandKind::RoofTurrets, 0);
+  int bank = w.director.scrapInBank();
+  assert(bank == T::SHIP_TIER_COST[1] + T::SHIP_TIER_COST[2]);
+
+  // Not mid-round: upgrades are a between-rounds decision.
+  assert(!w.director.onShipUpgrade(w.hero()));
+  assert(w.tier() == 0);
+
+  w.director.onDebugCommand(w.hero(), DebugCommandKind::SkipPhase, 0);
+  w.run(100.0f);
+  assert(w.director.phase() == Arena::MatchPhase::Intermission);
+  assert(w.director.onShipUpgrade(w.hero()));
+  assert(w.tier() == 1 &&
+         w.director.scrapInBank() == bank - T::SHIP_TIER_COST[1]);
+  // A full hull at the new tier's maximum, and the footprint changes.
+  assert(w.director.shipHealth() == T::SHIP_TIER_MAX_HEALTH[1]);
+  assert(w.director.buildState().shipTier == 1);
+  assert(w.director.buildState().shipMaxHealth == T::SHIP_TIER_MAX_HEALTH[1]);
+  assert(w.director.safeRadius() == T::SHIP_TIER_SAFE_RADIUS[1]);
+  assert(!w.tiersSet.empty() && w.tiersSet.back() == 1);
+
+  assert(w.director.onShipUpgrade(w.hero()));
+  assert(w.tier() == 2 && w.director.scrapInBank() == 0);
+  assert(w.director.shipHealth() == T::SHIP_TIER_MAX_HEALTH[2]);
+  // The top tier, and nothing left to spend.
+  assert(!w.director.onShipUpgrade(w.hero()));
+  std::cout << "  tiers: bought at intermission, full repair, new footprint\n";
+}
+
+void notEnoughScrapBuysNothing() {
+  World w;
+  w.hero().x = 0.0f;
+  w.hero().y = 150.0f;
+  // Two hauls home: one short of the first tier.
+  for (int i = 0; i < T::SHIP_TIER_COST[1] - 1; i++) {
+    w.director.onObjectiveCompleted(w.hero(), true, 900.0f, 0.0f);
+    w.run(100.0f);
+    assert(!w.hero().carryingScrap);
+  }
+  assert(w.director.scrapInBank() == T::SHIP_TIER_COST[1] - 1);
+  w.director.onDebugCommand(w.hero(), DebugCommandKind::SkipPhase, 0);
+  w.run(100.0f);
+  assert(w.director.phase() == Arena::MatchPhase::Intermission);
+  assert(!w.director.onShipUpgrade(w.hero()));
+  assert(w.tier() == 0 && w.tiersSet.empty());
+  std::cout << "  tiers: short of the price, nothing is spent\n";
+}
+
+void strongerTurretsAtHigherTiers() {
+  for (int t = 1; t < T::SHIP_TIER_COUNT; t++) {
+    assert(T::ROOF_TURRET_DAMAGE[t] > T::ROOF_TURRET_DAMAGE[t - 1]);
+    assert(T::ROOF_TURRET_RANGE[t] > T::ROOF_TURRET_RANGE[t - 1]);
+    assert(T::SHIP_TIER_MAX_HEALTH[t] > T::SHIP_TIER_MAX_HEALTH[t - 1]);
+    assert(T::SHIP_TIER_SAFE_RADIUS[t] > T::SHIP_TIER_SAFE_RADIUS[t - 1]);
+  }
+  std::cout << "  tiers: every tier is tougher, wider and hits harder\n";
+}
+
 }  // namespace
 
 int main() {
@@ -177,6 +277,10 @@ int main() {
   untouchedKillsGoToNoOne();
   outOfRangeIsLeftAlone();
   hullIsSolidAndRaidersChewOnIt();
+  hullFootprintFollowsTheTier();
+  scrapBuysTiersBetweenRounds();
+  notEnoughScrapBuysNothing();
+  strongerTurretsAtHigherTiers();
   std::cout << "All roof turret tests passed\n";
   return 0;
 }

@@ -940,7 +940,7 @@ std::vector<uint8_t> serialize(const MatchStatePacket& packet) {
   writeFloat(buffer, packet.shipY);
   writeFloat(buffer, packet.zoneRadius);
   writeUint16(buffer, packet.scrapBanked);
-  writeUint8(buffer, packet.turretsOnline);
+  writeUint8(buffer, packet.shipTier);
   writeUint32(buffer, packet.bossId);
   writeUint8(buffer, packet.roofTurrets);
   for (int i = 0; i < Arena::Tuning::ROOF_TURRET_COUNT; i++) {
@@ -994,7 +994,7 @@ MatchStatePacket deserializeMatchState(const uint8_t* data, size_t size) {
   packet.shipY = readFloat(data + 20);
   packet.zoneRadius = readFloat(data + 24);
   packet.scrapBanked = readUint16(data + 28);
-  packet.turretsOnline = readUint8(data + 30);
+  packet.shipTier = readUint8(data + 30);
   packet.bossId = readUint32(data + 31);
   packet.roofTurrets = readUint8(data + 35);
   for (int i = 0; i < Arena::Tuning::ROOF_TURRET_COUNT; i++) {
@@ -1075,6 +1075,19 @@ PlayerReadyPacket deserializePlayerReady(const uint8_t* data, size_t size) {
   PlayerReadyPacket packet;
   packet.ready = readUint8(data + 1);
   return packet;
+}
+
+std::vector<uint8_t> serialize(const ShipUpgradePacket& packet) {
+  std::vector<uint8_t> buffer;
+  writeUint8(buffer, static_cast<uint8_t>(packet.type));
+  return buffer;
+}
+
+ShipUpgradePacket deserializeShipUpgrade(const uint8_t* data, size_t size) {
+  assert(size >= 1);
+  assert(data[0] == static_cast<uint8_t>(PacketType::ShipUpgrade));
+  (void)size;
+  return ShipUpgradePacket();
 }
 
 std::vector<uint8_t> serialize(const DebugCommandPacket& packet) {

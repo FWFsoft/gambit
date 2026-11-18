@@ -435,7 +435,7 @@ bool EnemySystem::shipPoint(float x, float y, float& outX, float& outY) const {
   if (!solid) return false;
   float best = -1.0f;
   for (const auto& shape : solid->getShapes()) {
-    if (!CollisionSystem::isHull(shape)) continue;
+    if (!solid->isActiveHull(shape)) continue;
     float cx, cy;
     CollisionSystem::closestPoint(shape.aabb, x, y, cx, cy);
     float d = distance(x, y, cx, cy);

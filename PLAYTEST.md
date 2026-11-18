@@ -16,7 +16,9 @@ built to be cheap to change.
    Aliens pour in from all sides; each quarter of the map belongs to one
    genus (north ice, east fire, south poison, west psychic; the minimap
    shows it). Kill things, grab the **infusions** they drop, haul **scrap**
-   back to repair the ship. Raids march on the ship every ~45s.
+   back to repair the ship (it starts badly damaged and burning). Repair a
+   **derelict turret** and it goes up on the ship's roof. Raids march on
+   the ship every ~45s.
    After about a third of the round the **Blue Zone** starts closing on the
    ship; outside it you take damage. When the timer runs out, anyone not
    near the ship is lost for the night.
@@ -53,6 +55,7 @@ win, we win".
 | F | Interact with objectives (scrapyards, turrets) |
 | B | Suit screen (only works beside the ship mid-round) |
 | R | Ready up (night / end screen) |
+| U | Upgrade the ship with banked scrap (night only: 3 to dig it out, 5 more to fortify it) |
 | Tab (hold) | Full scoreboard |
 | Esc | Pause |
 | F3 | Fog of war on / off (for comparing) |
@@ -61,7 +64,8 @@ Stand over a downed teammate for 3 seconds to revive them. Standing near
 the ship slowly heals you.
 
 **Playtest cheats** (for poking at things, not for real tests):
-F2 stand up both roof turrets and set the ship burning (60% hull damage),
+F2 stand up both roof turrets, set the ship burning (60% hull damage)
+and bank 8 scrap (enough for both ship tiers),
 F5 skip phase, F6 one of every infusion item, F7 spawn a pack near you,
 F8 god mode, F9 kill everything, F10 spawn the boss, F11 spawn a swarm
 of Toxliths where you are aiming.

@@ -21,6 +21,55 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-18: Scrap upgrades the ship: dug out, then a fort
+- **Decision:** Scrap delivered to the ship still repairs 180 hull, and
+  now also goes into the crew's bank. Between rounds (intermission only)
+  anyone can spend the bank on the ship's next tier: the UPGRADE SHIP
+  button on the suit screen, or U. Tier 1, "dug out and loosely patched"
+  (`art/models/ShipPatched.glb`), costs 3 scrap; tier 2, the fort
+  (`art/models/ShipFort.glb`), costs 5 more. Each tier:
+  - raises max hull 1500 / 2000 / 2600 and repairs it fully;
+  - widens the safe zone 420 / 480 / 560 and its healing 4% / 5% / 6% of
+    max health a second;
+  - makes the roof turrets hit harder and reach further (75 / 95 / 115
+    damage, range 560 / 620 / 680);
+  - swaps the ship's look and its collision footprint (Tiled types
+    `hull`, `hull1`, `hull2`; only the current tier's is solid). The new
+    hull stands on the crash site, level, facing the same way. Anyone
+    left standing inside it is moved out in front.
+  After an upgrade the suit screen stands aside for 3.5 s and a "SHIP
+  UPGRADED" banner plays, so the crew sees what it built. A new tier
+  is repaired in full, so its fires are out until raiders hurt it again.
+  The old 3-scrap reward (an invisible 14-damage gun at the ship's
+  centre, "SHIP TURRETS ONLINE") is removed.
+- **Pillars:**
+  - Strategic Crunch: serves. Every haul home is now worth twice
+    (repair now, upgrade later), which makes the "one more objective or
+    head back" choice weightier. Higher tiers ease late pressure (more
+    hull, bigger safe zone), which the later rounds' bigger raids are
+    meant to offset; watch whether a fort makes round 3 too safe.
+  - Comradery in Competition: serves. The bank is shared and anyone
+    can spend it, and the hauler still scores 100 per scrap.
+  - Clarity: serves. The ship's look says its tier at a glance, the HUD
+    shows "Scrap n/cost" in green with [U] when an upgrade is affordable,
+    and the removed invisible gun was the least readable thing about the
+    ship.
+  - Creative Builds: neutral. Upgrades are a fixed path, not a choice of
+    build.
+- **Why:** Requested by a human, who supplied both models and picked the
+  rules (upgrades at intermission, all four kinds of perk, costs 3 then 5,
+  remove the old scrap gun). The numbers for each perk are first guesses.
+  The fort's look hints that the crew may never leave the planet; how
+  that plays into a match ending is an open question.
+- **Status:** Accepted (requested by a human); the per-tier numbers need
+  playtesting
+- **Where:** `include/ArenaData.h` (SHIP_TIER_*), `src/MatchDirector.cpp`
+  (onShipUpgrade), `src/CollisionSystem.cpp` (hull tiers),
+  `assets/maps/arena.tmx`, `src/ArenaView.cpp` (SHIP_TIER_LOOK,
+  WRECK_SPOTS), `src/ArenaHud.cpp`,
+  `tools/sprite_forge/actors/ship_patched.py`, `ship_fort.py`,
+  `tests/test_roof_turrets.cpp`
+
 ## 2026-11-18: The match opens just after the crash, with the hull at 35%
 - **Decision:** The ship starts every match at 35% hull (525 of 1500),
   heavily damaged and burning, instead of at full health. Each scrap
@@ -66,11 +115,9 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
     Watch whether players camp by the ship once both are up.
 - **Why:** Requested by a human ("high damage", kill credit to the last
   player to hit). 60 damage was tried first and does not one-shot the
-  grunts on the arena map, so it went to 75. **Open question:** the older
-  scrap reward ("SHIP TURRETS ONLINE" after 3 scrap: an invisible 14-damage
-  gun at the ship's centre) is unchanged. Two things now called ship
-  turrets is confusing (Clarity); consider folding the scrap reward into
-  the roof turrets (e.g. scrap upgrades them) or renaming it.
+  grunts on the arena map, so it went to 75. The older scrap reward
+  ("SHIP TURRETS ONLINE" after 3 scrap) was removed on 2026-11-18 when
+  scrap started buying ship tiers.
 - **Status:** Accepted (requested by a human); the numbers (75 damage,
   1.1 s, range 560, turn rate) are first guesses and need review
 - **Where:** `src/MatchDirector.cpp` (onTurretRepaired, updateRoofTurrets),

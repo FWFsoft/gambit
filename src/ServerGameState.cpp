@@ -66,6 +66,9 @@ ServerGameState::ServerGameState(NetworkServer* server,
   };
   hooks.clearPickups = [this]() { clearArenaPickups(); };
   hooks.resetWorld = [this]() { resetWorld(); };
+  hooks.setShipTier = [this](int tier) {
+    if (collisionSystem) collisionSystem->setHullTier(tier);
+  };
   director = std::make_unique<MatchDirector>(
       players, enemySystem.get(), abilitySystem.get(), shipX, shipY,
       worldWidth, worldHeight, hooks);
@@ -383,6 +386,12 @@ void ServerGameState::onNetworkPacketReceived(
             playerIt->second, static_cast<Arena::Genus>(packet.genus),
             static_cast<Arena::InfusionPart>(packet.part), packet.node);
       }
+      break;
+    }
+
+    case PacketType::ShipUpgrade: {
+      auto playerIt = players.find(e.clientId);
+      if (playerIt != players.end()) director->onShipUpgrade(playerIt->second);
       break;
     }
 

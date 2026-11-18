@@ -38,7 +38,7 @@ class ServerGameState {
   NetworkServer* server;
   float worldWidth;
   float worldHeight;
-  const CollisionSystem* collisionSystem;
+  CollisionSystem* collisionSystem;
   const std::vector<PlayerSpawn>* playerSpawns;
   std::unordered_map<uint32_t, Player> players;
   uint32_t serverTick;
