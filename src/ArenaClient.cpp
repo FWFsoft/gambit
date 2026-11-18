@@ -420,6 +420,11 @@ void ArenaClient::onGameEvent(const GameEventPacket& p) {
           pushBanner("SHIP TURRETS ONLINE", "The ship can defend itself now",
                      0xFF90FF90);
           break;
+        case Announcement::RoofTurretOnline:
+          pushBanner("ROOF TURRET ONLINE",
+                     "It guards the ship. Hit a foe last and its kill is yours",
+                     0xFF90FF90);
+          break;
         case Announcement::Intermission:
           pushBanner("SAFE FOR THE NIGHT", "Slot your infusions", 0xFFFFE0A0);
           break;

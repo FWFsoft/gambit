@@ -219,6 +219,9 @@ class ArenaView {
   void drawEnemy(ImDrawList* dl, const ArenaClient::EnemyView& view);
   void drawPickup(ImDrawList* dl, uint32_t itemId, float worldX, float worldY);
   void drawShip(ImDrawList* dl);
+  void drawShipWreckage(ImDrawList* dl, ImVec2 centre, float damage,
+                        bool smoke);
+  void drawRoofTurrets(ImDrawList* dl, ImVec2 centre, ImU32 tint);
   // A terrain rock: an inked block standing on its footprint.
   void drawRock(ImDrawList* dl, const CollisionShape& rock, bool inReach,
                 bool bonding);

@@ -116,6 +116,10 @@ TEST(ArenaPacketsRoundTrip) {
     m.scrapBanked = 4;
     m.turretsOnline = 1;
     m.bossId = 31;
+    m.roofTurrets = 2;
+    m.roofAim[0] = 17;
+    m.roofAim[1] = 250;
+    m.roofRecoil[1] = 128;
     MatchPlayerState a;
     a.playerId = 1;
     a.characterId = 20;
@@ -141,6 +145,9 @@ TEST(ArenaPacketsRoundTrip) {
     assert(out.timeRemaining == 12.5f && out.zoneRadius == 777.0f);
     assert(out.shipHealth == 900.0f && out.shipMaxHealth == 1500.0f);
     assert(out.scrapBanked == 4 && out.turretsOnline == 1 && out.bossId == 31);
+    assert(out.roofTurrets == 2 && out.roofAim[0] == 17 &&
+           out.roofAim[1] == 250 && out.roofRecoil[0] == 0 &&
+           out.roofRecoil[1] == 128);
     assert(out.players.size() == 2);
     assert(out.players[0].score == -150 && out.players[0].kills == 300);
     assert(out.players[0].coreGenus == 4 && out.players[0].corePart == 2);

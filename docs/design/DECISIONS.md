@@ -21,6 +21,72 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-18: Repaired Derelict Turrets become roof turrets on the ship
+- **Decision:** Each Derelict Turret objective the crew repairs stands up
+  one cannon on the ship's roof (two mounts; the human's Meshy model
+  "RV Spaceship Roof Cannon", `art/models/ShipTurret.glb`). Nothing stays
+  at the objective; the old 3-second Wound aura there is gone. A roof
+  turret swivels on its round base to the nearest enemy within 560 of its
+  mount (300 deg/s, 16 drawn headings), fires once it is within 12 deg,
+  and deals 75 a shot every 1.1 s (a grunt, 70 health, in one shot). It
+  kicks back and flashes at the muzzle. A kill goes to the player who last
+  hit the enemy (score, kill count, loot, on-kill infusions); an enemy no
+  player touched dies with no credit. Turrets fire during rounds and the
+  boss fight and come down with the next match. Banner: "ROOF TURRET
+  ONLINE".
+- **Pillars:**
+  - Comradery in Competition: the turret never steals a kill. It finishes
+    what a player started and the credit is theirs, so it backs up fights
+    near home instead of competing with the crew.
+  - Clarity: the guns are visible on the roof, turn toward their target
+    before firing and recoil with a flash; the hit shows a damage number.
+  - Strategic Crunch, slightly weakened: two guns at 68 DPS each make
+    the ship much safer against raids and make fighting near home easier.
+    The trade-off is the time spent repairing them instead of scavenging.
+    Watch whether players camp by the ship once both are up.
+- **Why:** Requested by a human ("high damage", kill credit to the last
+  player to hit). 60 damage was tried first and does not one-shot the
+  grunts on the arena map, so it went to 75. **Open question:** the older
+  scrap reward ("SHIP TURRETS ONLINE" after 3 scrap: an invisible 14-damage
+  gun at the ship's centre) is unchanged. Two things now called ship
+  turrets is confusing (Clarity); consider folding the scrap reward into
+  the roof turrets (e.g. scrap upgrades them) or renaming it.
+- **Status:** Accepted (requested by a human); the numbers (75 damage,
+  1.1 s, range 560, turn rate) are first guesses and need review
+- **Where:** `src/MatchDirector.cpp` (onTurretRepaired, updateRoofTurrets),
+  `include/ArenaData.h` (ROOF_TURRET_*), `src/ArenaView.cpp`
+  (drawRoofTurrets), `tools/sprite_forge/actors/ship_turret*.py`,
+  `tests/test_roof_turrets.cpp`. Playtest cheat: F2.
+
+## 2026-11-18: The crashed ship is solid, and it burns
+- **Decision:** The hull has a collision footprint: 11 stepped boxes
+  ("ShipHull_*", Tiled type `hull`) following the lower body of the
+  hull as drawn, from the rubble at the nose to the rockets. Players and
+  enemies are blocked; raiders now attack the nearest face of the hull
+  instead of walking to its centre. Anything standing south of the
+  footprint is drawn in front of the whole ship. Spawns and the "bring
+  everyone home" spot moved to open ground in front of the hull. The
+  wreck smokes and burns: the cab and a rocket nozzle always smoulder
+  (it crashed), and as hull health drops the smoke thickens and up to four
+  more spots catch fire (at 25%, 45%, 65% and 80% damage).
+- **Pillars:**
+  - Clarity: the ship's health can be read at a glance from how much of it
+    is on fire, and you can no longer walk over the hull.
+  - Strategic Crunch, slightly weakened: going around the 11 m hull is
+    a few seconds' walk. The drop-off and safe rings still reach past it,
+    so delivering scrap is no slower.
+- **Why:** Requested by a human; the previous entry flagged the missing
+  collision as the next fix. The footprint follows the hull image rather
+  than the model's true ground contact: the rockets point up into the air,
+  so the true contact is only the nose and a strip of empty-looking
+  ground below the hull, which would block where nothing is drawn.
+- **Status:** Accepted (requested by a human); the footprint shape and
+  the fire thresholds need review
+- **Where:** `assets/maps/arena.tmx`, `include/CollisionSystem.h`,
+  `src/EnemySystem.cpp` (shipPoint), `src/ArenaView.cpp`
+  (drawShipWreckage, depth sort), `src/MatchDirector.cpp`
+  (bringPlayersHome)
+
 ## 2026-11-17: The ship is a crashed RV with rockets, at true scale
 - **Decision:** The ship is now the human's model (`art/models/Ship.glb`, a
   crashed RV-turned-spaceship nose down in rubble). It is baked by the

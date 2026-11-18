@@ -479,6 +479,26 @@ constexpr float SHIP_DROP_RADIUS = 300.0f;
 constexpr float SHIP_REPAIR_PER_SCRAP = 180.0f;
 constexpr int SHIP_TURRET_SCRAP = 3;  // scrap banked before turrets come online
 
+// Roof turrets. Each Derelict Turret objective the crew repairs stands one
+// up on the ship's roof. It swivels on its round base to the nearest enemy
+// in range and fires hard; a kill goes to whoever last hit the enemy, so it
+// backs up the crew's fights instead of stealing them. Mounts are offsets
+// from the ship's centre to the turret's foot on the roof as drawn
+// (assets/sprites/actors/ShipTurret*.png on Ship.png).
+constexpr int ROOF_TURRET_COUNT = 2;
+constexpr float ROOF_TURRET_MOUNT_X[ROOF_TURRET_COUNT] = {-140.0f, -10.0f};
+constexpr float ROOF_TURRET_MOUNT_Y[ROOF_TURRET_COUNT] = {-168.0f, -214.0f};
+constexpr float ROOF_TURRET_RANGE = 560.0f;  // from the mount
+constexpr float ROOF_TURRET_DAMAGE = 75.0f;  // a grunt (70) in one shot
+constexpr float ROOF_TURRET_INTERVAL_MS = 1100.0f;
+constexpr float ROOF_TURRET_TURN_DEG_PER_S = 300.0f;
+constexpr float ROOF_TURRET_AIM_TOLERANCE_DEG = 12.0f;  // fires once this close
+// The muzzle relative to the foot, as drawn, for a barrel at heading a
+// (radians, clockwise from straight down): reach along the barrel on the
+// ground (halved in y by the 30 degree camera) and height above the foot.
+constexpr float ROOF_TURRET_BARREL_PX = 89.0f;
+constexpr float ROOF_TURRET_MUZZLE_LIFT_PX = 46.0f;
+
 // Standing by the ship patches you up, at the cost of time on the clock.
 constexpr float SHIP_HEAL_PER_SECOND = 0.04f;  // fraction of max health
 

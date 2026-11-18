@@ -105,7 +105,7 @@ void CollisionSystem::closestPoint(const AABB& box, float x, float y,
 
 void CollisionSystem::pushOutOfTerrain(float& x, float& y, float radius) const {
   for (const auto& shape : collisionShapes) {
-    if (!isTerrain(shape) || !intersects(x, y, radius, shape)) continue;
+    if (!blocksEnemies(shape) || !intersects(x, y, radius, shape)) continue;
     const AABB& b = shape.aabb;
     // Distance to leave through each side; take the shortest.
     float left = x + radius - b.x;

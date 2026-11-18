@@ -61,6 +61,7 @@ Stand over a downed teammate for 3 seconds to revive them. Standing near
 the ship slowly heals you.
 
 **Playtest cheats** (for poking at things, not for real tests):
+F2 stand up both roof turrets and set the ship burning (60% hull damage),
 F5 skip phase, F6 one of every infusion item, F7 spawn a pack near you,
 F8 god mode, F9 kill everything, F10 spawn the boss, F11 spawn a swarm
 of Toxliths where you are aiming.

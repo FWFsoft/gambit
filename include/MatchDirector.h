@@ -51,6 +51,9 @@ class MatchDirector {
   // salvagedScrap: the player now carries scrap home (banked at the ship).
   void onObjectiveCompleted(Player& player, bool salvagedScrap,
                             float objectiveX, float objectiveY);
+  // A Derelict Turret objective was repaired: the next roof turret stands
+  // up on the ship. Returns false if every roof turret is already up.
+  bool onTurretRepaired(Player& player);
   void damageShip(float amount);
   void onDebugCommand(Player& player, DebugCommandKind command, uint8_t arg);
 
@@ -90,6 +93,15 @@ class MatchDirector {
   float raidTimer = 0.0f;
   float zoneTickTimer = 0.0f;
   float turretTimer = 0.0f;
+  // Roof turrets, stood up by repairing Derelict Turret objectives.
+  struct RoofTurret {
+    bool online = false;
+    float aim = 0.0f;  // radians, clockwise from straight down
+    float cooldownMs = 0.0f;
+    float recoilMs = 0.0f;
+    uint32_t targetId = 0;
+  };
+  RoofTurret roofTurrets[Arena::Tuning::ROOF_TURRET_COUNT];
   float shipAlertCooldown = 0.0f;
   bool announcedShrink = false;
   bool announcedReturn = false;
@@ -129,6 +141,7 @@ class MatchDirector {
   void updateSpawning(float dtMs, bool bossPhase);
   void updateZoneDamage(float dtMs);
   void updateTurrets(float dtMs);
+  void updateRoofTurrets(float dtMs);
   void updateDeathsAndRevives(float dtMs);
   void updateScrapDelivery();
   // genusOverride / swarmersOnly are for playtest cheats.

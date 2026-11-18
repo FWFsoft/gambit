@@ -408,7 +408,8 @@ enum class Announcement : uint8_t {
   PlayerRevived = 11,
   ScrapDelivered = 12,
   ObjectiveComplete = 13,
-  ScrapSalvaged = 14
+  ScrapSalvaged = 14,
+  RoofTurretOnline = 15  // a repaired Derelict Turret stands up on the roof
 };
 
 struct GameEventPacket {
@@ -460,6 +461,12 @@ struct MatchStatePacket {
   uint16_t scrapBanked = 0;
   uint8_t turretsOnline = 0;
   uint32_t bossId = 0;
+  // Roof turrets (Arena::Tuning::ROOF_TURRET_*): bit i set = turret i is
+  // standing; its barrel heading (0-255 = a full turn clockwise from
+  // straight down); and its recoil (255 = just fired, falls to 0).
+  uint8_t roofTurrets = 0;
+  uint8_t roofAim[Arena::Tuning::ROOF_TURRET_COUNT] = {};
+  uint8_t roofRecoil[Arena::Tuning::ROOF_TURRET_COUNT] = {};
   std::vector<MatchPlayerState> players;
 };
 
@@ -482,7 +489,8 @@ enum class DebugCommandKind : uint8_t {
   ToggleGodMode = 4,
   SpawnBoss = 5,
   KillAll = 6,
-  EffectLab = 7  // arg = EffectLabAction
+  EffectLab = 7,   // arg = EffectLabAction
+  RoofTurrets = 8  // stand up both roof turrets and knock 60% off the hull
 };
 
 // Effect lab: drive each effect verb by hand to judge how it looks.

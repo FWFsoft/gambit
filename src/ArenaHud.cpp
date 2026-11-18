@@ -134,6 +134,8 @@ void ArenaView::handleHotkeys() {
   }
 
   // Playtest shortcuts
+  if (ImGui::IsKeyPressed(ImGuiKey_F2, false))
+    debug(DebugCommandKind::RoofTurrets);
   if (ImGui::IsKeyPressed(ImGuiKey_F5, false)) debug(DebugCommandKind::SkipPhase);
   if (ImGui::IsKeyPressed(ImGuiKey_F6, false)) debug(DebugCommandKind::GiveInfusions);
   if (ImGui::IsKeyPressed(ImGuiKey_F7, false)) debug(DebugCommandKind::SpawnWave);
