@@ -22,7 +22,7 @@ class CollisionSystem {
 
   // ---- Terrain: solid outcrops on the map (Collision objects whose Tiled
   // type is "terrain"). Players and enemies go around them; Isaac's
-  // Lifeline anchors to them.
+  // Lifeline anchors to them, and to the ship's hull.
   static bool isTerrain(const CollisionShape& shape) {
     return shape.objectType == "terrain";
   }
@@ -30,7 +30,7 @@ class CollisionSystem {
   // set per ship tier (Tiled type "hull" for tier 0, "hull1", "hull2").
   // Only the current tier's set is solid. Solid for players and enemies
   // like terrain, but not a rock: it is not drawn as one and Isaac's
-  // Lifeline does not anchor to it.
+  // Lifeline anchors to it like a rock (terrainNear).
   // The tier a hull box belongs to, or -1 for anything else.
   static int hullTierOf(const CollisionShape& shape);
   void setHullTier(int tier);
@@ -48,7 +48,8 @@ class CollisionSystem {
   bool blocksEnemies(const CollisionShape& shape) const {
     return isTerrain(shape) || isActiveHull(shape);
   }
-  // The terrain piece whose edge is nearest (x, y), if within maxDist.
+  // The terrain piece or current-tier hull box whose edge is nearest (x, y),
+  // if within maxDist: what Isaac's Lifeline can anchor to.
   const CollisionShape* terrainNear(float x, float y, float maxDist) const;
   // The point of `box` nearest (x, y) (the point itself when inside).
   static void closestPoint(const AABB& box, float x, float y, float& outX,
