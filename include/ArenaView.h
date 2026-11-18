@@ -254,6 +254,10 @@ class ArenaView {
   void drawFlora(ImDrawList* dl, const MapProp& prop, Arena::Genus genus,
                  uint32_t seed);
   void drawCityBlock(ImDrawList* dl, const MapProp& prop, uint32_t seed);
+  // Alpha for a tall thing covering the screen box (left..right, top..bottom)
+  // whose front edge is at world y `frontY`: 0.28 (a ghost) if any hero
+  // stands behind it, else 1. Heroes must never vanish (Clarity).
+  float ghostAlpha(float left, float right, float top, float bottom, float frontY) const;
   void drawLandmark(ImDrawList* dl, const MapProp& prop, uint32_t seed);
   void drawObjectiveSite(ImDrawList* dl, const ClientObjective& objective,
                          uint32_t id);

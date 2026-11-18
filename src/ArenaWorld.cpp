@@ -27,6 +27,7 @@
 #include "ClientPrediction.h"
 #include "CollisionSystem.h"
 #include "config/ScreenConfig.h"
+#include "config/WorldScale.h"
 
 using namespace ArenaDraw;
 
@@ -36,6 +37,9 @@ namespace {
 // runs left-down on screen).
 constexpr float AXIS_X = 0.894427f;
 constexpr float AXIS_Y = 0.447214f;
+
+// Scenery is sized in metres (Config::World): a hero is about 1.8 m.
+constexpr float M = Config::World::METRE;
 
 float hash01(uint32_t n) {
   n = (n << 13) ^ n;
@@ -219,58 +223,64 @@ void ArenaView::drawProp(ImDrawList* dl, const MapProp& p, uint32_t index) {
   ImVec2 feet = toScreen(p.x, p.y);
   ImVec2 pts[12];
   if (p.kind == "boulder") {
-    footprintRound(p.x, p.y, 22.0f * s, 7, pts, 0.5f, seed);
-    groundShadow(dl, feet, 30.0f * s);
-    prism(dl, pts, 7, (16.0f + 18.0f * hash01(seed)) * s, 0.65f, SLATE);
+    // Waist to head high: cover-sized rocks.
+    footprintRound(p.x, p.y, 0.9f * M * s, 7, pts, 0.5f, seed);
+    groundShadow(dl, feet, 1.2f * M * s);
+    prism(dl, pts, 7, (0.7f + 0.8f * hash01(seed)) * M * s, 0.65f, SLATE);
   } else if (p.kind == "debris") {
-    footprintBox(p.x, p.y, 16.0f * s, 8.0f * s, hash01(seed) * 3.0f, pts);
-    groundShadow(dl, feet, 18.0f * s);
-    prism(dl, pts, 4, 8.0f * s, 0.9f, METAL);
+    // Hull plates and machinery from the crash, a car door to a bonnet.
+    footprintBox(p.x, p.y, 0.9f * M * s, 0.5f * M * s, hash01(seed) * 3.0f, pts);
+    groundShadow(dl, feet, 1.1f * M * s);
+    prism(dl, pts, 4, 0.4f * M * s, 0.9f, METAL);
     float ember = 0.5f + 0.5f * std::sin(t * 2.3f + seed);
-    dl->AddCircleFilled(ImVec2(feet.x + 6, feet.y - 9 * s), 2.0f,
+    dl->AddCircleFilled(ImVec2(feet.x + 0.3f * M * s, feet.y - 0.6f * M * s), 3.0f,
                         rgbA(1.0f, 0.5f, 0.2f, 0.4f + 0.5f * ember), 8);
   } else if (p.kind == "bones") {
-    // A rib cage half sunk in the dust.
+    // The rib cage of a large beast, half sunk in the dust: knee high.
     for (int i = 0; i < 4; i++) {
-      ImVec2 a(feet.x - 24 * s + i * 14 * s, feet.y);
-      dl->PathArcTo(ImVec2(a.x, a.y), 14.0f * s, PI * 1.05f, PI * 1.95f, 10);
-      dl->PathStroke(tone(BONE.lit, 0.9f), 0, 3.0f);
+      ImVec2 a(feet.x - 1.3f * M * s + i * 0.85f * M * s, feet.y);
+      dl->PathArcTo(ImVec2(a.x, a.y), 0.8f * M * s, PI * 1.05f, PI * 1.95f, 12);
+      dl->PathStroke(tone(BONE.lit, 0.9f), 0, 4.0f);
     }
-    dl->AddLine(ImVec2(feet.x - 30 * s, feet.y), ImVec2(feet.x + 30 * s, feet.y),
-                tone(BONE.dark), 3.0f);
+    dl->AddLine(ImVec2(feet.x - 1.7f * M * s, feet.y),
+                ImVec2(feet.x + 1.7f * M * s, feet.y), tone(BONE.dark), 4.0f);
   } else if (p.kind == "ruin") {
-    footprintRound(p.x, p.y, 14.0f * s, 8, pts);
-    groundShadow(dl, feet, 22.0f * s);
-    float tall = (34.0f + 50.0f * hash01(seed)) * s;
+    // Broken columns, from head height to twice it.
+    footprintRound(p.x, p.y, 0.45f * M * s, 8, pts);
+    groundShadow(dl, feet, 0.8f * M * s);
+    float tall = (1.5f + 3.0f * hash01(seed)) * M * s;
     prism(dl, pts, 8, tall, 0.92f, SLATE);
     float pulse = 0.5f + 0.5f * std::sin(t * 1.3f + seed * 0.37f);
-    dl->AddLine(ImVec2(feet.x - 4, feet.y - tall * 0.3f),
-                ImVec2(feet.x - 4, feet.y - tall * 0.75f),
-                rgbA(0.35f, 0.9f, 1.0f, 0.25f + 0.35f * pulse), 2.0f);
+    dl->AddLine(ImVec2(feet.x - 0.1f * M, feet.y - tall * 0.3f),
+                ImVec2(feet.x - 0.1f * M, feet.y - tall * 0.75f),
+                rgbA(0.35f, 0.9f, 1.0f, 0.25f + 0.35f * pulse), 3.0f);
   } else if (p.kind == "lamp") {
+    // A street lamp: 4.5 m, well over a hero's head.
     Arena::Genus genus = regionGenusAt(p.x, p.y);
     Rgb neon = genusRgb(genus);
-    groundShadow(dl, feet, 8.0f);
-    dl->AddLine(feet, ImVec2(feet.x, feet.y - 58), INK, 3.0f);
-    ImVec2 head(feet.x + 8, feet.y - 58);
-    dl->AddLine(ImVec2(feet.x, feet.y - 58), head, INK, 3.0f);
+    const float pole = 4.5f * M, arm = 1.0f * M;
+    groundShadow(dl, feet, 0.35f * M);
+    dl->AddLine(feet, ImVec2(feet.x, feet.y - pole), INK, 5.0f);
+    ImVec2 head(feet.x + arm, feet.y - pole + 0.15f * M);
+    dl->AddLine(ImVec2(feet.x, feet.y - pole), head, INK, 4.0f);
     float flicker = hash01(seed + static_cast<uint32_t>(t * 6.0f)) > 0.97f ? 0.3f : 1.0f;
-    glow(dl, head, 16.0f, neon, 0.8f * flicker);
-    dl->AddCircleFilled(head, 3.0f, tone(neon, flicker, 1.3f), 8);
+    glow(dl, head, 0.9f * M, neon, 0.8f * flicker);
+    dl->AddCircleFilled(head, 0.12f * M, tone(neon, flicker, 1.3f), 10);
   } else if (p.kind == "sign") {
+    // A neon sign on a post, its board above head height.
     Arena::Genus genus = regionGenusAt(p.x, p.y);
     Rgb neon = genusRgb(genus);
-    dl->AddLine(feet, ImVec2(feet.x, feet.y - 40), INK, 3.0f);
-    ImVec2 a(feet.x - 22, feet.y - 74), b(feet.x + 22, feet.y - 44);
-    dl->AddRectFilled(a, b, rgbA(0.05f, 0.05f, 0.08f, 0.95f), 2.0f);
+    dl->AddLine(feet, ImVec2(feet.x, feet.y - 2.6f * M), INK, 5.0f);
+    ImVec2 a(feet.x - 1.3f * M, feet.y - 4.2f * M), b(feet.x + 1.3f * M, feet.y - 2.5f * M);
+    dl->AddRectFilled(a, b, rgbA(0.05f, 0.05f, 0.08f, 0.95f), 3.0f);
     float flicker = 0.75f + 0.25f * std::sin(t * 9.0f + seed);
-    dl->AddRect(a, b, tone(neon, 0.9f * flicker, 1.2f), 2.0f, 0, 2.0f);
+    dl->AddRect(a, b, tone(neon, 0.9f * flicker, 1.2f), 3.0f, 0, 3.0f);
     // Alien script: a few glowing strokes.
     for (int i = 0; i < 3; i++) {
-      float y = a.y + 8 + i * 8;
-      float w = 10 + 18 * hash01(seed + i);
-      dl->AddLine(ImVec2(a.x + 6, y), ImVec2(a.x + 6 + w, y),
-                  tone(neon, 0.7f * flicker, 1.1f), 2.0f);
+      float y = a.y + 0.4f * M + i * 0.42f * M;
+      float w = (0.5f + 1.2f * hash01(seed + i)) * M;
+      dl->AddLine(ImVec2(a.x + 0.3f * M, y), ImVec2(a.x + 0.3f * M + w, y),
+                  tone(neon, 0.7f * flicker, 1.1f), 4.0f);
     }
   } else if (p.kind == "city_block") {
     drawCityBlock(dl, p, seed);
@@ -283,7 +293,9 @@ void ArenaView::drawProp(ImDrawList* dl, const MapProp& p, uint32_t index) {
 
 void ArenaView::drawFlora(ImDrawList* dl, const MapProp& p, Arena::Genus genus,
                           uint32_t seed) {
-  const float s = p.scale;
+  // The shapes below were drawn at about 1/2.2 of real size; this puts egg
+  // sacs at 0.25-0.45 m, crystals and rime spikes at 0.6-1.9 m.
+  const float s = p.scale * 2.2f;
   const float t = timeSeconds;
   ImVec2 feet = toScreen(p.x, p.y);
   Rgb hue = genusRgb(genus);
@@ -350,6 +362,24 @@ void ArenaView::drawFlora(ImDrawList* dl, const MapProp& p, Arena::Genus genus,
   }
 }
 
+float ArenaView::ghostAlpha(float left, float right, float top, float bottom,
+                            float frontY) const {
+  // A hero behind something tall must not vanish (Clarity): if one stands
+  // in its shadow on screen, north of its front edge, it thins to a ghost.
+  // Checked for every hero, not only you: you need to see your crew.
+  auto behind = [&](float wx, float wy) {
+    ImVec2 q = toScreen(wx, wy);
+    return q.x > left - 10 && q.x < right + 10 && q.y > top && q.y < bottom &&
+           wy < frontY;
+  };
+  const Player& me = prediction->getLocalPlayer();
+  if (behind(me.x, me.y)) return 0.28f;
+  for (const auto& [id, view] : arena->players()) {
+    if (view.state.characterId != 0 && behind(view.x, view.y)) return 0.28f;
+  }
+  return 1.0f;
+}
+
 void ArenaView::drawCityBlock(ImDrawList* dl, const MapProp& p, uint32_t seed) {
   // A block of the coalition city: a dark tower with lit windows, its neon
   // in the colour of the genus whose district this is this match.
@@ -361,39 +391,47 @@ void ArenaView::drawCityBlock(ImDrawList* dl, const MapProp& p, uint32_t seed) {
   float tall = std::max(40.0f, p.tall);
   // Too far off screen to matter?
   if (!inView(base[2], 400, 400 + tall, 400, 400)) return;
-  // A hero behind the tower must not vanish (Clarity): if one stands in
-  // its shadow on screen, north of its front edge, the tower thins to a
-  // ghost. Checked for every hero, not only you: you need to see your crew.
-  float alpha = 1.0f;
-  float left = std::min(base[0].x, base[3].x), right = std::max(base[1].x, base[2].x);
-  float bottom = base[2].y, topY = base[0].y - tall;
-  auto behind = [&](float wx, float wy) {
-    ImVec2 q = toScreen(wx, wy);
-    return q.x > left - 10 && q.x < right + 10 && q.y > topY && q.y < bottom &&
-           wy < p.y + 40.0f;
-  };
-  const Player& me = prediction->getLocalPlayer();
-  if (behind(me.x, me.y)) alpha = 0.28f;
-  for (const auto& [id, view] : arena->players()) {
-    if (view.state.characterId != 0 && behind(view.x, view.y)) alpha = 0.28f;
-  }
+  float alpha = ghostAlpha(std::min(base[0].x, base[3].x), std::max(base[1].x, base[2].x),
+                           base[0].y - tall, base[2].y, p.y + 40.0f);
   prism(dl, base, 4, tall, 1.0f, TOWER, alpha);
   if (alpha < 1.0f) return;
   Rgb neon = genusRgb(regionGenusAt(p.x, p.y));
-  // Windows on the two faces we see: left (W..S) and right (S..E).
+  // Windows on the two faces we see: left (W..S) and right (S..E). One row
+  // per storey, one window per ~3 m of facade, each about a hero tall; the
+  // ground floor gets a door and a shopfront instead. Doors are the scale
+  // cue: a hero is a door high.
+  const float storey = Config::World::STOREY * M;
+  const int rows = std::max(1, static_cast<int>(std::lround(tall / storey)));
   auto windows = [&](ImVec2 a, ImVec2 b, uint32_t salt) {
-    const int cols = 5;
-    const int rows = std::max(2, static_cast<int>(tall / 26.0f));
-    for (int r = 0; r < rows; r++) {
+    float facade = std::hypot(b.x - a.x, b.y - a.y);
+    const int cols = std::max(2, static_cast<int>(facade / (3.0f * M)));
+    auto at = [&](float u, float height) {
+      return ImVec2(a.x + (b.x - a.x) * u, a.y + (b.y - a.y) * u - height);
+    };
+    for (int r = 1; r < rows; r++) {  // r storeys above the ground floor
       for (int c = 0; c < cols; c++) {
         if (hash01(seed * 131u + salt * 17u + r * 7u + c) > 0.42f) continue;
-        float u = (c + 0.5f) / cols, v = (r + 0.6f) / rows;
-        ImVec2 q(a.x + (b.x - a.x) * u, a.y + (b.y - a.y) * u - tall * (1.0f - v));
+        ImVec2 q = at((c + 0.5f) / cols, (r + 0.45f) * storey);
         bool warm = hash01(seed + r * 3u + c) > 0.7f;
-        ImU32 col = warm ? rgbA(1.0f, 0.78f, 0.45f, 0.55f) : tone(neon, 0.45f, 1.1f);
-        dl->AddRectFilled(ImVec2(q.x - 2.5f, q.y - 3.5f), ImVec2(q.x + 2.5f, q.y + 3.5f),
-                          col);
+        // Dim: the world stays dark and quiet; windows are texture, the
+        // heroes are the brightest things on screen (ART_DIRECTION.md).
+        ImU32 col = warm ? rgbA(1.0f, 0.78f, 0.45f, 0.30f) : tone(neon, 0.22f, 1.0f);
+        dl->AddRectFilled(ImVec2(q.x - 0.45f * M, q.y - 0.8f * M),
+                          ImVec2(q.x + 0.45f * M, q.y + 0.8f * M), col);
       }
+    }
+    // Ground floor: a door (2.2 m) and a lit shop window beside it.
+    int doorAt = static_cast<int>(hash01(seed * 7u + salt) * cols);
+    ImVec2 d = at((doorAt + 0.5f) / cols, 0.0f);
+    dl->AddRectFilled(ImVec2(d.x - 0.55f * M, d.y - 2.2f * M), ImVec2(d.x + 0.55f * M, d.y),
+                      rgbA(0.02f, 0.02f, 0.04f, 1.0f));
+    dl->AddRect(ImVec2(d.x - 0.55f * M, d.y - 2.2f * M), ImVec2(d.x + 0.55f * M, d.y),
+                rgbA(1.0f, 0.78f, 0.45f, 0.5f), 0.0f, 0, 2.0f);
+    for (int c = 0; c < cols; c++) {
+      if (c == doorAt || hash01(seed * 53u + salt * 5u + c) > 0.5f) continue;
+      ImVec2 q = at((c + 0.5f) / cols, 1.5f * M);
+      dl->AddRectFilled(ImVec2(q.x - 0.9f * M, q.y - 0.6f * M),
+                        ImVec2(q.x + 0.9f * M, q.y + 0.6f * M), tone(neon, 0.18f, 1.0f));
     }
   };
   windows(base[3], base[2], 1);
@@ -411,58 +449,73 @@ void ArenaView::drawLandmark(ImDrawList* dl, const MapProp& p, uint32_t seed) {
   ImVec2 feet = toScreen(p.x, p.y);
   ImVec2 pts[16];
   if (p.kind == "monolith") {
-    // A black slab taller than anything near it, cut with a glowing glyph.
-    footprintBox(p.x, p.y, 30.0f, 12.0f, 0.4f, pts);
-    groundShadow(dl, feet, 60.0f, 0.45f);
-    prism(dl, pts, 4, 230.0f, 0.82f, OBSIDIAN);
+    // A black slab 14 m tall, cut with a glowing glyph.
+    const float tall = 14.0f * M;
+    footprintBox(p.x, p.y, 2.2f * M, 0.8f * M, 0.4f, pts);
+    groundShadow(dl, feet, 3.5f * M, 0.45f);
+    float alpha = ghostAlpha(feet.x - 2.2f * M, feet.x + 2.2f * M, feet.y - tall,
+                             feet.y + 1.0f * M, p.y + 40.0f);
+    prism(dl, pts, 4, tall, 0.82f, OBSIDIAN, alpha);
+    if (alpha < 1.0f) return;
     float pulse = 0.5f + 0.5f * std::sin(t * 0.9f + seed);
     for (int i = 0; i < 5; i++) {
-      float y = feet.y - 40 - i * 36;
-      dl->AddLine(ImVec2(feet.x - 6, y), ImVec2(feet.x + 4, y - 14),
-                  rgbA(0.4f, 0.95f, 1.0f, 0.35f + 0.5f * pulse), 3.0f);
+      float y = feet.y - 2.5f * M - i * 2.4f * M;
+      dl->AddLine(ImVec2(feet.x - 0.3f * M, y), ImVec2(feet.x + 0.25f * M, y - 0.8f * M),
+                  rgbA(0.4f, 0.95f, 1.0f, 0.35f + 0.5f * pulse), 5.0f);
     }
   } else if (p.kind == "spire") {
-    footprintRound(p.x, p.y, 46.0f, 9, pts);
-    groundShadow(dl, feet, 70.0f, 0.45f);
-    prism(dl, pts, 9, 330.0f, 0.08f, OBSIDIAN);
+    // A 24 m needle of black glass, ringed with light.
+    const float tall = 24.0f * M, r0 = 3.5f * M;
+    footprintRound(p.x, p.y, r0, 9, pts);
+    groundShadow(dl, feet, 5.0f * M, 0.45f);
+    float alpha = ghostAlpha(feet.x - r0, feet.x + r0, feet.y - tall, feet.y + r0 * 0.5f,
+                             p.y + 40.0f);
+    prism(dl, pts, 9, tall, 0.08f, OBSIDIAN, alpha);
+    if (alpha < 1.0f) return;
     float pulse = 0.5f + 0.5f * std::sin(t * 1.5f + seed);
     for (int i = 1; i <= 3; i++) {
-      float y = feet.y - i * 80.0f;
-      float r = 46.0f * (1.0f - i * 80.0f / 330.0f) + 8.0f;
-      dl->AddEllipse(ImVec2(feet.x, y), ImVec2(r, r * 0.45f),
-                     rgbA(0.75f, 0.45f, 1.0f, 0.35f + 0.4f * pulse), 0.0f, 20, 2.0f);
+      float h = i * 6.0f * M;
+      float r = r0 * (1.0f - h / tall) + 0.4f * M;
+      dl->AddEllipse(ImVec2(feet.x, feet.y - h), ImVec2(r, r * 0.45f),
+                     rgbA(0.75f, 0.45f, 1.0f, 0.35f + 0.4f * pulse), 0.0f, 24, 3.0f);
     }
-    glow(dl, ImVec2(feet.x, feet.y - 330.0f), 26.0f, {0.8f, 0.5f, 1.0f}, 0.9f);
+    glow(dl, ImVec2(feet.x, feet.y - tall), 1.5f * M, {0.8f, 0.5f, 1.0f}, 0.9f);
   } else if (p.kind == "ribcage") {
-    // The bones of something enormous: a spine and arching ribs.
-    groundShadow(dl, feet, 140.0f, 0.3f);
-    ImVec2 head(feet.x - 150, feet.y + 20), tail(feet.x + 150, feet.y - 30);
-    dl->AddLine(head, tail, tone(BONE.dark), 10.0f);
+    // The bones of something enormous: a 24 m spine and ribs you walk under.
+    groundShadow(dl, feet, 12.0f * M, 0.3f);
+    ImVec2 head(feet.x - 12.0f * M, feet.y + 1.0f * M);
+    ImVec2 tail(feet.x + 12.0f * M, feet.y - 1.5f * M);
+    dl->AddLine(head, tail, tone(BONE.dark), 16.0f);
     for (int i = 0; i < 7; i++) {
       float u = (i + 1) / 8.0f;
       ImVec2 c(head.x + (tail.x - head.x) * u, head.y + (tail.y - head.y) * u);
-      float h = 110.0f * std::sin(u * PI) + 30.0f;
-      dl->PathArcTo(ImVec2(c.x, c.y), h * 0.55f, PI * 1.08f, PI * 1.92f, 14);
-      dl->PathStroke(tone(BONE.lit), 0, 7.0f);
-      dl->PathArcTo(ImVec2(c.x, c.y), h * 0.55f, PI * 1.08f, PI * 1.92f, 14);
-      dl->PathStroke(INK, 0, 1.5f);
+      float h = 6.0f * M * std::sin(u * PI) + 1.5f * M;
+      dl->PathArcTo(ImVec2(c.x, c.y), h * 0.55f, PI * 1.08f, PI * 1.92f, 16);
+      dl->PathStroke(tone(BONE.lit), 0, 11.0f);
+      dl->PathArcTo(ImVec2(c.x, c.y), h * 0.55f, PI * 1.08f, PI * 1.92f, 16);
+      dl->PathStroke(INK, 0, 2.0f);
     }
   } else if (p.kind == "crater") {
-    // Whatever fell here still glows.
+    // Whatever fell here still glows: a 4 m shard in the crater's heart.
     float pulse = 0.5f + 0.5f * std::sin(t * 2.2f + seed);
-    footprintRound(p.x, p.y, 22.0f, 5, pts, 0.6f, seed);
-    prism(dl, pts, 5, 70.0f, 0.2f, OBSIDIAN);
-    glow(dl, ImVec2(feet.x, feet.y - 40), 60.0f, {0.4f, 1.0f, 0.6f}, 0.5f + 0.4f * pulse);
+    footprintRound(p.x, p.y, 1.5f * M, 5, pts, 0.6f, seed);
+    float alpha = ghostAlpha(feet.x - 1.5f * M, feet.x + 1.5f * M, feet.y - 4.0f * M,
+                             feet.y + 0.8f * M, p.y + 40.0f);
+    prism(dl, pts, 5, 4.0f * M, 0.2f, OBSIDIAN, alpha);
+    glow(dl, ImVec2(feet.x, feet.y - 2.2f * M), 3.5f * M, {0.4f, 1.0f, 0.6f},
+         0.5f + 0.4f * pulse);
   } else if (p.kind == "freighter") {
-    // A coalition freighter, broken-backed where it came down.
-    footprintBox(p.x - 60, p.y + 10, 120.0f, 34.0f, 0.25f, pts);
-    groundShadow(dl, feet, 170.0f, 0.4f);
-    prism(dl, pts, 4, 60.0f, 0.85f, METAL);
-    footprintBox(p.x + 110, p.y - 30, 70.0f, 30.0f, -0.35f, pts);
-    prism(dl, pts, 4, 48.0f, 0.8f, METAL);
+    // A coalition freighter, broken-backed where it came down: 28 m long.
+    float alpha = ghostAlpha(feet.x - 10.5f * M, feet.x + 10.5f * M, feet.y - 7.0f * M,
+                             feet.y + 3.5f * M, p.y + 3.0f * M);
+    footprintBox(p.x - 3.5f * M, p.y + 0.5f * M, 7.0f * M, 2.2f * M, 0.25f, pts);
+    groundShadow(dl, feet, 10.0f * M, 0.4f);
+    prism(dl, pts, 4, 4.5f * M, 0.85f, METAL, alpha);
+    footprintBox(p.x + 6.5f * M, p.y - 1.7f * M, 4.0f * M, 1.8f * M, -0.35f, pts);
+    prism(dl, pts, 4, 3.5f * M, 0.8f, METAL, alpha);
     float blink = std::fmod(t + seed * 0.1f, 1.6f) < 0.25f ? 1.0f : 0.15f;
-    glow(dl, ImVec2(feet.x - 150, feet.y - 50), 10.0f, {1.0f, 0.2f, 0.2f}, blink);
-    glow(dl, ImVec2(feet.x + 150, feet.y - 70), 10.0f, {1.0f, 0.2f, 0.2f}, blink);
+    glow(dl, ImVec2(feet.x - 9.0f * M, feet.y - 3.5f * M), 0.6f * M, {1.0f, 0.2f, 0.2f}, blink);
+    glow(dl, ImVec2(feet.x + 9.0f * M, feet.y - 4.5f * M), 0.6f * M, {1.0f, 0.2f, 0.2f}, blink);
   }
 }
 
@@ -503,123 +556,158 @@ void ArenaView::drawObjectiveSite(ImDrawList* dl, const ClientObjective& o,
   Rgb local = genusRgb(genus);
   switch (o.type) {
     case ObjectiveType::AlienScrapyard: {
-      // A heap of wreckage under a leaning crane.
-      groundShadow(dl, c, 70.0f, 0.4f);
+      // Wreckage heaped round the back of the yard under a 9 m crane. The
+      // heaps sit behind the zone and stay below waist height, so whoever
+      // works it, or walks past it, stays in view (Clarity).
+      groundShadow(dl, c, 4.0f * M, 0.4f);
       for (int i = 0; i < 5; i++) {
-        float ox = (hash01(id * 5 + i) - 0.5f) * 90.0f;
-        float oy = (hash01(id * 7 + i) - 0.5f) * 40.0f;
-        footprintBox(o.x + ox, o.y + oy, 18.0f, 10.0f, hash01(id + i) * 3.0f, pts);
-        prism(dl, pts, 4, 10.0f + 18.0f * hash01(id * 3 + i), 0.85f, METAL, dim);
+        float a = PI * (1.0f + i / 4.0f) + (hash01(id * 5 + i) - 0.5f) * 0.4f;
+        float r = (2.4f + 0.9f * hash01(id * 7 + i)) * M;
+        footprintBox(o.x + std::cos(a) * r, o.y + std::sin(a) * r * 0.5f, 1.0f * M,
+                     0.6f * M, hash01(id + i) * 3.0f, pts);
+        prism(dl, pts, 4, (0.4f + 0.5f * hash01(id * 3 + i)) * M, 0.85f, METAL, dim);
       }
-      ImVec2 mast(c.x + 40, c.y - 10);
-      dl->AddLine(mast, ImVec2(mast.x - 10, mast.y - 110), INK, 5.0f);
-      dl->AddLine(ImVec2(mast.x - 10, mast.y - 110), ImVec2(mast.x - 80, mast.y - 80),
-                  INK, 4.0f);
-      dl->AddLine(ImVec2(mast.x - 80, mast.y - 80), ImVec2(mast.x - 80, mast.y - 40),
-                  rgbA(0.6f, 0.6f, 0.65f, 0.8f * dim), 1.5f);
-      if (!done) glow(dl, ImVec2(mast.x - 10, mast.y - 110), 10.0f, {1.0f, 0.75f, 0.3f}, 0.6f + 0.4f * pulse);
+      ImVec2 mast = toScreen(o.x + 2.6f * M, o.y - 1.6f * M);
+      ImVec2 jibRoot(mast.x - 0.5f * M, mast.y - 9.0f * M);
+      ImVec2 jibTip(mast.x - 5.5f * M, mast.y - 7.5f * M);
+      dl->AddLine(mast, jibRoot, INK, 14.0f);
+      dl->AddLine(mast, jibRoot, tone(METAL.dark, dim), 9.0f);
+      dl->AddLine(jibRoot, jibTip, INK, 10.0f);
+      dl->AddLine(jibRoot, jibTip, tone(METAL.dark, dim), 6.0f);
+      dl->AddLine(jibTip, ImVec2(jibTip.x, jibTip.y + 4.0f * M),
+                  rgbA(0.6f, 0.6f, 0.65f, 0.8f * dim), 2.0f);
+      if (!done) glow(dl, jibRoot, 0.6f * M, {1.0f, 0.75f, 0.3f}, 0.6f + 0.4f * pulse);
       break;
     }
     case ObjectiveType::SalvageMedpacks: {
-      // A dropped med pod, lid sealed until the camp is cleared.
-      footprintRound(o.x, o.y, 26.0f, 10, pts);
-      groundShadow(dl, c, 40.0f);
-      prism(dl, pts, 10, 30.0f, 0.75f, METAL, dim);
-      ImVec2 top(c.x, c.y - 34);
+      // A dropped med pod, waist high, lid sealed until the camp is cleared.
+      footprintRound(o.x, o.y, 1.0f * M, 10, pts);
+      groundShadow(dl, c, 1.4f * M);
+      prism(dl, pts, 10, 1.3f * M, 0.75f, METAL, dim);
+      ImVec2 top(c.x, c.y - 1.45f * M);
       Rgb green{0.4f, 1.0f, 0.6f};
-      dl->AddRectFilled(ImVec2(top.x - 3, top.y - 9), ImVec2(top.x + 3, top.y + 3),
-                        tone(green, done ? 0.2f : 0.6f + 0.4f * pulse));
-      dl->AddRectFilled(ImVec2(top.x - 9, top.y - 6), ImVec2(top.x + 9, top.y),
-                        tone(green, done ? 0.2f : 0.6f + 0.4f * pulse));
+      ImU32 cross = tone(green, done ? 0.2f : 0.6f + 0.4f * pulse);
+      dl->AddRectFilled(ImVec2(top.x - 0.12f * M, top.y - 0.4f * M),
+                        ImVec2(top.x + 0.12f * M, top.y + 0.1f * M), cross);
+      dl->AddRectFilled(ImVec2(top.x - 0.37f * M, top.y - 0.27f * M),
+                        ImVec2(top.x + 0.37f * M, top.y - 0.03f * M), cross);
       break;
     }
     case ObjectiveType::CaptureOutpost: {
-      // A coalition watchtower with its banner and floodlight.
-      footprintBox(o.x, o.y, 22.0f, 22.0f, 0.0f, pts);
-      groundShadow(dl, c, 50.0f, 0.4f);
-      prism(dl, pts, 4, 120.0f, 0.7f, METAL, dim);
-      ImVec2 top(c.x, c.y - 120);
-      footprintBox(o.x, o.y, 30.0f, 30.0f, 0.0f, pts);
-      for (ImVec2& q : pts) q.y -= 120.0f;
-      prism(dl, pts, 4, 14.0f, 1.0f, TOWER, dim);
+      // A coalition watchtower: a hut on a platform 6 m up, on four legs a
+      // hero can stand between, with its banner and floodlight.
+      const float legs = 6.0f * M, half = 1.6f * M;
+      groundShadow(dl, c, 2.6f * M, 0.4f);
+      ImVec2 foot[4], top[4];
+      footprintBox(o.x, o.y, half, half, 0.0f, foot);
+      footprintBox(o.x, o.y, half * 0.8f, half * 0.8f, 0.0f, top);
+      for (ImVec2& q : top) q.y -= legs;
+      ImU32 leg = tone(METAL.dark, dim);
+      for (int i = 0; i < 4; i++) {
+        if (i == 0) continue;  // the back leg hides behind the platform
+        dl->AddLine(foot[i], top[i], INK, 7.0f);
+        dl->AddLine(foot[i], top[i], leg, 4.0f);
+      }
+      // Cross braces on the two faces we see.
+      dl->AddLine(foot[3], top[2], leg, 2.5f);
+      dl->AddLine(foot[2], top[1], leg, 2.5f);
+      ImVec2 deck[4];
+      footprintBox(o.x, o.y, 2.0f * M, 2.0f * M, 0.0f, deck);
+      for (ImVec2& q : deck) q.y -= legs;
+      prism(dl, deck, 4, 0.4f * M, 1.0f, METAL, dim);
+      ImVec2 hut[4];
+      footprintBox(o.x, o.y, 1.4f * M, 1.4f * M, 0.0f, hut);
+      for (ImVec2& q : hut) q.y -= legs + 0.4f * M;
+      prism(dl, hut, 4, 2.2f * M, 0.9f, TOWER, dim);
+      ImVec2 roof(c.x, c.y - legs - 2.6f * M);
       Rgb flag = done ? Rgb{0.4f, 0.9f, 0.6f} : Rgb{0.95f, 0.25f, 0.25f};
-      dl->AddLine(ImVec2(top.x + 14, top.y - 14), ImVec2(top.x + 14, top.y - 60), INK, 2.5f);
-      float wave = std::sin(t * 4.0f + id) * 4.0f;
-      ImVec2 banner[4] = {ImVec2(top.x + 14, top.y - 60), ImVec2(top.x + 44, top.y - 54 + wave),
-                          ImVec2(top.x + 44, top.y - 38 + wave), ImVec2(top.x + 14, top.y - 44)};
+      ImVec2 poleTop(roof.x + 0.8f * M, roof.y - 2.8f * M);
+      dl->AddLine(ImVec2(roof.x + 0.8f * M, roof.y), poleTop, INK, 3.5f);
+      float wave = std::sin(t * 4.0f + id) * 0.2f * M;
+      ImVec2 banner[4] = {poleTop, ImVec2(poleTop.x + 1.6f * M, poleTop.y + 0.3f * M + wave),
+                          ImVec2(poleTop.x + 1.6f * M, poleTop.y + 1.2f * M + wave),
+                          ImVec2(poleTop.x, poleTop.y + 0.9f * M)};
       dl->AddConvexPolyFilled(banner, 4, tone(flag, 0.95f));
-      glow(dl, ImVec2(top.x - 10, top.y - 4), 14.0f, flag, 0.5f + 0.4f * pulse);
+      glow(dl, ImVec2(c.x - 1.2f * M, c.y - legs - 1.6f * M), 0.8f * M, flag,
+           0.5f + 0.4f * pulse);
       break;
     }
     case ObjectiveType::RecoverProbe: {
-      // A probe nose-down in a scorched dent, its light still blinking.
-      dl->AddEllipseFilled(c, ImVec2(46.0f, 20.0f), IM_COL32(8, 6, 8, 200), 0.0f, 20);
+      // A 2 m probe nose-down in a scorched dent, its light still blinking.
+      dl->AddEllipseFilled(c, ImVec2(2.2f * M, 1.0f * M), IM_COL32(8, 6, 8, 200), 0.0f, 24);
       if (o.state == ObjectiveState::Inactive) {
-        footprintRound(o.x, o.y - 6, 12.0f, 8, pts);
-        prism(dl, pts, 8, 42.0f, 0.55f, METAL);
+        footprintRound(o.x, o.y - 0.1f * M, 0.55f * M, 8, pts);
+        prism(dl, pts, 8, 1.9f * M, 0.55f, METAL);
         float blink = std::fmod(t + id * 0.3f, 1.2f) < 0.2f ? 1.0f : 0.2f;
-        glow(dl, ImVec2(c.x, c.y - 48), 9.0f, {0.4f, 0.7f, 1.0f}, blink);
+        glow(dl, ImVec2(c.x, c.y - 2.1f * M), 0.4f * M, {0.4f, 0.7f, 1.0f}, blink);
       }
       break;
     }
     case ObjectiveType::SaveTheFrogs: {
       // A pond, and the frogs that still need saving around it.
-      dl->AddEllipseFilled(c, ImVec2(54.0f, 24.0f), IM_COL32(18, 34, 40, 235), 0.0f, 24);
-      dl->AddEllipse(c, ImVec2(54.0f, 24.0f), tone(local, 0.35f), 0.0f, 24, 2.0f);
+      const float rx = 2.6f * M, ry = 1.2f * M;
+      dl->AddEllipseFilled(c, ImVec2(rx, ry), IM_COL32(18, 34, 40, 235), 0.0f, 28);
+      dl->AddEllipse(c, ImVec2(rx, ry), tone(local, 0.35f), 0.0f, 28, 2.5f);
       for (int i = 0; i < 4; i++) {
         float a = i * 1.6f + id;
-        ImVec2 pad(c.x + std::cos(a) * 30.0f, c.y + std::sin(a) * 12.0f);
-        dl->AddEllipseFilled(pad, ImVec2(7, 3), IM_COL32(40, 80, 50, 230), 0.0f, 10);
+        ImVec2 pad(c.x + std::cos(a) * 1.5f * M, c.y + std::sin(a) * 0.6f * M);
+        dl->AddEllipseFilled(pad, ImVec2(0.35f * M, 0.15f * M), IM_COL32(40, 80, 50, 230),
+                             0.0f, 12);
       }
       if (!done) {
-        float hop = std::max(0.0f, std::sin(t * 5.0f + id)) * 6.0f;
-        dl->AddCircleFilled(ImVec2(c.x + 70, c.y - 4 - hop), 5.0f,
-                            rgbA(0.5f, 0.95f, 0.3f, 1.0f), 10);
+        float hop = std::max(0.0f, std::sin(t * 5.0f + id)) * 0.3f * M;
+        dl->AddCircleFilled(ImVec2(c.x + 3.2f * M, c.y - 0.2f * M - hop), 0.18f * M,
+                            rgbA(0.5f, 0.95f, 0.3f, 1.0f), 12);
       }
       break;
     }
     case ObjectiveType::NoxiousGas: {
-      // Spore vents breathing a poisonous haze.
+      // Spore vents, knee high, breathing a poisonous haze.
       for (int i = 0; i < 3; i++) {
         float a = i * 2.1f + id;
-        float ox = std::cos(a) * 34.0f, oy = std::sin(a) * 14.0f;
-        footprintRound(o.x + ox, o.y + oy * 2.0f, 14.0f, 7, pts, 0.3f, id + i);
-        prism(dl, pts, 7, 18.0f, 0.35f, OBSIDIAN, dim);
+        float ox = std::cos(a) * 1.9f * M, oy = std::sin(a) * 0.8f * M;
+        footprintRound(o.x + ox, o.y + oy * 2.0f, 0.7f * M, 7, pts, 0.3f, id + i);
+        prism(dl, pts, 7, 0.8f * M, 0.35f, OBSIDIAN, dim);
         if (!done) {
           float puff = std::fmod(t * 0.6f + i * 0.33f, 1.0f);
-          dl->AddCircleFilled(ImVec2(c.x + ox, c.y + oy - 24 - puff * 40), 6 + puff * 16,
-                              rgbA(0.5f, 0.95f, 0.3f, 0.30f * (1.0f - puff)), 14);
+          dl->AddCircleFilled(ImVec2(c.x + ox, c.y + oy - 1.1f * M - puff * 2.0f * M),
+                              (0.3f + puff * 0.9f) * M,
+                              rgbA(0.5f, 0.95f, 0.3f, 0.30f * (1.0f - puff)), 16);
         }
       }
       break;
     }
     case ObjectiveType::LittleJohn: {
-      // A gate between two pillars, sealed by a field.
+      // A 6 m gate between two pillars, sealed by a field.
+      const float gx = 2.5f * M, gy = 0.55f * M, ph = 6.0f * M, lt = 0.7f * M;
       for (int side = -1; side <= 1; side += 2) {
-        footprintBox(o.x + side * 46.0f, o.y - side * 10.0f, 12.0f, 12.0f, 0.0f, pts);
-        prism(dl, pts, 4, 110.0f, 0.9f, SLATE, dim);
+        footprintBox(o.x + side * gx, o.y - side * gy, 0.6f * M, 0.6f * M, 0.0f, pts);
+        prism(dl, pts, 4, ph, 0.9f, SLATE, dim);
       }
-      ImVec2 l = toScreen(o.x - 46.0f, o.y + 10.0f), r = toScreen(o.x + 46.0f, o.y - 10.0f);
-      ImVec2 lintel[4] = {ImVec2(l.x - 10, l.y - 110), ImVec2(r.x + 10, r.y - 110),
-                          ImVec2(r.x + 10, r.y - 124), ImVec2(l.x - 10, l.y - 124)};
+      ImVec2 l = toScreen(o.x - gx, o.y + gy), r = toScreen(o.x + gx, o.y - gy);
+      ImVec2 lintel[4] = {ImVec2(l.x - 0.6f * M, l.y - ph), ImVec2(r.x + 0.6f * M, r.y - ph),
+                          ImVec2(r.x + 0.6f * M, r.y - ph - lt),
+                          ImVec2(l.x - 0.6f * M, l.y - ph - lt)};
       dl->AddConvexPolyFilled(lintel, 4, tone(SLATE.top, dim));
-      dl->AddPolyline(lintel, 4, INK, ImDrawFlags_Closed, 2.0f);
+      dl->AddPolyline(lintel, 4, INK, ImDrawFlags_Closed, 2.5f);
       if (!done) {
-        ImVec2 field[4] = {ImVec2(l.x, l.y), ImVec2(r.x, r.y), ImVec2(r.x, r.y - 108),
-                           ImVec2(l.x, l.y - 108)};
+        ImVec2 field[4] = {ImVec2(l.x, l.y), ImVec2(r.x, r.y), ImVec2(r.x, r.y - ph),
+                           ImVec2(l.x, l.y - ph)};
         dl->AddConvexPolyFilled(field, 4, rgbA(0.7f, 0.4f, 1.0f, 0.18f + 0.12f * pulse));
       }
       break;
     }
     case ObjectiveType::DerelictTurret: {
-      footprintBox(o.x, o.y, 20.0f, 20.0f, 0.0f, pts);
-      groundShadow(dl, c, 36.0f);
-      prism(dl, pts, 4, 24.0f, 0.8f, METAL, dim);
+      // A 2.5 m gun emplacement on a chest-high base.
+      footprintBox(o.x, o.y, 1.1f * M, 1.1f * M, 0.0f, pts);
+      groundShadow(dl, c, 1.6f * M);
+      prism(dl, pts, 4, 1.3f * M, 0.8f, METAL, dim);
       float aim = done ? 0.0f : 0.3f * std::sin(t * 0.5f + id);
-      ImVec2 hub(c.x, c.y - 30);
-      dl->AddLine(hub, ImVec2(hub.x + 40 * std::cos(aim - 0.4f), hub.y - 14 + 30 * std::sin(aim - 0.4f)),
-                  INK, 7.0f);
-      dl->AddCircleFilled(hub, 9.0f, tone(METAL.lit, dim), 12);
+      ImVec2 hub(c.x, c.y - 1.6f * M);
+      dl->AddLine(hub, ImVec2(hub.x + 2.4f * M * std::cos(aim - 0.4f),
+                              hub.y - 0.6f * M + 1.6f * M * std::sin(aim - 0.4f)),
+                  INK, 10.0f);
+      dl->AddCircleFilled(hub, 0.45f * M, tone(METAL.lit, dim), 14);
       break;
     }
     default:
