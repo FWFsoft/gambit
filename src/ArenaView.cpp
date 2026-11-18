@@ -485,6 +485,13 @@ std::string actionClip(const std::string& character, int slot,
     static const char* CLIPS[4] = {"slap", "beam", "", "step"};
     return CLIPS[std::max(0, std::min(3, slot))];
   }
+  if (character == "Jeff") {
+    // Acquire Biomass's hold plays "harvest_charge"; the cast is the
+    // release. Each sheet (legs, treads) has its own "transform": the one
+    // on the sheet he is changing into.
+    static const char* CLIPS[4] = {"fire", "harvest", "discharge", "transform"};
+    return CLIPS[std::max(0, std::min(3, slot))];
+  }
   if (character == "Isaac") {
     // Lifeline's hold plays "lifeline_charge"; the cast is the release.
     static const char* CLIPS[4] = {"ray", "lifeline", "blessing", "flash"};
@@ -712,6 +719,46 @@ void drawOpticBeam(ImDrawList* dl, ToScreen toScreen, float x0, float y0,
     float u1 = std::min(grow, u0 + 0.18f);
     dl->AddLine(at(u0, side), at(u1, side),
                 IM_COL32(255, 90, 210, static_cast<int>(210 * fade)), 2.5f);
+  }
+}
+
+// Jeff (G3F-0427): Acquire Biomass's reach while RMB is held, drawn with
+// biomass streaming inward; and the beam's heat as a gauge at his side,
+// which blinks red and steams while he is venting.
+void drawJeffGauges(ImDrawList* dl, const PlayerState& state, ImVec2 feet,
+                    float t) {
+  if (state.chargeSlot == 1) {
+    float radius = Arena::JeffMode::harvestRadius(state.charge / 255.0f);
+    dl->AddCircleFilled(feet, radius, themeColor(VfxTheme::Biomass, 0.07f), 48);
+    dl->AddCircle(feet, radius, themeColor(VfxTheme::Biomass, 0.85f), 48, 2.5f);
+    for (int i = 0; i < 12; i++) {
+      float a = i * 0.5236f + t * 0.8f;
+      float u = fract(t * 1.4f + i * 0.37f);  // 0 at the rim .. 1 at him
+      float r = radius * (1.0f - u);
+      ImVec2 p(feet.x + std::cos(a) * r, feet.y + std::sin(a) * r);
+      dl->AddCircleFilled(p, 2.5f, themeHot(VfxTheme::Biomass, 0.8f * (1.0f - u * 0.5f)), 6);
+    }
+  }
+  const float heat = state.resource / 255.0f;
+  const bool venting = Arena::JeffMode::overheated(state.kitMode);
+  if (heat <= 0.01f && !venting) return;
+  const ImVec2 a(feet.x + 24.0f, feet.y - 58.0f), b(feet.x + 30.0f, feet.y - 10.0f);
+  dl->AddRectFilled(a, b, IM_COL32(12, 12, 20, 200), 2.0f);
+  float top = b.y - (b.y - a.y) * heat;
+  ImU32 fill = venting ? (std::sin(t * 20.0f) > 0.0f ? IM_COL32(255, 60, 40, 255)
+                                                     : IM_COL32(150, 30, 20, 255))
+                       : rgba({1.0f, 0.75f - 0.45f * heat, 0.2f - 0.15f * heat}, 0.95f);
+  dl->AddRectFilled(ImVec2(a.x + 1.0f, top), ImVec2(b.x - 1.0f, b.y - 1.0f), fill, 1.5f);
+  dl->AddRect(a, b, IM_COL32(220, 214, 200, 200), 2.0f, 0, 1.0f);
+  if (venting) {
+    // Steam off the vents.
+    for (int i = 0; i < 8; i++) {
+      float h0 = nanoHash(state.playerId * 17u + i), h1 = nanoHash(state.playerId * 17u + i + 99u);
+      float u = fract(t * (1.2f + h0) + h1);
+      ImVec2 p(feet.x + (h0 - 0.5f) * 30.0f, feet.y - 50.0f - 40.0f * u);
+      dl->AddCircleFilled(p, 4.0f + 9.0f * u,
+                          IM_COL32(220, 225, 230, static_cast<int>(110 * (1.0f - u))), 12);
+    }
   }
 }
 
@@ -1273,7 +1320,22 @@ void ArenaView::drawGround(ImDrawList* dl) {
     ImU32 edge = zone.fromEnemy ? themeColor(VfxTheme::Danger, 0.8f * alpha)
                                 : themeColor(zone.theme, 0.7f * alpha);
 
-    if (zone.variant == Arena::KadeMode::MirrorZone) {
+    if (zone.variant == Arena::JeffMode::BiomassZone) {
+      // Remains of a slain enemy: a glowing heap that pulses brighter as it
+      // rots away, so a Jeff can tell what is still worth vacuuming.
+      float left = std::max(0.0f, zone.lifeMs - zone.ageMs);
+      float hurry = left < 3000.0f ? 0.5f + 0.5f * std::sin(timeSeconds * 14.0f) : 1.0f;
+      dl->AddEllipseFilled(centre, ImVec2(zone.radius, zone.radius * 0.5f),
+                           themeColor(zone.theme, 0.30f * alpha * hurry), 0.0f, 18);
+      for (int i = 0; i < 4; i++) {
+        float a = zone.id * 1.7f + i * 1.57f + timeSeconds * 0.6f;
+        ImVec2 p(centre.x + std::cos(a) * zone.radius * 0.45f,
+                 centre.y + std::sin(a) * zone.radius * 0.22f - 2.0f);
+        dl->AddCircleFilled(p, 3.0f + (i % 2), themeHot(zone.theme, 0.75f * alpha * hurry), 8);
+      }
+      dl->AddEllipse(centre, ImVec2(zone.radius + 3.0f, (zone.radius + 3.0f) * 0.5f),
+                     themeColor(zone.theme, 0.6f * alpha * hurry), 0.0f, 18, 1.5f);
+    } else if (zone.variant == Arena::KadeMode::MirrorZone) {
       // Kade's mirror stands in the world (drawEntities); on the floor only
       // a faint blue footprint.
       dl->AddEllipse(centre, ImVec2(zone.radius, zone.radius * 0.45f),
@@ -1841,7 +1903,14 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
       !kadePlacing) {
     drawKadeCharge(dl, feet, state.charge / 255.0f, timeSeconds);
   }
-  const ActorSheet* actor = definition ? actorFor(definition->name) : nullptr;
+  const bool isJeff = state.characterId == Arena::CharacterId::Jeff;
+  if (isJeff && !dead) drawJeffGauges(dl, state, feet, timeSeconds);
+  // On treads Jeff is a different body: its own sheet.
+  const ActorSheet* actor =
+      definition ? actorFor(isJeff && Arena::JeffMode::treads(state.kitMode)
+                                ? std::string("JeffTreads")
+                                : definition->name)
+                 : nullptr;
 
   // Gravon is the blade. When the host has fallen there is no body to draw:
   // the blade stands in the floor (or rides an ally, drawn with them) and
@@ -1932,6 +2001,10 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
                              : "spent");
       elapsed = view.animTime;
       anim.clip.clear();
+    }
+    if (!clip && charging && isJeff) {
+      clip = actor->find("harvest_charge");
+      elapsed = view.animTime;
     }
     if (!clip && charging && definition->name == "Isaac") {
       clip = actor->find("lifeline_charge");

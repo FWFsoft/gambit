@@ -205,7 +205,12 @@ const HINTS = {
     const p = fit[leftOf(n)];
     return isRight(n) ? [-p[0], p[1], p[2]] : p;
   };
-  const toPx = (p, side) => [W / 2 + (side ? p[1] : p[0]) / PS, H / 2 - (p[2] - ZC) / PS];
+  // A joint outside the view (a bad automatic guess) is drawn pinned to the
+  // view's edge, so it can always be grabbed and dragged back.
+  const EDGE = 10;
+  const pin = (v, size) => Math.min(size - EDGE, Math.max(EDGE, v));
+  const toPx = (p, side) => [pin(W / 2 + (side ? p[1] : p[0]) / PS, W),
+                             pin(H / 2 - (p[2] - ZC) / PS, H)];
   const round = (v) => Math.round(v * 1000) / 1000;
 
   // ---- build the two stages -------------------------------------------

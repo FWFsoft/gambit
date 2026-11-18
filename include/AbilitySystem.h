@@ -125,6 +125,21 @@ class Kit {
     (void)targetId;
     (void)prevented;
   }
+  // Any enemy died, anywhere on the map (onEnemyDiedNearby is only for
+  // players close by). Called once per living or dead player with this kit.
+  virtual void onEnemyDiedAnywhere(AbilitySystem& sys, Player& self,
+                                   const Enemy& enemy) {
+    (void)sys;
+    (void)self;
+    (void)enemy;
+  }
+  // Multiplier on all damage the player deals (1 = none). Jeff's Resonance.
+  virtual float damageDealtMultiplier(AbilitySystem& sys,
+                                      const Player& self) {
+    (void)sys;
+    (void)self;
+    return 1.0f;
+  }
   // Extra movement speed multiplier from the kit (1 = none).
   virtual float speedMultiplier(const Player& self) const {
     (void)self;

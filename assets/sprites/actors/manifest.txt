@@ -30,6 +30,26 @@ anim Isaac blessing 400 12 20 0
 anim Isaac flash 496 10 24 0
 anim Isaac hit 576 6 20 0
 anim Isaac death 624 12 12 0
+actor Jeff assets/sprites/actors/Jeff.png 192 176 96 136 25 1 smooth
+anim Jeff idle 0 12 8 1
+anim Jeff run 96 10 13 1
+anim Jeff fire 176 5 24 0
+anim Jeff harvest_charge 216 6 16 1
+anim Jeff harvest 264 8 20 0
+anim Jeff discharge 328 12 20 0
+anim Jeff transform 424 10 20 0
+anim Jeff hit 504 6 20 0
+anim Jeff death 552 12 12 0
+actor JeffTreads assets/sprites/actors/JeffTreads.png 192 176 96 136 25 1 smooth
+anim JeffTreads idle 0 12 8 1
+anim JeffTreads run 96 8 16 1
+anim JeffTreads fire 160 5 24 0
+anim JeffTreads harvest_charge 200 6 16 1
+anim JeffTreads harvest 248 8 20 0
+anim JeffTreads discharge 312 12 20 0
+anim JeffTreads transform 408 10 20 0
+anim JeffTreads hit 488 6 20 0
+anim JeffTreads death 536 12 12 0
 actor Kade assets/sprites/actors/Kade.png 176 156 88 128 28 1 smooth
 anim Kade idle 0 12 8 1
 anim Kade beam_charge 96 14 12 0

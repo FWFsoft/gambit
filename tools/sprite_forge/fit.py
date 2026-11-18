@@ -157,7 +157,7 @@ def main():
     args = ap.parse_args()
 
     fit, height, yaw, path = None, args.height, args.yaw, args.source
-    centre_x = 0.0
+    centre_x, rigid = 0.0, ()
     if not os.path.splitext(args.source)[1]:
         mod = importlib.import_module(args.source)
         path = mod.MODEL
@@ -165,13 +165,14 @@ def main():
         height = height or mod.HEIGHT
         yaw = getattr(mod, "YAW", 0.0) if yaw is None else yaw
         centre_x = getattr(mod, "CENTRE_X", 0.0)
+        rigid = getattr(mod, "RIGID", ())
     if not os.path.isabs(path) and not os.path.exists(path):
         path = os.path.join(REPO, path)
     height = height or 1.95
 
     bpy.ops.wm.read_factory_settings(use_empty=True)
     data = skin.prepare(path, height, fit, yaw=yaw or 0.0, cache=not args.no_cache,
-                        centre_x=centre_x)
+                        centre_x=centre_x, rigid=rigid)
     obj, mesh = data["obj"], data["obj"].data
     views = Views(height)
 

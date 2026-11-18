@@ -146,6 +146,10 @@ void AbilitySystem::clearTransient() {
 void AbilitySystem::onEnemyDied(const Enemy& enemy, uint32_t killerId) {
   effectManager->clearEntity(enemy.id, true);
   for (auto& [id, player] : players) {
+    if (player.characterId == 0) continue;
+    if (Kit* kit = kitFor(player)) kit->onEnemyDiedAnywhere(*this, player, enemy);
+  }
+  for (auto& [id, player] : players) {
     if (player.isDead()) continue;
     float d = length(player.x - enemy.x, player.y - enemy.y);
     if (d <= KIT_HOOK_RANGE) {
@@ -464,6 +468,9 @@ float AbilitySystem::damageEnemy(uint32_t attackerId, Enemy& enemy,
     auto mods = effectManager->calculateModifiers(attackerId, false);
     damage *= mods.damageDealtMultiplier;
     damage *= Infusions::damageMultiplier(*this, *attacker, enemy, flags);
+    if (Kit* kit = kitFor(*attacker)) {
+      damage *= kit->damageDealtMultiplier(*this, *attacker);
+    }
 
     if (!(flags & DamageFlag::Dot)) {
       const ActiveEffects& fx = effectManager->getPlayerEffects(attackerId);

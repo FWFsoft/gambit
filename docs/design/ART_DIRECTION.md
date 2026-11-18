@@ -234,6 +234,18 @@ work. As a swarm she has no body, only a cloud of those pixels (magenta
 on a foe, cyan on a friend), and the CRT stays on the floor where she set
 it down until she comes back for it.
 
+**Jeff (G3F-0427): the tank on the back and the nozzle arm.**
+A Recycler Bot in hazard-orange plating: a square, top-heavy machine. Its
+signature pieces are the glowing cyan biomass tank on its back, the widest
+thing at the top of its outline from every side, and the single red eye
+on a stalk above the head. The right arm is a black nozzle, both the
+cutting beam and the vacuum, and it is always up and pointed. The left
+hand is a claw. Heavy and mechanical in motion: a stiff spine, a robot's
+head tilt, recoil on every shot. On treads (a second model, its own
+sheet), the treads are wider than anyone in the cast and the upper body
+hunches into the speed. Effects follow the kit: the beam is fire orange;
+the remains, the vacuum and the Q discharge are the tank's cyan.
+
 **Suds: the barrel and the cooler.**
 A wide barrel of a torso in a blue Hawaiian shirt, on red armoured legs. A
 big white cooler juts out at his left hip. The life of the party: his idle
