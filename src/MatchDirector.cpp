@@ -279,7 +279,7 @@ void MatchDirector::resetMatch() {
   currentRound = 0;
   phaseTimeLeft = 0.0f;
   lobbyCountingDown = false;
-  shipHp = Tuning::SHIP_MAX_HEALTH;
+  shipHp = Tuning::SHIP_START_HEALTH;
   scrapBanked = 0;
   for (RoofTurret& turret : roofTurrets) turret = RoofTurret();
   bossId = 0;

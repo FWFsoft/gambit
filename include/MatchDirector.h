@@ -81,7 +81,7 @@ class MatchDirector {
   int currentRound = 0;
   float phaseTimeLeft = 0.0f;  // seconds
   float phaseElapsed = 0.0f;   // seconds
-  float shipHp = Arena::Tuning::SHIP_MAX_HEALTH;
+  float shipHp = Arena::Tuning::SHIP_START_HEALTH;
   float zone = Arena::Tuning::ZONE_START_RADIUS[0];
   int scrapBanked = 0;
   uint32_t bossId = 0;

@@ -470,6 +470,9 @@ constexpr float RAID_INTERVAL_MS = 45000.0f;
 constexpr float SHIP_DAMAGE_SCALE = 0.5f;  // hull armor vs. enemy hits
 
 constexpr float SHIP_MAX_HEALTH = 1500.0f;
+// The match opens just after the crash: the hull is badly damaged and
+// burning, and scrap hauled home is what patches it up.
+constexpr float SHIP_START_HEALTH = SHIP_MAX_HEALTH * 0.35f;
 // The ship is a crashed RV about 11 m long (some 510 px on screen, 256 to
 // either side of its centre): these reach just past its hull.
 constexpr float SHIP_RADIUS = 240.0f;       // enemies attack inside this

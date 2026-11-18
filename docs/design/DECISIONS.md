@@ -21,6 +21,26 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-18: The match opens just after the crash, with the hull at 35%
+- **Decision:** The ship starts every match at 35% hull (525 of 1500),
+  heavily damaged and burning, instead of at full health. Each scrap
+  banked still repairs 180, so about five hauls bring it back to full.
+- **Pillars:**
+  - Strategic Crunch: serves. The hull is in danger from the first raid,
+    so hauling scrap home competes with exploring from the start.
+  - Clarity: serves. The opening shot is a smoking, burning wreck, which
+    tells the story, and the fires die down as the crew repairs it.
+  - Comradery: neutral. Creative Builds: neutral.
+- **Why:** Requested by a human ("the ship has just crashed and is
+  heavily damaged"). 35% is a first guess. Risk: a raid early in round 1
+  can now end the match (the ship being destroyed is a loss). The bot
+  simulator cannot judge this, because its bots neither bank scrap nor let
+  raiders reach the hull; 5 seeds all ended in victory with the hull
+  untouched. Playtest the first raid.
+- **Status:** Accepted (requested by a human); the 35% needs playtesting
+- **Where:** `include/ArenaData.h` (SHIP_START_HEALTH),
+  `src/MatchDirector.cpp` (resetMatch)
+
 ## 2026-11-18: Repaired Derelict Turrets become roof turrets on the ship
 - **Decision:** Each Derelict Turret objective the crew repairs stands up
   one cannon on the ship's roof (two mounts; the human's Meshy model
