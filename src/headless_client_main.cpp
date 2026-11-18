@@ -105,7 +105,11 @@ int main(int argc, char* argv[]) {
   GameLoop gameLoop;
 
   TiledMap map;
-  assert(map.load("assets/maps/test_map.tmx") && "Failed to load required map");
+  // Not inside assert(): Release builds compile asserts out.
+  if (!map.load("assets/maps/test_map.tmx")) {
+    Logger::error("Failed to load required map: assets/maps/test_map.tmx");
+    return EXIT_FAILURE;
+  }
 
   CollisionSystem collisionSystem(map.getCollisionShapes(), &map.terrain());
   Logger::info("Client collision system initialized");

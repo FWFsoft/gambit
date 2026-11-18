@@ -21,6 +21,49 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-18: Scenery at real scale against the heroes
+- **Decision:** Everything the planet draws is sized in real metres
+  against a 1.8 m hero (1 m = 55 world px, `Config::World::METRE`, same
+  constant in `generate_planet.py`). Reference sizes are in
+  `MAP_PIPELINE.md`, "Scale". Highlights:
+  - **Town:** 8 m streets around 14 m blocks (half split by a 2 m alley),
+    buildings two storeys at the edge to five in the middle (3.5 m each),
+    with 2.2 m doors and a window per storey. The city region now holds 9
+    buildings instead of 158 toy blocks. Lamps are 4.5 m, about one per
+    15 m of street; signs hang 2.5 to 4.2 m up.
+  - **Set pieces:** the outpost is a watchtower with its hut on a deck 6 m
+    up, on legs a hero stands between. The scrapyard has a 9 m crane, and
+    its heaps stay below waist height and behind the zone. Med pod 1.3 m,
+    probe 1.9 m, turret 2.5 m, gate 6 m.
+  - **Landmarks:** monolith 14 m, spire 24 m, ribcage 24 m long, freighter
+    28 m long. Their cleared pads and solid cores grow to match.
+  - **Wilds:** boulders 0.7 to 1.5 m, ruin columns 1.5 to 4.5 m, flora about
+    2.2 times bigger, crash wreckage ~2 m pieces at half the old count with
+    room to walk between them.
+  - The buildings' fade-to-ghost now also covers the monolith, spire, crater
+    shard and freighter (`ArenaView::ghostAlpha`).
+- **Pillars:** serves Clarity (scale reads at a glance; objectives read as
+  places; heroes are never hidden by scenery). Neutral for Crunch, Comradery
+  and Creative Builds: no rules, timings or zone radii changed. Trades
+  slightly against Clarity: taller scenery covers more of the screen, and
+  an *enemy* behind a building or landmark is still hidden.
+- **Why:** The human playtest found the hero "the size of a kaiju" next to
+  the town, lamps and outposts: lamps were 58 px (about 1 m), towers two
+  heroes high, a tile 0.65 m. Asked for real scale. The tallest things
+  were kept below "real city" heights on purpose: five storeys at most,
+  so a building stays on screen and the ghost fade can cover it. Sprawl was
+  not kept: at real scale the city region fits only a few blocks, so it
+  now reads as the city's outskirts. That trades against `MAP_PIPELINE.md`'s
+  "streets and towers"; a denser city needs a bigger city region. The
+  scrapyard heaps were first drawn up to 1.6 m and hid heroes walking past,
+  so they were cut to waist height. Terrain height (peaks under 5 m) and
+  the ship (~11 m) were left alone and are noted as known gaps.
+- **Status:** Accepted (requested by a human: real scale). The exact sizes
+  are Built, needs review.
+- **Where:** `include/config/WorldScale.h`, `src/ArenaWorld.cpp`,
+  `tools/maps/generate_planet.py`, `assets/maps/planet.tmx`,
+  `docs/design/MAP_PIPELINE.md`
+
 ## 2026-11-18: The planet replaces the arena: a place, not a training room
 - **Decision:** The default map is now a generated planet
   (`assets/maps/planet.tmx`, from `tools/maps/generate_planet.py`), built

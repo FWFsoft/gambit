@@ -50,6 +50,20 @@ MAPS = REPO / "assets" / "maps"
 TILE = 64
 HALF_W, QUARTER_H = 32.0, 16.0
 
+# Real-world scale. Must match Config::World (include/config/WorldScale.h):
+# a hero is ~100 world px and ~1.8 m tall, so a metre is 55 world px, and a
+# tile is ~0.65 m along an axis. Size anything a hero stands next to in
+# metres (docs/design/MAP_PIPELINE.md, "Scale").
+METRE = 55.0
+STOREY = 3.5                                  # metres per building storey
+TILE_EDGE_M = math.hypot(HALF_W, QUARTER_H) / METRE
+
+
+def tiles(metres):
+    """Whole tiles along an axis covering `metres`."""
+    return max(1, round(metres / TILE_EDGE_M))
+
+
 # Must match TerrainGrid (include/TerrainGrid.h).
 BASE_LEVEL = 4
 LEVELS = 16
@@ -127,6 +141,12 @@ RINGS = [
 POI_SPACING = 850.0
 
 LANDMARKS = ["monolith", "ribcage", "crater", "freighter", "spire", "monolith"]
+# Flat ground cleared around each landmark, and its solid core, in world px.
+# Sized to the landmark's real footprint (ArenaView::drawLandmark).
+LANDMARK_PAD = {"monolith": 260, "spire": 380, "ribcage": 720, "crater": 330,
+                "freighter": 700}
+LANDMARK_CORE = {"monolith": 120, "spire": 200, "ribcage": 70, "crater": 90,
+                 "freighter": 420}
 
 
 # ---------------------------------------------------------------------------
@@ -292,8 +312,11 @@ def build(seed: int, size: int):
     material[city] = MAT["street"]
     props = []
     city_blocks = []
-    # Streets every PITCH tiles in both grid directions; blocks between.
-    pitch, street = 8, 2
+    # A grid of 8 m streets (two lanes and kerbs) around 14 m blocks, at
+    # real scale. Some blocks split into two narrower buildings across a 2 m
+    # alley.
+    street, block = tiles(8.0), tiles(14.0)
+    pitch = street + block
     for by in range(0, size, pitch):
         for bx in range(0, size, pitch):
             x0, y0 = bx + street, by + street
@@ -305,20 +328,32 @@ def build(seed: int, size: int):
                 continue
             if rng.random() < 0.18:
                 continue  # an empty lot / plaza
-            blocked[y0:y1, x0:x1] = True
-            ccx, ccy = (x0 + x1) / 2.0, (y0 + y1) / 2.0
-            cwx = (ccx - ccy) * HALF_W
-            cwy = (ccx + ccy) * QUARTER_H - QUARTER_H - g.cy
-            # Taller toward the city's heart (away from the island).
-            heart = math.hypot(cwx - city_x * 1.25, cwy - city_y * 1.25)
-            # Capped: towers hide what walks behind them (the client thins
-            # a tower with a hero behind it, but shorter is clearer still).
-            tall = min(260.0, max(60.0, 300.0 - heart * 0.09) * rng.uniform(0.6, 1.2))
-            city_blocks.append((cwx, cwy, x1 - x0, y1 - y0, tall))
-            props.append(("city_block", cwx, cwy, {"width": x1 - x0,
-                                                  "depth": y1 - y0,
-                                                  "tall": round(tall),
-                                                  "variant": rng.randrange(4)}))
+            lots = [(x0, y0, x1, y1)]
+            if rng.random() < 0.5:
+                alley = tiles(2.0)
+                if rng.random() < 0.5:
+                    mid = (x0 + x1 - alley) // 2
+                    lots = [(x0, y0, mid, y1), (mid + alley, y0, x1, y1)]
+                else:
+                    mid = (y0 + y1 - alley) // 2
+                    lots = [(x0, y0, x1, mid), (x0, mid + alley, x1, y1)]
+            for lx0, ly0, lx1, ly1 in lots:
+                blocked[ly0:ly1, lx0:lx1] = True
+                ccx, ccy = (lx0 + lx1) / 2.0, (ly0 + ly1) / 2.0
+                cwx = (ccx - ccy) * HALF_W
+                cwy = (ccx + ccy) * QUARTER_H - QUARTER_H - g.cy
+                # Taller toward the city's heart (away from the island):
+                # two storeys at the edge, up to five in the middle. Capped
+                # there: buildings hide what walks behind them (the client
+                # thins one with a hero behind it, but lower is clearer).
+                heart = math.hypot(cwx - city_x * 1.25, cwy - city_y * 1.25)
+                storeys = int(np.clip(round(5.0 - heart / 900.0 + rng.uniform(-1.0, 1.0)), 2, 5))
+                tall = storeys * STOREY * METRE
+                city_blocks.append((cwx, cwy, lx1 - lx0, ly1 - ly0, tall))
+                props.append(("city_block", cwx, cwy, {"width": lx1 - lx0,
+                                                      "depth": ly1 - ly0,
+                                                      "tall": round(tall),
+                                                      "variant": rng.randrange(4)}))
 
     # The skyline: the real city, out past the shore. Drawn, never reached.
     for i in range(26):
@@ -526,11 +561,11 @@ def place_landmarks(w):
         tx, ty = g.to_tile(x, y)
         if not g.inside(tx, ty) or w["city"][ty, tx] or w["trench"][ty, tx]:
             continue
-        if not walkable_spot(w, x, y, 260):
+        kind = want[0]
+        if not walkable_spot(w, x, y, LANDMARK_PAD[kind] + 20):
             continue
         if any(math.hypot(x - lx, y - ly) < 2200 for _k, lx, ly in w["landmarks"]):
             continue
-        kind = want[0]
         lvl = int(w["level"][ty, tx])
         if kind in ("monolith", "spire") and lvl < 7:
             if tries < 3000:
@@ -540,13 +575,13 @@ def place_landmarks(w):
                 continue
         want.pop(0)
         w["landmarks"].append((kind, x, y))
-        flatten(w, x, y, 240, material=MAT["dust"])
+        flatten(w, x, y, LANDMARK_PAD[kind], material=MAT["dust"])
         if kind == "crater":
             ring = g.disc(x, y, 330) & ~g.disc(x, y, 230) & ~w["blocked"]
             w["level"][ring] = np.minimum(w["level"][ring] + 2, 13)
             w["material"][g.disc(x, y, 230) & ~w["blocked"]] = MAT["scar"]
         # A small solid core: you walk around a landmark, not through it.
-        core = g.disc(x, y, 70 if kind != "freighter" else 150)
+        core = g.disc(x, y, LANDMARK_CORE[kind])
         w["blocked"] |= core & w["land"]
         w["props"].append((kind, x, y, {"variant": rng.randrange(4)}))
 
@@ -705,8 +740,8 @@ def dress(w):
     keepout = [(0.0, 0.0, SHIP_CLEAR + 80)]
     for kind, x, y, _ring in w["pois"]:
         keepout.append((x, y, POI_KINDS[kind][5] + 60))
-    for _k, x, y in w["landmarks"]:
-        keepout.append((x, y, 300))
+    for k, x, y in w["landmarks"]:
+        keepout.append((x, y, LANDMARK_PAD[k] + 60))
     rocks = w["rocks"]
 
     def free(x, y, r=40):
@@ -748,13 +783,15 @@ def dress(w):
             90, cluster=4, spread=110)
     scatter("boulder", 380, wild & ((mat == MAT["rock"]) | (mat == MAT["high"])), 120,
             cluster=2, spread=80)
-    scatter("debris", 140, w["trench"] & ~w["blocked"], 60, cluster=3, spread=90)
+    # Crash wreckage: pieces ~2 m across, with room to walk between them.
+    scatter("debris", 70, w["trench"] & ~w["blocked"], 4.0 * METRE, cluster=3,
+            spread=6.0 * METRE)
     scatter("bones", 60, wild & (mat == MAT["dust"]), 400)
     scatter("ruin", 90, wild & (w["level"] >= 7), 300, cluster=3, spread=160)
-    # City dressing: neon on the street corners.
+    # City dressing: a lamp every ~15 m of street, and the odd neon sign.
     streets = w["city"] & ~w["blocked"]
-    scatter("lamp", 160, streets, 160)
-    scatter("sign", 70, streets, 260)
+    scatter("lamp", 70, streets, 15.0 * METRE)
+    scatter("sign", 30, streets, 22.0 * METRE)
 
 
 # ---------------------------------------------------------------------------

@@ -41,9 +41,10 @@ default map (`assets/maps/arena.tmx`, the old prototype, still loads with
   genus holds each region is dealt by the server **every match**, so the
   genus layout is a discovery, not a fact. Drops, camps and objective
   rewards follow the region's genus.
-- **The city:** streets and towers on the north-east shore, its neon in the
-  colour of whichever genus holds the district this match, and the skyline
-  of the real city beyond the shore.
+- **The city:** the outskirts on the north-east shore, at real scale: a
+  few blocks of two- to five-storey buildings on 8 m streets, its neon in
+  the colour of whichever genus holds the district this match, and the
+  skyline of the real city beyond the shore.
 - **The crash:** a scorched trench the ship ploughed on the way in, with
   wreckage.
 - **Landmarks:** a monolith, a spire, a giant ribcage, a glowing crater and
@@ -61,7 +62,7 @@ default map (`assets/maps/arena.tmx`, the old prototype, still loads with
   (amber for far ones), landmarks in their own colour. The minimap shows
   only explored land, tinted by the genus that holds it this match. The old
   compass of genus quadrants is gone on the planet.
-- **Set dressing:** about 1,900 props (flora dressed per genus, boulders,
+- **Set dressing:** about 1,500 props (flora dressed per genus, boulders,
   ruins, bones, debris, street lamps and signs), kept off pads and trails
   so fights stay readable.
 
@@ -69,6 +70,32 @@ Review tools: `--preview <png>` draws the whole planet from above
 (`docs/prototype/planet_overview.png`). In game, **N** jumps a free camera
 to the city and each landmark in turn (Y takes it back), and F3 turns the
 fog off.
+
+## Scale
+
+The world is drawn at real scale against the heroes, so the planet never
+makes them look like giants. One metre is **55 world pixels**: a hero is
+about 100 world px (~78 px on screen) and about 1.8 m tall. The constant
+lives in `include/config/WorldScale.h` (`Config::World::METRE`) and in
+`generate_planet.py` (`METRE`); keep them equal. A tile is about 0.65 m
+along an axis, so size anything in metres and convert, never in tiles or
+pixels by eye.
+
+| Thing | Real size |
+| --- | --- |
+| Hero, door | 1.8 m, 2.2 m |
+| Street lamp, neon sign board | 4.5 m, 2.5 to 4.2 m up |
+| Town building | 2 to 5 storeys of 3.5 m, on 14 m blocks (some split by a 2 m alley), 8 m streets |
+| Outpost watchtower | hut on a deck 6 m up, legs 3.2 m apart (heroes stand between them) |
+| Scrapyard crane, heaps | 9 m; heaps 0.4 to 0.9 m, behind the zone |
+| Med pod, probe, turret, gate | 1.3 m, 1.9 m, 2.5 m, 6 m |
+| Boulders, ruins, crash wreckage | 0.7 to 1.5 m, 1.5 to 4.5 m columns, ~2 m pieces |
+| Monolith, spire, ribcage, freighter | 14 m, 24 m, 24 m long, 28 m long |
+
+Anything taller than a hero that a hero can walk behind (buildings,
+monolith, spire, crater shard, freighter) fades to a ghost while one is
+behind it (`ArenaView::ghostAlpha`). Baked art for a slot must be baked to
+the same scale.
 
 ## Asset slots: adding real art without touching code
 
@@ -132,9 +159,15 @@ For the designer to accept or change:
 
 ## Known gaps
 
-- **Tall terrain and towers can hide a hero.** City towers fade to a ghost
-  when a hero is behind them; mountain faces do not yet. This is the
-  camera spike from the spec.
+- **Tall terrain and buildings can hide things.** Buildings and the tall
+  landmarks fade to a ghost when a hero is behind them; mountain faces do
+  not yet, and nothing fades for an *enemy* behind it. This is the camera
+  spike from the spec.
+- **Only the scenery is at real scale.** Terrain height is still 16 px a
+  level (about 0.3 m), so the tallest peaks are under 5 m, and the crashed
+  ship is about bus-sized (~11 m).
+- **The city is small.** At real scale the city region holds only a few
+  blocks (9 buildings); a sprawling city needs a bigger city region.
 - **The fog image is drawn flat:** on high ground its edge sits a little
   low.
 - **Enemies have no pathfinding:** around lakes and peaks they slide along

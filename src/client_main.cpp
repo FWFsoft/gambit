@@ -115,7 +115,12 @@ int main(int argc, char* argv[]) {
 
   TiledMap map;
   std::string mapPath = MapSelectionState::instance().getSelectedMapPath();
-  assert(map.load(mapPath) && "Failed to load required map");
+  // Not inside assert(): Release builds compile asserts out, which skipped
+  // the load and left the client with no ground to draw.
+  if (!map.load(mapPath)) {
+    Logger::error("Failed to load required map: " + mapPath);
+    return EXIT_FAILURE;
+  }
 
   CollisionSystem collisionSystem(map.getCollisionShapes(), &map.terrain());
   Logger::info("Client collision system initialized");
