@@ -204,6 +204,35 @@ static const KitInfo KITS[] = {
           "Blink to the cursor, healing yourself and allies near the exit.",
           9000.0f, AbilityMode::Tap, 0.0f},
      }},
+    {CharacterId::Jeff,
+     "Jeff",
+     "G3F-0427, the Recycler Bot",
+     Archetype::Striker,
+     260.0f,
+     240.0f,
+     "Biomass Reactor",
+     "Each stack of Resonance (up to 10) makes G3F 3% faster and its damage "
+     "5% higher. Resonance fades 20s after the last harvest.",
+     {
+         {"Thermal Disassembly",
+          "A cutting beam that damages the first enemy in line. Firing "
+          "builds heat; at full heat it overheats and must reload. Heat "
+          "drains when not firing.",
+          180.0f, AbilityMode::Tap, 0.0f, "Thermal Beam"},
+         {"Acquire Biomass",
+          "Hold, then release: vacuum up the remains of slain enemies around "
+          "you, +1 Resonance each. Hold longer to reach farther. Any enemy "
+          "killed by anyone leaves remains for 12s.",
+          800.0f, AbilityMode::Charge, 1400.0f, "Acquire Biomass"},
+         {"Reverse of Installation",
+          "Fire a wide, piercing beam of radiation that damages every enemy "
+          "in its line. Discharges all Resonance: +16 damage per stack.",
+          11000.0f, AbilityMode::Tap, 0.0f, "Reverse Install"},
+         {"They See Me Rollin'",
+          "Reassemble the legs into tank treads: double base run speed and "
+          "+2 Haste, but no Acquire Biomass. Press again for legs.",
+          1200.0f, AbilityMode::Tap, 0.0f, "Rollin'"},
+     }},
     {CharacterId::Zephyr,
      "Zephyr",
      "the Galewalker",

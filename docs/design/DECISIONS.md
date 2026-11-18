@@ -21,6 +21,63 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-18: Jeff (G3F-0427, the Recycler Bot), a ranged Striker
+- **Decision:** Jeff is playable, with the kit as the human specified it.
+  Prototype numbers: 260 health, 240 speed.
+  - **Biomass Reactor (passive):** +3% move speed and +5% damage per
+    Resonance stack, up to 10. Resonance fades 20s after the last harvest.
+  - **LMB, Thermal Disassembly:** a beam that hits the first enemy in line
+    (470 reach, 12 damage every 180ms). Each shot adds 7 heat; at 100 it
+    overheats into a 1.6s reload. Heat drains at 45/s once he has not fired
+    for 0.3s.
+  - **RMB (hold), Acquire Biomass:** every enemy that dies, killed by
+    anyone, leaves a pile of remains for 12s. Releasing vacuums up every
+    pile within 90 to 280 reach (growing with a 1.4s hold), +1 Resonance
+    each. With nothing in reach, most of the cooldown comes back.
+  - **Q, Reverse of Installation:** a wide (46 half-width), 620-long
+    piercing beam. It discharges all Resonance first, then deals 40 + 16
+    per stack to everything in the line (200 at 10 stacks); the passive
+    does not count the discharged stacks a second time.
+  - **LSHIFT, They See Me Rollin':** toggles tank treads: double base run
+    speed and +2 Haste, but no Acquire Biomass. Pressing it again returns
+    the legs and removes that Haste. He goes back to legs on death and at
+    round start.
+- **Pillars:**
+  - Strategic Crunch: serves. Heat makes every burst a choice of when to
+    stop. Resonance is a trade-off: keep the stacks for speed and damage,
+    or cash them in on Q. The remains rot in 12s, so harvesting is urgent,
+    and treads trade the harvest for speed.
+  - Comradery in Competition: serves. Anyone's kill feeds Jeff, so the
+    team's fight is his fuel ("when I win, we win"). Only Jeffs use the
+    remains, so no one is denied anything.
+  - Creative Builds: serves. His damage scales with stacks, so it combines
+    with every damage infusion, and the tread Haste works with Haste-based
+    talents.
+  - Clarity: serves, with one risk. The remains glow cyan and pulse when
+    about to rot, the vacuum's reach is drawn while RMB is held, and heat
+    shows beside him and on the LMB button (red and steaming while
+    venting). The risk: in big fights the remains add clutter on the floor.
+  - **Against ARCHETYPES.md (flagged):** Strikers have mid mobility.
+    Treads (x2 speed and +2 Haste, x1.4) with 10 Resonance (x1.3) come to
+    about 3.6x base speed, faster than any Playmaker or Winger. Built as
+    requested. If it proves too much, cap the Resonance speed on treads or
+    lower the tread multiplier.
+- **Why:** this is the kit from the character design; the numbers are
+  first-pass tuning. The engine gained two generic kit hooks: an enemy
+  died anywhere (Jeff's remains), and a multiplier on all the damage a
+  player deals (Resonance).
+- **Art:** two generated bodies, `Jeff.glb` (legs) and `JeffTreads.glb`,
+  fetched from Meshy and shrunk locally (no credits spent). Each is its
+  own sheet, and the game swaps them on the toggle. The nozzle arm makes
+  the model lopsided, so each actor sets its centre line by hand
+  (`CENTRE_X`, as Isaac does). The joint fits are waiting on a human,
+  and the sheets are not baked yet.
+- **Status:** Built, needs review
+- **Where:** `src/CharacterKits.cpp` (JeffKit), `src/ArenaData.cpp`,
+  `src/ArenaView.cpp`, `src/ArenaHud.cpp`, `tests/test_jeff_kit.cpp`,
+  `tools/sprite_forge/actors/_jeff_body.py`, `jeff.py`, `jeff_treads.py`
+
+
 ## 2026-11-18: Isaac's Lifeline anchors to Kade's mirrors
 - **Decision:** Kade's mirrors (anyone's) count as terrain for Lifeline.
   Isaac bonds to whichever rock, hull face or mirror is nearest the

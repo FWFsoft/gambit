@@ -26,6 +26,7 @@ namespace {
 
 using Arena::CharacterId::Gravon;
 using Arena::CharacterId::Isaac;
+using Arena::CharacterId::Jeff;
 using Arena::CharacterId::Kade;
 using Arena::CharacterId::Mina;
 using Arena::CharacterId::Nolan;
@@ -1428,6 +1429,300 @@ class KadeKit : public Kit {
     sys.fxBurst(fromX, fromY, 34.0f, VfxTheme::Optic);
     sys.blinkPlayer(self, landX, landY);
     sys.fxBurst(landX, landY, 34.0f, VfxTheme::Optic);
+  }
+};
+
+// ===========================================================================
+// G3F-0427 "Jeff", the Recycler Bot (Striker)
+//   kitTimer[0]   Thermal Disassembly heat, 0-HEAT_MAX
+//   kitTimer[1]   ms since the beam last fired (cooling starts after a beat)
+//   kitTimer[2]   overheat vent left (ms)
+//   kitCounter[0] Resonance stacks, mirrored here for speedMultiplier
+//   kitMode       Arena::JeffMode bits (treads, overheated)
+//   resource      heat, 0-255, for the HUD and the gauge on his back
+// Biomass: every enemy that dies leaves a pile (a zone of variant
+// JeffMode::BiomassZone) while a Jeff is in the match. Any Jeff can vacuum
+// any pile, so the whole team's kills feed him.
+// ===========================================================================
+class JeffKit : public Kit {
+ public:
+  // Passive, Biomass Reactor: per stack of Resonance.
+  static constexpr float RESONANCE_SPEED = 0.03f;
+  static constexpr float RESONANCE_DAMAGE = 0.05f;
+  static constexpr float RESONANCE_MS = 20000.0f;  // refreshed by a harvest
+
+  // LMB, Thermal Disassembly.
+  static constexpr float BEAM_RANGE = 470.0f;
+  static constexpr float BEAM_HALF_WIDTH = 14.0f;
+  static constexpr float BEAM_DAMAGE = 12.0f;
+  static constexpr float HEAT_MAX = 100.0f;
+  static constexpr float HEAT_PER_SHOT = 7.0f;    // 15 shots, about 2.7s
+  static constexpr float COOL_DELAY_MS = 300.0f;
+  static constexpr float COOL_PER_S = 45.0f;
+  static constexpr float VENT_MS = 1600.0f;       // the forced reload
+
+  // RMB, Acquire Biomass.
+  static constexpr float PILE_LIFE_MS = 12000.0f;
+  static constexpr float PILE_RADIUS = 18.0f;
+  static constexpr float EMPTY_HARVEST_COOLDOWN_MS = 250.0f;
+
+  // Q, Reverse of Installation.
+  static constexpr float BLAST_RANGE = 620.0f;
+  static constexpr float BLAST_HALF_WIDTH = 46.0f;
+  static constexpr float BLAST_DAMAGE = 40.0f;
+  static constexpr float BLAST_DAMAGE_PER_STACK = 16.0f;
+  static constexpr float BLAST_LOCK_MS = 380.0f;
+
+  // LSHIFT, They See Me Rollin'.
+  static constexpr int TREAD_HASTE = 2;
+  static constexpr float TREAD_SPEED = 2.0f;  // double base run speed
+  static constexpr float TREAD_HASTE_MS = 600.0f;
+
+  static int resonance(AbilitySystem& sys, const Player& self) {
+    return sys.effects().getPlayerEffects(self.id).getStacks(
+        EffectType::Resonance);
+  }
+
+  bool canCast(AbilitySystem& sys, const Player& self, int slot) override {
+    (void)sys;
+    if (slot == 0) return !Arena::JeffMode::overheated(self.kitMode);
+    // The vacuum is part of his legs: no harvesting on treads.
+    if (slot == 1) return !Arena::JeffMode::treads(self.kitMode);
+    return slot >= 0 && slot <= 3;
+  }
+
+  float speedMultiplier(const Player& self) const override {
+    float mult = 1.0f + RESONANCE_SPEED * static_cast<float>(self.kitCounter[0]);
+    if (Arena::JeffMode::treads(self.kitMode)) mult *= TREAD_SPEED;
+    return mult;
+  }
+
+  float damageDealtMultiplier(AbilitySystem& sys, const Player& self) override {
+    return 1.0f + RESONANCE_DAMAGE * static_cast<float>(resonance(sys, self));
+  }
+
+  void onRoundStart(Player& self) override {
+    self.kitMode = 0;
+    self.kitTimer[0] = 0.0f;
+    self.kitTimer[1] = 0.0f;
+    self.kitTimer[2] = 0.0f;
+    self.resource = 0;
+  }
+
+  void onEnemyDiedAnywhere(AbilitySystem& sys, Player& self,
+                           const Enemy& enemy) override {
+    (void)self;
+    // One pile per death, however many Jeffs are playing.
+    if (enemy.id == lastPileEnemy) return;
+    lastPileEnemy = enemy.id;
+    AbilitySystem::Zone pile;
+    pile.ownerId = 0;
+    pile.x = enemy.x;
+    pile.y = enemy.y;
+    pile.radius = PILE_RADIUS;
+    pile.lifeMs = PILE_LIFE_MS;
+    pile.tickMs = PILE_LIFE_MS;
+    pile.theme = VfxTheme::Biomass;
+    pile.variant = Arena::JeffMode::BiomassZone;
+    sys.spawnZone(pile);
+  }
+
+  void cast(AbilityContext& ctx, int slot) override {
+    switch (slot) {
+      case 0:
+        thermalDisassembly(ctx);
+        break;
+      case 1:
+        acquireBiomass(ctx);
+        break;
+      case 2:
+        reverseOfInstallation(ctx);
+        break;
+      case 3:
+        rollOut(ctx);
+        break;
+      default:
+        break;
+    }
+  }
+
+  void tick(AbilitySystem& sys, Player& self, float dtMs) override {
+    using namespace Arena::JeffMode;
+    self.kitCounter[0] = resonance(sys, self);
+    if (self.isDead()) {
+      // He falls apart on his legs; the heat bleeds out.
+      if (Arena::JeffMode::treads(self.kitMode)) dropTreadHaste(sys, self);
+      self.kitMode = 0;
+      self.kitTimer[0] = 0.0f;
+      self.kitTimer[2] = 0.0f;
+      self.resource = 0;
+      return;
+    }
+
+    // Heat: venting is a full reload; otherwise it bleeds off once the
+    // trigger has been let go for a beat.
+    if (overheated(self.kitMode)) {
+      self.kitTimer[2] -= dtMs;
+      self.kitTimer[0] = HEAT_MAX * std::max(0.0f, self.kitTimer[2]) / VENT_MS;
+      if (self.kitTimer[2] <= 0.0f) {
+        self.kitTimer[0] = 0.0f;
+        self.kitMode &= static_cast<uint8_t>(~OverheatBit);
+      }
+    } else {
+      self.kitTimer[1] += dtMs;
+      if (self.kitTimer[1] >= COOL_DELAY_MS) {
+        self.kitTimer[0] =
+            std::max(0.0f, self.kitTimer[0] - COOL_PER_S * dtMs / 1000.0f);
+      }
+    }
+    self.resource = static_cast<uint8_t>(
+        std::max(0.0f, std::min(1.0f, self.kitTimer[0] / HEAT_MAX)) * 255.0f);
+
+    // On treads: hold +2 Haste for as long as he rolls.
+    if (treads(self.kitMode)) {
+      ActiveEffects& fx = sys.effects().mutableEffects(self.id, false);
+      int haste = fx.getStacks(EffectType::Haste);
+      if (haste < TREAD_HASTE) {
+        sys.applyToPlayer(self, EffectType::Haste, TREAD_HASTE - haste,
+                          self.id, TREAD_HASTE_MS);
+      } else if (EffectInstance* h = fx.findEffect(EffectType::Haste)) {
+        h->remainingDuration = std::max(h->remainingDuration, TREAD_HASTE_MS);
+      }
+    }
+  }
+
+ private:
+  uint32_t lastPileEnemy = 0;
+
+  // LMB: a hot cutting beam from the arm. It stops at the first enemy.
+  void thermalDisassembly(AbilityContext& ctx) {
+    AbilitySystem& sys = ctx.sys;
+    Player& self = ctx.self;
+    const float dx = ctx.dirX, dy = ctx.dirY;
+    Enemy* first = nullptr;
+    float best = BEAM_RANGE;
+    float endX = self.x + dx * BEAM_RANGE, endY = self.y + dy * BEAM_RANGE;
+    sys.clampToWorld(endX, endY);
+    sys.enemiesInLine(self.x, self.y, endX, endY, BEAM_HALF_WIDTH,
+                      [&](Enemy& enemy) {
+                        float t = (enemy.x - self.x) * dx + (enemy.y - self.y) * dy;
+                        if (t < best) {
+                          best = t;
+                          first = &enemy;
+                        }
+                      });
+    if (first) {
+      endX = self.x + dx * std::max(0.0f, best);
+      endY = self.y + dy * std::max(0.0f, best);
+    }
+    sys.fxBeam(self.x, self.y, endX, endY, 5.0f, 110.0f, VfxTheme::Fire);
+    if (first) {
+      sys.fxBurst(first->x, first->y, 14.0f, VfxTheme::Fire);
+      sys.damageEnemy(self.id, *first, BEAM_DAMAGE, DamageFlag::Basic);
+    }
+    self.kitTimer[1] = 0.0f;
+    self.kitTimer[0] += HEAT_PER_SHOT;
+    if (self.kitTimer[0] >= HEAT_MAX) {
+      // Overheat: the vents blow and he has to reload.
+      self.kitTimer[0] = HEAT_MAX;
+      self.kitTimer[2] = VENT_MS;
+      self.kitMode |= Arena::JeffMode::OverheatBit;
+      sys.fxBurst(self.x, self.y, 40.0f, VfxTheme::Steel);
+    }
+  }
+
+  // RMB released: everything rotting within reach is drawn into the tank.
+  void acquireBiomass(AbilityContext& ctx) {
+    AbilitySystem& sys = ctx.sys;
+    Player& self = ctx.self;
+    const float radius = Arena::JeffMode::harvestRadius(ctx.charge);
+    std::vector<uint32_t> piles;
+    for (const AbilitySystem::Zone& zone : sys.allZones()) {
+      if (zone.variant != Arena::JeffMode::BiomassZone || zone.lifeMs <= 0.0f) {
+        continue;
+      }
+      if (dist(zone.x, zone.y, self.x, self.y) > radius + zone.radius) continue;
+      piles.push_back(zone.id);
+      sys.fxTether(zone.x, zone.y, self.x, self.y, 260.0f, VfxTheme::Biomass);
+      sys.fxBurst(zone.x, zone.y, 20.0f, VfxTheme::Biomass);
+    }
+    sys.fxRing(self.x, self.y, radius, VfxTheme::Biomass);
+    if (piles.empty()) {
+      // Nothing to eat: most of the cooldown comes back.
+      self.cooldownMs[1] = EMPTY_HARVEST_COOLDOWN_MS;
+      return;
+    }
+    for (uint32_t id : piles) sys.endZone(id);
+    int have = resonance(sys, self);
+    int gain = std::min(static_cast<int>(piles.size()),
+                        Arena::JeffMode::MAX_RESONANCE - have);
+    if (gain > 0) {
+      sys.applyToPlayer(self, EffectType::Resonance, gain, self.id, RESONANCE_MS);
+    }
+    // A harvest keeps the whole reactor warm, even at the cap.
+    if (EffectInstance* r = sys.effects()
+                                .mutableEffects(self.id, false)
+                                .findEffect(EffectType::Resonance)) {
+      r->remainingDuration = std::max(r->remainingDuration, RESONANCE_MS);
+    }
+    self.kitCounter[0] = resonance(sys, self);
+    sys.fxBurst(self.x, self.y, 30.0f, VfxTheme::Biomass);
+  }
+
+  // Q: a wide, piercing beam of radiation. All Resonance goes into it.
+  void reverseOfInstallation(AbilityContext& ctx) {
+    AbilitySystem& sys = ctx.sys;
+    Player& self = ctx.self;
+    const int stacks = resonance(sys, self);
+    if (stacks > 0) {
+      // Discharged first, so the passive does not count them twice.
+      sys.effects().removeEffect(self.id, false, EffectType::Resonance);
+      sys.fxEffectVerb(EffectVerb::Detonate, EffectType::Resonance, self.id,
+                       false, self.x, self.y, static_cast<float>(stacks), 0.0f);
+    }
+    self.kitCounter[0] = 0;
+    self.castVariant = static_cast<uint8_t>(stacks);
+    const float damage = BLAST_DAMAGE + BLAST_DAMAGE_PER_STACK * stacks;
+    float endX = self.x + ctx.dirX * BLAST_RANGE;
+    float endY = self.y + ctx.dirY * BLAST_RANGE;
+    sys.clampToWorld(endX, endY);
+    const float width = BLAST_HALF_WIDTH * (1.0f + 0.04f * stacks);
+    sys.fxBeam(self.x, self.y, endX, endY, width, 420.0f + 30.0f * stacks,
+               VfxTheme::Biomass);
+    sys.fxRing(self.x, self.y, 60.0f + 6.0f * stacks, VfxTheme::Biomass);
+    const uint32_t selfId = self.id;
+    sys.enemiesInLine(self.x, self.y, endX, endY, width, [&](Enemy& enemy) {
+      sys.fxBurst(enemy.x, enemy.y, 22.0f + 2.0f * stacks, VfxTheme::Biomass);
+      sys.damageEnemy(selfId, enemy, damage);
+    });
+    self.actionLockMs = std::max(self.actionLockMs, BLAST_LOCK_MS);
+  }
+
+  // LSHIFT: legs to treads and back.
+  void rollOut(AbilityContext& ctx) {
+    Player& self = ctx.self;
+    self.kitMode ^= Arena::JeffMode::TreadsBit;
+    const bool rolling = Arena::JeffMode::treads(self.kitMode);
+    self.castVariant = rolling ? 1 : 0;
+    ctx.sys.fxBurst(self.x, self.y, 36.0f, VfxTheme::Steel);
+    if (rolling) {
+      ctx.sys.applyToPlayer(self, EffectType::Haste, TREAD_HASTE, self.id,
+                            TREAD_HASTE_MS);
+    } else {
+      dropTreadHaste(ctx.sys, self);
+    }
+  }
+
+  // Legs again: the treads' Haste goes with them (other Haste stays).
+  static void dropTreadHaste(AbilitySystem& sys, Player& self) {
+    ActiveEffects& fx = sys.effects().mutableEffects(self.id, false);
+    EffectInstance* haste = fx.findEffect(EffectType::Haste);
+    if (!haste) return;
+    if (haste->stacks <= TREAD_HASTE) {
+      sys.effects().removeEffect(self.id, false, EffectType::Haste);
+    } else {
+      haste->stacks = static_cast<uint8_t>(haste->stacks - TREAD_HASTE);
+    }
   }
 };
 
@@ -3131,6 +3426,8 @@ std::unique_ptr<Kit> makeKit(uint32_t characterId) {
       return std::make_unique<ZephyrKit>();
     case Kade:
       return std::make_unique<KadeKit>();
+    case Jeff:
+      return std::make_unique<JeffKit>();
     case Mina:
       return std::make_unique<MinaKit>();
     case Volgore:

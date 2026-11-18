@@ -371,6 +371,37 @@ void ArenaView::drawAbilityBar() {
              16.0f, secs);
       }
     }
+    if (state.characterId == Arena::CharacterId::Jeff && slot == 0) {
+      // Biomass Reactor: the beam's heat along the box's top edge. Venting,
+      // it blinks red and the box reads as a reload.
+      const float heat = state.resource / 255.0f;
+      const bool venting = Arena::JeffMode::overheated(state.kitMode);
+      ImVec2 h0(a.x + 4.0f, a.y - 5.0f), h1(b.x - 4.0f, a.y + 1.0f);
+      dl->AddRectFilled(h0, h1, IM_COL32(10, 12, 24, 240), 2.0f);
+      if (heat > 0.0f) {
+        bool blink = venting && std::fmod(ImGui::GetTime(), 0.25) < 0.125;
+        ImU32 fill = venting ? (blink ? IM_COL32(255, 70, 50, 255)
+                                      : IM_COL32(150, 30, 20, 255))
+                             : IM_COL32(255, static_cast<int>(200 - 130 * heat),
+                                        static_cast<int>(60 - 40 * heat), 255);
+        dl->AddRectFilled(ImVec2(h0.x + 1.0f, h0.y + 1.0f),
+                          ImVec2(h0.x + 1.0f + (h1.x - h0.x - 2.0f) * heat, h1.y - 1.0f),
+                          fill, 1.5f);
+      }
+      dl->AddRect(h0, h1, IM_COL32(220, 214, 200, 255), 2.0f, 0, 1.0f);
+      if (venting) {
+        dl->AddRectFilled(a, ImVec2(b.x, a.y + box * heat), IM_COL32(0, 0, 0, 150), 6.0f);
+        text(dl, ImVec2(a.x + box * 0.5f, a.y + 38.0f), IM_COL32(255, 120, 90, 255),
+             12.0f, "VENT");
+      }
+    }
+    if (state.characterId == Arena::CharacterId::Jeff && slot == 1 &&
+        Arena::JeffMode::treads(state.kitMode)) {
+      // No vacuum on treads.
+      dl->AddRectFilled(a, b, IM_COL32(0, 0, 0, 170), 6.0f);
+      text(dl, ImVec2(a.x + box * 0.5f, a.y + 38.0f), IM_COL32(200, 200, 210, 255),
+           11.0f, "treads");
+    }
     if (charging && !(kade && slot == 0)) {
       float progress = state.charge / 255.0f;
       dl->AddRectFilled(ImVec2(a.x, b.y - 6.0f),

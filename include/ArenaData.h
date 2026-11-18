@@ -158,6 +158,7 @@ bool isPlayable(uint32_t characterId);
 namespace CharacterId {
 constexpr uint32_t Gravon = 3;
 constexpr uint32_t Isaac = 4;
+constexpr uint32_t Jeff = 5;
 constexpr uint32_t Kade = 6;
 constexpr uint32_t Mina = 9;
 constexpr uint32_t Nolan = 12;
@@ -233,6 +234,26 @@ inline void mirrorFacing(float pinX, float pinY, float aimX, float aimY,
   dirY = std::sin(a);
 }
 }  // namespace KadeMode
+
+// Jeff's mirrored state (G3F-0427, the Recycler Bot). Player::kitMode holds
+// the bits below; Player::resource is the beam's heat (0-255). Biomass left
+// by slain enemies lies on the floor as zones of variant BiomassZone until
+// a Jeff vacuums it up or it rots.
+namespace JeffMode {
+constexpr uint8_t TreadsBit = 0x01;    // They See Me Rollin': on tank treads
+constexpr uint8_t OverheatBit = 0x02;  // Thermal Disassembly is venting
+constexpr uint8_t BiomassZone = 4;     // Zone variant: a pile of biomass
+constexpr int MAX_RESONANCE = 10;
+// Acquire Biomass: the vacuum's reach grows with how long RMB was held.
+constexpr float HARVEST_RADIUS_MIN = 90.0f;
+constexpr float HARVEST_RADIUS_MAX = 280.0f;
+inline float harvestRadius(float charge) {
+  charge = charge < 0.0f ? 0.0f : (charge > 1.0f ? 1.0f : charge);
+  return HARVEST_RADIUS_MIN + (HARVEST_RADIUS_MAX - HARVEST_RADIUS_MIN) * charge;
+}
+inline bool treads(uint8_t mode) { return (mode & TreadsBit) != 0; }
+inline bool overheated(uint8_t mode) { return (mode & OverheatBit) != 0; }
+}  // namespace JeffMode
 
 // Gravon's mirrored state (Player::kitMode). The player is the blade: while
 // the host stands they are one; when he falls the player *is* the blade, on
