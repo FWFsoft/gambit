@@ -100,7 +100,7 @@ const CollisionShape* CollisionSystem::terrainNear(float x, float y,
   const CollisionShape* best = nullptr;
   float bestDist = maxDist;
   for (const auto& shape : collisionShapes) {
-    if (!isTerrain(shape)) continue;
+    if (!blocksEnemies(shape)) continue;  // rocks and the current hull
     float cx, cy;
     closestPoint(shape.aabb, x, y, cx, cy);
     float d = std::hypot(cx - x, cy - y);

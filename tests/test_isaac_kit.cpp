@@ -1,8 +1,8 @@
 // Isaac's kit on the real combat systems, with terrain on the map: the Ray
 // slows and heals but deals no damage (Wingers have no base damage), and
-// Lifeline bonds to an ally or to a rock near the cursor, heals, and pulls
-// him there on release. With nothing in reach it does nothing and most of
-// the cooldown comes back. Enemies slide off terrain.
+// Lifeline bonds to an ally, a rock or the ship's hull near the cursor,
+// heals, and pulls him there on release. With nothing in reach it does nothing
+// and most of the cooldown comes back. Enemies slide off terrain.
 
 #include <cassert>
 #include <cmath>
@@ -24,19 +24,24 @@ constexpr uint8_t LMB = 1 << 0, RMB = 1 << 1;
 constexpr uint32_t ISAAC_ID = 1;
 constexpr uint32_t WADE_ID = 2;
 
-CollisionShape rock(float x, float y, float w, float h) {
+CollisionShape rock(float x, float y, float w, float h,
+                    const char* type = "terrain") {
   CollisionShape s;
   s.type = CollisionShape::Type::Rectangle;
   s.aabb = {x, y, w, h};
   s.name = "Rock";
-  s.objectType = "terrain";
+  s.objectType = type;
   return s;
 }
 
 struct World {
-  // A rock 400 to the east, in reach; another 1100 east, out of reach.
-  std::vector<CollisionShape> shapes{rock(400.0f, -40.0f, 80.0f, 80.0f),
-                                     rock(1100.0f, -40.0f, 80.0f, 80.0f)};
+  // A rock 400 to the east, in reach; another 1100 east, out of reach. The
+  // ship's hull 320 to the north (tier 0) and, for its next tier, 320 to
+  // the south.
+  std::vector<CollisionShape> shapes{
+      rock(400.0f, -40.0f, 80.0f, 80.0f), rock(1100.0f, -40.0f, 80.0f, 80.0f),
+      rock(-40.0f, -400.0f, 80.0f, 80.0f, "hull"),
+      rock(-40.0f, 320.0f, 80.0f, 80.0f, "hull1")};
   CollisionSystem solid{shapes};
   std::unordered_map<uint32_t, Player> players;
   std::vector<EnemySpawn> noSpawns;
@@ -122,6 +127,37 @@ void test_Lifeline_BondsToTheRockAndPullsToItsFace() {
   assert(w.isaac().cooldownMs[1] > 5000.0f);
 }
 
+void test_Lifeline_BondsToTheShipHull() {
+  World w;
+  w.isaac().health = 50.0f;
+  w.aimX = 0.0f;
+  w.aimY = -360.0f;  // on the ship
+  w.run(1000.0f, RMB);
+  assert(w.isaac().health > 50.0f);
+  w.run(700.0f, 0);  // pulled to the hull's face
+  assert(w.isaac().y < -200.0f);
+  assert(w.solid.isPositionValid(w.isaac().x, w.isaac().y,
+                                 Arena::Tuning::PLAYER_RADIUS));
+}
+
+void test_Lifeline_OnlyTheShipsCurrentTier() {
+  // The next tier's footprint is not there yet: nothing to bond to.
+  World w;
+  w.aimX = 0.0f;
+  w.aimY = 360.0f;
+  w.run(1000.0f, RMB);
+  w.run(700.0f, 0);
+  assert(std::abs(w.isaac().y) < 1.0f);
+  // Once the ship is upgraded, it is.
+  World up;
+  up.solid.setHullTier(1);
+  up.aimX = 0.0f;
+  up.aimY = 360.0f;
+  up.run(1000.0f, RMB);
+  up.run(700.0f, 0);
+  assert(up.isaac().y > 200.0f);
+}
+
 void test_Lifeline_TerrainHealsIsaacMoreThanAnAlly() {
   World onRock;
   onRock.isaac().health = 50.0f;
@@ -197,6 +233,8 @@ int main() {
   test_Ray_SlowsAndHealsButDealsNoDamage();
   test_Lifeline_BondsToTheRockAndPullsToItsFace();
   test_Lifeline_TerrainHealsIsaacMoreThanAnAlly();
+  test_Lifeline_BondsToTheShipHull();
+  test_Lifeline_OnlyTheShipsCurrentTier();
   test_Lifeline_BondsToAnAllyAndHealsThemToo();
   test_Lifeline_NothingInReach_StaysAndRefunds();
   test_Lifeline_RockOutOfReach();
