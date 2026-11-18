@@ -21,6 +21,111 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-18: Music follows the match, the party and the biome
+- **Decision:** The designer's music rules are built (`docs/design/MUSIC.md`,
+  `MusicDirector`): the intermission/character select song in the lobby and
+  between rounds; First Contact from landing until it ends; the landing
+  zone's two songs in the ship's home ring (2,000 px); the biome's songs
+  elsewhere; the ship biome's boss music in the boss fight (any boss music
+  if it has none). Mood: Confident while everyone stands (always, solo),
+  Alone for the last one, Weakened between. Decided with the designer: 3 of
+  4 alive is Weakened; the landing zone is the home ring, not the small
+  crash basin; boss music comes from the ship's biome. Added by me: a new
+  place needs 5 s of standing in it, a worse mood 1.5 s, a better one 6 s,
+  and a biome without music keeps what plays; tracks shuffle and crossfade
+  over 1.5 s. 31 tracks imported (133 min of playlist time, 96 MB of OGG at
+  -16 LUFS) with `tools/music/import_music.py`.
+- **Pillars:** serves Strategic Crunch (the music turns as the crew falls,
+  pressure you hear) and Clarity (the party's state is audible: Weakened
+  and Alone tell you without looking at the HUD). The holds trade a little
+  Clarity (the music lags a death by 1.5 s) for steadiness; without them a
+  revive or a trip home flips the track.
+- **Why:** The designer's spec, with the three open points asked and
+  answered. First Contact (4.4 min) is longer than round 1 (2.5 min): it
+  fades out as the intermission starts, accepted by the designer. Short of six minutes: every Tidal
+  category (no boss track), PNW Alone, City Boss. The web build preloads
+  every asset, so it now downloads 96 MB more before it starts; streaming
+  music on demand there is a follow-up.
+- **Status:** Accepted (requested by a human) for the rules; Built, needs
+  review for the holds, crossfade and fallbacks
+- **Where:** `include/MusicDirector.h`, `src/MusicDirector.cpp`,
+  `src/MusicSystem.cpp`, `assets/music/`, `tools/music/import_music.py`,
+  `tests/test_music_director.cpp`
+
+## 2026-11-18: Genus territories actually load; biome dressing is drawn
+- **Decision:** (1) Fixed the map loader reading every land tile as
+  region 15: the generator paints regions with row 1 of `terrain_data`
+  and the loader ignored the row. Since planet v1 the whole planet has
+  been one territory each match (one genus everywhere); now its 15
+  territories each get their own genus as designed. (2) The engine reads
+  the Biome layer (`TerrainGrid::biomeAt`, `include/Biome.h`). (3) Code
+  placeholders for the biome dressing: fir 9 to 14 m, snowy fir 8 to 11 m
+  with snow on the bough tips, rainforest tree 6 to 9 m trunk under a 6
+  to 9 m canopy, moss-hung cypress 6 to 10 m, palm 6 to 9 m, saguaro 3 to
+  5 m, grass 0.7 m, reeds 1.2 m, sea stacks 6 to 15 m. All dark and
+  inked, with a slight sway; everything taller than a hero thins to a
+  ghost with a hero behind it.
+- **Pillars:** serves Creative Builds & Dynamic Play (the genus patchwork
+  now differs every match, so drops, camps and infusions vary by where you
+  go, as the region design intended) and Clarity (each biome reads by its
+  silhouettes, heroes stay the brightest thing and are never hidden by
+  trees). Trades a little against Clarity: forests add screen clutter
+  around fights; the dressing stays off pads and trails, and density can
+  be lowered in `VEGETATION`.
+- **Why:** Asked to make the biomes visible in game and readable by the
+  engine for music. The region bug was found while adding the biome layer
+  and is fixed in the same place; `tests/test_planet_map.cpp` guards it.
+  The client was not run here; the loader and the dressing code were
+  compiled and checked outside the game.
+- **Status:** Built, needs review
+- **Where:** `src/TiledMap.cpp`, `include/TerrainGrid.h`, `include/Biome.h`,
+  `src/ArenaWorld.cpp` (`drawVegetation`), `tests/test_planet_map.cpp`
+
+## 2026-11-18: The planet is laid out in earth-like biomes
+- **Decision:** The planet is a continent of eight biomes laid out like a
+  compressed North America: Pacific Northwest on the west coast, Arctic as
+  its colder, higher northern part, a mountain spine down the continent
+  with the desert in its rain shadow, the tidal coast (San Diego) south of
+  where the spine meets the sea, with a Baja-like peninsula, plains through
+  the middle, the city on the north-east shore, swamp around the east bay
+  and jungle in the hot south-east. Genera do not drive biomes: up to 15
+  genus territories sit inside biomes and are still dealt per match.
+  Numbers: 720 x 720 tiles (about 840 m by 420 m, ~3.6 times the old
+  tiles); biome shares 6% (tidal) to 28% (plains); a straight sprint
+  through a biome takes 17 to 28 s at the median; a match's storm covers
+  two to four biomes. The ship sits on crash site 0 (plains, PNW, desert);
+  two more candidate sites are written to the map. Each biome has its own
+  ground (same low value, different hue), relief, water (walkable ice,
+  marsh and tide pools; deep lakes block) and dressing kinds. The city
+  grows from 9 to 23 buildings. Objectives also weigh biome (frogs and
+  gas by the swamp, scrap and med pods in the city).
+- **Pillars:** serves Clarity (each biome reads at a glance by ground
+  hue; the spine is a readable wall with four passes) and Creative Builds
+  & Dynamic Play (crash sites at different junctions give different biome
+  mixes, once the game picks one per match). Trades against Strategic
+  Crunch: the land is bigger, and most of it sits outside a match's storm
+  until crash sites vary per match; the objective rings around the ship
+  are unchanged, so a match's travel is not longer. The spine adds detours
+  to reach the far side; trails go through its passes.
+- **Why:** The designer asked for biomes big enough that music (three
+  categories, at least six minutes each) does not switch every few
+  seconds, and for the layout to feel real and natural. The first layout
+  put the tidal coast west of the forest (San Diego on the Oregon coast),
+  let snow meet grassland directly, and had mountains that did not explain
+  the climate. The spine and the wet/dry sides fixed all three. Kept small
+  on purpose: the ground is one draw batch without culling, so a much
+  bigger map needs renderer work first. The tidal coast, PNW and Arctic
+  are the smallest (17 to 18 s straight runs). Snow is the one light
+  ground and pushes the dark-world rule; it is kept cool and below the UI.
+  Not done: biome props are not drawn by the engine yet (no placeholders),
+  the engine does not read the Biome layer, music does not follow biomes,
+  and the genus deal ignores biology. The map was not loaded in game here
+  (no build environment).
+- **Status:** Built, needs review
+- **Where:** `tools/maps/generate_planet.py`, `assets/maps/planet.tmx`,
+  `docs/design/MAP_PIPELINE.md` ("Biomes"),
+  `docs/prototype/planet_overview_biomes.png`
+
 ## 2026-11-18: Scenery at real scale against the heroes
 - **Decision:** Everything the planet draws is sized in real metres
   against a 1.8 m hero (1 m = 55 world px, `Config::World::METRE`, same

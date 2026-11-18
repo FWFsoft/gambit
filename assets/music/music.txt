@@ -1,0 +1,39 @@
+# Playlists the game plays (MusicSystem / MusicDirector).
+# <playlist key> <file under assets/music/>. Written by
+# tools/music/import_music.py; edit by hand to move a track.
+# Keys: lobby, first_contact, landing.<mood>, <biome>.<mood>,
+# <biome>.boss. Moods: confident, weakened, alone.
+
+city.alone city/cigarette_solo.ogg
+city.alone city/silantara.ogg
+city.boss city/the_heat.ogg
+city.confident city/aughn.ogg
+city.confident city/neon_jackpot.ogg
+city.confident city/thrice_twice.ogg
+city.weakened city/blue_on_blue.ogg
+city.weakened city/dva_remain.ogg
+desert.alone desert/ghosts_in_the_dust.ogg
+desert.alone desert/last_one_fading.ogg
+desert.alone desert/tumbleweeds_and_echoes.ogg
+desert.boss desert/blood_on_the_sand.ogg
+desert.boss desert/dust_devil_showdown.ogg
+desert.confident desert/high_noon_strut.ogg
+desert.confident desert/six_gun_salsa.ogg
+desert.weakened desert/dust_devil_chase.ogg
+desert.weakened desert/ghosts_in_the_dust.ogg
+desert.weakened desert/two_guns_down.ogg
+first_contact landing/first_contact.ogg
+landing.alone landing/first_light.ogg
+landing.confident landing/frontier_pulse.ogg
+landing.weakened landing/first_light.ogg
+lobby lobby/intermission_select.ogg
+pnw.alone pnw/footprints_fill_with_rain.ogg
+pnw.alone pnw/the_weight_of_unopened_maps.ogg
+pnw.boss pnw/where_spruce_becomes_teeth.ogg
+pnw.confident pnw/compass_points_to_everywhere.ogg
+pnw.confident pnw/first_light_through_cedar_bones.ogg
+pnw.weakened pnw/second_boot_syndrome.ogg
+pnw.weakened pnw/two_fists_against_the_fog.ogg
+tidal.alone tidal/no_echo_returns.ogg
+tidal.confident tidal/descent_into_wonder.ogg
+tidal.weakened tidal/shared_weight.ogg

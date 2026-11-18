@@ -23,53 +23,141 @@ The split that makes this fast (the same one the character pipeline uses):
 | Meshy | image to 3D for props and set pieces (same rules as characters: ask before every spend) |
 | Code | layout, height, placement, shading, consistency, checks: everything between the picks |
 
-## What is built (v1)
+## What is built (v2: biomes)
 
-`tools/maps/generate_planet.py` writes `assets/maps/planet.tmx`, now the
+`tools/maps/generate_planet.py` writes `assets/maps/planet.tmx`, the
 default map (`assets/maps/arena.tmx`, the old prototype, still loads with
 `--map`). One seeded command makes the whole planet:
 
-- **Land:** an island in a dark sea, with fingers and a bay (the concept
-  map's shape), about 2.2 times the old arena across. The storm's radii
-  scale with it (map property `zone_scale`, 1.75).
-- **Height:** terraced hills and ridged mountain ranges. Peaks, lakes and
-  the sea are impassable (the `Blocked` layer) and shape the routes. Height
-  is gameplay-neutral, as the spec defines *elevation*: it lifts what is
-  drawn and costs nothing to climb.
-- **Regions:** the zone template from the spec. A basin around the crash, a
-  ring of seven wild regions, and the city. The *shapes* are fixed; which
-  genus holds each region is dealt by the server **every match**, so the
-  genus layout is a discovery, not a fact. Drops, camps and objective
-  rewards follow the region's genus.
-- **The city:** the outskirts on the north-east shore, at real scale: a
-  few blocks of two- to five-storey buildings on 8 m streets, its neon in
-  the colour of whichever genus holds the district this match, and the
-  skyline of the real city beyond the shore.
-- **The crash:** a scorched trench the ship ploughed on the way in, with
-  wreckage.
-- **Landmarks:** a monolith, a spire, a giant ribcage, a glowing crater and
-  a crashed coalition freighter, on sight lines.
-- **Objectives are places:** each type has a set piece (an outpost
-  watchtower, a med pod, a scrap heap under a crane, a probe in a dent, a
-  frog pond, spore vents, a sealed gate) instead of a reticle. Placement
-  follows context: frogs and gas by water, outposts on high ground, scrap
-  in the crash field and the city. Three rings, as the spec's black and
-  orange pins: near, mid, far. Some far ones sit past round 3's storm, worth
-  a dash through it.
-- **Trails:** one shortest-path tree from the ship to every place, so
-  trails merge into roads home.
-- **Discovery:** unvisited places show as columns of light through the fog
-  (amber for far ones), landmarks in their own colour. The minimap shows
-  only explored land, tinted by the genus that holds it this match. The old
-  compass of genus quadrants is gone on the planet.
-- **Set dressing:** about 1,500 props (flora dressed per genus, boulders,
-  ruins, bones, debris, street lamps and signs), kept off pads and trails
-  so fights stay readable.
+- **Land:** a continent filling the map (720 x 720 tiles, about 840 m by
+  420 m), with an east bay, coves and a peninsula off the warm south-west
+  coast, in a dark sea. Sea far from land is left undrawn.
+- **Biomes** (next section): earth-like places laid out like a compressed
+  North America. The genera do not drive them; genus territories sit
+  inside them.
+- **Crash sites:** candidate landing spots where two to four biomes meet
+  inside round 3's storm (`CrashSites` layer). The ship sits on one
+  (`--site N`, default 0); the game does not choose per match yet.
+- **Height:** each biome has its own relief, blended across borders. A
+  mountain spine runs down the continent (below). Peaks, deep lakes and
+  the sea are impassable (the `Blocked` layer). Height is gameplay-neutral,
+  as the spec defines *elevation*: it lifts what is drawn and costs nothing
+  to climb.
+- **Regions:** up to 15 genus territories, nested inside biomes (a
+  territory never crosses a biome border), dealt a genus by the server
+  **every match** as before. Drops, camps and objective rewards follow it.
+- **The city:** the city biome on the north-east shore, at real scale:
+  8 m streets around 14 m blocks, two to five storeys, its neon in the
+  colour of the genus holding it this match, the real city's skyline out
+  past the shore.
+- **The crash:** a scorched trench, ploughed in from the most open side.
+- **Landmarks, objectives, trails, rocks:** as in v1, around the ship:
+  a monolith, a spire, a ribcage, a crater and a freighter on sight lines;
+  objectives as set pieces in three rings, placed by context and now by
+  biome (frogs and gas by swamp and water, scrap and med pods in the city,
+  outposts on high ground); one shortest-path tree of trails home.
+- **Discovery:** unchanged from v1 (columns of light through the fog; the
+  minimap shows explored land tinted by genus).
 
-Review tools: `--preview <png>` draws the whole planet from above
-(`docs/prototype/planet_overview.png`). In game, **N** jumps a free camera
-to the city and each landmark in turn (Y takes it back), and F3 turns the
-fog off.
+Review tools: `--preview <png>` writes two images: the terrain from above
+(`docs/prototype/planet_overview.png`) and the biome map with the size
+check (`docs/prototype/planet_overview_biomes.png`). In game, **N** jumps
+a free camera to the city and each landmark in turn (Y takes it back),
+and F3 turns the fog off.
+
+![Biomes](../prototype/planet_overview_biomes.png)
+
+## Biomes
+
+| Id | Biome | Where, and why there | Ground | Relief and water | Dressing (slot) |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Plains | the middle, north to south: grassland between dry and wet | grass, meadow | rolling, a few lakes | `grass`, boulders |
+| 2 | Pacific Northwest | west of the spine, with its own rocky coast | moss, needle litter | hills, lakes, rivers off the spine | `conifer` |
+| 3 | Arctic | the colder, higher, northern part of the same forest | snow, frozen lakes (walkable ice) | high, rugged | `snow_conifer` |
+| 4 | Desert | east of the spine, in its rain shadow, inland of the warm coast | sand, dust, red rock | dunes and mesas (walkable tops) | `cactus`, bones |
+| 5 | Tidal coast | south of where the spine meets the sea, and its peninsula | beach, coastal scrub, tide pools (walkable) | low; sea stacks offshore | `palm`, `reeds`, `sea_stack` |
+| 6 | City | the north-east shore | street | flat | buildings, lamps, signs |
+| 7 | Jungle | the hot, wet south-east | jungle floor, vines | steep hills, many lakes | `jungle_tree` |
+| 8 | Swamp | around the east bay, between city and jungle | marsh, mud, bog (walkable shallows) | flat and low, deep pools | `cypress`, `reeds` |
+
+How the layout is made, so it can be changed by rule rather than by hand:
+
+- **Anchors** (`ANCHORS`): a few points per biome, with a size bias, laid
+  out like the continent. Borders come from the nearest anchor after a
+  two-scale domain warp, so they bend like real ecotones. Slivers smaller
+  than `MIN_FRAGMENT_M2` fold into their neighbours.
+- **The spine** (`SPINE`): one mountain range from the north coast down
+  the continent, bending west to the sea in the south-west (like the
+  Cascades and Sierra, then the Transverse Ranges). It is the border
+  between the wet side (forest and snow, west and north of it) and the dry
+  side (everything else). So the desert sits in its rain shadow and the
+  warm coast lies south of the bend, as San Diego does. Four passes
+  (`SPINE_PASSES`) cross it.
+- **Cold:** the forest's colder part (north, high on the ridges) is Arctic
+  (`ARCTIC_SHARE`), so snow starts deeper in. A boreal fringe
+  (`BOREAL_FRINGE`) keeps forest between snow and the plains.
+- **Coast rules:** tidal and city only within `TIDAL_DEPTH` and
+  `CITY_DEPTH` of the sea.
+- **Ground** reads the biome a few tiles off by noise, so borders blend.
+  Biomes differ by hue at the same low value (`ART_DIRECTION.md`, "World");
+  snow is the one light ground and is kept cool.
+
+The hidden `Biome` tile layer stores the biome per tile (row 3 of
+`terrain_data`, values 0..15, 0 = sea), and the map's `biomes` property
+lists the ids. The engine reads it into `TerrainGrid` (`biomeAt`,
+`biomeOf`; ids and names in `include/Biome.h`), ready for the music
+system. `tests/test_planet_map.cpp` (ctest `PlanetMap`) loads the real
+map and checks the regions, biomes and that every territory sits in one
+biome.
+
+### Sizing biomes for music
+
+Each biome will have three categories of music with at least six minutes
+in each, so the music must not switch every few seconds. The preview
+prints a size check: straight runs through each biome at hero speed (255
+px/s) from random points in random directions. The medians at seed 3 are:
+
+| Biome | Share of land | Straight run, median | Quarter of runs shorter than |
+| --- | --- | --- | --- |
+| Plains | 28% | 28 s | 21 s |
+| Pacific Northwest | 14% | 17 s | 11 s |
+| Arctic | 10% | 18 s | 10 s |
+| Desert | 12% | 20 s | 16 s |
+| Tidal coast | 6% | 17 s | 12 s |
+| City | 8% | 23 s | 19 s |
+| Jungle | 10% | 21 s | 14 s |
+| Swamp | 11% | 20 s | 15 s |
+
+A straight sprint is the worst case. In a match the crew stops to fight
+and loot, so it stays in a biome for minutes. A match's storm (radius
+5,075 px around the ship) covers two to four biomes. Two cheap ways to
+keep music steady at borders: switch only after some seconds in the new
+biome, and crossfade over a few seconds. The size knob is `--size`, but the
+ground is drawn as one batch without culling, so a much bigger map needs
+the renderer to cull or chunk first.
+
+### Dressing sizes (for the placeholders and baked art)
+
+Real sizes, as for everything else (`Scale`), before each prop's own
+scale (0.75 to 1.3). Code placeholders draw all of them
+(`ArenaView::drawVegetation`): dark, inked silhouettes, and anything taller
+than a hero thins to a ghost with a hero behind it
+(`ArenaView::ghostAlpha`). Baked art in a `Prop_<kind>` slot replaces the
+placeholder.
+
+![Dressing placeholders](../prototype/biome_dressing_placeholders.png)
+
+(Drawn from `drawVegetation`'s shapes outside the game, next to a 1.8 m hero bar.)
+
+| Slot | Real size |
+| --- | --- |
+| `conifer`, `snow_conifer` | 9 to 14 m, 3 to 5 m wide |
+| `jungle_tree` | 10 to 15 m, broad canopy 6 to 9 m |
+| `cypress` | 6 to 10 m, flared trunk |
+| `palm` | 6 to 9 m |
+| `cactus` | saguaro 3 to 5 m |
+| `grass`, `reeds` | knee to waist high (0.5 to 1.2 m) |
+| `sea_stack` | 6 to 15 m rock pillars, in the sea only |
 
 ## Scale
 
@@ -107,7 +195,7 @@ variant). No code change.
 
 | Slot | What |
 | --- | --- |
-| `Prop_<kind>` | `boulder`, `ruin`, `bones`, `debris`, `lamp`, `sign`, `city_block`, `monolith`, `spire`, `ribcage`, `crater`, `freighter` |
+| `Prop_<kind>` | `boulder`, `ruin`, `bones`, `debris`, `lamp`, `sign`, `city_block`, `monolith`, `spire`, `ribcage`, `crater`, `freighter`; biome dressing `conifer`, `snow_conifer`, `cactus`, `palm`, `reeds`, `sea_stack`, `jungle_tree`, `cypress`, `grass` |
 | `Prop_flora_<genus>` | `venoxarid`, `cerebrian`, `frigidariant`, `magnarok`, `none` |
 | `Objective_<type>` | `alien_scrapyard`, `capture_outpost`, `salvage_medpacks`, `recover_probe`, `save_the_frogs`, `noxious_gas`, `little_john`, `derelict_turret` (frame 1 = completed) |
 
@@ -159,6 +247,20 @@ For the designer to accept or change:
 
 ## Known gaps
 
+- **Music follows biomes for four of eight** (PNW, Desert, Tidal, City;
+  `MUSIC.md`). Plains, Arctic, Jungle and Swamp have no music yet and keep
+  whatever was playing.
+- **One crash site per map.** The candidate sites are written, but the
+  game always uses the one the map was generated for. Choosing per match
+  is what lets a run see a different biome mix (Creative Builds), and most
+  of the planet sits outside the storm until then.
+- **Genus by biology:** territories are dealt any genus. Weighting the
+  deal by biome (which genus can live in snow, swamp, desert) is not done.
+- **Not checked in the client yet.** The engine's map loader opens the
+  map (73 ms) and the PlanetMap test passes, and the dressing code was
+  compiled and drawn outside the game, but the client itself was not run
+  here (no full build environment). The ground batch is about 3.6 times
+  the old tile count; watch boot time and frame time.
 - **Tall terrain and buildings can hide things.** Buildings and the tall
   landmarks fade to a ghost when a hero is behind them; mountain faces do
   not yet, and nothing fades for an *enemy* behind it. This is the camera
@@ -166,8 +268,6 @@ For the designer to accept or change:
 - **Only the scenery is at real scale.** Terrain height is still 16 px a
   level (about 0.3 m), so the tallest peaks are under 5 m, and the crashed
   ship is about bus-sized (~11 m).
-- **The city is small.** At real scale the city region holds only a few
-  blocks (9 buildings); a sprawling city needs a bigger city region.
 - **The fog image is drawn flat:** on high ground its edge sits a little
   low.
 - **Enemies have no pathfinding:** around lakes and peaks they slide along

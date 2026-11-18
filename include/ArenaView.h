@@ -253,6 +253,9 @@ class ArenaView {
   void drawProp(ImDrawList* dl, const MapProp& prop, uint32_t index);
   void drawFlora(ImDrawList* dl, const MapProp& prop, Arena::Genus genus,
                  uint32_t seed);
+  // Biome dressing placeholders (trees, cacti, reeds...); false if `prop`
+  // is not a vegetation kind.
+  bool drawVegetation(ImDrawList* dl, const MapProp& prop, uint32_t seed);
   void drawCityBlock(ImDrawList* dl, const MapProp& prop, uint32_t seed);
   // Alpha for a tall thing covering the screen box (left..right, top..bottom)
   // whose front edge is at world y `frontY`: 0.28 (a ghost) if any hero

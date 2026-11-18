@@ -2,12 +2,16 @@
 
 #include <SDL_mixer.h>
 
+#include <random>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
+#include "MusicDirector.h"
 #include "MusicZone.h"
 
 // Forward declarations
+class ArenaClient;
 class ClientPrediction;
 class TiledMap;
 struct UpdateEvent;
@@ -23,8 +27,18 @@ class MusicSystem {
   static constexpr int SDL_MIXER_MAX_VOLUME = 128;  // SDL_mixer volume range
   static constexpr int LOOP_FOREVER = -1;           // SDL_mixer loop infinite
 
+  // Crossfade between playlists: the old track fades out, then the new one
+  // fades in.
+  static constexpr int PLAYLIST_FADE_MS = 1500;
+  static constexpr const char* PLAYLIST_FILE = "assets/music/music.txt";
+
   MusicSystem(const ClientPrediction* prediction, const TiledMap* map);
   ~MusicSystem();
+
+  // The match as the client sees it. With it and a playlist file, music
+  // follows the match (MusicDirector); without, the map's music zones.
+  void setArena(const ArenaClient* arena) { arenaClient = arena; }
+  bool hasPlaylists() const { return !playlists.empty(); }
 
   // Manually trigger music change (for future event-based system)
   void playTrack(const std::string& trackName, int fadeMs = DEFAULT_FADE_MS);
@@ -35,14 +49,27 @@ class MusicSystem {
   const ClientPrediction* clientPrediction;
   const TiledMap* tiledMap;
 
+  const ArenaClient* arenaClient = nullptr;
+
   std::unordered_map<std::string, Mix_Music*> loadedTracks;
   std::string currentTrack;
   std::string currentZoneName;
   float volume;
   bool muted;
 
+  // Playlists (assets/music/music.txt): key -> files under assets/music/.
+  std::unordered_map<std::string, std::vector<std::string>> playlists;
+  MusicDirector director;
+  std::string currentPlaylist;  // what our music is playing ("" = none)
+  std::string pendingPlaylist;  // waiting for a fade out to finish
+  std::mt19937 shuffle{std::random_device{}()};
+
   void onUpdate(const UpdateEvent& e);
   void onToggleMute(const struct ToggleMuteEvent& e);
   void checkZoneTransition();
+  void loadPlaylists();
+  void followMatch(float dtSeconds);
+  MusicDirector::Inputs readMatch() const;
+  void startPlaylist(const std::string& key);
   Mix_Music* loadMusic(const std::string& filename);
 };
