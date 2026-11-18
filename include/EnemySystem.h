@@ -28,6 +28,10 @@ class EnemySystem {
   // Everything gone, and every camp from the map back at full strength (a
   // new match).
   void resetCamps();
+  // Only camps in reach of the site the ship landed on spawn
+  // (EnemySpawn::sites). -1 = every camp.
+  void setActiveSite(int site) { activeSite = site; }
+  int getActiveSite() const { return activeSite; }
 
   struct SpawnOptions {
     bool targetShip = false;
@@ -109,6 +113,7 @@ class EnemySystem {
   std::vector<DisabledZone> disabledZones;
 
   const std::vector<EnemySpawn>& spawns;
+  int activeSite = -1;
   std::unordered_map<uint32_t, Enemy> enemies;  // enemyId -> Enemy
   uint32_t nextEnemyId;
   std::vector<EnemyDeath> pendingDeaths;

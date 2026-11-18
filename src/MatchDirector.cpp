@@ -1263,6 +1263,16 @@ void MatchDirector::setZoneScale(float scale) {
   }
 }
 
+void MatchDirector::moveShip(float x, float y) {
+  shipX = x;
+  shipY = y;
+  enemies->setShip(shipX, shipY, false);
+  bringPlayersHome(false);
+  Logger::info("Match: the ship lands at (" +
+               std::to_string(static_cast<int>(x)) + ", " +
+               std::to_string(static_cast<int>(y)) + ")");
+}
+
 void MatchDirector::dealRegions() {
   // Deal the genera in shuffled hands of four, so every genus holds about
   // the same share of the planet and no two matches lay it out alike.

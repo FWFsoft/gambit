@@ -21,6 +21,43 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-18: Every match lands somewhere new; objectives are fixed places
+- **Decision:** The planet has four landing sites; each match lands on a
+  different one (random, never the last), so the storm, the zone and the
+  run home move with it. The ship brings its own: its hull, player spawns
+  and the two derelict turrets. Objectives and their camps are fixed places
+  on the planet, the same every match; one is in play when the ship lands
+  within 9,000 px of it, so neighbouring sites share ground. Each site's
+  near ring is its own; its mid and far rings are filled to their usual
+  counts, counting what neighbours already put there. A match has 28 to 34
+  objectives in play (one site had 32 before) and peaks at about 74
+  enemies (85 before). The zone's size, the round times and the return to
+  the ship are unchanged.
+- **Pillars:** serves Creative Builds & Dynamic Play (each run lands among
+  a different mix of biomes, genus ground and objectives; across four
+  sites, all eight biomes are in play) and keeps Strategic Crunch (the zone
+  and the return home are as tight as before; the bigger planet adds no
+  running). Fixed objectives serve the "learn the planet over months" idea:
+  places are known, which ones matter changes with the landing. Neutral for
+  Comradery and Clarity.
+- **Why:** The designer asked whether the zone and the return to the ship
+  were too limiting on the bigger map. They were not: the limit was one
+  fixed landing, which left most of the planet (and half the biomes and
+  their music) out of play. First built with each site carrying its own
+  objectives; the designer asked for objectives in fixed places with only
+  the ship's own (the turrets) coming with the landing, which is what this
+  is. A first fixed version over-shared (81 objectives at one site); the
+  ring quotas fixed that. Not built: the crew choosing the landing (a vote
+  would add a decision), a flight between sites (the ship jumps at the end
+  of a match). The unused sites' crash trenches stay on the ground as old
+  scars.
+- **Status:** Built, needs review
+- **Where:** `tools/maps/generate_planet.py`, `src/ServerGameState.cpp`
+  (`chooseLandingSite`), `src/MatchDirector.cpp` (`moveShip`),
+  `src/CollisionSystem.cpp` (hull per site), `src/TiledMap.cpp`,
+  `src/ClientPrediction.cpp`, `tests/arena_sim.cpp` (`--matches`),
+  `tests/test_planet_map.cpp`; ctest `PlanetMatches`
+
 ## 2026-11-18: Music follows the match, the party and the biome
 - **Decision:** The designer's music rules are built (`docs/design/MUSIC.md`,
   `MusicDirector`): the intermission/character select song in the lobby and

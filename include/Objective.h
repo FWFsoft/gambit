@@ -36,6 +36,14 @@ struct Objective {
   std::string description;   // UI description
   float x = 0.0f, y = 0.0f;  // World position
   float radius = 50.0f;      // Interaction/zone radius
+  // The landing sites it is in play for, one bit per site (map property
+  // "sites", e.g. "0,2"). Objectives are fixed places on the planet; one is
+  // in play when the ship lands within reach of it. Ship-bound ones (the
+  // derelict turrets) list only their own site. 0 = every match.
+  uint32_t sites = 0;
+  bool activeFor(int site) const {
+    return sites == 0 || site < 0 || ((sites >> site) & 1u) != 0;
+  }
 
   // For CaptureOutpost: track enemies in zone
   int enemiesRequired = 0;  // Total enemies to kill

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <cstdlib>
 
 CollisionSystem::CollisionSystem(
     const std::vector<CollisionShape>& collisionShapes,
@@ -94,18 +95,54 @@ void CollisionSystem::resolveCollision(float oldX, float oldY, float& newX,
 }
 
 int CollisionSystem::hullTierOf(const CollisionShape& shape) {
-  const std::string& type = shape.objectType;
-  if (type == "hull") return 0;
-  if (type.size() == 5 && type.compare(0, 4, "hull") == 0 && type[4] >= '1' &&
-      type[4] <= '9') {
-    return type[4] - '0';
+  // "hull", "hull1".."hull9", each optionally "@<site>" (a landing site).
+  const std::string& full = shape.objectType;
+  const size_t at = full.find('@');
+  const size_t len = at == std::string::npos ? full.size() : at;
+  if (len == 4 && full.compare(0, 4, "hull") == 0) return 0;
+  if (len == 5 && full.compare(0, 4, "hull") == 0 && full[4] >= '1' &&
+      full[4] <= '9') {
+    return full[4] - '0';
   }
   return -1;
+}
+
+int CollisionSystem::hullSiteOf(const CollisionShape& shape) {
+  const std::string& full = shape.objectType;
+  const size_t at = full.find('@');
+  if (at == std::string::npos || hullTierOf(shape) < 0) return -1;
+  int site = std::atoi(full.c_str() + at + 1);
+  assert(site >= 0 && site < 64 && "hull site out of range");
+  return site;
 }
 
 void CollisionSystem::setHullTier(int tier) {
   assert(tier >= 0 && tier <= 9);
   hullTier = tier;
+}
+
+void CollisionSystem::setHullSite(int site) {
+  assert(site >= -1 && site < 64);
+  hullSite = site;
+}
+
+void CollisionSystem::placeHullNear(float x, float y) {
+  // The landing site whose hull is nearest the ship. Cheap: a handful of
+  // boxes, and only when the ship moves.
+  int best = -1;
+  float bestDist = 0.0f;
+  for (const CollisionShape& shape : collisionShapes) {
+    int site = hullSiteOf(shape);
+    if (site < 0 || shape.type != CollisionShape::Type::Rectangle) continue;
+    float cx = shape.aabb.x + shape.aabb.width * 0.5f;
+    float cy = shape.aabb.y + shape.aabb.height * 0.5f;
+    float d = (cx - x) * (cx - x) + (cy - y) * (cy - y);
+    if (best < 0 || d < bestDist) {
+      best = site;
+      bestDist = d;
+    }
+  }
+  hullSite = best;
 }
 
 const CollisionShape* CollisionSystem::terrainNear(float x, float y,

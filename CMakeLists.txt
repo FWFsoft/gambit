@@ -765,6 +765,7 @@ add_executable(test_planet_map
     src/Logger.cpp
     src/ArenaData.cpp
     src/TiledMap.cpp
+    src/CollisionSystem.cpp
 )
 target_include_directories(test_planet_map PRIVATE include tests)
 target_link_libraries(test_planet_map PRIVATE spdlog::spdlog SDL2::SDL2)
@@ -809,6 +810,14 @@ add_test(NAME ArenaMatchFlow
          COMMAND ArenaSim --god --quiet --expect victory
                  --bots Suds,Gravon,Isaac,Zephyr,Mina,Volgore,Wade,Presidente)
 set_tests_properties(ArenaMatchFlow PROPERTIES
+    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+# The planet: three matches in a row on one server, each landing on a
+# different crash site with the objectives in its reach.
+add_test(NAME PlanetMatches
+         COMMAND ArenaSim --map assets/maps/planet.tmx --god --quiet
+                 --matches 3 --minutes 60 --expect victory
+                 --bots Suds,Gravon,Isaac,Zephyr)
+set_tests_properties(PlanetMatches PROPERTIES
     WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 # Same match without god mode: either result is fine, it just has to finish.
 add_test(NAME ArenaMatchBots COMMAND ArenaSim --quiet)

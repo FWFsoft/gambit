@@ -138,9 +138,12 @@ void ClientPrediction::onNetworkPacketReceived(
 
   // The ship's tier decides which hull footprint is solid; predict against
   // the same one the server uses.
+  // On maps with several landing sites, only the hull the ship stands in is
+  // solid: the one nearest it.
   if (type == PacketType::MatchState && collisionSystem) {
-    collisionSystem->setHullTier(
-        deserializeMatchState(e.data, e.size).shipTier);
+    MatchStatePacket match = deserializeMatchState(e.data, e.size);
+    collisionSystem->setHullTier(match.shipTier);
+    collisionSystem->placeHullNear(match.shipX, match.shipY);
     return;
   }
 
@@ -355,6 +358,11 @@ void ClientPrediction::setupObjectiveEventHandlers() {
 
         if (type == PacketType::ShipLocation) {
           ShipLocationPacket packet = deserializeShipLocation(e.data, e.size);
+          // The ship landed somewhere new (a new match): the last site's
+          // objectives are gone; the server sends the new site's next.
+          if (hasShip && (packet.x != shipX || packet.y != shipY)) {
+            objectives.clear();
+          }
           shipX = packet.x;
           shipY = packet.y;
           hasShip = true;

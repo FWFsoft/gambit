@@ -39,16 +39,27 @@ class CollisionSystem {
   // Lifeline anchors to it like a rock (terrainNear).
   // The tier a hull box belongs to, or -1 for anything else.
   static int hullTierOf(const CollisionShape& shape);
+  // Maps with several landing sites have a hull per site (type
+  // "hull@<site>", "hull1@<site>"...): the site it stands at, or -1.
+  static int hullSiteOf(const CollisionShape& shape);
   void setHullTier(int tier);
   int getHullTier() const { return hullTier; }
-  // A hull box of the current tier.
+  // Only the hull at the site the ship landed on is solid (-1: every hull,
+  // as on one-site maps).
+  void setHullSite(int site);
+  int getHullSite() const { return hullSite; }
+  // Picks the site whose hull is nearest (x, y): the client knows where the
+  // ship is, not which site that is.
+  void placeHullNear(float x, float y);
+  // A hull box of the current tier, at the current site.
   bool isActiveHull(const CollisionShape& shape) const {
-    return hullTierOf(shape) == hullTier;
+    if (hullTierOf(shape) != hullTier) return false;
+    int site = hullSiteOf(shape);
+    return site < 0 || hullSite < 0 || site == hullSite;
   }
-  // Blocks movement now (a hull box of another tier does not).
+  // Blocks movement now (a hull box of another tier or site does not).
   bool isSolid(const CollisionShape& shape) const {
-    int tier = hullTierOf(shape);
-    return tier < 0 || tier == hullTier;
+    return hullTierOf(shape) < 0 || isActiveHull(shape);
   }
   // Solid for enemies (players collide with every solid shape).
   bool blocksEnemies(const CollisionShape& shape) const {
@@ -68,6 +79,7 @@ class CollisionSystem {
   const std::vector<CollisionShape>& collisionShapes;
   const TerrainGrid* terrain = nullptr;
   int hullTier = 0;
+  int hullSite = -1;
 
   bool terrainBlocks(float x, float y, float radius) const {
     return terrain && terrain->blocksBody(x, y, radius);

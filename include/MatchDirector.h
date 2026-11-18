@@ -46,6 +46,9 @@ class MatchDirector {
   // objective distance are the Tuning values times this (map property
   // "zone_scale"; 1 on the prototype arena).
   void setZoneScale(float scale);
+  // The ship lands somewhere else (a new match on a map with several
+  // landing sites): the zone, the raids and the crew follow it.
+  void moveShip(float x, float y);
   // The genus that holds this spot of the planet this match.
   Arena::Genus genusAt(float x, float y) const;
 

@@ -2,11 +2,12 @@
 
 #include <cstdlib>
 #include <memory>
+#include <random>
 #include <unordered_map>
 #include <vector>
 
-#include "EnemySpawn.h"
 #include "EffectManager.h"
+#include "EnemySpawn.h"
 #include "EventBus.h"
 #include "NetworkProtocol.h"
 #include "Objective.h"
@@ -32,6 +33,10 @@ class ServerGameState {
   ObjectiveSystem* getObjectiveSystem() { return objectiveSystem.get(); }
   AbilitySystem* getAbilitySystem() { return abilitySystem.get(); }
   MatchDirector* getMatchDirector() { return director.get(); }
+  // The crash site this match landed on (-1 on one-site maps), and where.
+  int getLandingSite() const { return landingSite; }
+  float getShipX() const { return shipX; }
+  float getShipY() const { return shipY; }
   std::unordered_map<uint32_t, Player>& getPlayers() { return players; }
 
  private:
@@ -57,6 +62,11 @@ class ServerGameState {
   float shipX = 0.0f;
   float shipY = 0.0f;
   bool hasShip = false;
+  // Landing sites (TiledMap::getCrashSites); -1 on one-site maps.
+  const TiledMap* tiledMap = nullptr;
+  int landingSite = -1;
+  std::vector<PlayerSpawn> siteSpawns;  // the active site's player spawns
+  std::mt19937 siteRng{std::random_device{}()};
 
   // World item management
   std::unordered_map<uint32_t, WorldItem> worldItems;
@@ -104,6 +114,12 @@ class ServerGameState {
   void initializeLittleJohnGuardians();
   // A new match: camps and objectives back as the map has them.
   void resetWorld();
+  // A new match lands on a different crash site (maps with several): moves
+  // the ship, its hull and the crew there. The planet's objectives and camps
+  // stay where they are; those in reach of the site are in play, plus the
+  // ship's own (its turrets).
+  void chooseLandingSite();
+  std::vector<Objective> siteObjectives() const;
   // The objectives as the map places them, to restore for a new match.
   std::vector<Objective> mapObjectives;
 };

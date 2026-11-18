@@ -233,6 +233,10 @@ RINGS = [
                              "medpacks_big", "medpacks_big", "gas", "frogs"]),
 ]
 POI_SPACING = 850.0
+# Objectives are fixed places on the planet. One is in play for every
+# landing site within this reach (the far ring's edge), not just the site it
+# was placed around, so sites close together share the ground between them.
+POI_REACH = 9000.0
 # Where an objective type feels at home, by biome (added to its score).
 POI_BIOME = {
     "frogs": {SWAMP: 3.0, TIDAL: 2.0, JUNGLE: 2.0},
@@ -245,6 +249,7 @@ POI_BIOME = {
 }
 
 LANDMARKS = ["monolith", "ribcage", "crater", "freighter", "spire", "monolith"]
+LANDMARKS_PER_SITE = 5
 # Flat ground cleared around each landmark, and its solid core, in world px.
 # Sized to the landmark's real footprint (ArenaView::drawLandmark).
 LANDMARK_PAD = {"monolith": 260, "spire": 380, "ribcage": 720, "crater": 330,
@@ -561,13 +566,13 @@ def choose_sites(g, land, biome, sea_dist, rng, spine_dist, count=6):
             tx, ty = g.to_tile(x, y)
             if not g.inside(tx, ty) or not land[ty, tx]:
                 continue
-            if sea_dist[ty, tx] < 3200 or biome[ty, tx] == CITY or spine_dist[ty, tx] < 3000:
+            if sea_dist[ty, tx] < 2400 or biome[ty, tx] == CITY or spine_dist[ty, tx] < 3000:
                 continue
             mix = biome_mix(g, biome, x, y, radius, step=500.0)
             sea = mix[0]
             shares = mix[1:]
             real = int((shares >= 0.12).sum())
-            if sea > 0.3 or mix[CITY] > 0.35:
+            if sea > 0.4 or mix[CITY] > 0.35:
                 continue
             score = {1: 0.0, 2: 2.0, 3: 3.0, 4: 2.2}.get(real, 1.0)
             score += 1.5 * (1.0 - sea) + rng.uniform(0, 0.3)
@@ -577,7 +582,7 @@ def choose_sites(g, land, biome, sea_dist, rng, spine_dist, count=6):
     cands.sort(key=lambda c: -c[0])
     sites = []
     for score, x, y, mix in cands:
-        if any(math.hypot(x - sx, y - sy) < 8000 for _s, sx, sy, _m in sites):
+        if any(math.hypot(x - sx, y - sy) < 7500 for _s, sx, sy, _m in sites):
             continue
         sites.append((score, x, y, mix))
         if len(sites) >= count:
@@ -605,10 +610,13 @@ def build(seed: int, size: int, site_index: int):
     sites = choose_sites(g, land, biome, sea_dist, random.Random(seed * 7 + 1), spine_dist)
     assert sites, "no crash site found"
     site_index = min(site_index, len(sites) - 1)
-    ship_x, ship_y, _mix = sites[site_index]
-    rx, ry = wx - ship_x, wy - ship_y           # ship-relative
-    ship_dist = np.hypot(rx, ry)
-    land[g.disc(ship_x, ship_y, BASIN_RADIUS + 400)] = True
+    # Every site is a landing (basin, trench, hull, camps, objectives); the
+    # server picks one per match. `--site` only sets the map's default ship.
+    site_xy = [(x, y) for x, y, _mix in sites]
+    ship_x, ship_y = site_xy[site_index]
+    ship_dist = np.min([np.hypot(wx - x, wy - y) for x, y in site_xy], axis=0)
+    for x, y in site_xy:
+        land[g.disc(x, y, BASIN_RADIUS + 400)] = True
 
     # ---- 4. Height -----------------------------------------------------------
     params = np.zeros((5, size, size), dtype=np.float32)
@@ -787,23 +795,29 @@ def build(seed: int, size: int, site_index: int):
                                               "variant": rng.randrange(4)}))
             placed += 1
 
-    # ---- 8. The crash trench ----------------------------------------------
-    # Ploughed in from whichever side has the most open land.
-    best_dir, best_open = 155.0, -1.0
-    for deg in range(0, 360, 15):
-        a = math.radians(deg)
-        open_ = 0
-        for k in range(1, 22):
-            tx, ty = g.to_tile(ship_x + math.cos(a) * k * 100, ship_y + math.sin(a) * k * 100)
-            if g.inside(tx, ty) and land[ty, tx] and biome[ty, tx] != CITY:
-                open_ += 1
-        if open_ > best_open + 0.5 or (open_ == best_open and abs(deg - 155) < abs(best_dir - 155)):
-            best_dir, best_open = float(deg), open_
-    crash_angle = math.radians(best_dir)
-    ux, uy = math.cos(crash_angle), math.sin(crash_angle)
-    along = rx * ux + ry * uy
-    across = -rx * uy + ry * ux
-    trench = (along > 150) & (along < 2100) & (np.abs(across) < 70 + along * 0.05)
+    # ---- 8. The crash trenches: one per landing site ----------------------
+    # Ploughed in from whichever side has the most open land. The sites the
+    # ship did not land on this match read as old landing scars.
+    trench = np.zeros((size, size), dtype=bool)
+    crash_dirs = []
+    for sx_, sy_ in site_xy:
+        best_dir, best_open = 155.0, -1.0
+        for deg in range(0, 360, 15):
+            a = math.radians(deg)
+            open_ = 0
+            for k in range(1, 22):
+                tx, ty = g.to_tile(sx_ + math.cos(a) * k * 100, sy_ + math.sin(a) * k * 100)
+                if g.inside(tx, ty) and land[ty, tx] and biome[ty, tx] != CITY:
+                    open_ += 1
+            if open_ > best_open + 0.5 or (open_ == best_open and
+                                           abs(deg - 155) < abs(best_dir - 155)):
+                best_dir, best_open = float(deg), open_
+        a = math.radians(best_dir)
+        ux, uy = math.cos(a), math.sin(a)
+        crash_dirs.append((ux, uy))
+        along = (wx - sx_) * ux + (wy - sy_) * uy
+        across = -(wx - sx_) * uy + (wy - sy_) * ux
+        trench |= (along > 150) & (along < 2100) & (np.abs(across) < 70 + along * 0.05)
     trench &= land & ~city
     level[trench] = np.maximum(level[trench] - 1, 2)
 
@@ -822,7 +836,7 @@ def build(seed: int, size: int, site_index: int):
         if made >= 16:
             break
         wsx, wsy = g.centre(sx_, sy_)
-        if math.hypot(wsx - ship_x, wsy - ship_y) < 2200:
+        if min(math.hypot(wsx - x, wsy - y) for x, y in site_xy) < 2200:
             continue
         if river[max(0, sy_ - 30):sy_ + 30, max(0, sx_ - 30):sx_ + 30].any():
             continue
@@ -911,6 +925,10 @@ def build(seed: int, size: int, site_index: int):
     # Whatever still cannot be reached is filled in: nobody gets stuck there.
     pockets = land & ~blocked & ~reach
     blocked |= pockets
+    for x, y in site_xy:
+        tx, ty = g.to_tile(x, y + 60)
+        assert reach[ty, tx], f"landing site ({x:.0f}, {y:.0f}) is cut off"
+
 
     # ---- Materials ---------------------------------------------------------
     slope = np.zeros_like(height)
@@ -956,22 +974,41 @@ def build(seed: int, size: int, site_index: int):
     material[lakes] = MAT["water"]
     material[~land] = MAT["sea"]
     material[trench] = MAT["scar"]
-    basin_dust = g.disc(ship_x, ship_y, BASIN_RADIUS * 0.8) & land & ~trench & ~city
-    material[basin_dust] = MAT["dust"]
+    for x, y in site_xy:
+        basin_dust = g.disc(x, y, BASIN_RADIUS * 0.8) & land & ~trench & ~city
+        material[basin_dust] = MAT["dust"]
 
     world = dict(g=g, rng=rng, land=land, level=level, region=region, biome=biome,
                  blocked=blocked, material=material, city=city, lakes=lakes,
                  river=river, trench=trench, peaks=peaks, ridge=ridge,
                  near_water=near_water | marsh | tidepool, props=props,
                  city_id=city_id, city_blocks=city_blocks, slope=slope,
-                 crash=(ux, uy), ship=(ship_x, ship_y), sites=sites,
+                 crash=crash_dirs[site_index], ship=(ship_x, ship_y), sites=sites,
+                 site_xy=site_xy, crash_dirs=crash_dirs,
                  site_index=site_index, sea_dist=sea_dist, marsh=marsh,
                  frozen=frozen, tidepool=tidepool, beach=beach,
                  land_dist=land_dist)
-    place_landmarks(world)
-    place_pois(world)
-    cut_trails(world)
-    place_rocks(world)
+    # Each landing site gets its own rings of objectives, landmarks, trails
+    # home and lifeline rocks. Rings are placed across all sites one ring at
+    # a time, so every site's near objectives come before anyone's far ones.
+    world["landmarks"], world["pois"], world["rocks"] = [], [], []
+    world["trail"] = np.zeros((size, size), dtype=bool)
+
+    def at_site(i):
+        world["ship"], world["crash"], world["site_now"] = site_xy[i], crash_dirs[i], i
+
+    for i in range(len(site_xy)):
+        at_site(i)
+        place_landmarks(world)
+    for ring in RINGS:
+        for i in range(len(site_xy)):
+            at_site(i)
+            place_pois(world, ring)
+    for i in range(len(site_xy)):
+        at_site(i)
+        cut_trails(world)
+        place_rocks(world)
+    at_site(site_index)
     dress(world)
     return world
 
@@ -1014,9 +1051,8 @@ def flatten(w, x, y, radius, material=None, keep_level=None):
 def place_landmarks(w):
     g, rng = w["g"], w["rng"]
     sx, sy = w["ship"]
-    w["landmarks"] = []
     tries = 0
-    want = list(LANDMARKS)
+    want = list(LANDMARKS[:LANDMARKS_PER_SITE])
     while want and tries < 5000:
         tries += 1
         a = rng.uniform(-math.pi, math.pi)
@@ -1050,10 +1086,11 @@ def place_landmarks(w):
         w["props"].append((kind, x, y, {"variant": rng.randrange(4)}))
 
 
-def place_pois(w):
+def place_pois(w, ring_spec):
     g, rng = w["g"], w["rng"]
     sx, sy = w["ship"]
-    pois = []
+    site = w["site_now"]
+    pois = w["pois"]
     level, near_water = w["level"], w["near_water"]
 
     def context_score(kind, x, y):
@@ -1082,8 +1119,21 @@ def place_pois(w):
                     s += 3.0
         return s
 
-    for ring, r0, r1, kinds in RINGS:
-        for kind in kinds:
+    others = [p for i, p in enumerate(w["site_xy"]) if i != site]
+
+    def ring_full(ox, oy, d):
+        for _name, q0, q1, quota in RINGS:
+            if q0 <= d <= q1:
+                return sum(1 for _k, px, py, _r, _s in pois
+                           if q0 <= math.hypot(px - ox, py - oy) <= q1) >= len(quota) + 3
+        return False
+    for ring, r0, r1, kinds in [ring_spec]:
+        # Shared ground: objectives already in this band (placed around a
+        # neighbouring site) count toward this ring, so every site sees
+        # about the same number in play.
+        have = sum(1 for _k, px, py, _r, _s in pois
+                   if r0 <= math.hypot(px - sx, py - sy) <= r1)
+        for kind in kinds[have:]:
             pad = POI_KINDS[kind][5]
             best = None
             for _ in range(500):
@@ -1093,9 +1143,15 @@ def place_pois(w):
                 d = math.hypot(x - sx, y - sy)
                 if d < r0 or d > r1:
                     continue
+                # Never inside another site's near ring (that is its own), and
+                # never where it would push any site's ring past its count.
+                if any(math.hypot(x - ox, y - oy) < 2500.0 for ox, oy in others):
+                    continue
+                if any(ring_full(ox, oy, math.hypot(x - ox, y - oy)) for ox, oy in others):
+                    continue
                 if not walkable_spot(w, x, y, pad + 40):
                     continue
-                if any(math.hypot(x - px, y - py) < POI_SPACING for _k, px, py, _r in pois):
+                if any(math.hypot(x - px, y - py) < POI_SPACING for _k, px, py, _r, _s in pois):
                     continue
                 if any(math.hypot(x - lx, y - ly) < 380 for _k, lx, ly in w["landmarks"]):
                     continue
@@ -1108,9 +1164,8 @@ def place_pois(w):
             if best is None:
                 continue
             _s, x, y = best
-            pois.append((kind, x, y, ring))
+            pois.append((kind, x, y, ring, site))
             flatten(w, x, y, pad, material=MAT["pad"])
-    w["pois"] = pois
 
 
 def cut_trails(w):
@@ -1144,12 +1199,16 @@ def cut_trails(w):
                 prev[(nx, ny)] = (x, y)
                 heapq.heappush(heap, (nc, nx, ny))
     trail = np.zeros((size, size), dtype=bool)
-    for _kind, x, y, _ring in w["pois"]:
+    for _kind, x, y, _ring, site in w["pois"]:
+        if site != w["site_now"]:
+            continue
         node = g.to_tile(x, y)
         while node in prev:
             trail[node[1], node[0]] = True
             node = prev[node]
     for kind, x, y in w["landmarks"]:
+        if math.hypot(x - w["ship"][0], y - w["ship"][1]) > 6000:
+            continue
         node = g.to_tile(x + 300, y + 120)
         while node in prev:
             trail[node[1], node[0]] = True
@@ -1161,7 +1220,7 @@ def cut_trails(w):
     keep = (w["material"] == MAT["pad"]) | w["city"] | w["river"] | \
         (w["material"] == MAT["scar"]) | blocked
     w["material"][wide & ~keep] = MAT["path"]
-    w["trail"] = wide
+    w["trail"] = w["trail"] | wide
 
 
 def place_rocks(w):
@@ -1172,13 +1231,13 @@ def place_rocks(w):
     sx, sy = w["ship"]
     spacing = 560.0
     zone = ZONE_RADII[-1] + 400
-    keepout = [(sx, sy, SHIP_CLEAR)]
-    for kind, x, y, _ring in w["pois"]:
+    keepout = [(x, y, SHIP_CLEAR) for x, y in w["site_xy"]]
+    for kind, x, y, _ring, _site in w["pois"]:
         keepout.append((x, y, POI_KINDS[kind][5] + 120))
     for _k, x, y in w["landmarks"]:
         keepout.append((x, y, 360))
-    rocks = []
-    for _ in range(60000):
+    rocks = w["rocks"]
+    for _ in range(20000):
         x = sx + rng.uniform(-zone * 1.3, zone * 1.3)
         y = sy + rng.uniform(-zone, zone)
         rw, rh = round(rng.uniform(70, 150)), round(rng.uniform(45, 95))
@@ -1197,7 +1256,6 @@ def place_rocks(w):
         if bad or any(math.hypot(x - rx, y - ry) < spacing for rx, ry, _w, _h in rocks):
             continue
         rocks.append((x, y, rw, rh))
-    w["rocks"] = rocks
 
 
 # Vegetation per biome: (kind, count per hectare of the biome, min gap m,
@@ -1227,8 +1285,8 @@ def dress(w):
     g, rng = w["g"], w["rng"]
     props = w["props"]
     sx, sy = w["ship"]
-    keepout = [(sx, sy, SHIP_CLEAR + 80)]
-    for kind, x, y, _ring in w["pois"]:
+    keepout = [(x, y, SHIP_CLEAR + 80) for x, y in w["site_xy"]]
+    for kind, x, y, _ring, _site in w["pois"]:
         keepout.append((x, y, POI_KINDS[kind][5] + 60))
     for k, x, y in w["landmarks"]:
         keepout.append((x, y, LANDMARK_PAD[k] + 60))
@@ -1500,29 +1558,59 @@ def write_tmx(w, path, seed, size_arg):
     def add(layer, xml):
         groups.setdefault(layer, []).append(xml)
 
+    # The default ship (one-site tools and the editor); the server moves it
+    # to a landing site every match.
     add("Ship", point_object(next_id, "The Ship", ship_x, ship_y, cy)); next_id += 1
-    for i in range(4):
-        a = math.pi / 2 + i * math.pi / 2
-        add("PlayerSpawns", point_object(next_id, f"Spawn_{i + 1}",
-                                         ship_x + math.cos(a) * 150,
-                                         ship_y + math.sin(a) * 110 + 40 + 110, cy))
-        next_id += 1
+    hull = ship_collision_from_arena(cy)
+    for site, (sx_, sy_) in enumerate(w["site_xy"]):
+        tag = ("site", "int", str(site))
+        for i in range(4):
+            a = math.pi / 2 + i * math.pi / 2
+            add("PlayerSpawns", point_object(next_id, f"S{site}_Spawn_{i + 1}",
+                                             sx_ + math.cos(a) * 150,
+                                             sy_ + math.sin(a) * 110 + 40 + 110, cy, [tag]))
+            next_id += 1
+        # The ship's own objectives come with it: only at its own site.
+        for i, angle_deg in enumerate((225.0, 45.0)):
+            a = math.radians(angle_deg)
+            add("Objectives", point_object(next_id, f"S{site}_Turret_{i + 1}",
+                                           sx_ + math.cos(a) * 420,
+                                           sy_ + math.sin(a) * 420, cy, [
+                ("objective_type", "string", "derelict_turret"),
+                ("description", "string", "Repair the derelict turret"),
+                ("radius", "float", "70.0"), ("interaction_time", "float", "4.0"),
+                ("sites", "string", str(site))]))
+            next_id += 1
+        # The hull: solid only at the site the ship stands on ("hull@<site>").
+        for name, typ, x, y, wdt, hgt in hull:
+            typ = f"{typ}@{site}" if typ.startswith("hull") else typ
+            add("Collision", f'    <object id="{next_id}" name="S{site}_{name}" type="{typ}" '
+                             f'x="{x + sx_:.1f}" y="{y + sy_ + cy:.1f}" '
+                             f'width="{wdt:g}" height="{hgt:g}" />')
+            next_id += 1
 
     counts = {}
-    for kind, x, y, ring in w["pois"]:
+    for kind, x, y, ring, site in w["pois"]:
+        # Fixed on the planet: in play for every landing site in reach. The
+        # camp's size was set by the site it was placed around (its ring).
+        sx_, sy_ = w["site_xy"][site]
+        reach = [i for i, (px, py) in enumerate(w["site_xy"])
+                 if math.hypot(x - px, y - py) <= POI_REACH]
+        assert site in reach
+        tag = ("sites", "string", ",".join(str(i) for i in reach))
         otype, desc, radius, itime, (grunts, elites), _pad = POI_KINDS[kind]
         counts[kind] = counts.get(kind, 0) + 1
         name = f"{kind.title().replace('_', '')}_{counts[kind]}"
         props = [("objective_type", "string", otype), ("description", "string", desc),
                  ("radius", "float", f"{radius:.1f}"),
-                 ("interaction_time", "float", f"{itime:.1f}")]
+                 ("interaction_time", "float", f"{itime:.1f}"), tag]
         if ring == "far" and grunts:
             grunts += 1
         camp = grunts + elites
         if otype in ("capture_outpost", "salvage_medpacks"):
             props.append(("enemies_required", "int", str(camp)))
         if otype == "save_the_frogs":
-            dx, dy = x - ship_x, y - ship_y
+            dx, dy = x - sx_, y - sy_
             d = math.hypot(dx, dy)
             px, py = x - dx / d * 260.0, y - dy / d * 260.0
             props += [("enemies_required", "int", "3"),
@@ -1538,28 +1626,13 @@ def write_tmx(w, path, seed, size_arg):
                 ring_r = (radius * 0.6 if otype in ("capture_outpost", "salvage_medpacks")
                           else radius + 40.0)
                 gx, gy = x + math.cos(a) * ring_r, y + math.sin(a) * ring_r * 0.8
-            camp_props = [("enemy_type", "string", "venoxarid_grunt")]
+            camp_props = [("enemy_type", "string", "venoxarid_grunt"), tag]
             if elite:
                 camp_props.append(("elite", "bool", "true"))
             add("EnemySpawns", point_object(next_id, f"{name}_guard_{i + 1}", gx, gy, cy,
                                             camp_props))
             next_id += 1
 
-    for i, angle_deg in enumerate((225.0, 45.0)):
-        a = math.radians(angle_deg)
-        add("Objectives", point_object(next_id, f"Turret_{i + 1}",
-                                       ship_x + math.cos(a) * 420,
-                                       ship_y + math.sin(a) * 420, cy, [
-            ("objective_type", "string", "derelict_turret"),
-            ("description", "string", "Repair the derelict turret"),
-            ("radius", "float", "70.0"), ("interaction_time", "float", "4.0")]))
-        next_id += 1
-
-    for name, typ, x, y, wdt, hgt in ship_collision_from_arena(cy):
-        add("Collision", f'    <object id="{next_id}" name="{name}" type="{typ}" '
-                         f'x="{x + ship_x:.1f}" y="{y + ship_y + cy:.1f}" '
-                         f'width="{wdt:g}" height="{hgt:g}" />')
-        next_id += 1
     for i, (x, y, rw, rh) in enumerate(sorted(w["rocks"], key=lambda r: (r[1], r[0]))):
         add("Terrain", f'    <object id="{next_id}" name="Rock_{i + 1}" type="terrain" '
                        f'x="{x - rw / 2:.1f}" y="{y - rh / 2 + cy:.1f}" width="{rw}" height="{rh}" />')
@@ -1567,13 +1640,11 @@ def write_tmx(w, path, seed, size_arg):
     for i, (kind, x, y, props) in enumerate(w["props"]):
         add("Props", prop_xml(next_id, f"{kind}_{i + 1}", kind, x, y, cy, props))
         next_id += 1
-    # Every candidate crash site, for choosing one per match (not used by
-    # the game yet; the ship sits on site `active`).
+    # The landing sites: the server picks one per match (never the last).
     for i, (x, y, mix) in enumerate(w["sites"]):
         names = ",".join(f"{BIOMES[b][0]}:{mix[b]:.2f}" for b in BIOMES if mix[b] >= 0.05)
         add("CrashSites", point_object(next_id, f"Site_{i}", x, y, cy, [
-            ("biomes", "string", names),
-            ("active", "bool", "true" if i == w["site_index"] else "false")]))
+            ("biomes", "string", names)]))
         next_id += 1
 
     order = ["Ship", "PlayerSpawns", "Objectives", "EnemySpawns", "Collision", "Terrain",
@@ -1715,7 +1786,7 @@ def preview(w, path):
     d = ImageDraw.Draw(img)
     _overlay(w, d, to_px, scale, terrain=True)
     d.text((8, 6), "planet terrain: pads (near black / mid yellow / far orange), landmarks "
-                   "pink, storm rings blue, crash sites white (active filled)", fill=(220, 220, 220))
+                   "pink, round-3 storm around every landing site blue", fill=(220, 220, 220))
     img.save(path)
 
     # --- Biome view -------------------------------------------------------
@@ -1765,8 +1836,8 @@ def preview(w, path):
         d.rectangle([lx, y + 2, lx + 10, y + 11], fill=c)
         d.text((lx + 16, y), f"{name:<18} {share * 100:4.1f}%   {med:5.0f} s / {q1:4.0f} s",
                fill=(220, 220, 220))
-    d.text((8, 6), "planet biomes: borders white, storm rings around the ship blue, crash "
-                   "sites numbered (active filled). Straight runs at hero speed (255 px/s).",
+    d.text((8, 6), "planet biomes: borders white, round-3 storm around each landing site "
+                   "blue, sites numbered. Straight runs at hero speed (255 px/s).",
            fill=(220, 220, 220))
     biome_path = Path(path).with_name(Path(path).stem + "_biomes.png")
     img.save(biome_path)
@@ -1774,11 +1845,13 @@ def preview(w, path):
 
 
 def _overlay(w, d, to_px, scale, terrain):
-    sx, sy = w["ship"]
-    for r in ZONE_RADII:
+    # Round 3's storm around every landing site (the default one brighter).
+    for i, (sx, sy) in enumerate(w["site_xy"]):
         cx, cy_ = to_px(sx, sy)
-        d.ellipse([cx - r * scale, cy_ - r * scale, cx + r * scale, cy_ + r * scale],
-                  outline=(70, 130, 255))
+        rings = ZONE_RADII if i == w["site_index"] else ZONE_RADII[-1:]
+        for r in rings:
+            d.ellipse([cx - r * scale, cy_ - r * scale, cx + r * scale, cy_ + r * scale],
+                      outline=(70, 130, 255) if i == w["site_index"] else (50, 80, 160))
     if terrain:
         for kind, x, y, _p in w["props"]:
             if kind == "city_block":
@@ -1793,14 +1866,14 @@ def _overlay(w, d, to_px, scale, terrain):
         for kind, x, y in w["landmarks"]:
             px, py = to_px(x, y)
             d.polygon([(px, py - 10), (px + 5, py), (px - 5, py)], fill=(255, 120, 220))
-        for kind, x, y, ring in w["pois"]:
+        for kind, x, y, ring, _site in w["pois"]:
             px, py = to_px(x, y)
             col = (20, 20, 20) if ring == "near" else (240, 150, 40) if ring == "far" \
                 else (240, 220, 90)
             d.ellipse([px - 3, py - 3, px + 3, py + 3], fill=col, outline=(255, 255, 255))
     for i, (x, y, _mix) in enumerate(w["sites"]):
         px, py = to_px(x, y)
-        active = i == w["site_index"]
+        active = True
         d.ellipse([px - 6, py - 6, px + 6, py + 6], outline=(255, 255, 255),
                   fill=(120, 255, 170) if active else None, width=2)
         d.text((px + 8, py - 6), str(i), fill=(255, 255, 255))
@@ -1827,7 +1900,11 @@ def main():
           f"tiles, {len(w['pois'])} points of interest, {len(w['landmarks'])} landmarks, "
           f"{len(w['rocks'])} rocks, {len(w['props'])} props")
     sx, sy = w["ship"]
-    print(f"ship on crash site {w['site_index']} of {len(w['sites'])} at ({sx:.0f}, {sy:.0f})")
+    print(f"{len(w['sites'])} landing sites (the server picks one per match); default ship "
+          f"on site {w['site_index']} at ({sx:.0f}, {sy:.0f})")
+    for i in range(len(w["sites"])):
+        n = sum(1 for p in w["pois"] if p[4] == i)
+        print(f"  site {i}: {n} objectives")
     for i, (x, y, mix) in enumerate(w["sites"]):
         names = ", ".join(f"{BIOMES[b][1]} {mix[b] * 100:.0f}%" for b in BIOMES
                           if mix[b] >= 0.05)

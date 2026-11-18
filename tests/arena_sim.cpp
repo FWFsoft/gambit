@@ -11,6 +11,8 @@
 // Usage:
 //   ArenaSim [--bots Suds,Gravon,Isaac,Zephyr] [--map assets/maps/arena.tmx]
 //            [--god] [--minutes 20] [--seed N] [--quiet] [--expect victory]
+//            [--matches N]  (play N matches in a row on one server; maps with
+//                            several crash sites land somewhere new each time)
 //
 // Exit code is non-zero if the match does not finish in time, or if
 // --expect is given and the result differs.
@@ -24,6 +26,7 @@
 #include <map>
 #include <memory>
 #include <random>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -470,6 +473,7 @@ int main(int argc, char** argv) {
   std::string expect;
   bool god = false;
   bool quiet = false;
+  int matches = 1;
   float minutes = 20.0f;
   unsigned seed = 7;
 
@@ -482,6 +486,8 @@ int main(int argc, char** argv) {
     else if (arg == "--map") mapPath = next();
     else if (arg == "--god") god = true;
     else if (arg == "--quiet") quiet = true;
+    else if (arg == "--matches")
+      matches = std::max(1, std::stoi(next()));
     else if (arg == "--minutes") minutes = std::stof(next());
     else if (arg == "--seed") seed = static_cast<unsigned>(std::stoul(next()));
     else if (arg == "--expect") expect = next();
@@ -509,6 +515,30 @@ int main(int argc, char** argv) {
   int lastRound = 0;
   const uint64_t maxTicks = static_cast<uint64_t>(minutes * 60.0f * 60.0f);
   int peakEnemies = 0;
+
+  // Maps with several crash sites: where this match landed, and that only
+  // that site's objectives were live (all of them near its ship).
+  auto reportLanding = [&](int match) {
+    if (sim.game().getLandingSite() < 0) return;
+    ObjectiveSystem* objectives = sim.game().getObjectiveSystem();
+    float farthest = 0.0f;
+    int count = 0;
+    int shared = 0;
+    for (const Objective& o : objectives->getObjectives()) {
+      farthest = std::max(farthest, std::hypot(o.x - sim.game().getShipX(),
+                                               o.y - sim.game().getShipY()));
+      shared += __builtin_popcount(o.sites) > 1;
+      count++;
+    }
+    std::printf(
+        "match %d: landing site %d at (%.0f, %.0f): %d objectives in play "
+        "(%d shared with another site), farthest %.0f px from the ship\n",
+        match, sim.game().getLandingSite(), sim.game().getShipX(),
+        sim.game().getShipY(), count, shared, farthest);
+  };
+  std::vector<int> landedOn;
+  bool countedEnd = false;
+  bool repeatedSite = false;
 
   while (sim.ticks() < maxTicks) {
     sim.step();
@@ -540,7 +570,18 @@ int main(int argc, char** argv) {
     }
     if (phase == Arena::MatchPhase::Victory ||
         phase == Arena::MatchPhase::Defeat) {
-      break;
+      if (!countedEnd) {
+        countedEnd = true;
+        int site = sim.game().getLandingSite();
+        if (!landedOn.empty() && site >= 0 && site == landedOn.back()) {
+          repeatedSite = true;
+        }
+        landedOn.push_back(site);
+        reportLanding(static_cast<int>(landedOn.size()));
+        if (static_cast<int>(landedOn.size()) >= matches) break;
+      }
+    } else {
+      countedEnd = false;
     }
   }
 
@@ -549,6 +590,15 @@ int main(int argc, char** argv) {
   std::printf("\nresult: %s after %.0fs of game time (round %d)\n",
               phaseName(result), seconds, director.round());
   std::printf("peak enemies alive: %d\n", peakEnemies);
+  if (repeatedSite) {
+    std::printf("ERROR: two matches in a row landed on the same site\n");
+    return 1;
+  }
+  if (static_cast<int>(landedOn.size()) < matches) {
+    std::printf("ERROR: only %zu of %d matches finished\n", landedOn.size(),
+                matches);
+    return 1;
+  }
   std::printf("server -> all clients: %.1f KB/s, %.0f packets/s\n",
               sim.bytesSent() / 1024.0 / seconds, sim.packetsSent() / seconds);
   for (const Bot& bot : sim.allBots()) {
