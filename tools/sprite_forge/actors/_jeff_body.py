@@ -87,8 +87,9 @@ class Body:
                     dict(at=r, rot=(0, 0, 0), knee=(0, -1, 0)))
         floor = self.rest("ankle_L")[2]
         x = abs(self.rest("ankle_L")[0])
-        return (dict(at=(x + 0.04, -0.04, floor), rot=(0, 0, 6), knee=(0.2, -1, 0)),
-                dict(at=(-x - 0.04, 0.06, floor), rot=(0, 0, -6), knee=(-0.2, -1, 0)))
+        # A heavy machine's stance: feet wider than the hips.
+        return (dict(at=(x + 0.08, -0.04, floor), rot=(0, 0, 6), knee=(0.35, -1, 0)),
+                dict(at=(-x - 0.08, 0.06, floor), rot=(0, 0, -6), knee=(-0.35, -1, 0)))
 
     def ctl(self, off=(0, 0, -0.03), twist=(0, 0, 0), lean=(2, 0), side=(0, 0),
             tilt=0.0, nod=-2.0, look=0.95, L=None, R=None, fl=None, fr=None):
@@ -281,14 +282,30 @@ def animation(body):
                L=dict(at=(0.56, 0.10, -0.70), elbow=(0.8, 0.6, -0.2)),
                R=dict(at=(-0.40, -0.20, -0.56), elbow=(-0.8, 0.6, -0.2)))
     clip("hit", 6, 20, [(0, G), (1, hurt, "out"), (3, hurt), (6, G)], overlap=0.02)
+    # Death: he powers down rather than toppling. The knees give, he drops
+    # to the floor with the head hanging, and settles with a small tip
+    # forward. A full fall would leave the cell from some directions, and a
+    # slumped machine reads as "down, revive me" from every side.
     slump = ctl(off=(0, 0.02, -0.36), lean=(26, 22), nod=24,
                 L=dict(at=(0.40, -0.30, -1.00), elbow=(0.8, 0.2, -0.6)),
                 R=dict(at=(-0.40, -0.30, -1.00), elbow=(-0.8, 0.2, -0.6)))
+    if body.treads:
+        down = ctl(lean=(30, 26), nod=30,
+                   L=dict(at=(0.42, -0.36, -0.98), elbow=(0.8, 0.2, -0.6)),
+                   R=dict(at=(-0.40, -0.40, -1.00), elbow=(-0.8, 0.2, -0.6)))
+    else:
+        floor = body.rest("ankle_L")[2]
+        x = abs(body.rest("ankle_L")[0])
+        down = ctl(off=(0, 0.10, -0.62), lean=(30, 26), nod=30,
+                   fl=dict(at=(x + 0.10, -0.26, floor), rot=(0, 0, 14), knee=(0.4, -1, 0.4)),
+                   fr=dict(at=(-x - 0.10, -0.20, floor), rot=(0, 0, -14), knee=(-0.4, -1, 0.4)),
+                   L=dict(at=(0.42, -0.36, -0.98), elbow=(0.8, 0.2, -0.6)),
+                   R=dict(at=(-0.40, -0.40, -1.00), elbow=(-0.8, 0.2, -0.6)))
     clip("death", 12, 12, [
         (0, hurt),
         (3, slump, "in"),
-        (6, slump, "smooth", (8, 0, 0)),
-        (9, slump, "in", (70, 0, 0)),
-        (12, slump, "smooth", (82, 0, 0)),
+        (7, down, "in", (10, 0, 0)),
+        (9, down, "out", (16, 0, 0)),
+        (12, down, "smooth", (14, 0, 0)),
     ], overlap=0.02)
     return out.data()
