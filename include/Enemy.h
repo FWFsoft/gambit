@@ -42,6 +42,7 @@ struct Enemy : public Animatable {
   float windupTotalMs = 0.0f;
   float cooldownMs = 0.0f;     // until the next attack may start
   float aimX = 0.0f, aimY = 0.0f;  // where the attack was aimed
+  bool aimedAtShip = false;        // the attack winding up is on the ship
   float knockVx = 0.0f, knockVy = 0.0f, knockMs = 0.0f;
   // Knocked into the air: helpless until it lands (AbilitySystem::knockUp).
   float airMs = 0.0f;

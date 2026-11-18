@@ -15,8 +15,8 @@ enum class ObjectiveType : uint8_t {
   DigPitTrap,      // Build a hidden pit trap (interact timer); arms on completion
   StringTripwire,  // String a tripwire with ordnance (interact timer); arms on
                    // completion, affects friendlies
-  DerelictTurret   // Repair turret (interact timer); auto-attacks enemies when
-                   // active
+  DerelictTurret   // Repair turret (interact timer); stands a roof turret up
+                   // on the ship (MatchDirector::onTurretRepaired)
 };
 
 // Current state of an objective
@@ -65,10 +65,6 @@ struct Objective {
   // For DigPitTrap: whether the completed trap has already been triggered
   bool pitTrapArmed = false;      // True after trap fires (one-time use)
   bool tripwireArmed = false;     // True after tripwire fires (one-time use)
-
-  // For DerelictTurret: auto-attack after repair
-  bool turretActive = false;        // True once repaired and calibrated
-  float turretDamageTimer = 0.0f;   // Accumulates ms; fires every 3000ms
 
   // Player currently interacting (0 = none)
   uint32_t interactingPlayerId = 0;

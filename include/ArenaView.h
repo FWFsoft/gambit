@@ -201,6 +201,10 @@ class ArenaView {
   int selectedGenus = 0;        // infusion item picked in the suit screen
   int selectedPart = 0;         // (genus 0 = none)
   bool suitScreenOpen = false;  // toggled with B outside intermission
+  // The ship's tier last frame, and until when the suit screen stands aside
+  // to show a freshly upgraded ship.
+  int lastShipTier = 0;
+  float shipRevealUntil = 0.0f;
   bool effectLab = false;       // F12: number keys drive effect verbs
   void drawEffectLabPanel();
   float timeSeconds = 0.0f;
@@ -219,6 +223,13 @@ class ArenaView {
   void drawEnemy(ImDrawList* dl, const ArenaClient::EnemyView& view);
   void drawPickup(ImDrawList* dl, uint32_t itemId, float worldX, float worldY);
   void drawShip(ImDrawList* dl);
+  // Between rounds, with enough banked scrap for the ship's next tier.
+  bool canUpgradeShip() const;
+  // "Inside for the night" at the ship's current tier.
+  float shipSafeRadius() const;
+  void drawShipWreckage(ImDrawList* dl, ImVec2 centre, float damage, int tier,
+                        bool smoke);
+  void drawRoofTurrets(ImDrawList* dl, ImVec2 anchor, int tier, ImU32 tint);
   // A terrain rock: an inked block standing on its footprint.
   void drawRock(ImDrawList* dl, const CollisionShape& rock, bool inReach,
                 bool bonding);

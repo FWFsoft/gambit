@@ -558,6 +558,25 @@ add_executable(test_points_of_interest
 target_include_directories(test_points_of_interest PRIVATE include tests)
 target_link_libraries(test_points_of_interest PRIVATE spdlog::spdlog SDL2::SDL2)
 
+add_executable(test_roof_turrets
+    tests/test_roof_turrets.cpp
+    src/Logger.cpp
+    src/EnemySystem.cpp
+    src/Effect.cpp
+    src/EffectManager.cpp
+    src/ArenaData.cpp
+    src/AbilitySystem.cpp
+    src/CharacterKits.cpp
+    src/Infusions.cpp
+    src/CollisionSystem.cpp
+    src/ItemRegistry.cpp
+    src/AnimationController.cpp
+    src/MatchDirector.cpp
+    src/ObjectiveSystem.cpp
+)
+target_include_directories(test_roof_turrets PRIVATE include tests)
+target_link_libraries(test_roof_turrets PRIVATE spdlog::spdlog SDL2::SDL2)
+
 add_executable(test_character_swap
     tests/test_character_swap.cpp
     src/Logger.cpp
@@ -728,6 +747,7 @@ add_test(NAME AnimationSystem COMMAND test_animation_system)
 add_test(NAME GameLoop COMMAND test_gameloop)
 add_test(NAME WadeKit COMMAND test_wade_kit)
 add_test(NAME Infusions COMMAND test_infusions)
+add_test(NAME RoofTurrets COMMAND test_roof_turrets)
 add_test(NAME NolanKit COMMAND test_nolan_kit)
 add_test(NAME IsaacKit COMMAND test_isaac_kit)
 add_test(NAME KadeKit COMMAND test_kade_kit)

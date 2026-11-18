@@ -34,7 +34,8 @@ enum class PacketType : uint8_t {
   MatchState = 25,         // Server → Client (round, zone, ship, scores)
   InfusionSlot = 26,       // Client → Server (slot an infusion)
   PlayerReady = 27,        // Client → Server (ready up in lobby/intermission)
-  DebugCommand = 28        // Client → Server (playtest shortcuts)
+  DebugCommand = 28,       // Client → Server (playtest shortcuts)
+  ShipUpgrade = 29         // Client → Server (spend banked scrap on a tier)
 };
 
 // Ability buttons carried in ClientInputPacket::buttons (held state).
@@ -399,7 +400,7 @@ enum class Announcement : uint8_t {
   ZoneShrinking = 2,
   ReturnToShip = 3,
   ShipUnderAttack = 4,
-  ShipTurretsOnline = 5,
+  ShipTurretsOnline = 5,  // retired: the scrap-banked ship gun is gone
   Intermission = 6,
   BossIncoming = 7,
   Victory = 8,
@@ -408,7 +409,9 @@ enum class Announcement : uint8_t {
   PlayerRevived = 11,
   ScrapDelivered = 12,
   ObjectiveComplete = 13,
-  ScrapSalvaged = 14
+  ScrapSalvaged = 14,
+  RoofTurretOnline = 15,  // a repaired Derelict Turret stands up on the roof
+  ShipUpgraded = 16       // banked scrap built the ship's next tier
 };
 
 struct GameEventPacket {
@@ -458,8 +461,14 @@ struct MatchStatePacket {
   float shipX = 0.0f, shipY = 0.0f;
   float zoneRadius = 0.0f;
   uint16_t scrapBanked = 0;
-  uint8_t turretsOnline = 0;
+  uint8_t shipTier = 0;  // Arena::Tuning::SHIP_TIER_*: 0 crashed .. 2 fort
   uint32_t bossId = 0;
+  // Roof turrets (Arena::Tuning::ROOF_TURRET_*): bit i set = turret i is
+  // standing; its barrel heading (0-255 = a full turn clockwise from
+  // straight down); and its recoil (255 = just fired, falls to 0).
+  uint8_t roofTurrets = 0;
+  uint8_t roofAim[Arena::Tuning::ROOF_TURRET_COUNT] = {};
+  uint8_t roofRecoil[Arena::Tuning::ROOF_TURRET_COUNT] = {};
   std::vector<MatchPlayerState> players;
 };
 
@@ -468,6 +477,11 @@ struct InfusionSlotPacket {
   uint8_t genus = 0;  // Arena::Genus
   uint8_t part = 0;   // Arena::InfusionPart
   uint8_t node = 0;   // Arena::suitNode index, or Arena::CORE_NODE
+};
+
+// Spend banked scrap on the ship's next tier (intermission only).
+struct ShipUpgradePacket {
+  PacketType type = PacketType::ShipUpgrade;
 };
 
 struct PlayerReadyPacket {
@@ -482,7 +496,8 @@ enum class DebugCommandKind : uint8_t {
   ToggleGodMode = 4,
   SpawnBoss = 5,
   KillAll = 6,
-  EffectLab = 7  // arg = EffectLabAction
+  EffectLab = 7,   // arg = EffectLabAction
+  RoofTurrets = 8  // stand up both roof turrets and knock 60% off the hull
 };
 
 // Effect lab: drive each effect verb by hand to judge how it looks.
@@ -519,6 +534,8 @@ GameEventPacket deserializeGameEvent(const uint8_t* data, size_t size);
 MatchStatePacket deserializeMatchState(const uint8_t* data, size_t size);
 InfusionSlotPacket deserializeInfusionSlot(const uint8_t* data, size_t size);
 PlayerReadyPacket deserializePlayerReady(const uint8_t* data, size_t size);
+std::vector<uint8_t> serialize(const ShipUpgradePacket& packet);
+ShipUpgradePacket deserializeShipUpgrade(const uint8_t* data, size_t size);
 DebugCommandPacket deserializeDebugCommand(const uint8_t* data, size_t size);
 
 std::vector<uint8_t> serialize(const ClientInputPacket& packet);

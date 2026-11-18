@@ -19,7 +19,8 @@ constexpr float DEAD_LINGER_MS = 1200.0f;  // corpse stays for the death anim
 constexpr float ENEMY_TERRAIN_RADIUS = 16.0f;  // body size against terrain
 constexpr float AGGRO_RANGE = 620.0f;
 constexpr float CAMP_AGGRO_RANGE = 300.0f;
-constexpr float SHIP_REACH = 60.0f;
+constexpr float SHIP_REACH = 60.0f;  // from the centre (a map with no hull)
+constexpr float HULL_REACH = 24.0f;  // from the face of the hull
 constexpr float PI = 3.14159265f;
 
 VfxTheme themeFor(Genus genus) {
@@ -214,13 +215,17 @@ EnemySystem::Target EnemySystem::pickTarget(
 
   if (enemy.targetShip && shipAttackable) {
     // Ship raiders only peel off for players standing in their way.
-    float shipDist = distance(enemy.x, enemy.y, shipX, shipY);
-    if (bestPlayer == nullptr || bestDist > 170.0f || shipDist < 140.0f) {
+    float hullX, hullY;
+    shipPoint(enemy.x, enemy.y, hullX, hullY);
+    bool hull = hullX != shipX || hullY != shipY;
+    float shipDist = distance(enemy.x, enemy.y, hullX, hullY);
+    if (bestPlayer == nullptr || bestDist > 170.0f ||
+        shipDist < (hull ? 60.0f : 140.0f)) {
       target.valid = true;
       target.isShip = true;
-      target.x = shipX;
-      target.y = shipY;
-      target.radius = SHIP_REACH;
+      target.x = hullX;
+      target.y = hullY;
+      target.radius = hull ? HULL_REACH : SHIP_REACH;
       return target;
     }
   }
@@ -378,7 +383,7 @@ void EnemySystem::updateEnemy(Enemy& enemy,
   float dy = target.y - enemy.y;
   float dist = std::sqrt(dx * dx + dy * dy);
   float reach = enemy.attackRange + target.radius * 0.5f;
-  if (target.isShip) reach = SHIP_REACH + enemy.attackRange;
+  if (target.isShip) reach = target.radius + enemy.attackRange;
 
   if (dist <= reach && enemy.cooldownMs <= 0.0f) {
     beginAttack(enemy, target);
@@ -423,6 +428,26 @@ void EnemySystem::updateEnemy(Enemy& enemy,
   }
 }
 
+bool EnemySystem::shipPoint(float x, float y, float& outX, float& outY) const {
+  outX = shipX;
+  outY = shipY;
+  const CollisionSystem* solid = combat ? combat->collisionSystem() : nullptr;
+  if (!solid) return false;
+  float best = -1.0f;
+  for (const auto& shape : solid->getShapes()) {
+    if (!solid->isActiveHull(shape)) continue;
+    float cx, cy;
+    CollisionSystem::closestPoint(shape.aabb, x, y, cx, cy);
+    float d = distance(x, y, cx, cy);
+    if (best < 0.0f || d < best) {
+      best = d;
+      outX = cx;
+      outY = cy;
+    }
+  }
+  return best >= 0.0f && best < 0.5f;
+}
+
 void EnemySystem::separate(Enemy& enemy) {
   // Cheap crowd separation so packs surround instead of stacking.
   for (auto& [id, other] : enemies) {
@@ -455,6 +480,7 @@ void EnemySystem::beginAttack(Enemy& enemy, const Target& target) {
   enemy.windupMs = def.windupMs;
   enemy.aimX = target.x;
   enemy.aimY = target.y;
+  enemy.aimedAtShip = target.isShip;
   enemy.vx = 0.0f;
   enemy.vy = 0.0f;
 
@@ -595,12 +621,17 @@ void EnemySystem::resolveAttack(Enemy& enemy,
     return;
   }
 
-  // Raiders chewing on the ship.
-  if (enemy.targetShip && shipAttackable &&
-      distance(enemy.x, enemy.y, shipX, shipY) <=
-          SHIP_REACH + enemy.attackRange + 30.0f &&
-      distance(enemy.aimX, enemy.aimY, shipX, shipY) < 5.0f) {
-    combat->fxBurst(shipX + dirX * -20.0f, shipY + dirY * -20.0f, 40.0f, theme);
+  // Raiders chewing on the ship: the nearest face of the hull (or its
+  // centre, on a map without a hull), if they are still in reach of it.
+  float hullX = shipX, hullY = shipY;
+  if (enemy.targetShip && shipAttackable && enemy.aimedAtShip) {
+    shipPoint(enemy.x, enemy.y, hullX, hullY);
+  }
+  bool hasHull = hullX != shipX || hullY != shipY;
+  if (enemy.targetShip && shipAttackable && enemy.aimedAtShip &&
+      distance(enemy.x, enemy.y, hullX, hullY) <=
+          (hasHull ? HULL_REACH : SHIP_REACH) + enemy.attackRange + 30.0f) {
+    combat->fxBurst(hullX + dirX * -20.0f, hullY + dirY * -20.0f, 40.0f, theme);
     if (onShipDamaged) onShipDamaged(damage);
     return;
   }

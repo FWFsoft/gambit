@@ -83,7 +83,7 @@ class ClientPrediction {
   Player localPlayer;
   float worldWidth;
   float worldHeight;
-  const CollisionSystem* collisionSystem;
+  CollisionSystem* collisionSystem;
 
   std::deque<LocalInputEvent> inputHistory;
   uint32_t localInputSequence;

@@ -66,6 +66,9 @@ ServerGameState::ServerGameState(NetworkServer* server,
   };
   hooks.clearPickups = [this]() { clearArenaPickups(); };
   hooks.resetWorld = [this]() { resetWorld(); };
+  hooks.setShipTier = [this](int tier) {
+    if (collisionSystem) collisionSystem->setHullTier(tier);
+  };
   director = std::make_unique<MatchDirector>(
       players, enemySystem.get(), abilitySystem.get(), shipX, shipY,
       worldWidth, worldHeight, hooks);
@@ -190,10 +193,10 @@ ServerGameState::ServerGameState(NetworkServer* server,
                          "' armed and waiting for victims");
           }
 
-          // DerelictTurret: turret repaired — now auto-attacks enemies
-          if (obj->type == ObjectiveType::DerelictTurret) {
-            Logger::info("DerelictTurret '" + obj->name +
-                         "' repaired and online — auto-turret active");
+          // DerelictTurret: the repaired gun stands up on the ship's roof
+          if (obj->type == ObjectiveType::DerelictTurret && director &&
+              completer != players.end()) {
+            director->onTurretRepaired(completer->second);
           }
 
           // SaveTheFrogs: spawn healing pickups at pond
@@ -383,6 +386,12 @@ void ServerGameState::onNetworkPacketReceived(
             playerIt->second, static_cast<Arena::Genus>(packet.genus),
             static_cast<Arena::InfusionPart>(packet.part), packet.node);
       }
+      break;
+    }
+
+    case PacketType::ShipUpgrade: {
+      auto playerIt = players.find(e.clientId);
+      if (playerIt != players.end()) director->onShipUpgrade(playerIt->second);
       break;
     }
 
@@ -1395,24 +1404,8 @@ void ServerGameState::updateObjectiveSideEffects(float deltaTime) {
       }
     }
 
-    // DerelictTurret: once repaired, auto-attack enemies in radius
-    if (obj.type == ObjectiveType::DerelictTurret &&
-        obj.state == ObjectiveState::Completed && enemySystem) {
-      obj.turretActive = true;
-      obj.turretDamageTimer += deltaTime;
-      if (obj.turretDamageTimer >= 3000.0f) {  // Fire every 3 seconds
-        obj.turretDamageTimer = 0.0f;
-        for (auto& [enemyId, enemy] : enemySystem->getEnemies()) {
-          if (enemy.state != EnemyState::Dead &&
-              obj.isInRange(enemy.x, enemy.y)) {
-            effectManager->applyEffect(enemyId, EffectType::Wound, 2, 3000.0f,
-                                       0, enemySystem->getEnemies());
-            Logger::info("DerelictTurret '" + obj.name + "' fired at enemy " +
-                         std::to_string(enemyId));
-          }
-        }
-      }
-    }
+    // DerelictTurret: a repaired turret now lives on the ship's roof
+    // (MatchDirector::updateRoofTurrets); nothing stays out here.
 
     // LittleJohn: activate guardian when a player enters the zone
     if (obj.type == ObjectiveType::LittleJohn &&

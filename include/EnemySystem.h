@@ -120,6 +120,11 @@ class EnemySystem {
   std::function<void(float)> onShipDamaged;
   std::mt19937 rng{1337};
 
+  // The point of the ship a raider at (x, y) goes for: the nearest face of
+  // the hull (CollisionSystem::isHull), or the ship's centre on a map that
+  // has no hull. True when (x, y) itself is on or in the hull.
+  bool shipPoint(float x, float y, float& outX, float& outY) const;
+
   struct Target {
     bool valid = false;
     bool isShip = false;

@@ -26,6 +26,9 @@ class MatchDirector {
     std::function<void()> clearPickups;
     // A new match: camps back at full strength, objectives undone.
     std::function<void()> resetWorld;
+    // The ship reached a tier (Arena::Tuning::SHIP_TIER_*): its hull
+    // footprint changes.
+    std::function<void(int tier)> setShipTier;
   };
 
   MatchDirector(std::unordered_map<uint32_t, Player>& players,
@@ -51,6 +54,13 @@ class MatchDirector {
   // salvagedScrap: the player now carries scrap home (banked at the ship).
   void onObjectiveCompleted(Player& player, bool salvagedScrap,
                             float objectiveX, float objectiveY);
+  // A Derelict Turret objective was repaired: the next roof turret stands
+  // up on the ship. Returns false if every roof turret is already up.
+  bool onTurretRepaired(Player& player);
+  // Spend banked scrap on the ship's next tier. Intermission only; returns
+  // false if it is not intermission, the ship is at its top tier, or the
+  // crew has not banked enough.
+  bool onShipUpgrade(Player& player);
   void damageShip(float amount);
   void onDebugCommand(Player& player, DebugCommandKind command, uint8_t arg);
 
@@ -58,6 +68,14 @@ class MatchDirector {
   Arena::MatchPhase phase() const { return currentPhase; }
   int round() const { return currentRound; }
   float shipHealth() const { return shipHp; }
+  int shipTier() const { return tier; }
+  int scrapInBank() const { return scrapBanked; }
+  float shipMaxHealth() const {
+    return Arena::Tuning::SHIP_TIER_MAX_HEALTH[tier];
+  }
+  float safeRadius() const {
+    return Arena::Tuning::SHIP_TIER_SAFE_RADIUS[tier];
+  }
   float zoneRadius() const { return zone; }
   MatchStatePacket buildState() const;
   // True while enemies and abilities are live.
@@ -78,9 +96,10 @@ class MatchDirector {
   int currentRound = 0;
   float phaseTimeLeft = 0.0f;  // seconds
   float phaseElapsed = 0.0f;   // seconds
-  float shipHp = Arena::Tuning::SHIP_MAX_HEALTH;
+  float shipHp = Arena::Tuning::SHIP_START_HEALTH;
   float zone = Arena::Tuning::ZONE_START_RADIUS[0];
-  int scrapBanked = 0;
+  int scrapBanked = 0;  // delivered and not yet spent on a tier
+  int tier = 0;         // the ship's upgrade tier
   uint32_t bossId = 0;
   bool bossSpawned = false;
   bool lobbyCountingDown = false;
@@ -89,7 +108,15 @@ class MatchDirector {
   float spawnTimer = 0.0f;
   float raidTimer = 0.0f;
   float zoneTickTimer = 0.0f;
-  float turretTimer = 0.0f;
+  // Roof turrets, stood up by repairing Derelict Turret objectives.
+  struct RoofTurret {
+    bool online = false;
+    float aim = 0.0f;  // radians, clockwise from straight down
+    float cooldownMs = 0.0f;
+    float recoilMs = 0.0f;
+    uint32_t targetId = 0;
+  };
+  RoofTurret roofTurrets[Arena::Tuning::ROOF_TURRET_COUNT];
   float shipAlertCooldown = 0.0f;
   bool announcedShrink = false;
   bool announcedReturn = false;
@@ -128,7 +155,7 @@ class MatchDirector {
   // Shared helpers
   void updateSpawning(float dtMs, bool bossPhase);
   void updateZoneDamage(float dtMs);
-  void updateTurrets(float dtMs);
+  void updateRoofTurrets(float dtMs);
   void updateDeathsAndRevives(float dtMs);
   void updateScrapDelivery();
   // genusOverride / swarmersOnly are for playtest cheats.

@@ -1,10 +1,12 @@
 #include "MatchDirector.h"
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <vector>
 
 #include "AbilitySystem.h"
+#include "CollisionSystem.h"
 #include "EffectManager.h"
 #include "EnemySystem.h"
 #include "Infusions.h"
@@ -22,9 +24,6 @@ constexpr float PI = 3.14159265f;
 constexpr float END_SCREEN_SECONDS = 8.0f;
 constexpr float MIN_SPAWN_DISTANCE = 430.0f;   // from any living player
 constexpr float MAX_SPAWN_DISTANCE = 1050.0f;  // from the nearest player
-constexpr float TURRET_RANGE = 380.0f;
-constexpr float TURRET_DAMAGE = 14.0f;
-constexpr float TURRET_INTERVAL_MS = 700.0f;
 
 float dist(float x0, float y0, float x1, float y1) {
   float dx = x1 - x0;
@@ -112,10 +111,12 @@ void MatchDirector::bringPlayersHome(bool reviveAndHeal) {
   int count = std::max(1, participantCount());
   for (auto& [id, player] : players) {
     if (!isParticipant(player)) continue;
-    float angle = (2.0f * PI * index) / count + PI * 0.5f;
+    // A row in the open ground in front of the hull (the hull's footprint
+    // is solid: arena.tmx, "ShipHull_*").
+    float t = count == 1 ? 0.5f : static_cast<float>(index) / (count - 1);
     index++;
-    player.x = shipX + std::cos(angle) * 150.0f;
-    player.y = shipY + std::sin(angle) * 110.0f + 40.0f;
+    player.x = shipX - 150.0f + 300.0f * t;
+    player.y = shipY + 150.0f;
     player.vx = player.vy = 0.0f;
     // A blip of forced motion tells clients not to predict across the jump.
     player.forcedVx = player.forcedVy = 0.0f;
@@ -173,7 +174,7 @@ void MatchDirector::endRound() {
   // Night falls. Anyone who is not back at the ship is lost to the dark.
   for (auto& [id, player] : players) {
     if (!isParticipant(player) || player.isDead()) continue;
-    if (dist(player.x, player.y, shipX, shipY) > Tuning::SHIP_SAFE_RADIUS) {
+    if (dist(player.x, player.y, shipX, shipY) > safeRadius()) {
       player.health = 0.0f;
       player.deaths++;
       player.score += Tuning::SCORE_DEATH;
@@ -277,8 +278,11 @@ void MatchDirector::resetMatch() {
   currentRound = 0;
   phaseTimeLeft = 0.0f;
   lobbyCountingDown = false;
-  shipHp = Tuning::SHIP_MAX_HEALTH;
+  shipHp = Tuning::SHIP_START_HEALTH;
   scrapBanked = 0;
+  tier = 0;
+  if (hooks.setShipTier) hooks.setShipTier(0);
+  for (RoofTurret& turret : roofTurrets) turret = RoofTurret();
   bossId = 0;
   bossSpawned = false;
   zone = Tuning::ZONE_START_RADIUS[0];
@@ -316,6 +320,7 @@ void MatchDirector::update(float dtMs) {
     }
   }
   shipAlertCooldown = std::max(0.0f, shipAlertCooldown - dtMs);
+  if (inCombat()) updateRoofTurrets(dtMs);
 
   switch (currentPhase) {
     case MatchPhase::Lobby:
@@ -385,7 +390,6 @@ void MatchDirector::updateRound(float dtMs) {
 
   updateSpawning(dtMs, false);
   updateZoneDamage(dtMs);
-  updateTurrets(dtMs);
   updateScrapDelivery();
   updateDeathsAndRevives(dtMs);
 
@@ -613,10 +617,11 @@ void MatchDirector::updateZoneDamage(float dtMs) {
   for (auto& [id, player] : players) {
     if (!isParticipant(player) || player.isDead()) continue;
     float shipDistance = dist(player.x, player.y, shipX, shipY);
-    if (shipDistance <= Tuning::SHIP_SAFE_RADIUS &&
-        currentPhase == MatchPhase::Round && player.health < player.maxHealth) {
+    if (shipDistance <= safeRadius() && currentPhase == MatchPhase::Round &&
+        player.health < player.maxHealth) {
       abilities->healPlayer(
-          0, player, player.maxHealth * Tuning::SHIP_HEAL_PER_SECOND * 0.5f);
+          0, player,
+          player.maxHealth * Tuning::SHIP_TIER_HEAL_PER_SECOND[tier] * 0.5f);
     }
     if (shipDistance <= zone) continue;
     // Outside the Blue Zone the planet itself is killing you.
@@ -626,17 +631,115 @@ void MatchDirector::updateZoneDamage(float dtMs) {
   }
 }
 
-void MatchDirector::updateTurrets(float dtMs) {
-  if (scrapBanked < Tuning::SHIP_TURRET_SCRAP) return;
-  turretTimer -= dtMs;
-  if (turretTimer > 0.0f) return;
-  turretTimer = TURRET_INTERVAL_MS;
+bool MatchDirector::onTurretRepaired(Player& player) {
+  for (int i = 0; i < Tuning::ROOF_TURRET_COUNT; i++) {
+    RoofTurret& turret = roofTurrets[i];
+    if (turret.online) continue;
+    turret = RoofTurret();
+    turret.online = true;
+    float mx = shipX + Tuning::ROOF_TURRET_MOUNT_X[tier][i];
+    float my = shipY + Tuning::ROOF_TURRET_MOUNT_Y[tier][i];
+    // The repaired gun is hauled up and bolted on: a lob from the repairer
+    // to the roof, then the weld flares.
+    abilities->fxLob(player.x, player.y, mx, my, 22.0f, 380.0f, VfxTheme::Steel,
+                     0);
+    abilities->fxBurst(mx, my, 70.0f, VfxTheme::Steel);
+    abilities->fxRing(mx, my, Tuning::ROOF_TURRET_RANGE[tier], VfxTheme::Steel);
+    abilities->fxAnnounce(Announcement::RoofTurretOnline);
+    Logger::info("Match: roof turret " + std::to_string(i) +
+                 " online, repaired by player " + std::to_string(player.id));
+    return true;
+  }
+  return false;
+}
 
-  Enemy* target = abilities->nearestEnemy(shipX, shipY, TURRET_RANGE);
-  if (!target) return;
-  abilities->fxBeam(shipX, shipY - 30.0f, target->x, target->y, 5.0f, 140.0f,
-                    VfxTheme::Steel);
-  abilities->damageEnemy(0, *target, TURRET_DAMAGE, DamageFlag::Proc);
+bool MatchDirector::onShipUpgrade(Player& player) {
+  if (currentPhase != MatchPhase::Intermission) return false;
+  if (tier + 1 >= Tuning::SHIP_TIER_COUNT) return false;
+  int cost = Tuning::SHIP_TIER_COST[tier + 1];
+  if (scrapBanked < cost) return false;
+  scrapBanked -= cost;
+  tier++;
+  assert(tier < Tuning::SHIP_TIER_COUNT && scrapBanked >= 0);
+  // Built out and patched up: a full hull at the new tier's maximum.
+  shipHp = shipMaxHealth();
+  if (hooks.setShipTier) hooks.setShipTier(tier);
+  // The hull changed shape: anyone now standing inside it steps out to the
+  // open ground in front.
+  if (const CollisionSystem* solid = abilities->collisionSystem()) {
+    float slot = -150.0f;
+    for (auto& [id, other] : players) {
+      if (!isParticipant(other) ||
+          solid->isPositionValid(other.x, other.y, Tuning::PLAYER_RADIUS)) {
+        continue;
+      }
+      other.x = shipX + slot;
+      other.y = shipY + 150.0f;
+      other.forcedVx = other.forcedVy = 0.0f;
+      other.forcedMs = 100.0f;  // clients do not predict across the jump
+      slot += 100.0f;
+    }
+  }
+  abilities->fxBurst(shipX, shipY - 120.0f, 320.0f, VfxTheme::Heal);
+  abilities->fxRing(shipX, shipY, safeRadius(), VfxTheme::Heal);
+  abilities->fxAnnounce(Announcement::ShipUpgraded);
+  Logger::info("Match: ship upgraded to tier " + std::to_string(tier) +
+               " by player " + std::to_string(player.id) + " (" +
+               std::to_string(scrapBanked) + " scrap left)");
+  return true;
+}
+
+void MatchDirector::updateRoofTurrets(float dtMs) {
+  constexpr float TAU = 2.0f * PI;
+  for (int i = 0; i < Tuning::ROOF_TURRET_COUNT; i++) {
+    RoofTurret& turret = roofTurrets[i];
+    if (!turret.online) continue;
+    turret.cooldownMs = std::max(0.0f, turret.cooldownMs - dtMs);
+    turret.recoilMs = std::max(0.0f, turret.recoilMs - dtMs);
+    float mx = shipX + Tuning::ROOF_TURRET_MOUNT_X[tier][i];
+    float my = shipY + Tuning::ROOF_TURRET_MOUNT_Y[tier][i];
+
+    // Keep a target while it lives and stays in range; else the nearest.
+    Enemy* target =
+        turret.targetId ? abilities->findEnemy(turret.targetId) : nullptr;
+    if (target && (target->state == EnemyState::Dead ||
+                   dist(mx, my, target->x, target->y) - target->radius >
+                       Tuning::ROOF_TURRET_RANGE[tier])) {
+      target = nullptr;
+    }
+    if (!target)
+      target = abilities->nearestEnemy(mx, my, Tuning::ROOF_TURRET_RANGE[tier]);
+    turret.targetId = target ? target->id : 0;
+    if (!target) continue;
+
+    // Swivel on the base toward it, at a readable speed.
+    float want = std::atan2(target->x - mx, target->y - my);  // cw from down
+    float delta = std::remainder(want - turret.aim, TAU);
+    float step =
+        Tuning::ROOF_TURRET_TURN_DEG_PER_S * PI / 180.0f * dtMs / 1000.0f;
+    turret.aim += std::clamp(delta, -step, step);
+    turret.aim = std::remainder(turret.aim, TAU);
+    if (std::fabs(std::remainder(want - turret.aim, TAU)) >
+            Tuning::ROOF_TURRET_AIM_TOLERANCE_DEG * PI / 180.0f ||
+        turret.cooldownMs > 0.0f) {
+      continue;
+    }
+
+    turret.cooldownMs = Tuning::ROOF_TURRET_INTERVAL_MS;
+    turret.recoilMs = 220.0f;
+    float muzzleX = mx + std::sin(turret.aim) * Tuning::ROOF_TURRET_BARREL_PX;
+    float muzzleY =
+        my + std::cos(turret.aim) * Tuning::ROOF_TURRET_BARREL_PX * 0.5f -
+        Tuning::ROOF_TURRET_MUZZLE_LIFT_PX;
+    abilities->fxBeam(muzzleX, muzzleY, target->x, target->y - 20.0f, 9.0f,
+                      160.0f, VfxTheme::Steel);
+    abilities->fxBurst(muzzleX, muzzleY, 26.0f, VfxTheme::Fire);
+    abilities->fxBurst(target->x, target->y, 46.0f, VfxTheme::Fire);
+    // No attacker: the kill (score, loot, on-kill infusions) goes to the
+    // player who last hit this enemy, or to no one.
+    abilities->damageEnemy(0, *target, Tuning::ROOF_TURRET_DAMAGE[tier],
+                           DamageFlag::Proc);
+  }
 }
 
 void MatchDirector::startCarryingScrap(Player& player) {
@@ -650,12 +753,10 @@ void MatchDirector::bankScrap(Player& player) {
   abilities->effects().cleanseDebuff(player.id, EffectType::Slow);
   scrapBanked++;
   float repaired =
-      std::min(Tuning::SHIP_MAX_HEALTH - shipHp, Tuning::SHIP_REPAIR_PER_SCRAP);
+      std::min(shipMaxHealth() - shipHp, Tuning::SHIP_REPAIR_PER_SCRAP);
   shipHp += repaired;
   player.score += Tuning::SCORE_SCRAP;
-  abilities->fxAnnounce(scrapBanked == Tuning::SHIP_TURRET_SCRAP
-                            ? Announcement::ShipTurretsOnline
-                            : Announcement::ScrapDelivered);
+  abilities->fxAnnounce(Announcement::ScrapDelivered);
   // The scrap is heaved onto the hull, which flares as it is welded on.
   abilities->fxLob(player.x, player.y, shipX, shipY - 30.0f, 22.0f, 380.0f,
                    VfxTheme::Heal, 0);
@@ -840,7 +941,7 @@ void MatchDirector::onSlotInfusion(Player& player, Genus genus,
   // The suit can only be opened up back at the ship.
   if (currentPhase == MatchPhase::Round ||
       currentPhase == MatchPhase::BossFight) {
-    if (dist(player.x, player.y, shipX, shipY) > Tuning::SHIP_SAFE_RADIUS) {
+    if (dist(player.x, player.y, shipX, shipY) > safeRadius()) {
       return;
     }
   }
@@ -1128,6 +1229,15 @@ void MatchDirector::onDebugCommand(Player& player, DebugCommandKind command,
     case DebugCommandKind::EffectLab:
       runEffectLab(player, static_cast<EffectLabAction>(arg));
       break;
+    case DebugCommandKind::RoofTurrets:
+      // To see the roof turrets fight and the wreck burn without playing
+      // for them.
+      while (onTurretRepaired(player)) {
+      }
+      shipHp = std::max(1.0f, shipHp - shipMaxHealth() * 0.6f);
+      // And enough scrap in the bank for every tier.
+      scrapBanked += Tuning::SHIP_TIER_COST[1] + Tuning::SHIP_TIER_COST[2];
+      break;
     case DebugCommandKind::KillAll: {
       std::vector<uint32_t> ids;
       for (auto& [id, enemy] : enemies->getEnemies()) {
@@ -1148,13 +1258,23 @@ MatchStatePacket MatchDirector::buildState() const {
   packet.roundCount = static_cast<uint8_t>(Tuning::ROUND_COUNT);
   packet.timeRemaining = std::max(0.0f, phaseTimeLeft);
   packet.shipHealth = shipHp;
-  packet.shipMaxHealth = Tuning::SHIP_MAX_HEALTH;
+  packet.shipMaxHealth = shipMaxHealth();
   packet.shipX = shipX;
   packet.shipY = shipY;
   packet.zoneRadius = zone;
   packet.scrapBanked = static_cast<uint16_t>(scrapBanked);
-  packet.turretsOnline = scrapBanked >= Tuning::SHIP_TURRET_SCRAP ? 1 : 0;
+  packet.shipTier = static_cast<uint8_t>(tier);
   packet.bossId = bossId;
+  for (int i = 0; i < Tuning::ROOF_TURRET_COUNT; i++) {
+    const RoofTurret& turret = roofTurrets[i];
+    if (!turret.online) continue;
+    packet.roofTurrets |= static_cast<uint8_t>(1u << i);
+    float turn = turret.aim / (2.0f * PI);
+    turn -= std::floor(turn);
+    packet.roofAim[i] = static_cast<uint8_t>(std::lround(turn * 256.0f) & 255);
+    packet.roofRecoil[i] = static_cast<uint8_t>(
+        std::clamp(turret.recoilMs / 220.0f, 0.0f, 1.0f) * 255.0f);
+  }
 
   for (const auto& [id, player] : players) {
     MatchPlayerState p;

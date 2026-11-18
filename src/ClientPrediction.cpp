@@ -125,6 +125,14 @@ void ClientPrediction::onNetworkPacketReceived(
 
   PacketType type = static_cast<PacketType>(e.data[0]);
 
+  // The ship's tier decides which hull footprint is solid; predict against
+  // the same one the server uses.
+  if (type == PacketType::MatchState && collisionSystem) {
+    collisionSystem->setHullTier(
+        deserializeMatchState(e.data, e.size).shipTier);
+    return;
+  }
+
   if (type == PacketType::StateUpdate) {
     StateUpdatePacket stateUpdate = deserializeStateUpdate(e.data, e.size);
     reconcile(stateUpdate);

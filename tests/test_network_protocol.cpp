@@ -114,8 +114,12 @@ TEST(ArenaPacketsRoundTrip) {
     m.shipY = -6.0f;
     m.zoneRadius = 777.0f;
     m.scrapBanked = 4;
-    m.turretsOnline = 1;
+    m.shipTier = 2;
     m.bossId = 31;
+    m.roofTurrets = 2;
+    m.roofAim[0] = 17;
+    m.roofAim[1] = 250;
+    m.roofRecoil[1] = 128;
     MatchPlayerState a;
     a.playerId = 1;
     a.characterId = 20;
@@ -140,7 +144,10 @@ TEST(ArenaPacketsRoundTrip) {
     assert(out.phase == 2 && out.round == 3 && out.roundCount == 3);
     assert(out.timeRemaining == 12.5f && out.zoneRadius == 777.0f);
     assert(out.shipHealth == 900.0f && out.shipMaxHealth == 1500.0f);
-    assert(out.scrapBanked == 4 && out.turretsOnline == 1 && out.bossId == 31);
+    assert(out.scrapBanked == 4 && out.shipTier == 2 && out.bossId == 31);
+    assert(out.roofTurrets == 2 && out.roofAim[0] == 17 &&
+           out.roofAim[1] == 250 && out.roofRecoil[0] == 0 &&
+           out.roofRecoil[1] == 128);
     assert(out.players.size() == 2);
     assert(out.players[0].score == -150 && out.players[0].kills == 300);
     assert(out.players[0].coreGenus == 4 && out.players[0].corePart == 2);
@@ -170,6 +177,13 @@ TEST(ArenaPacketsRoundTrip) {
     auto readyBytes = serialize(ready);
     assert(deserializePlayerReady(readyBytes.data(), readyBytes.size()).ready ==
            1);
+
+    ShipUpgradePacket upgrade;
+    auto upgradeBytes = serialize(upgrade);
+    assert(upgradeBytes.size() == 1);
+    assert(
+        deserializeShipUpgrade(upgradeBytes.data(), upgradeBytes.size()).type ==
+        PacketType::ShipUpgrade);
 
     DebugCommandPacket debug;
     debug.command = static_cast<uint8_t>(DebugCommandKind::SpawnWave);

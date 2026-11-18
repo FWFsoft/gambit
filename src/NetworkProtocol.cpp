@@ -920,7 +920,8 @@ GameEventPacket deserializeGameEvent(const uint8_t* data, size_t size) {
   return packet;
 }
 
-static constexpr size_t MATCH_HEADER_BYTES = 36;
+static constexpr size_t MATCH_HEADER_BYTES =
+    36 + 1 + 2 * Arena::Tuning::ROOF_TURRET_COUNT;
 // Fixed part of a player entry; then 2 bytes per filled suit node.
 static constexpr size_t MATCH_PLAYER_BYTES =
     4 + 1 + 4 + 2 + 1 + 1 + 1 + 1 + Arena::GENUS_COUNT * Arena::PART_COUNT + 1 +
@@ -939,8 +940,13 @@ std::vector<uint8_t> serialize(const MatchStatePacket& packet) {
   writeFloat(buffer, packet.shipY);
   writeFloat(buffer, packet.zoneRadius);
   writeUint16(buffer, packet.scrapBanked);
-  writeUint8(buffer, packet.turretsOnline);
+  writeUint8(buffer, packet.shipTier);
   writeUint32(buffer, packet.bossId);
+  writeUint8(buffer, packet.roofTurrets);
+  for (int i = 0; i < Arena::Tuning::ROOF_TURRET_COUNT; i++) {
+    writeUint8(buffer, packet.roofAim[i]);
+    writeUint8(buffer, packet.roofRecoil[i]);
+  }
   assert(packet.players.size() <= 255);
   writeUint8(buffer, static_cast<uint8_t>(packet.players.size()));
   assert(buffer.size() == MATCH_HEADER_BYTES);
@@ -988,9 +994,14 @@ MatchStatePacket deserializeMatchState(const uint8_t* data, size_t size) {
   packet.shipY = readFloat(data + 20);
   packet.zoneRadius = readFloat(data + 24);
   packet.scrapBanked = readUint16(data + 28);
-  packet.turretsOnline = readUint8(data + 30);
+  packet.shipTier = readUint8(data + 30);
   packet.bossId = readUint32(data + 31);
-  uint8_t count = readUint8(data + 35);
+  packet.roofTurrets = readUint8(data + 35);
+  for (int i = 0; i < Arena::Tuning::ROOF_TURRET_COUNT; i++) {
+    packet.roofAim[i] = readUint8(data + 36 + 2 * i);
+    packet.roofRecoil[i] = readUint8(data + 37 + 2 * i);
+  }
+  uint8_t count = readUint8(data + MATCH_HEADER_BYTES - 1);
   assert(size >= MATCH_HEADER_BYTES + count * MATCH_PLAYER_BYTES);
   (void)size;
 
@@ -1064,6 +1075,19 @@ PlayerReadyPacket deserializePlayerReady(const uint8_t* data, size_t size) {
   PlayerReadyPacket packet;
   packet.ready = readUint8(data + 1);
   return packet;
+}
+
+std::vector<uint8_t> serialize(const ShipUpgradePacket& packet) {
+  std::vector<uint8_t> buffer;
+  writeUint8(buffer, static_cast<uint8_t>(packet.type));
+  return buffer;
+}
+
+ShipUpgradePacket deserializeShipUpgrade(const uint8_t* data, size_t size) {
+  assert(size >= 1);
+  assert(data[0] == static_cast<uint8_t>(PacketType::ShipUpgrade));
+  (void)size;
+  return ShipUpgradePacket();
 }
 
 std::vector<uint8_t> serialize(const DebugCommandPacket& packet) {
