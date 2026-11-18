@@ -749,6 +749,21 @@ elseif(TARGET PkgConfig::TMXLITE)
     )
 endif()
 
+# The generated planet as the engine loads it (regions, biomes, nesting).
+add_executable(test_planet_map
+    tests/test_planet_map.cpp
+    src/Logger.cpp
+    src/ArenaData.cpp
+    src/TiledMap.cpp
+)
+target_include_directories(test_planet_map PRIVATE include tests)
+target_link_libraries(test_planet_map PRIVATE spdlog::spdlog SDL2::SDL2)
+if(tmxlite_FOUND)
+    target_link_libraries(test_planet_map PRIVATE tmxlite::tmxlite)
+elseif(TARGET PkgConfig::TMXLITE)
+    target_link_libraries(test_planet_map PRIVATE PkgConfig::TMXLITE)
+endif()
+
 # Register tests with CTest
 add_test(NAME PlayerMovement COMMAND test_player)
 add_test(NAME NetworkProtocol COMMAND test_network_protocol)
@@ -774,6 +789,8 @@ add_test(NAME NyxKit COMMAND test_nyx_kit)
 add_test(NAME GravonKit COMMAND test_gravon_kit)
 add_test(NAME PointsOfInterest COMMAND test_points_of_interest)
 add_test(NAME CharacterSwap COMMAND test_character_swap)
+add_test(NAME PlanetMap COMMAND test_planet_map)
+set_tests_properties(PlanetMap PROPERTIES WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
 # Full match on the real server with bot players (lobby -> 3 rounds -> boss).
 # God mode makes the outcome deterministic: it must reach Victory.

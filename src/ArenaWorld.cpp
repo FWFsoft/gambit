@@ -219,6 +219,7 @@ void ArenaView::drawProp(ImDrawList* dl, const MapProp& p, uint32_t index) {
     return;
   }
   if (drawSlotArt(dl, "Prop_" + p.kind, p.x, p.y, p.variant, s)) return;
+  if (drawVegetation(dl, p, seed)) return;
 
   ImVec2 feet = toScreen(p.x, p.y);
   ImVec2 pts[12];
@@ -360,6 +361,257 @@ void ArenaView::drawFlora(ImDrawList* dl, const MapProp& p, Arena::Genus genus,
       break;
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Biome dressing: trees, cacti, palms, reeds, grass and sea stacks
+// (generate_planet.py, VEGETATION). Placeholders until art fills the
+// Prop_<kind> slots. Real sizes from MAP_PIPELINE.md, "Biomes": anything
+// taller than a hero thins to a ghost with a hero behind it (Clarity).
+// Dark, low-saturation foliage: the world stays quiet, the heroes are the
+// brightest things on screen.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+constexpr Rgb FIR{0.10f, 0.20f, 0.19f};  // PNW conifer, blue-green
+constexpr Rgb FIR_DARK{0.05f, 0.11f, 0.11f};
+constexpr Rgb SNOW{0.62f, 0.68f, 0.76f};    // cool and dim, never white
+constexpr Rgb CANOPY{0.10f, 0.25f, 0.12f};  // jungle, saturated green
+constexpr Rgb CANOPY_DARK{0.05f, 0.13f, 0.06f};
+constexpr Rgb MOSSY{0.20f, 0.22f, 0.13f};  // cypress, olive
+constexpr Rgb FROND{0.14f, 0.24f, 0.14f};
+constexpr Rgb CACTUS{0.16f, 0.24f, 0.15f};
+constexpr Rgb STRAW{0.30f, 0.30f, 0.18f};  // dry grass
+constexpr Rgb REED{0.22f, 0.26f, 0.16f};
+constexpr Rgb BARK{0.13f, 0.10f, 0.08f};
+
+// One tier of a conifer: a flat-bottomed triangle, inked.
+void firTier(ImDrawList* dl, ImVec2 base, float halfW, float tall, Rgb lit,
+             Rgb dark, float alpha) {
+  ImVec2 apex(base.x, base.y - tall);
+  ImVec2 l(base.x - halfW, base.y), r(base.x + halfW, base.y);
+  ImVec2 m(base.x, base.y + halfW * 0.12f);
+  // Lit from the upper left: the left half a shade lighter.
+  ImVec2 left[3] = {apex, l, m};
+  ImVec2 right[3] = {apex, m, r};
+  dl->AddConvexPolyFilled(left, 3, tone(lit, alpha));
+  dl->AddConvexPolyFilled(right, 3, tone(dark, alpha));
+  ImVec2 outline[4] = {l, apex, r, m};
+  dl->AddPolyline(outline, 4, rgbA(0.02f, 0.02f, 0.04f, 0.85f * alpha),
+                  ImDrawFlags_Closed, 1.5f);
+}
+
+}  // namespace
+
+bool ArenaView::drawVegetation(ImDrawList* dl, const MapProp& p,
+                               uint32_t seed) {
+  const std::string& k = p.kind;
+  if (k != "conifer" && k != "snow_conifer" && k != "jungle_tree" &&
+      k != "cypress" && k != "palm" && k != "cactus" && k != "grass" &&
+      k != "reeds" && k != "sea_stack") {
+    return false;
+  }
+  const float s = p.scale;
+  const float t = timeSeconds;
+  ImVec2 feet = toScreen(p.x, p.y);
+  // A slow sway for anything with leaves (a pixel or two, never a strobe).
+  const float sway = std::sin(t * 0.8f + seed * 0.61f) * 0.08f * M;
+
+  if (k == "conifer" || k == "snow_conifer") {
+    // PNW fir 9 to 14 m; in the snow a little shorter and narrower.
+    const bool snowy = k == "snow_conifer";
+    const float tall =
+        (snowy ? 8.0f + 3.5f * hash01(seed) : 9.0f + 5.0f * hash01(seed)) * M *
+        s;
+    const float halfW = (snowy ? 1.6f : 2.1f) * M * s;
+    groundShadow(dl, feet, halfW * 1.1f, 0.4f);
+    float alpha = ghostAlpha(feet.x - halfW, feet.x + halfW, feet.y - tall,
+                             feet.y + 0.3f * M, p.y + 20.0f);
+    // Trunk: the bottom eighth, below the lowest boughs.
+    dl->AddLine(feet, ImVec2(feet.x, feet.y - tall * 0.2f), tone(BARK, alpha),
+                0.35f * M * s);
+    const int tiers = 4;
+    for (int i = 0; i < tiers; i++) {
+      float f = static_cast<float>(i) / tiers;
+      float y = feet.y - tall * (0.12f + 0.2f * i);
+      float w = halfW * (1.0f - 0.2f * i);
+      float h = tall * (0.42f - 0.05f * i);
+      ImVec2 base(feet.x + sway * f, y);
+      firTier(dl, base, w, h, FIR, FIR_DARK, alpha);
+      if (snowy) {
+        // Snow lying along the bough tips of each tier, the part the tier
+        // above does not cover: a pale sliver on both lower edges.
+        for (int side = -1; side <= 1; side += 2) {
+          ImVec2 cap[4] = {
+              ImVec2(base.x + side * w * 0.98f, base.y - h * 0.02f),
+              ImVec2(base.x + side * w * 0.45f, base.y - h * 0.58f),
+              ImVec2(base.x + side * w * 0.38f, base.y - h * 0.50f),
+              ImVec2(base.x + side * w * 0.80f, base.y + h * 0.02f)};
+          dl->AddConvexPolyFilled(cap, 4,
+                                  tone(SNOW, (side < 0 ? 0.9f : 0.6f) * alpha));
+        }
+      }
+    }
+    return true;
+  }
+
+  if (k == "jungle_tree") {
+    // A rainforest tree: a pale trunk 6 to 9 m to a broad dark canopy 6 to
+    // 9 m across, a few lobes of it overlapping.
+    const float trunk = (6.0f + 3.0f * hash01(seed)) * M * s;
+    const float crown = (3.0f + 1.5f * hash01(seed + 3)) * M * s;
+    groundShadow(dl, feet, crown * 0.9f, 0.45f);
+    float alpha =
+        ghostAlpha(feet.x - crown, feet.x + crown, feet.y - trunk - crown,
+                   feet.y + 0.3f * M, p.y + 20.0f);
+    ImVec2 top(feet.x + sway * 0.5f, feet.y - trunk);
+    dl->AddLine(feet, top, tone(BARK, alpha, 1.6f), 0.5f * M * s);
+    // Buttress roots.
+    dl->AddLine(feet, ImVec2(feet.x - 0.9f * M * s, feet.y + 0.1f * M),
+                tone(BARK, alpha), 0.25f * M);
+    dl->AddLine(feet, ImVec2(feet.x + 0.8f * M * s, feet.y + 0.15f * M),
+                tone(BARK, alpha), 0.25f * M);
+    for (int i = 0; i < 4; i++) {
+      float ox = (hash01(seed + 10 + i) - 0.5f) * crown * 1.3f;
+      float oy = (hash01(seed + 20 + i) - 0.5f) * crown * 0.5f;
+      float r = crown * (0.55f + 0.25f * hash01(seed + 30 + i));
+      ImVec2 c(top.x + ox + sway, top.y + oy);
+      dl->AddCircleFilled(c, r, tone(i % 2 ? CANOPY_DARK : CANOPY, alpha), 18);
+      dl->AddCircle(c, r, rgbA(0.02f, 0.02f, 0.04f, 0.7f * alpha), 18, 1.5f);
+    }
+    return true;
+  }
+
+  if (k == "cypress") {
+    // Swamp cypress 6 to 10 m: a flared foot in the water, a narrow,
+    // drooping crown hung with moss.
+    const float tall = (6.0f + 4.0f * hash01(seed)) * M * s;
+    const float halfW = 1.3f * M * s;
+    groundShadow(dl, feet, halfW, 0.35f);
+    float alpha = ghostAlpha(feet.x - halfW * 1.4f, feet.x + halfW * 1.4f,
+                             feet.y - tall, feet.y + 0.3f * M, p.y + 20.0f);
+    ImVec2 flare[3] = {ImVec2(feet.x - 0.9f * M * s, feet.y),
+                       ImVec2(feet.x + 0.9f * M * s, feet.y),
+                       ImVec2(feet.x, feet.y - 1.6f * M * s)};
+    dl->AddConvexPolyFilled(flare, 3, tone(BARK, alpha, 1.3f));
+    ImVec2 top(feet.x + sway * 0.4f, feet.y - tall);
+    dl->AddLine(feet, top, tone(BARK, alpha, 1.3f), 0.4f * M * s);
+    for (int i = 0; i < 3; i++) {
+      float y = top.y + tall * (0.12f + 0.2f * i);
+      ImVec2 c(top.x + (hash01(seed + i) - 0.5f) * halfW + sway, y);
+      dl->AddEllipseFilled(c, ImVec2(halfW * (1.0f + 0.2f * i), tall * 0.12f),
+                           tone(MOSSY, alpha, 1.0f - 0.15f * i), 0.0f, 16);
+      // Hanging moss: two short strands under each mass.
+      for (int j = -1; j <= 1; j += 2) {
+        ImVec2 a(c.x + j * halfW * 0.5f, c.y + tall * 0.06f);
+        dl->AddLine(a, ImVec2(a.x + sway, a.y + 1.2f * M * s),
+                    tone(MOSSY, 0.7f * alpha, 0.8f), 2.0f);
+      }
+    }
+    return true;
+  }
+
+  if (k == "palm") {
+    // A palm 6 to 9 m: a leaning, curved trunk and a burst of fronds.
+    const float tall = (6.0f + 3.0f * hash01(seed)) * M * s;
+    const float lean = (hash01(seed + 1) - 0.5f) * 2.4f * M * s;
+    groundShadow(dl, feet, 1.6f * M * s, 0.35f);
+    ImVec2 top(feet.x + lean + sway, feet.y - tall);
+    float alpha = ghostAlpha(std::min(feet.x, top.x) - 3.0f * M * s,
+                             std::max(feet.x, top.x) + 3.0f * M * s,
+                             top.y - 1.0f * M, feet.y + 0.3f * M, p.y + 20.0f);
+    ImVec2 trunk[6];
+    for (int i = 0; i < 6; i++) {
+      float f = i / 5.0f;
+      // Curve: lean grows toward the top.
+      trunk[i] = ImVec2(feet.x + (lean + sway) * f * f, feet.y - tall * f);
+    }
+    dl->AddPolyline(trunk, 6, tone(BARK, alpha, 1.7f), 0, 0.35f * M * s);
+    for (int i = 0; i < 7; i++) {
+      float a = PI * (1.05f + 0.9f * i / 6.0f) +
+                (hash01(seed + 40 + i) - 0.5f) * 0.3f;
+      float len = (2.4f + 1.0f * hash01(seed + 50 + i)) * M * s;
+      ImVec2 mid(top.x + std::cos(a) * len * 0.55f,
+                 top.y + std::sin(a) * len * 0.35f);
+      ImVec2 tip(top.x + std::cos(a) * len,
+                 top.y + std::sin(a) * len * 0.3f + 0.9f * M * s);
+      ImVec2 frond[3] = {top, mid, tip};
+      dl->AddPolyline(frond, 3, tone(FROND, alpha), 0, 0.35f * M * s);
+    }
+    dl->AddCircleFilled(top, 0.35f * M * s, tone(BARK, alpha), 8);
+    return true;
+  }
+
+  if (k == "cactus") {
+    // A saguaro 3 to 5 m: a ribbed column with one or two arms.
+    const float tall = (3.0f + 2.0f * hash01(seed)) * M * s;
+    const float thick = 0.55f * M * s;
+    groundShadow(dl, feet, 0.8f * M * s, 0.4f);
+    float alpha = ghostAlpha(feet.x - 1.5f * M * s, feet.x + 1.5f * M * s,
+                             feet.y - tall, feet.y + 0.3f * M, p.y + 20.0f);
+    ImU32 body = tone(CACTUS, alpha),
+          ink = rgbA(0.02f, 0.02f, 0.04f, 0.85f * alpha);
+    ImVec2 top(feet.x, feet.y - tall);
+    dl->AddLine(feet, top, ink, thick + 3.0f);
+    dl->AddLine(feet, top, body, thick);
+    dl->AddCircleFilled(top, thick * 0.5f, body, 10);
+    const int arms = 1 + static_cast<int>(hash01(seed + 2) * 2.0f);
+    for (int i = 0; i < arms; i++) {
+      float side = (i % 2 == 0) ? -1.0f : 1.0f;
+      float at = tall * (0.35f + 0.2f * hash01(seed + 4 + i));
+      ImVec2 a(feet.x, feet.y - at);
+      ImVec2 b(feet.x + side * 0.9f * M * s, feet.y - at);
+      ImVec2 c(b.x, b.y - (0.9f + 0.8f * hash01(seed + 6 + i)) * M * s);
+      ImVec2 arm[3] = {a, b, c};
+      dl->AddPolyline(arm, 3, ink, 0, thick * 0.75f + 3.0f);
+      dl->AddPolyline(arm, 3, body, 0, thick * 0.75f);
+      dl->AddCircleFilled(c, thick * 0.38f, body, 8);
+    }
+    // A rib down the lit side.
+    dl->AddLine(ImVec2(feet.x - thick * 0.2f, feet.y - 0.2f * M),
+                ImVec2(top.x - thick * 0.2f, top.y),
+                tone(CACTUS, 0.8f * alpha, 1.5f), 1.5f);
+    return true;
+  }
+
+  if (k == "grass" || k == "reeds") {
+    // Knee to waist high: never hides a hero, so no ghost.
+    const bool reeds = k == "reeds";
+    const int blades = reeds ? 7 : 8;
+    const float high = (reeds ? 1.2f : 0.7f) * M * s;
+    const Rgb col = reeds ? REED : STRAW;
+    for (int i = 0; i < blades; i++) {
+      float ox = (hash01(seed + i) - 0.5f) * (reeds ? 1.2f : 1.0f) * M * s;
+      float h = high * (0.7f + 0.5f * hash01(seed + 9 + i));
+      float bend = sway * 0.6f + (hash01(seed + 17 + i) - 0.5f) * 0.25f * M * s;
+      ImVec2 a(feet.x + ox, feet.y);
+      ImVec2 b(a.x + bend, a.y - h);
+      dl->AddLine(a, b, tone(col, 0.95f, 0.9f + 0.5f * hash01(seed + 25 + i)),
+                  reeds ? 3.0f : 3.0f);
+      if (reeds && i % 2 == 0) {
+        // A cattail head.
+        dl->AddLine(ImVec2(b.x, b.y + 0.05f * M), ImVec2(b.x, b.y + 0.3f * M),
+                    tone(BARK, 1.0f, 1.6f), 4.0f);
+      }
+    }
+    return true;
+  }
+
+  // Sea stack: a rock pillar 6 to 15 m standing in the surf.
+  ImVec2 pts[8];
+  const float tall = (6.0f + 9.0f * hash01(seed)) * M * s;
+  const float r0 = (1.6f + 1.2f * hash01(seed + 1)) * M * s;
+  footprintRound(p.x, p.y, r0, 8, pts, 0.5f, seed);
+  float alpha = ghostAlpha(feet.x - r0, feet.x + r0, feet.y - tall,
+                           feet.y + r0 * 0.5f, p.y + 20.0f);
+  prism(dl, pts, 8, tall, 0.7f, SLATE, alpha);
+  // Surf at its foot.
+  float wash = 0.5f + 0.5f * std::sin(t * 1.1f + seed);
+  dl->AddEllipse(feet, ImVec2(r0 * 1.25f, r0 * 0.55f),
+                 rgbA(0.55f, 0.70f, 0.80f, 0.15f + 0.15f * wash), 0.0f, 20,
+                 2.0f);
+  return true;
 }
 
 float ArenaView::ghostAlpha(float left, float right, float top, float bottom,

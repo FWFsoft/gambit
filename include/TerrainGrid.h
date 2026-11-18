@@ -15,6 +15,7 @@
 //   "Height"  ground level 0..15 (tile id in the terrain_data tileset)
 //   "Region"  region 0..15 (0 = no region: sea, void)
 //   "Blocked" any tile = nobody walks here (sea, peaks, city blocks)
+//   "Biome"   biome 0..15 (0 = none: sea, void); see Biome.h
 // A map without these layers (the old arena) is flat and open everywhere.
 //
 // Elevation is gameplay-neutral (docs/design: "Map & Environment Design",
@@ -33,6 +34,7 @@ class TerrainGrid {
   static constexpr int BASE_LEVEL = 4;
   static constexpr int LEVEL_COUNT = 16;
   static constexpr int REGION_COUNT = 16;
+  static constexpr int BIOME_COUNT = 16;
 
   void reset(int width, int height, int tileWidth, int tileHeight) {
     assert(width > 0 && height > 0 && tileWidth > 0 && tileHeight > 0);
@@ -43,6 +45,7 @@ class TerrainGrid {
     centreY = ((w - 1) / 2.0f + (h - 1) / 2.0f) * quarterTileH;
     levels.assign(static_cast<size_t>(w * h), BASE_LEVEL);
     regions.assign(static_cast<size_t>(w * h), 0);
+    biomes.assign(static_cast<size_t>(w * h), 0);
     blocked.assign(static_cast<size_t>(w * h), 0);
     corners.clear();
     loaded = false;
@@ -75,13 +78,16 @@ class TerrainGrid {
   int width() const { return w; }
   int height() const { return h; }
 
-  void setCell(int tx, int ty, int level, int region, bool isBlocked) {
+  void setCell(int tx, int ty, int level, int region, bool isBlocked,
+               int biome = 0) {
     assert(inBounds(tx, ty));
     assert(level >= 0 && level < LEVEL_COUNT);
     assert(region >= 0 && region < REGION_COUNT);
+    assert(biome >= 0 && biome < BIOME_COUNT);
     size_t i = static_cast<size_t>(ty * w + tx);
     levels[i] = static_cast<uint8_t>(level);
     regions[i] = static_cast<uint8_t>(region);
+    biomes[i] = static_cast<uint8_t>(biome);
     blocked[i] = isBlocked ? 1 : 0;
   }
 
@@ -151,6 +157,17 @@ class TerrainGrid {
     if (!tileAt(wx, wy, tx, ty)) return 0;
     return regions[ty * w + tx];
   }
+  // 0 = no biome (sea, void, off the map, a map without a Biome layer).
+  int biomeAt(float wx, float wy) const {
+    if (!loaded) return 0;
+    int tx, ty;
+    if (!tileAt(wx, wy, tx, ty)) return 0;
+    return biomes[ty * w + tx];
+  }
+  int biomeOf(int tx, int ty) const {
+    assert(inBounds(tx, ty));
+    return biomes[ty * w + tx];
+  }
   int levelOf(int tx, int ty) const {
     assert(inBounds(tx, ty));
     return levels[ty * w + tx];
@@ -187,6 +204,7 @@ class TerrainGrid {
   float halfTileW = 32.0f, quarterTileH = 16.0f, centreY = 0.0f;
   std::vector<uint8_t> levels;
   std::vector<uint8_t> regions;
+  std::vector<uint8_t> biomes;
   std::vector<uint8_t> blocked;
   std::vector<float> corners;
   bool loaded = false;

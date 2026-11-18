@@ -518,12 +518,14 @@ void TiledMap::extractTerrain() {
   const tmx::TileLayer* heightLayer = nullptr;
   const tmx::TileLayer* regionLayer = nullptr;
   const tmx::TileLayer* blockedLayer = nullptr;
+  const tmx::TileLayer* biomeLayer = nullptr;
   for (const auto& layer : tmxMap.getLayers()) {
     if (layer->getType() != tmx::Layer::Type::Tile) continue;
     const auto* tiles = dynamic_cast<const tmx::TileLayer*>(layer.get());
     if (layer->getName() == "Height") heightLayer = tiles;
     if (layer->getName() == "Region") regionLayer = tiles;
     if (layer->getName() == "Blocked") blockedLayer = tiles;
+    if (layer->getName() == "Biome") biomeLayer = tiles;
   }
   if (dataGid == 0 || !heightLayer) return;  // an old, flat map
 
@@ -531,26 +533,33 @@ void TiledMap::extractTerrain() {
   assert(heightLayer->getTiles().size() == cells);
   assert(!regionLayer || regionLayer->getTiles().size() == cells);
   assert(!blockedLayer || blockedLayer->getTiles().size() == cells);
-  auto value = [&](const tmx::TileLayer* layer, size_t i, int fallback,
+  assert(!biomeLayer || biomeLayer->getTiles().size() == cells);
+  // terrain_data has one row of 16 tiles per layer: row 0 heights, row 1
+  // regions, row 2 blocked, row 3 biomes. A layer's value is its tile's
+  // column within its own row.
+  auto value = [&](const tmx::TileLayer* layer, size_t i, int row, int fallback,
                    int limit) {
     if (!layer) return fallback;
     uint32_t gid = layer->getTiles()[i].ID;
-    if (gid < dataGid) return fallback;
-    return std::clamp(static_cast<int>(gid - dataGid), 0, limit - 1);
+    const uint32_t first = dataGid + static_cast<uint32_t>(row) * 16u;
+    if (gid < first || gid >= first + 16u) return fallback;
+    return std::clamp(static_cast<int>(gid - first), 0, limit - 1);
   };
   for (int ty = 0; ty < mapHeight; ty++) {
     for (int tx = 0; tx < mapWidth; tx++) {
       size_t i = static_cast<size_t>(ty * mapWidth + tx);
-      int level = value(heightLayer, i, TerrainGrid::BASE_LEVEL,
+      int level = value(heightLayer, i, 0, TerrainGrid::BASE_LEVEL,
                         TerrainGrid::LEVEL_COUNT);
-      int region = value(regionLayer, i, 0, TerrainGrid::REGION_COUNT);
+      int region = value(regionLayer, i, 1, 0, TerrainGrid::REGION_COUNT);
       bool solid =
           blockedLayer && blockedLayer->getTiles()[i].ID != 0;
-      terrainGrid.setCell(tx, ty, level, region, solid);
+      int biome = value(biomeLayer, i, 3, 0, TerrainGrid::BIOME_COUNT);
+      terrainGrid.setCell(tx, ty, level, region, solid, biome);
     }
   }
   terrainGrid.finish();
-  Logger::info("Loaded terrain: heights, regions and blocked cells");
+  Logger::info(std::string("Loaded terrain: heights, regions, blocked cells") +
+               (biomeLayer ? " and biomes" : ""));
 }
 
 void TiledMap::extractProps() {

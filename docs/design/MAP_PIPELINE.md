@@ -104,7 +104,11 @@ How the layout is made, so it can be changed by rule rather than by hand:
 
 The hidden `Biome` tile layer stores the biome per tile (row 3 of
 `terrain_data`, values 0..15, 0 = sea), and the map's `biomes` property
-lists the ids. The engine does not read it yet; the music system will.
+lists the ids. The engine reads it into `TerrainGrid` (`biomeAt`,
+`biomeOf`; ids and names in `include/Biome.h`), ready for the music
+system. `tests/test_planet_map.cpp` (ctest `PlanetMap`) loads the real
+map and checks the regions, biomes and that every territory sits in one
+biome.
 
 ### Sizing biomes for music
 
@@ -134,8 +138,16 @@ the renderer to cull or chunk first.
 
 ### Dressing sizes (for the placeholders and baked art)
 
-Real sizes, as for everything else (`Scale`). Trees are taller than heroes
-and need the ghost fade (`ArenaView::ghostAlpha`) when art lands.
+Real sizes, as for everything else (`Scale`), before each prop's own
+scale (0.75 to 1.3). Code placeholders draw all of them
+(`ArenaView::drawVegetation`): dark, inked silhouettes, and anything taller
+than a hero thins to a ghost with a hero behind it
+(`ArenaView::ghostAlpha`). Baked art in a `Prop_<kind>` slot replaces the
+placeholder.
+
+![Dressing placeholders](../prototype/biome_dressing_placeholders.png)
+
+(Drawn from `drawVegetation`'s shapes outside the game, next to a 1.8 m hero bar.)
 
 | Slot | Real size |
 | --- | --- |
@@ -235,23 +247,19 @@ For the designer to accept or change:
 
 ## Known gaps
 
-- **Biome dressing is not drawn yet.** The new kinds (`conifer`, `palm`,
-  `cactus` and the rest) are in the map, but the engine has no
-  placeholder for them, so until there is art in their slots or a code
-  placeholder in `ArenaView::drawProp`, the biomes read in game only by
-  their ground, relief and water.
-- **The engine does not read the Biome layer yet**, so music cannot follow
-  biomes until `TerrainGrid` and the music system do.
+- **Music does not follow biomes yet.** The engine reads the Biome layer;
+  the music system still plays the map's old rectangle zones.
 - **One crash site per map.** The candidate sites are written, but the
   game always uses the one the map was generated for. Choosing per match
   is what lets a run see a different biome mix (Creative Builds), and most
   of the planet sits outside the storm until then.
 - **Genus by biology:** territories are dealt any genus. Weighting the
   deal by biome (which genus can live in snow, swamp, desert) is not done.
-- **Not checked in game yet.** The map was generated and its data checked
-  but not loaded in the client here (no build environment). The ground
-  batch is about 3.6 times the old tile count; watch boot time and frame
-  time.
+- **Not checked in the client yet.** The engine's map loader opens the
+  map (73 ms) and the PlanetMap test passes, and the dressing code was
+  compiled and drawn outside the game, but the client itself was not run
+  here (no full build environment). The ground batch is about 3.6 times
+  the old tile count; watch boot time and frame time.
 - **Tall terrain and buildings can hide things.** Buildings and the tall
   landmarks fade to a ghost when a hero is behind them; mountain faces do
   not yet, and nothing fades for an *enemy* behind it. This is the camera

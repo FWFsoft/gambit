@@ -21,6 +21,35 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-18: Genus territories actually load; biome dressing is drawn
+- **Decision:** (1) Fixed the map loader reading every land tile as
+  region 15: the generator paints regions with row 1 of `terrain_data`
+  and the loader ignored the row. Since planet v1 the whole planet has
+  been one territory each match (one genus everywhere); now its 15
+  territories each get their own genus as designed. (2) The engine reads
+  the Biome layer (`TerrainGrid::biomeAt`, `include/Biome.h`). (3) Code
+  placeholders for the biome dressing: fir 9 to 14 m, snowy fir 8 to 11 m
+  with snow on the bough tips, rainforest tree 6 to 9 m trunk under a 6
+  to 9 m canopy, moss-hung cypress 6 to 10 m, palm 6 to 9 m, saguaro 3 to
+  5 m, grass 0.7 m, reeds 1.2 m, sea stacks 6 to 15 m. All dark and
+  inked, with a slight sway; everything taller than a hero thins to a
+  ghost with a hero behind it.
+- **Pillars:** serves Creative Builds & Dynamic Play (the genus patchwork
+  now differs every match, so drops, camps and infusions vary by where you
+  go, as the region design intended) and Clarity (each biome reads by its
+  silhouettes, heroes stay the brightest thing and are never hidden by
+  trees). Trades a little against Clarity: forests add screen clutter
+  around fights; the dressing stays off pads and trails, and density can
+  be lowered in `VEGETATION`.
+- **Why:** Asked to make the biomes visible in game and readable by the
+  engine for music. The region bug was found while adding the biome layer
+  and is fixed in the same place; `tests/test_planet_map.cpp` guards it.
+  The client was not run here; the loader and the dressing code were
+  compiled and checked outside the game.
+- **Status:** Built, needs review
+- **Where:** `src/TiledMap.cpp`, `include/TerrainGrid.h`, `include/Biome.h`,
+  `src/ArenaWorld.cpp` (`drawVegetation`), `tests/test_planet_map.cpp`
+
 ## 2026-11-18: The planet is laid out in earth-like biomes
 - **Decision:** The planet is a continent of eight biomes laid out like a
   compressed North America: Pacific Northwest on the west coast, Arctic as
