@@ -41,8 +41,8 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
   Clarity (the music lags a death by 1.5 s) for steadiness; without them a
   revive or a trip home flips the track.
 - **Why:** The designer's spec, with the three open points asked and
-  answered. First Contact (4.4 min) is longer than round 1 (2.5 min), so the
-  intermission song cuts it off; flagged. Short of six minutes: every Tidal
+  answered. First Contact (4.4 min) is longer than round 1 (2.5 min): it
+  fades out as the intermission starts, accepted by the designer. Short of six minutes: every Tidal
   category (no boss track), PNW Alone, City Boss. The web build preloads
   every asset, so it now downloads 96 MB more before it starts; streaming
   music on demand there is a follow-up.

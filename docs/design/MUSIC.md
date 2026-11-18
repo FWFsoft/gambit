@@ -70,4 +70,5 @@ map's (`include/Biome.h`): `plains`, `pnw`, `arctic`, `desert`, `tidal`,
 See the importer's report (`tools/music/import_music.py`). Short of the six
 minutes a category should hold: Tidal (every category, and no boss track),
 PNW Alone, City Boss. First Contact (4.4 min) is longer than round 1
-(2.5 min), so the intermission song cuts it off.
+(2.5 min): it fades out as the intermission starts, which the designer is
+happy with (2026-11-18), and does not come back in later rounds.
