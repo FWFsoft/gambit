@@ -112,17 +112,29 @@ BIOMES = {
 ANCHORS = [
     (PLAINS, 0.04, -0.04, 900.0),
     (PLAINS, 0.16, -0.50, 1400.0),
-    (PLAINS, 0.06, 0.52, 1800.0),
+    (PLAINS, 0.04, 0.48, -300.0),
     (PNW, -0.42, -0.12, -700.0),
-    (PNW, -0.26, -0.44, 0.0),
-    (ARCTIC, -0.04, -0.70, 0.0),       # cascadia: split by cold, see below
-    (DESERT, -0.22, 0.44, -900.0),
-    (TIDAL, -0.66, 0.26, -2600.0),
+    (PNW, -0.30, -0.44, 0.0),
+    (PNW, -0.68, -0.02, -400.0),       # its own coast: rocky, foggy
+    (ARCTIC, -0.22, -0.68, 0.0),       # cascadia: split by cold, see below
+    (DESERT, -0.22, 0.34, -300.0),
+    (TIDAL, -0.56, 0.46, -4400.0),     # south of the range, like San Diego
     (CITY, 0.48, -0.34, -600.0),
     (JUNGLE, 0.34, 0.48, -1900.0),
     (SWAMP, 0.62, 0.12, -3200.0),
 ]
-ARCTIC_SHARE = 0.44        # of the cascadian forest (PNW + Arctic)
+ARCTIC_SHARE = 0.44 
+BOREAL_FRINGE = 1300.0     # forest kept between the snow and the dry side
+# The spine: one mountain range down the continent, west of the plains,
+# bending to the sea in the south-west (the Cascades and Sierra, then the
+# Transverse Ranges). The wet side (west and north of it) is forest and
+# snow; the dry side is everything else, so the desert sits in its rain
+# shadow and the warm coast lies south of the bend. Points are fractions
+# of the half extents, north to south. Passes are where it drops low.
+SPINE = [(-0.02, -0.86), (-0.10, -0.50), (-0.20, -0.16), (-0.27, 0.06),
+         (-0.40, 0.20), (-0.60, 0.22), (-0.82, 0.20)]
+SPINE_WIDTH = 1300.0       # world px from crest to foot (roughly)
+SPINE_PASSES = [0.16, 0.42, 0.66, 0.88]  # along the spine, 0 north .. 1 south       # of the cascadian forest (PNW + Arctic)
 TIDAL_DEPTH = 7500.0       # world px inland the tidal coast reaches
 CITY_DEPTH = 8000.0
 MIN_FRAGMENT_M2 = 9000.0   # pieces of a biome smaller than this fold away
@@ -131,7 +143,7 @@ MIN_FRAGMENT_M2 = 9000.0   # pieces of a biome smaller than this fold away
 # mesa step, deep-lake threshold on the lake noise (None: no deep lakes).
 BIOME_RELIEF = {
     PLAINS: (4.6, 1.5, 0.0, 0.0, 0.44),
-    PNW: (5.6, 3.2, 8.5, 0.0, 0.36),
+    PNW: (5.6, 3.2, 5.0, 0.0, 0.36),
     ARCTIC: (6.4, 2.8, 6.5, 0.0, 0.33),
     DESERT: (5.0, 1.1, 0.0, 3.0, None),
     TIDAL: (3.4, 1.2, 0.0, 0.0, None),
@@ -432,10 +444,46 @@ def make_land(g, noise):
                                   (-0.18, 0.74, 0.07, 0.05, 0.40)):
         d = np.hypot((nx_ - bx) / rx, (ny_ - by) / ry)
         e = e + depth * np.clip(1.0 - d, 0, 1)
+    # A peninsula off the warm south-west coast (Baja, below San Diego):
+    # room for the tidal coast to be a place, not a strip.
+    d = np.hypot((nx_ + 0.50) / 0.20, (ny_ - 0.56) / 0.16)
+    e = e - 0.30 * np.clip(1.0 - d, 0, 1) ** 0.7
     return e < COAST, e
 
 
-def lay_out_biomes(g, land, sea_dist, noises, rng):
+def spine_field(g, noise):
+    """Distance to the spine's crest (world px), which side of it a cell
+    is on (True: the wet west/north side) and how far along it (0..1)."""
+    wx = g.wx + 900 * noise.fbm(g.wx, g.wy, 3000, 3)
+    wy = g.wy + 600 * noise.fbm(g.wx + 400, g.wy - 90, 3000, 3)
+    pts = [(fx * g.hx, fy * g.hy) for fx, fy in SPINE]
+    # Extend both ends well past the coast so "side" is defined everywhere.
+    (x0, y0), (x1, y1) = pts[0], pts[1]
+    pts.insert(0, (x0 + (x0 - x1) * 3, y0 + (y0 - y1) * 3))
+    (x0, y0), (x1, y1) = pts[-1], pts[-2]
+    pts.append((x0 + (x0 - x1) * 3, y0 + (y0 - y1) * 3))
+    lengths = [math.hypot(bx - ax, by - ay) for (ax, ay), (bx, by) in zip(pts, pts[1:])]
+    real0, real1 = lengths[0], sum(lengths[:-1])
+    best = np.full(wx.shape, np.inf, dtype=np.float32)
+    side = np.zeros(wx.shape, dtype=bool)
+    along = np.zeros(wx.shape, dtype=np.float32)
+    run = 0.0
+    for ((ax, ay), (bx, by)), seg in zip(zip(pts, pts[1:]), lengths):
+        dx, dy = bx - ax, by - ay
+        t = np.clip(((wx - ax) * dx + (wy - ay) * dy) / (seg * seg), 0, 1)
+        d = np.hypot(wx - (ax + t * dx), wy - (ay + t * dy))
+        cross = dx * (wy - ay) - dy * (wx - ax)
+        take = d < best
+        best[take] = d[take]
+        # Walking north to south, the west/north side is on the right in
+        # screen space (y down): positive cross product.
+        side[take] = cross[take] > 0
+        along[take] = (run + t[take] * seg - real0) / (real1 - real0)
+        run += seg
+    return best, side, np.clip(along, 0, 1)
+
+
+def lay_out_biomes(g, land, sea_dist, noises, rng, spine):
     """The biome of every land cell (0 for sea)."""
     n_warp, n_cold, n_ridge = noises
     wx, wy = g.wx, g.wy
@@ -444,10 +492,14 @@ def lay_out_biomes(g, land, sea_dist, noises, rng):
     warp_x = wx + 7000 * n_warp.fbm(wx, wy, 4200, 3) + 1800 * n_warp.fbm(wx, wy + 51, 1300, 2)
     warp_y = wy + 4500 * n_warp.fbm(wx + 999, wy - 333, 4200, 3) + \
         1200 * n_warp.fbm(wx - 71, wy, 1300, 2)
+    _sd, wet_side, _along = spine
     dists = []
     for biome, fx, fy, bias in ANCHORS:
         ax, ay = fx * g.hx, fy * g.hy
         d = np.hypot(warp_x - ax, warp_y - ay) + bias
+        # The range is the border: forest and snow on its wet side only.
+        forest_anchor = biome in (PNW, ARCTIC)
+        d = np.where(wet_side == forest_anchor, d, np.inf)
         if biome == TIDAL:
             d = np.where(sea_dist <= TIDAL_DEPTH, d, np.inf)
         if biome == CITY:
@@ -465,8 +517,12 @@ def lay_out_biomes(g, land, sea_dist, noises, rng):
     if forest.any():
         ridge_hint = np.clip(1.0 - np.abs(n_ridge.fbm(wx, wy, 3600, 4)) * 3.2, 0, 1)
         cold = -wy / g.hy + 0.35 * ridge_hint + 0.22 * n_cold.fbm(wx, wy, 3000, 3)
-        cut = np.quantile(cold[forest], 1.0 - ARCTIC_SHARE)
-        biome[forest] = np.where(cold[forest] > cut, ARCTIC, PNW)
+        # Boreal fringe: never snow right against the dry side's land.
+        dry = land & ~forest
+        fringe = grid_distance(dry, BOREAL_FRINGE + 100) < BOREAL_FRINGE
+        snowable = forest & ~fringe
+        cut = np.quantile(cold[snowable], 1.0 - ARCTIC_SHARE / max(0.01, snowable.mean() / forest.mean()))
+        biome[forest] = np.where((cold[forest] > cut) & snowable[forest], ARCTIC, PNW)
 
     # Fold slivers into their neighbours: every piece of a biome is a place.
     min_cells = MIN_FRAGMENT_M2 * METRE * METRE / (TILE * TILE / 2.0)
@@ -495,7 +551,7 @@ def biome_mix(g, biome, x, y, radius, step=260.0):
     return counts / max(1.0, counts.sum())
 
 
-def choose_sites(g, land, biome, sea_dist, rng, count=6):
+def choose_sites(g, land, biome, sea_dist, rng, spine_dist, count=6):
     """Candidate crash sites: flat-able land where two or three biomes meet
     inside the round-3 storm, spread across the planet."""
     radius = ZONE_RADII[-1]
@@ -505,7 +561,7 @@ def choose_sites(g, land, biome, sea_dist, rng, count=6):
             tx, ty = g.to_tile(x, y)
             if not g.inside(tx, ty) or not land[ty, tx]:
                 continue
-            if sea_dist[ty, tx] < 3200 or biome[ty, tx] == CITY:
+            if sea_dist[ty, tx] < 3200 or biome[ty, tx] == CITY or spine_dist[ty, tx] < 3000:
                 continue
             mix = biome_mix(g, biome, x, y, radius, step=500.0)
             sea = mix[0]
@@ -541,10 +597,12 @@ def build(seed: int, size: int, site_index: int):
     land_dist = grid_distance(land, SEA_KEEP + 100.0)
 
     # ---- 2. Biomes -----------------------------------------------------------
-    biome = lay_out_biomes(g, land, sea_dist, (n5, n6, n3), rng)
+    spine = spine_field(g, n4)
+    spine_dist, _wet, spine_along = spine
+    biome = lay_out_biomes(g, land, sea_dist, (n5, n6, n3), rng, spine)
 
     # ---- 3. Crash sites --------------------------------------------------
-    sites = choose_sites(g, land, biome, sea_dist, random.Random(seed * 7 + 1))
+    sites = choose_sites(g, land, biome, sea_dist, random.Random(seed * 7 + 1), spine_dist)
     assert sites, "no crash site found"
     site_index = min(site_index, len(sites) - 1)
     ship_x, ship_y, _mix = sites[site_index]
@@ -574,7 +632,18 @@ def build(seed: int, size: int, site_index: int):
     mesa_n = n4.fbm(wx, wy, 1900, 3)
     mesa = (mesa_n > 0.16).astype(np.float32) + (mesa_n > 0.34)
     coast = np.clip(sea_dist / 2200.0, 0, 1) ** 0.6
+    # The spine: a crest with rugged peaks, dropping to passes.
+    crest = np.exp(-(spine_dist / SPINE_WIDTH) ** 2)
+    gap = np.ones_like(crest)
+    for tp in SPINE_PASSES:
+        gap -= 0.8 * np.exp(-((spine_along - tp) / 0.035) ** 2)
+    rugged = 0.7 + 0.5 * np.clip(n3.fbm(wx + 300, wy, 900, 3) + 0.5, 0, 1)
+    spine_h = 10.0 * crest * np.clip(gap, 0.1, 1) * rugged
+    spine_h *= np.clip((ship_dist - 1800) / 1500, 0, 1)
+    spine_h *= np.clip(sea_dist / 1200, 0.25, 1)
+    ridge = np.maximum(ridge, np.clip(spine_h / 10.5, 0, 1) * (crest > 0.35))
     height = base + hill_amp * hills + 10.5 * ridge + mesa_amp * mesa
+    height = np.maximum(height, base + spine_h)
     height = 2.0 + (height - 2.0) * (0.35 + 0.65 * coast)
     basin = np.clip((ship_dist - BASIN_RADIUS) / 900.0, 0, 1)
     height = BASE_LEVEL + (height - BASE_LEVEL) * basin

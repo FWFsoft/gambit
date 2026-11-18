@@ -21,29 +21,50 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
-## 2026-11-18: The planet is laid out in earth-like biomes (work in progress)
-- **Decision:** `generate_planet.py` now lays the planet out by biome first:
-  Plains, Pacific Northwest, Arctic (the colder, higher, northern part of
-  the PNW forest), Desert, Tidal coast, City, Jungle, Swamp, arranged like
-  a compressed North America. Genera do not drive biomes; genus
-  territories are nested inside biomes and still dealt per match. The map
-  grows to 720x720 tiles (about 3.6 times the old tile count), with a new
-  hidden `Biome` layer and candidate crash sites where 2 to 4 biomes meet.
-  A straight sprint through a biome takes 16 to 25 s (median); the
-  designer's bar is that music must not switch every few seconds.
-- **Pillars:** Creative Builds & Dynamic Play (crash sites at different
-  junctions give different biome mixes per run); Clarity (biomes differ by
-  ground hue at the same low value). Trades against Strategic Crunch if
-  the bigger land holds empty space; most of the planet sits outside a
-  match's storm until crash sites vary per match.
-- **Why:** The designer asked for biomes sized for music that lasts minutes
-  per category. Open points from review: the tidal coast should move
-  south of the PNW (which needs its own coast), the Arctic should not
-  touch the Plains directly, and a mountain spine between forest and
-  desert/plains would explain the dry side. Not yet regenerated into
-  `assets/maps/planet.tmx` or checked in-game (no build here).
-- **Status:** Proposed
-- **Where:** `tools/maps/generate_planet.py`
+## 2026-11-18: The planet is laid out in earth-like biomes
+- **Decision:** The planet is a continent of eight biomes laid out like a
+  compressed North America: Pacific Northwest on the west coast, Arctic as
+  its colder, higher northern part, a mountain spine down the continent
+  with the desert in its rain shadow, the tidal coast (San Diego) south of
+  where the spine meets the sea, with a Baja-like peninsula, plains through
+  the middle, the city on the north-east shore, swamp around the east bay
+  and jungle in the hot south-east. Genera do not drive biomes: up to 15
+  genus territories sit inside biomes and are still dealt per match.
+  Numbers: 720 x 720 tiles (about 840 m by 420 m, ~3.6 times the old
+  tiles); biome shares 6% (tidal) to 28% (plains); a straight sprint
+  through a biome takes 17 to 28 s at the median; a match's storm covers
+  two to four biomes. The ship sits on crash site 0 (plains, PNW, desert);
+  two more candidate sites are written to the map. Each biome has its own
+  ground (same low value, different hue), relief, water (walkable ice,
+  marsh and tide pools; deep lakes block) and dressing kinds. The city
+  grows from 9 to 23 buildings. Objectives also weigh biome (frogs and
+  gas by the swamp, scrap and med pods in the city).
+- **Pillars:** serves Clarity (each biome reads at a glance by ground
+  hue; the spine is a readable wall with four passes) and Creative Builds
+  & Dynamic Play (crash sites at different junctions give different biome
+  mixes, once the game picks one per match). Trades against Strategic
+  Crunch: the land is bigger, and most of it sits outside a match's storm
+  until crash sites vary per match; the objective rings around the ship
+  are unchanged, so a match's travel is not longer. The spine adds detours
+  to reach the far side; trails go through its passes.
+- **Why:** The designer asked for biomes big enough that music (three
+  categories, at least six minutes each) does not switch every few
+  seconds, and for the layout to feel real and natural. The first layout
+  put the tidal coast west of the forest (San Diego on the Oregon coast),
+  let snow meet grassland directly, and had mountains that did not explain
+  the climate. The spine and the wet/dry sides fixed all three. Kept small
+  on purpose: the ground is one draw batch without culling, so a much
+  bigger map needs renderer work first. The tidal coast, PNW and Arctic
+  are the smallest (17 to 18 s straight runs). Snow is the one light
+  ground and pushes the dark-world rule; it is kept cool and below the UI.
+  Not done: biome props are not drawn by the engine yet (no placeholders),
+  the engine does not read the Biome layer, music does not follow biomes,
+  and the genus deal ignores biology. The map was not loaded in game here
+  (no build environment).
+- **Status:** Built, needs review
+- **Where:** `tools/maps/generate_planet.py`, `assets/maps/planet.tmx`,
+  `docs/design/MAP_PIPELINE.md` ("Biomes"),
+  `docs/prototype/planet_overview_biomes.png`
 
 ## 2026-11-18: Scenery at real scale against the heroes
 - **Decision:** Everything the planet draws is sized in real metres
