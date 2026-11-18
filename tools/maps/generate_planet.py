@@ -1,44 +1,55 @@
 #!/usr/bin/env python3
 """Generate the planet map: assets/maps/planet.tmx and its tilesets.
 
-The planet replaces the flat, round prototype arena with a place: an island
-of hills, mountain ranges, lakes and rivers around the crashed ship, with
-the outskirts of a coalition city on one side and the city's skyline beyond
-the shore. Read docs/design/MAP_PIPELINE.md first; the rules here follow it.
+The planet is a continent of earth-like biomes around the crashed ship.
+Biomes are geography, not genus: the four genera live across them (each
+region is dealt a genus per match by the server, as before). Read
+docs/design/MAP_PIPELINE.md first; the rules here follow it.
 
 What it builds, in order:
-  1. Land: an irregular island (fingers, a bay) in a dark sea.
-  2. Height: rolling hills plus ridged mountain ranges; the crash basin
+  1. Land: a continent filling the map's diamond, with bays and coves, in a
+     dark sea.
+  2. Biomes: anchor points laid out like a coast of the Americas (forest and
+     snow in the north-west, a warm coast and desert in the south-west,
+     plains in the middle, a city on the north-east shore, swamp around the
+     east bay, jungle in the south-east), with organic borders. The
+     Pacific Northwest and the Arctic are one forest: the colder, higher,
+     more northern part of it is Arctic. Tidal and city hug the coast.
+     Slivers are folded into their neighbours so every biome is a big
+     place (see "Biomes" in MAP_PIPELINE.md for the sizing rule).
+  3. Crash sites: candidate landing spots where two or three biomes meet.
+     The ship sits on one (--site); all are written to the map.
+  4. Height: each biome has its own relief (Cascades ridges, desert mesas,
+     flat swamp, rolling plains), blended across borders. The crash basin
      around the ship is flat. Peaks are impassable and shape the routes.
-  3. Water: lakes in the low ground (impassable), rivers running from the
-     mountains to the sea (walkable shallows).
-  4. Regions: the fixed zone template. A central basin, a ring of wild
-     regions and the city. Each region is dealt a genus per match by the
-     server, so where each genus lives is a discovery every run.
-  5. The city: streets and blocks on the north-east shore.
-  6. The crash: a scorched trench the ship ploughed on its way in.
-  7. Landmarks: a few big, unique set pieces on sight lines.
-  8. Points of interest: each objective kind goes where it makes sense
-     (frogs by water, outposts on high ground, scrapyards in the crash
-     field and the city), in three rings: near (quick), mid, far.
-  9. Trails from the ship to every point of interest (one shortest-path
-     tree, so trails merge into roads toward home).
- 10. Lifeline rocks (Terrain layer) and set dressing (Props layer).
+  5. Water: lakes (frozen and walkable in the Arctic), marsh in the swamp,
+     tide pools and beaches on the tidal coast, rivers off the mountains.
+  6. Regions: genus territories, nested inside biomes (a territory never
+     crosses a biome border), dealt a genus per match by the server.
+  7. The city: streets and blocks of the city biome, at real scale.
+  8. The crash: a scorched trench the ship ploughed on its way in.
+  9. Landmarks, points of interest (three rings around the ship), trails
+     from the ship to every one, lifeline rocks, and set dressing per
+     biome (conifers, cacti, palms, jungle trees, cypress, grass...).
 
-Everything is seeded: the same seed gives the same planet. The output is a
-normal Tiled map. Hand edits in Tiled are fine, but re-running the generator
-overwrites them (a "locked" override layer is planned, not built).
+Everything is seeded: the same seed and site give the same planet. The
+output is a normal Tiled map (big layers are zlib-compressed). Hand edits
+in Tiled are fine, but re-running the generator overwrites them.
 
 Usage:
-  python3 tools/maps/generate_planet.py [--seed 3] [--size 360]
+  python3 tools/maps/generate_planet.py [--seed 3] [--size 720] [--site 0]
       [--preview docs/prototype/planet_overview.png]
 """
 
 import argparse
+import base64
 import heapq
 import math
 import random
 import re
+import struct
+import zlib
+from collections import deque
 from pathlib import Path
 
 import numpy as np
@@ -57,6 +68,8 @@ HALF_W, QUARTER_H = 32.0, 16.0
 METRE = 55.0
 STOREY = 3.5                                  # metres per building storey
 TILE_EDGE_M = math.hypot(HALF_W, QUARTER_H) / METRE
+TILE_STEP_PX = 45.0     # average world px per grid step, for grid distances
+HERO_SPEED = 255.0      # Config::Player::SPEED, world px per second
 
 
 def tiles(metres):
@@ -69,35 +82,104 @@ BASE_LEVEL = 4
 LEVELS = 16
 LEVEL_PIXELS = 16.0
 
-# Island radii in world (screen) pixels. The zone of round 3 (MAP_ZONE_SCALE
-# times the arena's) reaches most of it; the far fingers stay past it.
-ISLAND_RX = 7200.0
-ISLAND_RY = 5300.0
 ZONE_SCALE = 1.75          # written to the map; scales the storm's radii
 ZONE_RADII = [2000.0 * ZONE_SCALE, 2500.0 * ZONE_SCALE, 2900.0 * ZONE_SCALE]
 BASIN_RADIUS = 950.0       # flat ground around the ship
 SHIP_CLEAR = 420.0
-CITY_ANGLE = -32.0         # degrees, screen space (0 = east, -90 = north)
+COAST = 0.86               # land where the shape metric is below this
+SEA_KEEP = 2600.0          # sea tiles drawn this far out; past it, empty
+
+# ---------------------------------------------------------------------------
+# Biomes. Ids are the Biome layer's values (0 = sea / none). Earth-like
+# places; the genera appear across them.
+# ---------------------------------------------------------------------------
+PLAINS, PNW, ARCTIC, DESERT, TIDAL, CITY, JUNGLE, SWAMP = range(1, 9)
+BIOMES = {
+    PLAINS: ("plains", "Plains", (196, 184, 96)),
+    PNW: ("pnw", "Pacific Northwest", (64, 156, 104)),
+    ARCTIC: ("arctic", "Arctic", (206, 226, 246)),
+    DESERT: ("desert", "Desert", (228, 150, 72)),
+    TIDAL: ("tidal", "Tidal coast", (92, 200, 214)),
+    CITY: ("city", "City", (156, 132, 236)),
+    JUNGLE: ("jungle", "Jungle", (52, 206, 78)),
+    SWAMP: ("swamp", "Swamp", (150, 128, 66)),
+}
+
+# Anchors: (biome, x, y, bias) with x, y as fractions of the map's half
+# extents (screen space: -y is north) and bias in world px (negative grows
+# the biome). Several anchors may share a biome. The plains are the
+# connective tissue between the rest, as on a real continent.
+ANCHORS = [
+    (PLAINS, 0.04, -0.04, 900.0),
+    (PLAINS, 0.16, -0.50, 1400.0),
+    (PLAINS, 0.06, 0.52, 1800.0),
+    (PNW, -0.42, -0.12, -700.0),
+    (PNW, -0.26, -0.44, 0.0),
+    (ARCTIC, -0.04, -0.70, 0.0),       # cascadia: split by cold, see below
+    (DESERT, -0.22, 0.44, -900.0),
+    (TIDAL, -0.66, 0.26, -2600.0),
+    (CITY, 0.48, -0.34, -600.0),
+    (JUNGLE, 0.34, 0.48, -1900.0),
+    (SWAMP, 0.62, 0.12, -3200.0),
+]
+ARCTIC_SHARE = 0.44        # of the cascadian forest (PNW + Arctic)
+TIDAL_DEPTH = 7500.0       # world px inland the tidal coast reaches
+CITY_DEPTH = 8000.0
+MIN_FRAGMENT_M2 = 9000.0   # pieces of a biome smaller than this fold away
+
+# Relief per biome: base level, hill amplitude, ridge (mountain) amplitude,
+# mesa step, deep-lake threshold on the lake noise (None: no deep lakes).
+BIOME_RELIEF = {
+    PLAINS: (4.6, 1.5, 0.0, 0.0, 0.44),
+    PNW: (5.6, 3.2, 8.5, 0.0, 0.36),
+    ARCTIC: (6.4, 2.8, 6.5, 0.0, 0.33),
+    DESERT: (5.0, 1.1, 0.0, 3.0, None),
+    TIDAL: (3.4, 1.2, 0.0, 0.0, None),
+    CITY: (5.0, 0.4, 0.0, 0.0, None),
+    JUNGLE: (5.2, 3.6, 3.6, 0.0, 0.40),
+    SWAMP: (2.8, 0.5, 0.0, 0.0, 0.22),
+}
+
+# Genus territories (the Region layer, 1..15) per biome, by area share.
+REGION_SLOTS = 15
 
 # ---------------------------------------------------------------------------
 # Ground materials: one row of the tileset each, four variants per row.
 # Painted dark and quiet (the look darkens them further); detail lives in
 # seams and specks, never in bright texture (ART_DIRECTION.md, "World").
+# Biomes differ by hue at the same low value, so they read at a glance
+# without lighting the floor up. Snow is the one light ground, kept cool.
 # ---------------------------------------------------------------------------
 MATERIALS = [
-    # name,   base,            alt,             seam,           speck
-    ("dust",   (86, 80, 78),   (80, 75, 74),   (64, 60, 60),   (110, 102, 96)),
-    ("scrub",  (52, 62, 60),   (48, 57, 56),   (36, 44, 44),   (78, 92, 84)),
-    ("rock",   (70, 70, 82),   (64, 64, 76),   (44, 44, 54),   (96, 96, 110)),
-    ("high",   (96, 98, 114),  (90, 92, 108),  (62, 64, 78),   (128, 130, 146)),
-    ("wet",    (44, 54, 62),   (40, 50, 58),   (30, 38, 46),   (64, 84, 96)),
-    ("path",   (104, 96, 88),  (98, 91, 84),   (78, 72, 66),   (126, 116, 104)),
-    ("pad",    (112, 104, 94), (106, 99, 90),  (84, 78, 70),   (138, 128, 112)),
-    ("scar",   (36, 30, 30),   (32, 27, 28),   (22, 18, 20),   (150, 70, 40)),
-    ("street", (58, 58, 70),   (54, 54, 66),   (34, 34, 44),   (90, 90, 110)),
-    ("river",  (40, 62, 78),   (38, 58, 74),   (30, 46, 62),   (80, 120, 140)),
-    ("water",  (22, 34, 48),   (20, 31, 45),   (16, 25, 38),   (48, 72, 92)),
-    ("sea",    (14, 20, 32),   (13, 19, 30),   (10, 15, 25),   (30, 44, 62)),
+    # name,     base,            alt,             seam,           speck
+    ("dust",     (86, 80, 78),   (80, 75, 74),   (64, 60, 60),   (110, 102, 96)),
+    ("scrub",    (52, 62, 60),   (48, 57, 56),   (36, 44, 44),   (78, 92, 84)),
+    ("rock",     (70, 70, 82),   (64, 64, 76),   (44, 44, 54),   (96, 96, 110)),
+    ("high",     (96, 98, 114),  (90, 92, 108),  (62, 64, 78),   (128, 130, 146)),
+    ("wet",      (44, 54, 62),   (40, 50, 58),   (30, 38, 46),   (64, 84, 96)),
+    ("path",     (104, 96, 88),  (98, 91, 84),   (78, 72, 66),   (126, 116, 104)),
+    ("pad",      (112, 104, 94), (106, 99, 90),  (84, 78, 70),   (138, 128, 112)),
+    ("scar",     (36, 30, 30),   (32, 27, 28),   (22, 18, 20),   (150, 70, 40)),
+    ("street",   (58, 58, 70),   (54, 54, 66),   (34, 34, 44),   (90, 90, 110)),
+    ("river",    (40, 62, 78),   (38, 58, 74),   (30, 46, 62),   (80, 120, 140)),
+    ("water",    (22, 34, 48),   (20, 31, 45),   (16, 25, 38),   (48, 72, 92)),
+    ("sea",      (14, 20, 32),   (13, 19, 30),   (10, 15, 25),   (30, 44, 62)),
+    # Biome grounds.
+    ("grass",    (62, 70, 48),   (58, 66, 45),   (44, 50, 34),   (88, 98, 62)),
+    ("meadow",   (72, 72, 50),   (67, 68, 47),   (52, 52, 36),   (98, 96, 64)),
+    ("moss",     (34, 50, 54),   (31, 46, 50),   (22, 34, 38),   (56, 78, 80)),
+    ("needles",  (50, 46, 44),   (46, 42, 40),   (34, 31, 30),   (74, 66, 58)),
+    ("snow",     (110, 118, 134), (104, 112, 128), (82, 90, 108), (136, 144, 160)),
+    ("ice",      (70, 92, 112),  (66, 87, 106),  (50, 70, 90),   (110, 136, 156)),
+    ("sand",     (104, 88, 66),  (98, 83, 62),   (80, 66, 48),   (128, 108, 80)),
+    ("redrock",  (96, 64, 54),   (90, 60, 51),   (66, 42, 36),   (122, 84, 68)),
+    ("beach",    (108, 100, 84), (102, 95, 80),  (84, 76, 62),   (132, 124, 104)),
+    ("tidepool", (46, 70, 78),   (43, 66, 74),   (32, 52, 60),   (82, 116, 122)),
+    ("jungle",   (30, 60, 32),   (28, 55, 30),   (18, 40, 20),   (50, 92, 50)),
+    ("mud",      (58, 50, 38),   (54, 46, 35),   (40, 34, 26),   (78, 68, 50)),
+    ("marsh",    (50, 54, 38),   (46, 50, 35),   (34, 38, 26),   (78, 84, 58)),
+    ("bog",      (34, 46, 42),   (32, 43, 40),   (24, 34, 32),   (70, 92, 80)),
+    ("vine",     (40, 62, 30),   (37, 58, 28),   (26, 44, 18),   (64, 96, 44)),
 ]
 MAT = {name: i for i, (name, *_rest) in enumerate(MATERIALS)}
 VARIANTS = 4
@@ -126,8 +208,8 @@ POI_KINDS = {
 }
 
 # What each ring asks for. Near: quick stops in round 1. Mid: a real trip.
-# Far: rounds 2-3, bigger camps, two infusions; some sit out in the fingers
-# past round 3's storm, worth a dash through it (Strategic Crunch).
+# Far: rounds 2-3, bigger camps, two infusions; some sit past round 3's
+# storm, worth a dash through it (Strategic Crunch).
 RINGS = [
     ("near", 1150.0, 2500.0, ["scrapyard", "scrapyard", "medpacks", "outpost",
                               "outpost", "probe", "gas", "frogs"]),
@@ -139,6 +221,16 @@ RINGS = [
                              "medpacks_big", "medpacks_big", "gas", "frogs"]),
 ]
 POI_SPACING = 850.0
+# Where an objective type feels at home, by biome (added to its score).
+POI_BIOME = {
+    "frogs": {SWAMP: 3.0, TIDAL: 2.0, JUNGLE: 2.0},
+    "gas": {SWAMP: 3.0, JUNGLE: 2.0, DESERT: 1.0},
+    "scrapyard": {CITY: 2.0, DESERT: 1.0, PLAINS: 0.5},
+    "medpacks": {CITY: 2.5},
+    "outpost": {PNW: 1.0, ARCTIC: 1.0, DESERT: 1.0},
+    "probe": {ARCTIC: 1.5, DESERT: 1.0},
+    "littlejohn": {JUNGLE: 1.0, PNW: 1.0},
+}
 
 LANDMARKS = ["monolith", "ribcage", "crater", "freighter", "spire", "monolith"]
 # Flat ground cleared around each landmark, and its solid core, in world px.
@@ -195,10 +287,11 @@ class Grid:
     def __init__(self, size):
         self.size = size
         self.cy = (size - 1) * QUARTER_H  # world y of the map centre
+        self.hx, self.hy = size * HALF_W, size * QUARTER_H  # half extents
         ty, tx = np.mgrid[0:size, 0:size]
         self.tx, self.ty = tx, ty
-        self.wx = (tx - ty) * HALF_W
-        self.wy = (tx + ty) * QUARTER_H - self.cy
+        self.wx = ((tx - ty) * HALF_W).astype(np.float32)
+        self.wy = ((tx + ty) * QUARTER_H - self.cy).astype(np.float32)
 
     def to_tile(self, wx, wy):
         diff = wx / HALF_W
@@ -225,98 +318,349 @@ def neighbours8(size, tx, ty):
                     yield nx, ny, (1.4142 if dx and dy else 1.0)
 
 
+def shift(a, dy, dx, fill=False):
+    """a moved by (dy, dx) cells, edges filled with `fill`."""
+    out = np.full_like(a, fill)
+    h, w = a.shape
+    out[max(dy, 0):h + min(dy, 0), max(dx, 0):w + min(dx, 0)] = \
+        a[max(-dy, 0):h + min(-dy, 0), max(-dx, 0):w + min(-dx, 0)]
+    return out
+
+
+def dilate(mask, eight=True):
+    out = mask.copy()
+    steps = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+    if eight:
+        steps += [(-1, -1), (-1, 1), (1, -1), (1, 1)]
+    for dy, dx in steps:
+        out |= shift(mask, dy, dx)
+    return out
+
+
+def grid_distance(mask, limit):
+    """Approximate distance in world px from every cell to `mask`, capped at
+    limit (alternating 4- and 8-neighbour growth: an octagonal metric)."""
+    steps = int(limit / TILE_STEP_PX) + 1
+    dist = np.full(mask.shape, limit, dtype=np.float32)
+    dist[mask] = 0.0
+    seen = mask.copy()
+    front = mask.copy()
+    for k in range(1, steps):
+        grown = dilate(front, eight=(k % 2 == 0)) & ~seen
+        if not grown.any():
+            break
+        dist[grown] = k * TILE_STEP_PX
+        seen |= grown
+        front = grown
+    return dist
+
+
+def blur(a, r, passes=2):
+    """Box blur of radius r cells (edge-clamped), `passes` times."""
+    out = a.astype(np.float32)
+    k = 2 * r + 1
+    for _ in range(passes):
+        p = np.pad(out, ((r + 1, r), (0, 0)), mode="edge")
+        c = np.cumsum(p, axis=0, dtype=np.float64)
+        out = ((c[k:] - c[:-k]) / k).astype(np.float32)
+        p = np.pad(out, ((0, 0), (r + 1, r)), mode="edge")
+        c = np.cumsum(p, axis=1, dtype=np.float64)
+        out = ((c[:, k:] - c[:, :-k]) / k).astype(np.float32)
+    return out
+
+
+def components(mask):
+    """Connected pieces (8-neighbour) of mask: a label array and sizes."""
+    size_y, size_x = mask.shape
+    label = np.zeros(mask.shape, dtype=np.int32)
+    sizes = [0]
+    todo = np.argwhere(mask)
+    current = 0
+    for y0, x0 in todo:
+        if label[y0, x0]:
+            continue
+        current += 1
+        label[y0, x0] = current
+        queue = deque([(y0, x0)])
+        n = 0
+        while queue:
+            y, x = queue.popleft()
+            n += 1
+            for dy in (-1, 0, 1):
+                for dx in (-1, 0, 1):
+                    ny, nx = y + dy, x + dx
+                    if 0 <= ny < size_y and 0 <= nx < size_x and mask[ny, nx] \
+                            and not label[ny, nx]:
+                        label[ny, nx] = current
+                        queue.append((ny, nx))
+        sizes.append(n)
+    return label, np.array(sizes)
+
+
+def fill_from_neighbours(labels, holes):
+    """Give every hole cell the label of its nearest labelled neighbour."""
+    labels = labels.copy()
+    holes = holes.copy()
+    labels[holes] = 0
+    for _ in range(4000):
+        if not holes.any():
+            break
+        for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (1, 1),
+                       (-1, 1), (1, -1)):
+            src = shift(labels, dy, dx, 0)
+            take = holes & (src > 0)
+            labels[take] = src[take]
+            holes &= ~take
+    return labels
+
+
 # ---------------------------------------------------------------------------
 # The planet
 # ---------------------------------------------------------------------------
-def build(seed: int, size: int):
+def make_land(g, noise):
+    wx, wy = g.wx, g.wy
+    nx_, ny_ = wx / g.hx, wy / g.hy
+    diamond = np.abs(nx_) + np.abs(ny_)
+    ellipse = np.hypot(nx_, ny_) * 1.12
+    e = 0.7 * diamond + 0.3 * ellipse
+    e = e + 0.085 * noise.fbm(wx, wy, 5200, 4) + 0.03 * noise.fbm(wx + 77, wy, 1500, 3)
+    # Bays and coves: the east bay (the swamp's), coves on the tidal coast,
+    # an inlet under the city.
+    for bx, by, rx, ry, depth in ((0.66, 0.16, 0.12, 0.11, 0.55),
+                                  (-0.72, 0.16, 0.06, 0.05, 0.45),
+                                  (-0.60, 0.40, 0.05, 0.05, 0.45),
+                                  (-0.18, 0.74, 0.07, 0.05, 0.40)):
+        d = np.hypot((nx_ - bx) / rx, (ny_ - by) / ry)
+        e = e + depth * np.clip(1.0 - d, 0, 1)
+    return e < COAST, e
+
+
+def lay_out_biomes(g, land, sea_dist, noises, rng):
+    """The biome of every land cell (0 for sea)."""
+    n_warp, n_cold, n_ridge = noises
+    wx, wy = g.wx, g.wy
+    # Domain warp at two scales: big bends, then a ragged edge. Without it
+    # the borders between anchors are ruled lines.
+    warp_x = wx + 7000 * n_warp.fbm(wx, wy, 4200, 3) + 1800 * n_warp.fbm(wx, wy + 51, 1300, 2)
+    warp_y = wy + 4500 * n_warp.fbm(wx + 999, wy - 333, 4200, 3) + \
+        1200 * n_warp.fbm(wx - 71, wy, 1300, 2)
+    dists = []
+    for biome, fx, fy, bias in ANCHORS:
+        ax, ay = fx * g.hx, fy * g.hy
+        d = np.hypot(warp_x - ax, warp_y - ay) + bias
+        if biome == TIDAL:
+            d = np.where(sea_dist <= TIDAL_DEPTH, d, np.inf)
+        if biome == CITY:
+            d = np.where(sea_dist <= CITY_DEPTH, d, np.inf)
+        dists.append(d.astype(np.float32))
+    dists = np.stack(dists)
+    owner = np.argmin(dists, axis=0)
+    ids = np.array([a[0] for a in ANCHORS])
+    biome = ids[owner]
+    biome[~land] = 0
+
+    # Cascadia: the PNW and Arctic anchors make one forest; its colder part
+    # (north, high, a little noise) is Arctic, so snow starts deeper in.
+    forest = (biome == PNW) | (biome == ARCTIC)
+    if forest.any():
+        ridge_hint = np.clip(1.0 - np.abs(n_ridge.fbm(wx, wy, 3600, 4)) * 3.2, 0, 1)
+        cold = -wy / g.hy + 0.35 * ridge_hint + 0.22 * n_cold.fbm(wx, wy, 3000, 3)
+        cut = np.quantile(cold[forest], 1.0 - ARCTIC_SHARE)
+        biome[forest] = np.where(cold[forest] > cut, ARCTIC, PNW)
+
+    # Fold slivers into their neighbours: every piece of a biome is a place.
+    min_cells = MIN_FRAGMENT_M2 * METRE * METRE / (TILE * TILE / 2.0)
+    holes = np.zeros_like(land)
+    for b in BIOMES:
+        label, sizes = components(biome == b)
+        small = np.where(sizes < min_cells)[0]
+        small = small[small > 0]
+        if len(small):
+            holes |= np.isin(label, small)
+    biome = fill_from_neighbours(biome, holes & land)
+    biome[~land] = 0
+    return biome
+
+
+def biome_mix(g, biome, x, y, radius, step=260.0):
+    """Shares of each biome (0 = sea) inside a disc, by sampling."""
+    counts = np.zeros(len(BIOMES) + 1)
+    for sx in np.arange(-radius, radius + 1, step):
+        for sy in np.arange(-radius, radius + 1, step):
+            if sx * sx + sy * sy > radius * radius:
+                continue
+            tx, ty = g.to_tile(x + sx, y + sy)
+            b = biome[ty, tx] if g.inside(tx, ty) else 0
+            counts[b] += 1
+    return counts / max(1.0, counts.sum())
+
+
+def choose_sites(g, land, biome, sea_dist, rng, count=6):
+    """Candidate crash sites: flat-able land where two or three biomes meet
+    inside the round-3 storm, spread across the planet."""
+    radius = ZONE_RADII[-1]
+    cands = []
+    for x in np.arange(-g.hx * 0.8, g.hx * 0.8, 900.0):
+        for y in np.arange(-g.hy * 0.8, g.hy * 0.8, 900.0):
+            tx, ty = g.to_tile(x, y)
+            if not g.inside(tx, ty) or not land[ty, tx]:
+                continue
+            if sea_dist[ty, tx] < 3200 or biome[ty, tx] == CITY:
+                continue
+            mix = biome_mix(g, biome, x, y, radius, step=500.0)
+            sea = mix[0]
+            shares = mix[1:]
+            real = int((shares >= 0.12).sum())
+            if sea > 0.3 or mix[CITY] > 0.35:
+                continue
+            score = {1: 0.0, 2: 2.0, 3: 3.0, 4: 2.2}.get(real, 1.0)
+            score += 1.5 * (1.0 - sea) + rng.uniform(0, 0.3)
+            # The default site favours the heart of the continent.
+            score -= 0.6 * math.hypot(x / g.hx, y / g.hy)
+            cands.append((score, x, y, mix))
+    cands.sort(key=lambda c: -c[0])
+    sites = []
+    for score, x, y, mix in cands:
+        if any(math.hypot(x - sx, y - sy) < 8000 for _s, sx, sy, _m in sites):
+            continue
+        sites.append((score, x, y, mix))
+        if len(sites) >= count:
+            break
+    return [(x, y, mix) for _s, x, y, mix in sites]
+
+
+def build(seed: int, size: int, site_index: int):
     rng = random.Random(seed)
     g = Grid(size)
-    n1, n2, n3, n4, n5 = (Noise(rng) for _ in range(5))
+    n1, n2, n3, n4, n5, n6, n7, n8 = (Noise(rng) for _ in range(8))
     wx, wy = g.wx, g.wy
-    dist = np.hypot(wx, wy)
-    ang = np.degrees(np.arctan2(wy, wx))
 
-    # ---- 1. Land ---------------------------------------------------------
-    e = np.hypot(wx / ISLAND_RX, wy / ISLAND_RY)
-    e = e + 0.20 * n1.fbm(wx, wy, 2600, 4)
-    # Fingers: lobes of land reaching out at a few angles.
-    for a, reach, width in ((150, 0.22, 22), (60, 0.16, 18), (-120, 0.18, 20),
-                            (-15, 0.10, 16)):
-        d = (ang - a + 180) % 360 - 180
-        e = e - reach * np.exp(-(d / width) ** 2) * np.clip(dist / 4000 - 0.3, 0, 1)
-    # A bay biting in from the south-east, like the concept's inner sea.
-    bay = np.hypot((wx - 3300) / 1500, (wy - 1500) / 900)
-    e = e + 0.55 * np.clip(1.0 - bay, 0, 1)
-    land = e < 1.0
-    land &= dist > -1  # (keep shape)
-    land[g.disc(0, 0, BASIN_RADIUS + 400)] = True
+    # ---- 1. Land -----------------------------------------------------------
+    land, shape = make_land(g, n1)
+    sea_dist = grid_distance(~land, 9000.0)
+    land_dist = grid_distance(land, SEA_KEEP + 100.0)
 
-    # ---- 2. Height ---------------------------------------------------------
-    inland = np.clip(1.0 - e, 0, 1)
+    # ---- 2. Biomes -----------------------------------------------------------
+    biome = lay_out_biomes(g, land, sea_dist, (n5, n6, n3), rng)
+
+    # ---- 3. Crash sites --------------------------------------------------
+    sites = choose_sites(g, land, biome, sea_dist, random.Random(seed * 7 + 1))
+    assert sites, "no crash site found"
+    site_index = min(site_index, len(sites) - 1)
+    ship_x, ship_y, _mix = sites[site_index]
+    rx, ry = wx - ship_x, wy - ship_y           # ship-relative
+    ship_dist = np.hypot(rx, ry)
+    land[g.disc(ship_x, ship_y, BASIN_RADIUS + 400)] = True
+
+    # ---- 4. Height -----------------------------------------------------------
+    params = np.zeros((5, size, size), dtype=np.float32)
+    lake_thr = np.full((size, size), 9.0, dtype=np.float32)
+    for b, (base, hill, ridge_amp, mesa, lake) in BIOME_RELIEF.items():
+        m = biome == b
+        params[0][m], params[1][m], params[2][m], params[3][m] = base, hill, ridge_amp, mesa
+        lake_thr[m] = 9.0 if lake is None else lake
+    params[0][~land] = 2.0
+    blend = [blur(params[i], 22) for i in range(4)]
+    base, hill_amp, ridge_amp = blend[0], blend[1], blend[2]
+    mesa_amp = blur(params[3], 4)          # mesas keep steep edges
     hills = n2.fbm(wx, wy, 1500, 4)
-    ridge_n = n3.fbm(wx, wy, 2400, 4)
+    dunes = n2.fbm(wx * 0.45 + 300, wy * 1.6, 700, 2)
+    hills = np.where(biome == DESERT, 0.5 * hills + 0.7 * dunes, hills)
+    ridge_n = n3.fbm(wx, wy, 3600, 4)
     ridge = np.clip(1.0 - np.abs(ridge_n) * 3.2, 0, 1) ** 2.2
-    ridge *= np.clip((dist - 1600) / 1400, 0, 1)        # none near the ship
-    ridge *= np.clip(inland * 3.0, 0, 1)                # none on the shore
-    height = 3.0 + 4.0 * inland + 3.4 * hills + 10.5 * ridge
-    # The crash basin: flat at the base level, easing into the hills.
-    basin = np.clip((dist - BASIN_RADIUS) / 900.0, 0, 1)
+    ridge *= np.clip((ship_dist - 1600) / 1400, 0, 1)   # none near the ship
+    ridge *= np.clip((sea_dist - 300) / 2500, 0, 1)      # none on the shore
+    ridge *= ridge_amp / 10.0
+    mesa_n = n4.fbm(wx, wy, 1900, 3)
+    mesa = (mesa_n > 0.16).astype(np.float32) + (mesa_n > 0.34)
+    coast = np.clip(sea_dist / 2200.0, 0, 1) ** 0.6
+    height = base + hill_amp * hills + 10.5 * ridge + mesa_amp * mesa
+    height = 2.0 + (height - 2.0) * (0.35 + 0.65 * coast)
+    basin = np.clip((ship_dist - BASIN_RADIUS) / 900.0, 0, 1)
     height = BASE_LEVEL + (height - BASE_LEVEL) * basin
     height[~land] = 1.0
 
-    # ---- 3. Water: lakes in low inland ground ------------------------------
-    lake_field = n4.fbm(wx, wy, 1300, 3)
-    lakes = land & (lake_field > 0.34) & (dist > 1900) & (ridge < 0.2) & (inland > 0.12)
+    # ---- 5. Water: lakes, marsh, tide pools --------------------------------
+    lake_field = n7.fbm(wx, wy, 1500, 3)
+    lakes_all = land & (lake_field > lake_thr) & (ship_dist > 1900) & (ridge < 0.2) \
+        & (sea_dist > 500)
+    frozen = lakes_all & (biome == ARCTIC)            # walkable ice
+    lakes = lakes_all & ~frozen                       # deep, impassable
     height[lakes] = np.minimum(height[lakes], 2.4)
+    height[frozen] = np.minimum(height[frozen], np.maximum(height[frozen] - 1.5, 3.0))
+    marsh = land & (biome == SWAMP) & (lake_field > -0.06) & ~lakes & (ship_dist > 1300)
+    height[marsh] = np.minimum(height[marsh], 2.6)
+    tidepool = land & (biome == TIDAL) & (sea_dist < 650) & \
+        (n8.fbm(wx, wy, 500, 2) > 0.05) & (ship_dist > 1300)
+    beach = land & (biome == TIDAL) & (sea_dist < 1500)
 
-    # Terraces: the hills step in pairs of levels, so the land reads as
-    # plateaus and ledges (a cliff face per step) rather than a smooth
-    # blur. The mountains keep every level: rugged, not stepped.
+    # Terraces: hills step in pairs of levels, so the land reads as plateaus
+    # and ledges rather than a blur. Mountains keep every level: rugged.
     terraced = 2.0 * np.rint(height / 2.0)
     height = np.where((ridge < 0.25) & (basin > 0.5), terraced, height)
     level = np.clip(np.rint(height), 0, LEVELS - 1).astype(int)
+    level[biome == DESERT] = np.minimum(level[biome == DESERT], 12)  # buttes, not peaks
     level[lakes] = 2
     level[~land] = 1
 
-    # ---- 4. Regions (the zone template) -----------------------------------
+    # ---- 6. Regions: genus territories nested in biomes --------------------
     region = np.zeros((size, size), dtype=int)
-    seeds = [(1, 0.0, 0.0, 600.0)]  # id, x, y, weight (bigger = smaller cell)
-    ring = 7
-    for i in range(ring):
-        a = math.radians(CITY_ANGLE + 360.0 * (i + 1) / (ring + 1) + rng.uniform(-12, 12))
-        seeds.append((i + 2, math.cos(a) * ISLAND_RX * 0.62,
-                      math.sin(a) * ISLAND_RY * 0.62, 0.0))
-    city_id = ring + 2
-    ca = math.radians(CITY_ANGLE)
-    city_x, city_y = math.cos(ca) * ISLAND_RX * 0.70, math.sin(ca) * ISLAND_RY * 0.70
-    seeds.append((city_id, city_x, city_y, 0.0))
-    warp_x = wx + 700 * n5.fbm(wx, wy, 1800, 3)
-    warp_y = wy + 700 * n5.fbm(wx + 999, wy - 333, 1800, 3)
-    best = np.full((size, size), np.inf)
-    for rid, sx, sy, w in seeds:
-        d = np.hypot(warp_x - sx, (warp_y - sy) * 1.2) + w
-        if rid == 1:
-            d = d + 1200.0  # the basin is a small hub, not a big region
-        take = d < best
-        best[take] = d[take]
-        region[take] = rid
-    region[~land] = 0
+    areas = {b: int((biome == b).sum()) for b in BIOMES}
+    total = sum(areas.values())
+    want = {b: max(1, round(REGION_SLOTS * a / total)) if a else 0
+            for b, a in areas.items()}
+    want[CITY] = 1 if areas[CITY] else 0
+    while sum(want.values()) > REGION_SLOTS:
+        big = max(want, key=lambda b: want[b] if b != CITY else -1)
+        want[big] -= 1
+    next_region = 1
+    for b in BIOMES:
+        cells = np.argwhere(biome == b)
+        if not len(cells):
+            continue
+        k = want[b]
+        # Farthest-point seeds inside the biome, then nearest-seed cells.
+        pick = [cells[rng.randrange(len(cells))]]
+        for _ in range(k - 1):
+            d = np.min([np.hypot(*(cells - p).T) for p in pick], axis=0)
+            pick.append(cells[int(np.argmax(d))])
+        cwx = (cells[:, 1] - cells[:, 0]) * HALF_W
+        cwy = (cells[:, 1] + cells[:, 0]) * QUARTER_H
+        cwx = cwx + 600 * n5.fbm(cwx, cwy, 2000, 2)
+        best = np.full(len(cells), np.inf)
+        owner = np.zeros(len(cells), dtype=int)
+        for i, (py, px) in enumerate(pick):
+            pwx, pwy = (px - py) * HALF_W, (px + py) * QUARTER_H
+            d = np.hypot(cwx - pwx, cwy - pwy)
+            take = d < best
+            best[take] = d[take]
+            owner[take] = i
+        region[cells[:, 0], cells[:, 1]] = next_region + owner
+        next_region += k
+    assert next_region - 1 <= REGION_SLOTS
+    city_id = int(region[biome == CITY].max()) if areas[CITY] else -1
 
-    # ---- 5. The city --------------------------------------------------------
+    # ---- 7. The city --------------------------------------------------------
     material = np.full((size, size), MAT["scrub"], dtype=int)
     blocked = np.zeros((size, size), dtype=bool)
-    city = land & (region == city_id) & (inland > 0.04)
+    city = land & (biome == CITY) & (sea_dist > 150)
     city_level = 6
     level[city] = city_level
     ridge[city] = 0
     material[city] = MAT["street"]
     props = []
     city_blocks = []
+    cx_all, cy_all = wx[city], wy[city]
+    city_x = float(cx_all.mean()) if city.any() else 0.0
+    city_y = float(cy_all.mean()) if city.any() else 0.0
+    out_len = math.hypot(city_x, city_y) or 1.0
+    out_x, out_y = city_x / out_len, city_y / out_len
     # A grid of 8 m streets (two lanes and kerbs) around 14 m blocks, at
     # real scale. Some blocks split into two narrower buildings across a 2 m
     # alley.
     street, block = tiles(8.0), tiles(14.0)
     pitch = street + block
+    city_span = float(np.max(np.hypot(cx_all - city_x, cy_all - city_y))) if city.any() else 1.0
     for by in range(0, size, pitch):
         for bx in range(0, size, pitch):
             x0, y0 = bx + street, by + street
@@ -342,12 +686,13 @@ def build(seed: int, size: int):
                 ccx, ccy = (lx0 + lx1) / 2.0, (ly0 + ly1) / 2.0
                 cwx = (ccx - ccy) * HALF_W
                 cwy = (ccx + ccy) * QUARTER_H - QUARTER_H - g.cy
-                # Taller toward the city's heart (away from the island):
-                # two storeys at the edge, up to five in the middle. Capped
-                # there: buildings hide what walks behind them (the client
-                # thins one with a hero behind it, but lower is clearer).
-                heart = math.hypot(cwx - city_x * 1.25, cwy - city_y * 1.25)
-                storeys = int(np.clip(round(5.0 - heart / 900.0 + rng.uniform(-1.0, 1.0)), 2, 5))
+                # Taller toward the city's heart (out by the shore): two
+                # storeys at the edge, up to five in the middle. Capped
+                # there: buildings hide what walks behind them.
+                heart = math.hypot(cwx - (city_x + out_x * city_span * 0.4),
+                                   cwy - (city_y + out_y * city_span * 0.4))
+                storeys = int(np.clip(round(5.0 - 3.0 * heart / city_span +
+                                            rng.uniform(-1.0, 1.0)), 2, 5))
                 tall = storeys * STOREY * METRE
                 city_blocks.append((cwx, cwy, lx1 - lx0, ly1 - ly0, tall))
                 props.append(("city_block", cwx, cwy, {"width": lx1 - lx0,
@@ -356,22 +701,41 @@ def build(seed: int, size: int):
                                                       "variant": rng.randrange(4)}))
 
     # The skyline: the real city, out past the shore. Drawn, never reached.
-    for i in range(26):
-        a = math.radians(CITY_ANGLE + rng.uniform(-28, 28))
-        r = rng.uniform(1.08, 1.45)
-        sx, sy = math.cos(a) * ISLAND_RX * r, math.sin(a) * ISLAND_RY * r
-        props.append(("skyline", sx, sy, {"tall": round(rng.uniform(500, 1500)),
-                                          "width": round(rng.uniform(140, 380)),
-                                          "variant": rng.randrange(4)}))
+    if city.any():
+        placed = 0
+        for _ in range(4000):
+            if placed >= 34:
+                break
+            t = rng.uniform(0.9, 2.2)
+            lat = rng.uniform(-0.9, 0.9) * city_span
+            sx = city_x + out_x * city_span * t - out_y * lat
+            sy = city_y + out_y * city_span * t + out_x * lat
+            tx, ty = g.to_tile(sx, sy)
+            if not g.inside(tx, ty) or land[ty, tx] or sea_dist[ty, tx] < 500:
+                continue
+            props.append(("skyline", sx, sy, {"tall": round(rng.uniform(500, 1500)),
+                                              "width": round(rng.uniform(140, 380)),
+                                              "variant": rng.randrange(4)}))
+            placed += 1
 
-    # ---- 6. The crash trench ----------------------------------------------
-    crash_angle = math.radians(155.0)
+    # ---- 8. The crash trench ----------------------------------------------
+    # Ploughed in from whichever side has the most open land.
+    best_dir, best_open = 155.0, -1.0
+    for deg in range(0, 360, 15):
+        a = math.radians(deg)
+        open_ = 0
+        for k in range(1, 22):
+            tx, ty = g.to_tile(ship_x + math.cos(a) * k * 100, ship_y + math.sin(a) * k * 100)
+            if g.inside(tx, ty) and land[ty, tx] and biome[ty, tx] != CITY:
+                open_ += 1
+        if open_ > best_open + 0.5 or (open_ == best_open and abs(deg - 155) < abs(best_dir - 155)):
+            best_dir, best_open = float(deg), open_
+    crash_angle = math.radians(best_dir)
     ux, uy = math.cos(crash_angle), math.sin(crash_angle)
-    along = wx * ux + wy * uy
-    across = -wx * uy + wy * ux
+    along = rx * ux + ry * uy
+    across = -rx * uy + ry * ux
     trench = (along > 150) & (along < 2100) & (np.abs(across) < 70 + along * 0.05)
-    trench &= land
-    material[trench] = MAT["scar"]
+    trench &= land & ~city
     level[trench] = np.maximum(level[trench] - 1, 2)
 
     # ---- Blocked: sea, lakes, peaks ----------------------------------------
@@ -380,21 +744,25 @@ def build(seed: int, size: int):
 
     # ---- Rivers: from the mountain flanks to the water --------------------
     river = np.zeros((size, size), dtype=bool)
-    springs = np.argwhere(land & (level >= 10) & (level <= 12) & ~blocked)
-    rng.shuffle(springs := [tuple(p) for p in springs])
+    springs = np.argwhere(land & (level >= 10) & (level <= 12) & ~blocked &
+                          np.isin(biome, (PNW, ARCTIC, JUNGLE, PLAINS)))
+    springs = [tuple(p) for p in springs]
+    rng.shuffle(springs)
     made = 0
     for sy_, sx_ in springs:
-        if made >= 7:
+        if made >= 16:
             break
         wsx, wsy = g.centre(sx_, sy_)
-        if math.hypot(wsx, wsy) < 2200:
+        if math.hypot(wsx - ship_x, wsy - ship_y) < 2200:
+            continue
+        if river[max(0, sy_ - 30):sy_ + 30, max(0, sx_ - 30):sx_ + 30].any():
             continue
         path, x, y = [], sx_, sy_
         seen = set()
-        for _ in range(900):
+        for _ in range(1600):
             path.append((x, y))
             seen.add((x, y))
-            if not land[y, x] or lakes[y, x]:
+            if not land[y, x] or lakes[y, x] or river[y, x]:
                 break
             options = [(height[ny, nx] + rng.uniform(0, 0.35), nx, ny)
                        for nx, ny, _c in neighbours8(size, x, y)
@@ -404,7 +772,7 @@ def build(seed: int, size: int):
             _h, x, y = min(options)
         else:
             continue
-        if len(path) < 40:
+        if len(path) < 60:
             continue
         for x, y in path:
             if land[y, x] and not city[y, x] and not lakes[y, x]:
@@ -414,9 +782,9 @@ def build(seed: int, size: int):
     river &= ~blocked
     level[river] = np.maximum(level[river] - 1, 2)
 
-    # ---- 7. Connectivity: carve passes so all big land reaches the ship ---
+    # ---- Connectivity: carve passes so all big land reaches the ship ------
     def reachable_from_ship():
-        sx, sy = g.to_tile(0, 60)
+        sx, sy = g.to_tile(ship_x, ship_y + 60)
         seen = np.zeros((size, size), dtype=bool)
         stack = [(sx, sy)]
         seen[sy, sx] = True
@@ -428,7 +796,7 @@ def build(seed: int, size: int):
                     stack.append((nx, ny))
         return seen
 
-    for _attempt in range(12):
+    for _attempt in range(40):
         reach = reachable_from_ship()
         stranded = land & ~blocked & ~reach
         if stranded.sum() < 60:
@@ -449,7 +817,7 @@ def build(seed: int, size: int):
             if c > best_cost.get((x, y), 1e18):
                 continue
             for nx, ny, step in neighbours8(size, x, y):
-                if not land[ny, nx] or lakes[ny, nx] or city_blocked(blocked, city, nx, ny):
+                if not land[ny, nx] or lakes[ny, nx] or (city[ny, nx] and blocked[ny, nx]):
                     continue
                 nc = c + step
                 if nc < best_cost.get((nx, ny), 1e18):
@@ -479,38 +847,64 @@ def build(seed: int, size: int):
     slope = np.zeros_like(height)
     slope[1:-1, 1:-1] = (np.abs(height[1:-1, 2:] - height[1:-1, :-2]) +
                          np.abs(height[2:, 1:-1] - height[:-2, 1:-1]))
-    scrubby = n1.fbm(wx + 500, wy - 700, 900, 3) > -0.05
-    wild = land & ~city & ~trench
-    material[wild] = np.where(scrubby[wild], MAT["scrub"], MAT["dust"])
-    material[wild & (slope > 1.4)] = MAT["rock"]
-    material[wild & (level >= 11)] = MAT["high"]
-    near_water = np.zeros_like(land)
+    # Ecotones: the ground's biome is read a few tiles off, by noise, so
+    # borders are ragged and blended rather than ruled lines.
+    jx = np.rint(4.0 * n8.fbm(wx, wy, 260, 2)).astype(int)
+    jy = np.rint(4.0 * n8.fbm(wx + 500, wy - 200, 260, 2)).astype(int)
+    gb = biome[np.clip(g.ty + jy, 0, size - 1), np.clip(g.tx + jx, 0, size - 1)]
+    gb = np.where(gb == 0, biome, gb)
+    patch = n1.fbm(wx + 500, wy - 700, 900, 3)
+    wild = land & ~city
+    pick = {
+        PLAINS: np.where(patch > 0.05, MAT["meadow"], MAT["grass"]),
+        PNW: np.where(patch > -0.1, MAT["moss"], MAT["needles"]),
+        ARCTIC: np.full(patch.shape, MAT["snow"]),
+        DESERT: np.where(patch > 0.25, MAT["dust"], MAT["sand"]),
+        TIDAL: np.where(patch > 0.0, MAT["scrub"], MAT["sand"]),
+        CITY: np.full(patch.shape, MAT["dust"]),
+        JUNGLE: np.where(patch > 0.2, MAT["vine"], MAT["jungle"]),
+        SWAMP: np.where(patch > 0.1, MAT["marsh"], MAT["mud"]),
+    }
+    for b, mats in pick.items():
+        m = wild & (gb == b)
+        material[m] = mats[m]
+    rocky = wild & (slope > 1.4)
+    material[rocky & (gb != ARCTIC) & (gb != DESERT)] = MAT["rock"]
+    material[rocky & (gb == DESERT)] = MAT["redrock"]
+    material[wild & (biome == DESERT) & (mesa_amp * mesa > 1.5)] = MAT["redrock"]
+    material[wild & (level >= 11) & ~np.isin(gb, (ARCTIC, DESERT))] = MAT["high"]
+    material[wild & (level >= 11) & (gb == DESERT)] = MAT["redrock"]
+    material[wild & (level >= 11) & (gb == ARCTIC) & (slope > 1.4)] = MAT["high"]
     water = (~land) | lakes | river
-    for dy in (-2, -1, 0, 1, 2):
-        for dx in (-2, -1, 0, 1, 2):
-            near_water |= np.roll(np.roll(water, dy, 0), dx, 1)
-    material[wild & near_water & (level <= 6)] = MAT["wet"]
+    near_water = dilate(dilate(water))
+    material[wild & near_water & (level <= 6) &
+             np.isin(gb, (PLAINS, PNW, JUNGLE))] = MAT["wet"]
+    material[beach & ~city] = MAT["beach"]
+    material[tidepool & ~city] = MAT["tidepool"]
+    material[marsh] = MAT["bog"]
+    material[frozen] = MAT["ice"]
     material[river] = MAT["river"]
     material[lakes] = MAT["water"]
     material[~land] = MAT["sea"]
-    basin_dust = g.disc(0, 0, BASIN_RADIUS * 0.8) & land & ~trench
+    material[trench] = MAT["scar"]
+    basin_dust = g.disc(ship_x, ship_y, BASIN_RADIUS * 0.8) & land & ~trench & ~city
     material[basin_dust] = MAT["dust"]
 
-    world = dict(g=g, rng=rng, land=land, level=level, region=region,
+    world = dict(g=g, rng=rng, land=land, level=level, region=region, biome=biome,
                  blocked=blocked, material=material, city=city, lakes=lakes,
                  river=river, trench=trench, peaks=peaks, ridge=ridge,
-                 near_water=near_water, props=props, city_id=city_id,
-                 city_blocks=city_blocks, slope=slope, crash=(ux, uy))
+                 near_water=near_water | marsh | tidepool, props=props,
+                 city_id=city_id, city_blocks=city_blocks, slope=slope,
+                 crash=(ux, uy), ship=(ship_x, ship_y), sites=sites,
+                 site_index=site_index, sea_dist=sea_dist, marsh=marsh,
+                 frozen=frozen, tidepool=tidepool, beach=beach,
+                 land_dist=land_dist)
     place_landmarks(world)
     place_pois(world)
     cut_trails(world)
     place_rocks(world)
     dress(world)
     return world
-
-
-def city_blocked(blocked, city, x, y):
-    return city[y, x] and blocked[y, x]
 
 
 def walkable_spot(w, x, y, radius):
@@ -550,6 +944,7 @@ def flatten(w, x, y, radius, material=None, keep_level=None):
 
 def place_landmarks(w):
     g, rng = w["g"], w["rng"]
+    sx, sy = w["ship"]
     w["landmarks"] = []
     tries = 0
     want = list(LANDMARKS)
@@ -557,7 +952,7 @@ def place_landmarks(w):
         tries += 1
         a = rng.uniform(-math.pi, math.pi)
         r = rng.uniform(1800, 5200)
-        x, y = math.cos(a) * r * 1.2, math.sin(a) * r * 0.85
+        x, y = sx + math.cos(a) * r * 1.2, sy + math.sin(a) * r * 0.85
         tx, ty = g.to_tile(x, y)
         if not g.inside(tx, ty) or w["city"][ty, tx] or w["trench"][ty, tx]:
             continue
@@ -588,6 +983,7 @@ def place_landmarks(w):
 
 def place_pois(w):
     g, rng = w["g"], w["rng"]
+    sx, sy = w["ship"]
     pois = []
     level, near_water = w["level"], w["near_water"]
 
@@ -595,7 +991,10 @@ def place_pois(w):
         tx, ty = g.to_tile(x, y)
         lvl = level[ty, tx]
         s = rng.uniform(0, 1.0)
-        in_city = w["region"][ty, tx] == w["city_id"]
+        b = int(w["biome"][ty, tx])
+        in_city = b == CITY
+        base_kind = kind.split("_")[0]
+        s += POI_BIOME.get(base_kind, {}).get(b, 0.0)
         if kind in ("frogs", "gas"):
             s += 3.0 if near_water[ty, tx] else 0.0
             s += 1.0 if lvl <= 5 else 0.0
@@ -604,10 +1003,8 @@ def place_pois(w):
         if kind.startswith("scrapyard"):
             s += 3.0 if (w["trench"][ty, tx] or in_city) else 0.0
             ux, uy = w["crash"]
-            if x * ux + y * uy > 0 and abs(-x * uy + y * ux) < 500:
+            if (x - sx) * ux + (y - sy) * uy > 0 and abs(-(x - sx) * uy + (y - sy) * ux) < 500:
                 s += 2.0
-        if kind.startswith("medpacks"):
-            s += 2.5 if in_city else 0.0
         if kind == "probe":
             s += 0.25 * lvl + (1.5 if w["ridge"][ty, tx] > 0.1 else 0.0)
         if kind == "littlejohn":
@@ -623,8 +1020,8 @@ def place_pois(w):
             for _ in range(500):
                 a = rng.uniform(-math.pi, math.pi)
                 r = rng.uniform(r0, r1)
-                x, y = math.cos(a) * r * 1.25, math.sin(a) * r * 0.9
-                d = math.hypot(x, y)
+                x, y = sx + math.cos(a) * r * 1.25, sy + math.sin(a) * r * 0.9
+                d = math.hypot(x - sx, y - sy)
                 if d < r0 or d > r1:
                     continue
                 if not walkable_spot(w, x, y, pad + 40):
@@ -652,24 +1049,25 @@ def cut_trails(w):
     g = w["g"]
     size = g.size
     level, blocked = w["level"], w["blocked"]
-    sx, sy = g.to_tile(0, 60)
+    sx, sy = g.to_tile(w["ship"][0], w["ship"][1] + 60)
     cost = {(sx, sy): 0.0}
     prev = {}
     heap = [(0.0, sx, sy)]
+    limit = 11000.0 / TILE_STEP_PX * 6.0   # far enough for every ring
     while heap:
         c, x, y = heapq.heappop(heap)
-        if c > cost.get((x, y), 1e18):
+        if c > cost.get((x, y), 1e18) or c > limit:
             continue
         for nx, ny, step in neighbours8(size, x, y):
             if blocked[ny, nx]:
                 continue
             climb = abs(int(level[ny, nx]) - int(level[y, x]))
             # Trails prefer flat ground, reuse each other (cheap on path),
-            # and avoid the rivers' wet feet when they can.
+            # and avoid the rivers' and marshes' wet feet when they can.
             k = step * (1.0 + 1.6 * climb * climb)
             if w["material"][ny, nx] == MAT["path"]:
                 k *= 0.6
-            if w["river"][ny, nx]:
+            if w["river"][ny, nx] or w["marsh"][ny, nx]:
                 k *= 1.6
             nc = c + k
             if nc < cost.get((nx, ny), 1e18):
@@ -699,20 +1097,21 @@ def cut_trails(w):
 
 def place_rocks(w):
     """Lifeline rocks (Terrain layer, type "terrain"): the place_terrain.py
-    rules on a bigger island. Centres about SPACING apart so Isaac can chain
+    rules around the ship. Centres about SPACING apart so Isaac can chain
     them; clear of the ship ring, the pads, trails and spawns."""
     g, rng = w["g"], w["rng"]
+    sx, sy = w["ship"]
     spacing = 560.0
     zone = ZONE_RADII[-1] + 400
-    keepout = [(0.0, 0.0, SHIP_CLEAR)]
+    keepout = [(sx, sy, SHIP_CLEAR)]
     for kind, x, y, _ring in w["pois"]:
         keepout.append((x, y, POI_KINDS[kind][5] + 120))
     for _k, x, y in w["landmarks"]:
         keepout.append((x, y, 360))
     rocks = []
     for _ in range(60000):
-        x = rng.uniform(-zone * 1.3, zone * 1.3)
-        y = rng.uniform(-zone, zone)
+        x = sx + rng.uniform(-zone * 1.3, zone * 1.3)
+        y = sy + rng.uniform(-zone, zone)
         rw, rh = round(rng.uniform(70, 150)), round(rng.uniform(45, 95))
         tx, ty = g.to_tile(x, y)
         if not g.inside(tx, ty) or w["city"][ty, tx] or w["trail"][ty, tx]:
@@ -732,66 +1131,131 @@ def place_rocks(w):
     w["rocks"] = rocks
 
 
+# Vegetation per biome: (kind, count per hectare of the biome, min gap m,
+# cluster size, cluster spread m, which ground). Real sizes are in
+# MAP_PIPELINE.md, "Biomes". Looks only: nothing here blocks movement.
+VEGETATION = {
+    PNW: [("conifer", 260, 4.5, 6, 9.0, "soft"), ("boulder", 14, 6.0, 2, 3.0, "rock"),
+          ("flora", 14, 3.0, 3, 3.0, "soft")],
+    ARCTIC: [("snow_conifer", 110, 5.0, 4, 8.0, "soft"), ("boulder", 18, 6.0, 2, 3.0, "rock"),
+             ("flora", 10, 3.0, 3, 3.0, "soft")],
+    DESERT: [("cactus", 45, 6.0, 2, 6.0, "soft"), ("boulder", 22, 6.0, 2, 3.0, "rock"),
+             ("bones", 4, 25.0, 1, 0.0, "soft"), ("flora", 8, 3.0, 2, 3.0, "soft")],
+    TIDAL: [("palm", 60, 5.0, 3, 6.0, "soft"), ("reeds", 90, 2.5, 4, 3.0, "wet"),
+            ("boulder", 16, 6.0, 2, 3.0, "rock"), ("flora", 10, 3.0, 3, 3.0, "soft")],
+    JUNGLE: [("jungle_tree", 230, 5.5, 5, 9.0, "soft"), ("flora", 30, 3.0, 4, 3.0, "soft"),
+             ("boulder", 10, 6.0, 2, 3.0, "rock")],
+    SWAMP: [("cypress", 130, 4.5, 4, 6.0, "any"), ("reeds", 220, 2.0, 6, 3.0, "wet"),
+            ("flora", 22, 3.0, 4, 3.0, "soft")],
+    PLAINS: [("grass", 200, 2.5, 6, 4.0, "soft"), ("boulder", 8, 8.0, 2, 3.0, "rock"),
+             ("flora", 12, 3.0, 3, 3.0, "soft")],
+}
+
+
 def dress(w):
-    """Set dressing: props that make the planet a place. Looks only; kept
+    """Set dressing: props that make each biome a place. Looks only; kept
     off pads and trails so fights stay readable (Clarity)."""
     g, rng = w["g"], w["rng"]
     props = w["props"]
-    keepout = [(0.0, 0.0, SHIP_CLEAR + 80)]
+    sx, sy = w["ship"]
+    keepout = [(sx, sy, SHIP_CLEAR + 80)]
     for kind, x, y, _ring in w["pois"]:
         keepout.append((x, y, POI_KINDS[kind][5] + 60))
     for k, x, y in w["landmarks"]:
         keepout.append((x, y, LANDMARK_PAD[k] + 60))
     rocks = w["rocks"]
+    # Spatial hash of keepouts, rocks and placed props: the planet is big.
+    bucket = 600.0
+    keep_hash = {}
+    for kx, ky, kr in keepout:
+        for bx in range(int((kx - kr) // bucket), int((kx + kr) // bucket) + 1):
+            for by in range(int((ky - kr) // bucket), int((ky + kr) // bucket) + 1):
+                keep_hash.setdefault((bx, by), []).append((kx, ky, kr))
+    rock_hash = {}
+    for rx, ry, rw, rh in rocks:
+        rock_hash.setdefault((int(rx // bucket), int(ry // bucket)), []).append((rx, ry, rw, rh))
 
-    def free(x, y, r=40):
-        if any(math.hypot(x - kx, y - ky) < kr for kx, ky, kr in keepout):
+    def free(x, y):
+        key = (int(x // bucket), int(y // bucket))
+        if any(math.hypot(x - kx, y - ky) < kr for kx, ky, kr in keep_hash.get(key, ())):
             return False
-        if any(abs(x - rx) < rw / 2 + 30 and abs(y - ry) < rh / 2 + 30
-               for rx, ry, rw, rh in rocks):
-            return False
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for rx, ry, rw, rh in rock_hash.get((key[0] + dx, key[1] + dy), ()):
+                    if abs(x - rx) < rw / 2 + 30 and abs(y - ry) < rh / 2 + 30:
+                        return False
         tx, ty = g.to_tile(x, y)
         if not g.inside(tx, ty) or w["blocked"][ty, tx] or w["trail"][ty, tx]:
             return False
         return True
 
     def scatter(kind, count, where, min_gap, cluster=1, spread=0.0):
-        placed = []
+        placed = {}
         cells = np.argwhere(where)
-        if len(cells) == 0:
+        if len(cells) == 0 or count <= 0:
             return
-        for _ in range(count * 6):
-            if len(placed) >= count:
+        cell = max(min_gap, 1.0)
+        n = 0
+        for _ in range(count * 4):
+            if n >= count:
                 break
             cy_, cx_ = cells[rng.randrange(len(cells))]
             bx, by = g.centre(cx_, cy_)
             for _c in range(cluster):
                 x = bx + rng.uniform(-spread, spread)
                 y = by + rng.uniform(-spread, spread) * 0.6
-                if not free(x, y):
+                tx, ty = g.to_tile(x, y)
+                if not g.inside(tx, ty) or not where[ty, tx] or not free(x, y):
                     continue
-                if any(math.hypot(x - px, y - py) < min_gap for px, py in placed):
+                kx, ky = int(x // cell), int(y // cell)
+                if any(math.hypot(x - px, y - py) < min_gap
+                       for ddx in (-1, 0, 1) for ddy in (-1, 0, 1)
+                       for px, py in placed.get((kx + ddx, ky + ddy), ())):
                     continue
-                placed.append((x, y))
+                placed.setdefault((kx, ky), []).append((x, y))
+                n += 1
                 props.append((kind, x, y, {"variant": rng.randrange(4),
                                            "scale": round(rng.uniform(0.75, 1.3), 2)}))
 
     land, mat = w["land"], w["material"]
+    biome = w["biome"]
     wild = land & ~w["city"] & ~w["blocked"]
-    # Flora: dressed per genus by the client (the region decides the look).
-    scatter("flora", 900, wild & ((mat == MAT["scrub"]) | (mat == MAT["wet"])),
-            90, cluster=4, spread=110)
-    scatter("boulder", 380, wild & ((mat == MAT["rock"]) | (mat == MAT["high"])), 120,
-            cluster=2, spread=80)
+    soft = ~np.isin(mat, (MAT["rock"], MAT["high"], MAT["redrock"], MAT["path"],
+                          MAT["pad"], MAT["scar"], MAT["river"], MAT["ice"],
+                          MAT["tidepool"], MAT["bog"], MAT["beach"]))
+    rock = np.isin(mat, (MAT["rock"], MAT["high"], MAT["redrock"]))
+    wet = np.isin(mat, (MAT["bog"], MAT["wet"], MAT["tidepool"], MAT["mud"]))
+    tile_ha = (TILE * TILE / 2.0) / (METRE * METRE) / 1e4
+    for b, kinds in VEGETATION.items():
+        inside = wild & (biome == b)
+        ha = inside.sum() * tile_ha
+        for kind, per_ha, gap, cluster, spread, ground in kinds:
+            where = inside & {"soft": soft, "rock": rock, "wet": wet,
+                              "any": soft | wet}[ground]
+            scatter(kind, int(per_ha * ha), where, gap * METRE, cluster=cluster,
+                    spread=spread * METRE)
+    # Sea stacks off the tidal coast: rock pillars standing in the surf.
+    surf = ~land & (w["sea_dist"] < 600)
+    tidal_near = dilate(dilate(biome == TIDAL))
+    for _ in range(3):
+        tidal_near = dilate(tidal_near)
+    near = surf & blur(tidal_near.astype(np.float32), 18, 1).astype(bool)
+    cells = np.argwhere(near)
+    for _ in range(min(60, len(cells))):
+        cy_, cx_ = cells[rng.randrange(len(cells))]
+        x, y = g.centre(cx_, cy_)
+        props.append(("sea_stack", x, y, {"variant": rng.randrange(4),
+                                          "scale": round(rng.uniform(0.7, 1.4), 2)}))
     # Crash wreckage: pieces ~2 m across, with room to walk between them.
     scatter("debris", 70, w["trench"] & ~w["blocked"], 4.0 * METRE, cluster=3,
             spread=6.0 * METRE)
-    scatter("bones", 60, wild & (mat == MAT["dust"]), 400)
-    scatter("ruin", 90, wild & (w["level"] >= 7), 300, cluster=3, spread=160)
+    scatter("ruin", 260, wild & (w["level"] >= 7) & ~np.isin(biome, (SWAMP, TIDAL)),
+            300, cluster=3, spread=160)
     # City dressing: a lamp every ~15 m of street, and the odd neon sign.
     streets = w["city"] & ~w["blocked"]
-    scatter("lamp", 70, streets, 15.0 * METRE)
-    scatter("sign", 30, streets, 22.0 * METRE)
+    street_ha = streets.sum() * tile_ha
+    scatter("lamp", int(24 * street_ha), streets, 15.0 * METRE)
+    scatter("sign", int(10 * street_ha), streets, 22.0 * METRE)
 
 
 # ---------------------------------------------------------------------------
@@ -811,7 +1275,6 @@ def draw_tile(rng, mat, variant):
     noise = np.array([[rng.uniform(-4, 4) for _ in range(TILE // 2)]
                       for _ in range(TILE // 2)], dtype=np.float32)
     img[..., :3] += np.kron(noise, np.ones((2, 2)))[..., None]
-    ys, xs = np.mgrid[0:TILE, 0:TILE]
     cx = cy = (TILE - 1) / 2.0
 
     def line(x0, y0, x1, y1, colour, width=1):
@@ -825,19 +1288,26 @@ def draw_tile(rng, mat, variant):
     if name == "street":
         line(2, cy, cx, 17, seam)            # paving seams along the grid
         line(cx, 47, TILE - 3, cy, seam)
-    elif name in ("rock", "high"):
+    elif name in ("rock", "high", "redrock", "ice"):
         for _ in range(1 + variant % 3):
             x0, y0 = rng.uniform(14, 50), rng.uniform(22, 42)
             line(x0, y0, x0 + rng.uniform(-12, 12), y0 + rng.uniform(-5, 5), seam)
-    elif name in ("dust", "pad", "path", "scrub", "wet"):
+    elif name in ("sand", "beach", "snow"):
+        # Ripples and drifts: soft lines along one axis.
+        for _ in range(1 + variant % 2):
+            x0, y0 = rng.uniform(12, 40), rng.uniform(24, 40)
+            line(x0, y0, x0 + rng.uniform(10, 18), y0 + rng.uniform(-2, 2), seam)
+    elif name in ("dust", "pad", "path", "scrub", "wet", "grass", "meadow", "moss",
+                  "needles", "jungle", "mud", "vine"):
         if variant >= 2:
             x0, y0 = rng.uniform(16, 48), rng.uniform(24, 40)
             line(x0, y0, x0 + rng.uniform(-10, 10), y0 + rng.uniform(-4, 4), seam)
-    elif name in ("water", "sea", "river"):
+    elif name in ("water", "sea", "river", "tidepool", "bog"):
         for _ in range(2):
             x0, y0 = rng.uniform(16, 44), rng.uniform(26, 38)
             line(x0, y0, x0 + rng.uniform(6, 14), y0, speck)
-    for _ in range((variant % 2) + (2 if name in ("scrub", "scar") else 1)):
+    busy = 2 if name in ("scrub", "scar", "grass", "meadow", "needles", "jungle", "vine") else 1
+    for _ in range((variant % 2) + busy):
         u, v = rng.uniform(-0.6, 0.6), rng.uniform(-0.55, 0.55)
         v *= 1 - abs(u)
         x, y = int(cx + u * TILE / 2), int(cy + v * TILE / 4)
@@ -856,10 +1326,14 @@ def build_ground_tileset(seed):
     return sheet
 
 
+DATA_ROWS = 4   # height, region, blocked, biome
+
+
 def build_data_tileset():
     """terrain_data.png: what the hidden layers paint with in Tiled.
-    Row 0: height 0..15 (dark to light). Row 1: region 0..15. Row 2: blocked."""
-    sheet = Image.new("RGBA", (TILE * 16, TILE * 3), (0, 0, 0, 0))
+    Row 0: height 0..15 (dark to light). Row 1: region 0..15. Row 2:
+    blocked. Row 3: biome 0..15 (in the biome's legend colour)."""
+    sheet = Image.new("RGBA", (TILE * 16, TILE * DATA_ROWS), (0, 0, 0, 0))
     d = ImageDraw.Draw(sheet)
     font = ImageFont.load_default()
     palette = [(80, 80, 80), (230, 120, 80), (110, 200, 120), (120, 150, 240),
@@ -875,6 +1349,10 @@ def build_data_tileset():
         poly1 = [(px, py + TILE) for px, py in poly]
         d.polygon(poly1, fill=palette[i] + (170,))
         d.text((x + 26, TILE + 26), str(i), fill=(0, 0, 0, 255), font=font)
+        poly3 = [(px, py + 3 * TILE) for px, py in poly]
+        colour = BIOMES[i][2] if i in BIOMES else (60, 60, 70)
+        d.polygon(poly3, fill=colour + (170,))
+        d.text((x + 26, 3 * TILE + 26), str(i), fill=(0, 0, 0, 255), font=font)
     poly2 = [(32, 16 + 2 * TILE), (63, 32 + 2 * TILE), (32, 47 + 2 * TILE), (0, 32 + 2 * TILE)]
     d.polygon(poly2, fill=(230, 40, 40, 170))
     d.text((20, 2 * TILE + 26), "X", fill=(255, 255, 255, 255), font=font)
@@ -923,29 +1401,29 @@ def ship_collision_from_arena(cy):
     return out
 
 
-def write_tmx(w, path, seed):
+def encode_layer(values):
+    """Tiled's base64 + zlib layer data: little-endian uint32 gids."""
+    raw = np.ascontiguousarray(values.astype("<u4")).tobytes()
+    return base64.b64encode(zlib.compress(raw, 9)).decode("ascii")
+
+
+def write_tmx(w, path, seed, size_arg):
     g = w["g"]
     size, cy = g.size, g.cy
     n_ground = len(MATERIALS) * VARIANTS
     data_gid = n_ground + 1
-    rng = random.Random(seed * 31 + 5)
+    rng = np.random.default_rng(seed * 31 + 5)
+    ship_x, ship_y = w["ship"]
 
-    ground_rows, height_rows, region_rows, blocked_rows = [], [], [], []
-    for ty in range(size):
-        gr, hr, rr, br = [], [], [], []
-        for tx in range(size):
-            m = int(w["material"][ty, tx])
-            roll = rng.random()
-            variant = 0 if roll < 0.5 else 1 if roll < 0.85 else 2 if roll < 0.95 else 3
-            gr.append(str(m * VARIANTS + variant + 1))
-            hr.append(str(data_gid + int(w["level"][ty, tx])))
-            reg = int(w["region"][ty, tx])
-            rr.append(str(data_gid + 16 + reg) if reg else "0")
-            br.append(str(data_gid + 32) if w["blocked"][ty, tx] else "0")
-        ground_rows.append(",".join(gr))
-        height_rows.append(",".join(hr))
-        region_rows.append(",".join(rr))
-        blocked_rows.append(",".join(br))
+    roll = rng.random((size, size))
+    variant = np.where(roll < 0.5, 0, np.where(roll < 0.85, 1, np.where(roll < 0.95, 2, 3)))
+    ground = w["material"] * VARIANTS + variant + 1
+    far_sea = ~w["land"] & (w["land_dist"] >= SEA_KEEP)
+    ground[far_sea] = 0                       # the void past the sea: not drawn
+    height = data_gid + w["level"]
+    region = np.where(w["region"] > 0, data_gid + 16 + w["region"], 0)
+    blocked = np.where(w["blocked"], data_gid + 32, 0)
+    biome = np.where(w["biome"] > 0, data_gid + 48 + w["biome"], 0)
 
     next_id = 1
     groups = {}
@@ -953,11 +1431,12 @@ def write_tmx(w, path, seed):
     def add(layer, xml):
         groups.setdefault(layer, []).append(xml)
 
-    add("Ship", point_object(next_id, "The Ship", 0, 0, cy)); next_id += 1
+    add("Ship", point_object(next_id, "The Ship", ship_x, ship_y, cy)); next_id += 1
     for i in range(4):
         a = math.pi / 2 + i * math.pi / 2
-        add("PlayerSpawns", point_object(next_id, f"Spawn_{i + 1}", math.cos(a) * 150,
-                                         math.sin(a) * 110 + 40 + 110, cy))
+        add("PlayerSpawns", point_object(next_id, f"Spawn_{i + 1}",
+                                         ship_x + math.cos(a) * 150,
+                                         ship_y + math.sin(a) * 110 + 40 + 110, cy))
         next_id += 1
 
     counts = {}
@@ -974,8 +1453,9 @@ def write_tmx(w, path, seed):
         if otype in ("capture_outpost", "salvage_medpacks"):
             props.append(("enemies_required", "int", str(camp)))
         if otype == "save_the_frogs":
-            d = math.hypot(x, y)
-            px, py = x - x / d * 260.0, y - y / d * 260.0
+            dx, dy = x - ship_x, y - ship_y
+            d = math.hypot(dx, dy)
+            px, py = x - dx / d * 260.0, y - dy / d * 260.0
             props += [("enemies_required", "int", "3"),
                       ("deposit_x", "float", f"{px:.1f}"),
                       ("deposit_y", "float", f"{py + cy:.1f}")]
@@ -985,7 +1465,7 @@ def write_tmx(w, path, seed):
             if elite:
                 gx, gy = x, y + (0.0 if grunts == 0 else 12.0)
             else:
-                a = 2 * math.pi * i / max(1, grunts) + rng.uniform(-0.3, 0.3)
+                a = 2 * math.pi * i / max(1, grunts) + random.Random(next_id).uniform(-0.3, 0.3)
                 ring_r = (radius * 0.6 if otype in ("capture_outpost", "salvage_medpacks")
                           else radius + 40.0)
                 gx, gy = x + math.cos(a) * ring_r, y + math.sin(a) * ring_r * 0.8
@@ -998,8 +1478,9 @@ def write_tmx(w, path, seed):
 
     for i, angle_deg in enumerate((225.0, 45.0)):
         a = math.radians(angle_deg)
-        add("Objectives", point_object(next_id, f"Turret_{i + 1}", math.cos(a) * 420,
-                                       math.sin(a) * 420, cy, [
+        add("Objectives", point_object(next_id, f"Turret_{i + 1}",
+                                       ship_x + math.cos(a) * 420,
+                                       ship_y + math.sin(a) * 420, cy, [
             ("objective_type", "string", "derelict_turret"),
             ("description", "string", "Repair the derelict turret"),
             ("radius", "float", "70.0"), ("interaction_time", "float", "4.0")]))
@@ -1007,7 +1488,8 @@ def write_tmx(w, path, seed):
 
     for name, typ, x, y, wdt, hgt in ship_collision_from_arena(cy):
         add("Collision", f'    <object id="{next_id}" name="{name}" type="{typ}" '
-                         f'x="{x:.1f}" y="{y + cy:.1f}" width="{wdt:g}" height="{hgt:g}" />')
+                         f'x="{x + ship_x:.1f}" y="{y + ship_y + cy:.1f}" '
+                         f'width="{wdt:g}" height="{hgt:g}" />')
         next_id += 1
     for i, (x, y, rw, rh) in enumerate(sorted(w["rocks"], key=lambda r: (r[1], r[0]))):
         add("Terrain", f'    <object id="{next_id}" name="Rock_{i + 1}" type="terrain" '
@@ -1016,37 +1498,50 @@ def write_tmx(w, path, seed):
     for i, (kind, x, y, props) in enumerate(w["props"]):
         add("Props", prop_xml(next_id, f"{kind}_{i + 1}", kind, x, y, cy, props))
         next_id += 1
+    # Every candidate crash site, for choosing one per match (not used by
+    # the game yet; the ship sits on site `active`).
+    for i, (x, y, mix) in enumerate(w["sites"]):
+        names = ",".join(f"{BIOMES[b][0]}:{mix[b]:.2f}" for b in BIOMES if mix[b] >= 0.05)
+        add("CrashSites", point_object(next_id, f"Site_{i}", x, y, cy, [
+            ("biomes", "string", names),
+            ("active", "bool", "true" if i == w["site_index"] else "false")]))
+        next_id += 1
 
-    order = ["Ship", "PlayerSpawns", "Objectives", "EnemySpawns", "Collision", "Terrain", "Props"]
+    order = ["Ship", "PlayerSpawns", "Objectives", "EnemySpawns", "Collision", "Terrain",
+             "Props", "CrashSites"]
     xml_groups = []
-    layer_id = 5
+    layer_id = 6
     for name in order:
         items = groups.get(name, [])
         xml_groups.append(f'  <objectgroup id="{layer_id}" name="{name}">\n' +
                           "\n".join(items) + "\n  </objectgroup>")
         layer_id += 1
 
-    def layer(lid, name, rows, visible=True):
+    def layer(lid, name, values, visible=True):
         vis = "" if visible else ' visible="0"'
         return (f'  <layer id="{lid}" name="{name}" width="{size}" height="{size}"{vis}>\n'
-                f'    <data encoding="csv">\n' + ",\n".join(rows) + "\n</data>\n  </layer>")
+                f'    <data encoding="base64" compression="zlib">\n'
+                f'{encode_layer(values)}\n    </data>\n  </layer>')
 
+    biome_names = ";".join(f"{b}={BIOMES[b][0]}" for b in BIOMES)
     tmx = f'''<?xml version="1.0" encoding="UTF-8"?>
 <map version="1.10" tiledversion="1.10.2" orientation="isometric" renderorder="right-down" width="{size}" height="{size}" tilewidth="{TILE}" tileheight="{TILE}" infinite="0" nextlayerid="{layer_id}" nextobjectid="{next_id}">
   <properties>
-    <property name="generator" value="tools/maps/generate_planet.py --seed {seed} --size {size}" />
+    <property name="generator" value="tools/maps/generate_planet.py --seed {seed} --size {size_arg} --site {w['site_index']}" />
     <property name="zone_scale" type="float" value="{ZONE_SCALE}" />
+    <property name="biomes" value="{biome_names}" />
   </properties>
   <tileset firstgid="1" name="planet_tiles" tilewidth="{TILE}" tileheight="{TILE}" tilecount="{n_ground}" columns="{VARIANTS}">
     <image source="planet_tiles.png" width="{TILE * VARIANTS}" height="{TILE * len(MATERIALS)}" />
   </tileset>
-  <tileset firstgid="{data_gid}" name="terrain_data" tilewidth="{TILE}" tileheight="{TILE}" tilecount="48" columns="16">
-    <image source="terrain_data.png" width="{TILE * 16}" height="{TILE * 3}" />
+  <tileset firstgid="{data_gid}" name="terrain_data" tilewidth="{TILE}" tileheight="{TILE}" tilecount="{16 * DATA_ROWS}" columns="16">
+    <image source="terrain_data.png" width="{TILE * 16}" height="{TILE * DATA_ROWS}" />
   </tileset>
-{layer(1, "Ground", ground_rows)}
-{layer(2, "Height", height_rows, False)}
-{layer(3, "Region", region_rows, False)}
-{layer(4, "Blocked", blocked_rows, False)}
+{layer(1, "Ground", ground)}
+{layer(2, "Height", height, False)}
+{layer(3, "Region", region, False)}
+{layer(4, "Blocked", blocked, False)}
+{layer(5, "Biome", biome, False)}
 {chr(10).join(xml_groups)}
 </map>
 '''
@@ -1055,102 +1550,225 @@ def write_tmx(w, path, seed):
 
 
 # ---------------------------------------------------------------------------
+# Stats: is every biome big enough? (the music test)
+# ---------------------------------------------------------------------------
+def crossing_stats(w, samples=3000, seed=11):
+    """Straight runs through each biome at hero speed. From a random walkable
+    point, run both ways along a random heading until the biome changes (or
+    the ground stops): the chord's length is one run through the biome.
+    Returns {biome: (median s, 25th percentile s, share of land)}."""
+    g = w["g"]
+    rng = random.Random(seed)
+    biome, blocked, land = w["biome"], w["blocked"], w["land"]
+    cells = np.argwhere(land & ~blocked & (biome > 0))
+    runs = {b: [] for b in BIOMES}
+    step = 60.0
+    for _ in range(samples):
+        cy_, cx_ = cells[rng.randrange(len(cells))]
+        b = int(biome[cy_, cx_])
+        x0, y0 = g.centre(cx_, cy_)
+        a = rng.uniform(0, math.pi)
+        ux, uy = math.cos(a), math.sin(a)
+        total = 0.0
+        for sgn in (1, -1):
+            t = 0.0
+            while t < 60000:
+                t += step
+                tx, ty = g.to_tile(x0 + sgn * ux * t, y0 + sgn * uy * t)
+                if not g.inside(tx, ty) or biome[ty, tx] != b or not land[ty, tx]:
+                    break
+            total += t
+        runs[b].append(total / HERO_SPEED)
+    land_cells = max(1, int((biome > 0).sum()))
+    out = {}
+    for b, r in runs.items():
+        share = float((biome == b).sum()) / land_cells
+        if r:
+            out[b] = (float(np.median(r)), float(np.percentile(r, 25)), share)
+        else:
+            out[b] = (0.0, 0.0, share)
+    return out
+
+
+# ---------------------------------------------------------------------------
 # Preview: the whole planet from above, for review (not used by the game)
 # ---------------------------------------------------------------------------
+# Preview colours are the real tile colours, brightened evenly (the preview
+# is small and has no lighting), so it never flatters the ground.
+MAT_PREVIEW = {m[0]: tuple(min(255, int(c * 1.7)) for c in m[1]) for m in MATERIALS}
+
+
+def _project(w, scale, top):
+    g = w["g"]
+    lift = (w["level"] - BASE_LEVEL) * LEVEL_PIXELS
+    px = ((g.wx + g.hx) * scale).astype(int)
+    py = ((g.wy - lift + g.hy) * scale + top).astype(int)
+    return px, py
+
+
+def _paint(img_arr, px, py, colours, order):
+    h, w_ = img_arr.shape[:2]
+    for dy in (0, 1):
+        for dx in (-1, 0, 1):
+            x = np.clip(px[order] + dx, 0, w_ - 1)
+            y = np.clip(py[order] + dy, 0, h - 1)
+            img_arr[y, x] = colours[order]
+
+
 def preview(w, path):
     g = w["g"]
-    size = g.size
-    scale = 0.06  # world px -> preview px
-    half_w = size * HALF_W
-    half_h = size * QUARTER_H
-    W, H = int(half_w * 2 * scale), int(half_h * 2 * scale) + 40
-    img = Image.new("RGB", (W, H), (6, 8, 14))
-    d = ImageDraw.Draw(img)
-    colours = {MAT[k]: c for k, c in {
-        "dust": (120, 110, 100), "scrub": (70, 92, 80), "rock": (96, 96, 112),
-        "high": (150, 150, 170), "wet": (60, 80, 92), "path": (190, 170, 130),
-        "pad": (230, 210, 150), "scar": (60, 30, 26), "street": (80, 80, 100),
-        "river": (70, 120, 160), "water": (34, 60, 90), "sea": (14, 22, 38)}.items()}
-    lvl = w["level"]
-    for ty in range(size):
-        for tx in range(size):
-            wx_, wy_ = g.centre(tx, ty)
-            lift = (lvl[ty, tx] - BASE_LEVEL) * LEVEL_PIXELS
-            px = (wx_ + half_w) * scale
-            py = (wy_ - lift + half_h) * scale + 20
-            c = colours[int(w["material"][ty, tx])]
-            shade = 0.75 + 0.03 * lvl[ty, tx]
-            if w["blocked"][ty, tx] and w["land"][ty, tx] and not w["lakes"][ty, tx]:
-                c = (40, 38, 46) if not w["city"][ty, tx] else (30, 30, 44)
-            c = tuple(min(255, int(v * shade)) for v in c)
-            d.rectangle([px - 1.2, py - 0.7, px + 1.2, py + 0.7], fill=c)
-    # Region borders
-    reg = w["region"]
-    for ty in range(1, size):
-        for tx in range(1, size):
-            if reg[ty, tx] and (reg[ty, tx] != reg[ty - 1, tx] or reg[ty, tx] != reg[ty, tx - 1]) \
-                    and reg[ty - 1, tx] and reg[ty, tx - 1]:
-                wx_, wy_ = g.centre(tx, ty)
-                lift = (lvl[ty, tx] - BASE_LEVEL) * LEVEL_PIXELS
-                px = (wx_ + half_w) * scale
-                py = (wy_ - lift + half_h) * scale + 20
-                d.point((px, py), fill=(200, 200, 255))
+    scale = 1800.0 / (2 * g.hx)
+    top = 40
+    W, H = int(2 * g.hx * scale), int(2 * g.hy * scale) + top + 30
+    px, py = _project(w, scale, top)
+    order = np.argsort((g.tx + g.ty).ravel(), kind="stable")
+    px, py = px.ravel(), py.ravel()
+    lvl = w["level"].ravel()
+    shade = (0.72 + 0.035 * lvl)[:, None]
 
     def to_px(x, y):
         tx, ty = g.to_tile(x, y)
-        lift = (lvl[ty, tx] - BASE_LEVEL) * LEVEL_PIXELS if g.inside(tx, ty) else 0
-        return (x + half_w) * scale, (y - lift + half_h) * scale + 20
+        lift = (w["level"][ty, tx] - BASE_LEVEL) * LEVEL_PIXELS if g.inside(tx, ty) else 0
+        return (x + g.hx) * scale, (y - lift + g.hy) * scale + top
 
+    stats = crossing_stats(w)
+
+    # --- Terrain view -------------------------------------------------------
+    palette = np.array([MAT_PREVIEW[m[0]] for m in MATERIALS], dtype=np.float32)
+    col = palette[w["material"].ravel()]
+    rock_blocked = (w["blocked"] & w["land"] & ~w["lakes"]).ravel()
+    col[rock_blocked] = (40, 38, 46)
+    col = np.clip(col * shade, 0, 255).astype(np.uint8)
+    arr = np.zeros((H, W, 3), dtype=np.uint8)
+    arr[:] = (6, 8, 14)
+    _paint(arr, px, py, col, order)
+    img = Image.fromarray(arr)
+    d = ImageDraw.Draw(img)
+    _overlay(w, d, to_px, scale, terrain=True)
+    d.text((8, 6), "planet terrain: pads (near black / mid yellow / far orange), landmarks "
+                   "pink, storm rings blue, crash sites white (active filled)", fill=(220, 220, 220))
+    img.save(path)
+
+    # --- Biome view -------------------------------------------------------
+    bpal = np.zeros((16, 3), dtype=np.float32)
+    bpal[0] = (14, 22, 38)
+    for b, (_k, _n, c) in BIOMES.items():
+        bpal[b] = c
+    col = bpal[w["biome"].ravel()] * 0.62
+    col[rock_blocked] *= 0.5
+    waterish = (w["lakes"] | w["river"]).ravel()
+    col[waterish] = (30, 60, 96)
+    col[(w["marsh"] | w["tidepool"] | w["frozen"]).ravel()] *= 0.8
+    col = np.clip(col * shade, 0, 255).astype(np.uint8)
+    arr = np.zeros((H, W, 3), dtype=np.uint8)
+    arr[:] = (6, 8, 14)
+    _paint(arr, px, py, col, order)
+    # Biome borders, bright.
+    biome = w["biome"]
+    edge = (biome > 0) & ((biome != shift(biome, 1, 0, 0)) | (biome != shift(biome, 0, 1, 0))) \
+        & (shift(biome, 1, 0, 0) > 0) & (shift(biome, 0, 1, 0) > 0)
+    ey, ex = np.nonzero(edge)
+    arr[np.clip(py.reshape(biome.shape)[ey, ex], 0, H - 1),
+        np.clip(px.reshape(biome.shape)[ey, ex], 0, W - 1)] = (235, 235, 245)
+    img = Image.fromarray(arr)
+    d = ImageDraw.Draw(img)
+    _overlay(w, d, to_px, scale, terrain=False)
+    for b, (_k, name, c) in BIOMES.items():
+        m = biome == b
+        if not m.any():
+            continue
+        cx, cy = float(g.wx[m].mean()), float(g.wy[m].mean())
+        # Nudge the label onto the biome itself.
+        tx, ty = g.to_tile(cx, cy)
+        if not (g.inside(tx, ty) and biome[ty, tx] == b):
+            yy, xx = np.argwhere(m)[len(np.argwhere(m)) // 2]
+            cx, cy = g.centre(xx, yy)
+        lx, ly = to_px(cx, cy)
+        d.text((lx - 30, ly - 6), name.upper(), fill=(255, 255, 255))
+    # Legend with the music test.
+    lx, ly = 10, H - 150
+    d.rectangle([lx - 4, ly - 4, lx + 560, H - 6], fill=(10, 12, 20))
+    d.text((lx, ly), "biome            land   straight run through (median / quarter shortest)",
+           fill=(220, 220, 220))
+    for i, (b, (_k, name, c)) in enumerate(BIOMES.items()):
+        med, q1, share = stats[b]
+        y = ly + 14 + i * 14
+        d.rectangle([lx, y + 2, lx + 10, y + 11], fill=c)
+        d.text((lx + 16, y), f"{name:<18} {share * 100:4.1f}%   {med:5.0f} s / {q1:4.0f} s",
+               fill=(220, 220, 220))
+    d.text((8, 6), "planet biomes: borders white, storm rings around the ship blue, crash "
+                   "sites numbered (active filled). Straight runs at hero speed (255 px/s).",
+           fill=(220, 220, 220))
+    biome_path = Path(path).with_name(Path(path).stem + "_biomes.png")
+    img.save(biome_path)
+    return stats, biome_path
+
+
+def _overlay(w, d, to_px, scale, terrain):
+    sx, sy = w["ship"]
     for r in ZONE_RADII:
-        cx, cy_ = to_px(0, 0)
+        cx, cy_ = to_px(sx, sy)
         d.ellipse([cx - r * scale, cy_ - r * scale, cx + r * scale, cy_ + r * scale],
                   outline=(70, 130, 255))
-    for x, y, rw, rh in w["rocks"]:
-        px, py = to_px(x, y)
-        d.rectangle([px - 1, py - 1, px + 1, py + 1], fill=(170, 170, 190))
-    for kind, x, y, _p in w["props"]:
-        if kind in ("city_block",):
+    if terrain:
+        for kind, x, y, _p in w["props"]:
+            if kind == "city_block":
+                px, py = to_px(x, y)
+                d.rectangle([px - 1, py - 1 - _p["tall"] * scale * 0.5, px + 1, py + 1],
+                            fill=(36, 40, 70), outline=(90, 200, 255))
+            elif kind == "skyline":
+                px, py = to_px(x, y)
+                d.rectangle([px - _p["width"] * scale / 2, py - _p["tall"] * scale,
+                             px + _p["width"] * scale / 2, py],
+                            fill=(20, 24, 44), outline=(60, 120, 200))
+        for kind, x, y in w["landmarks"]:
             px, py = to_px(x, y)
-            d.rectangle([px - 3, py - 2 - _p["tall"] * scale * 0.5, px + 3, py + 2],
-                        fill=(36, 40, 70), outline=(90, 200, 255))
-        if kind == "skyline":
+            d.polygon([(px, py - 10), (px + 5, py), (px - 5, py)], fill=(255, 120, 220))
+        for kind, x, y, ring in w["pois"]:
             px, py = to_px(x, y)
-            d.rectangle([px - _p["width"] * scale / 2, py - _p["tall"] * scale, px + _p["width"] * scale / 2, py],
-                        fill=(20, 24, 44), outline=(60, 120, 200))
-    for kind, x, y in w["landmarks"]:
+            col = (20, 20, 20) if ring == "near" else (240, 150, 40) if ring == "far" \
+                else (240, 220, 90)
+            d.ellipse([px - 3, py - 3, px + 3, py + 3], fill=col, outline=(255, 255, 255))
+    for i, (x, y, _mix) in enumerate(w["sites"]):
         px, py = to_px(x, y)
-        d.polygon([(px, py - 14), (px + 7, py), (px - 7, py)], fill=(255, 120, 220))
-        d.text((px + 8, py - 10), kind, fill=(255, 160, 230))
-    for kind, x, y, ring in w["pois"]:
-        px, py = to_px(x, y)
-        col = (20, 20, 20) if ring == "near" else (240, 150, 40) if ring == "far" else (240, 220, 90)
-        d.ellipse([px - 5, py - 5, px + 5, py + 5], fill=col, outline=(255, 255, 255))
-    cx, cy_ = to_px(0, 0)
-    d.rectangle([cx - 6, cy_ - 4, cx + 6, cy_ + 4], fill=(120, 255, 170))
-    d.text((8, 4), "planet overview: pads (near black / mid yellow / far orange), landmarks pink, "
-                   "storm rings blue, city blocks cyan", fill=(220, 220, 220))
-    img.save(path)
+        active = i == w["site_index"]
+        d.ellipse([px - 6, py - 6, px + 6, py + 6], outline=(255, 255, 255),
+                  fill=(120, 255, 170) if active else None, width=2)
+        d.text((px + 8, py - 6), str(i), fill=(255, 255, 255))
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawTextHelpFormatter)
     ap.add_argument("--seed", type=int, default=3)
-    ap.add_argument("--size", type=int, default=380)
+    ap.add_argument("--size", type=int, default=720)
+    ap.add_argument("--site", type=int, default=0,
+                    help="which candidate crash site the ship sits on")
     ap.add_argument("--out", default=str(MAPS / "planet.tmx"))
     ap.add_argument("--preview", default="")
     args = ap.parse_args()
-    w = build(args.seed, args.size)
-    build_ground_tileset(args.seed).save(MAPS / "planet_tiles.png")
-    build_data_tileset().save(MAPS / "terrain_data.png")
-    write_tmx(w, Path(args.out), args.seed)
+    w = build(args.seed, args.size, args.site)
+    out = Path(args.out)
+    build_ground_tileset(args.seed).save(out.parent / "planet_tiles.png")
+    build_data_tileset().save(out.parent / "terrain_data.png")
+    write_tmx(w, out, args.seed, args.size)
     land = int(w["land"].sum())
-    print(f"wrote {args.out}: {args.size}x{args.size} tiles, {land} land tiles, "
-          f"{len(w['pois'])} points of interest, {len(w['landmarks'])} landmarks, "
+    drawn = int((~(~w["land"] & (w["land_dist"] >= SEA_KEEP))).sum())
+    print(f"wrote {args.out}: {args.size}x{args.size} tiles ({drawn} drawn), {land} land "
+          f"tiles, {len(w['pois'])} points of interest, {len(w['landmarks'])} landmarks, "
           f"{len(w['rocks'])} rocks, {len(w['props'])} props")
+    sx, sy = w["ship"]
+    print(f"ship on crash site {w['site_index']} of {len(w['sites'])} at ({sx:.0f}, {sy:.0f})")
+    for i, (x, y, mix) in enumerate(w["sites"]):
+        names = ", ".join(f"{BIOMES[b][1]} {mix[b] * 100:.0f}%" for b in BIOMES
+                          if mix[b] >= 0.05)
+        print(f"  site {i}: {names}, sea {mix[0] * 100:.0f}%")
     if args.preview:
-        preview(w, args.preview)
-        print(f"preview: {args.preview}")
+        stats, biome_path = preview(w, args.preview)
+        print(f"preview: {args.preview}, {biome_path}")
+        for b, (med, q1, share) in stats.items():
+            print(f"  {BIOMES[b][1]:<18} {share * 100:5.1f}% of land, straight run "
+                  f"{med:4.0f} s median, {q1:4.0f} s quarter-shortest")
 
 
 if __name__ == "__main__":

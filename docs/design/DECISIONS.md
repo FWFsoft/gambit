@@ -21,6 +21,30 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-18: The planet is laid out in earth-like biomes (work in progress)
+- **Decision:** `generate_planet.py` now lays the planet out by biome first:
+  Plains, Pacific Northwest, Arctic (the colder, higher, northern part of
+  the PNW forest), Desert, Tidal coast, City, Jungle, Swamp, arranged like
+  a compressed North America. Genera do not drive biomes; genus
+  territories are nested inside biomes and still dealt per match. The map
+  grows to 720x720 tiles (about 3.6 times the old tile count), with a new
+  hidden `Biome` layer and candidate crash sites where 2 to 4 biomes meet.
+  A straight sprint through a biome takes 16 to 25 s (median); the
+  designer's bar is that music must not switch every few seconds.
+- **Pillars:** Creative Builds & Dynamic Play (crash sites at different
+  junctions give different biome mixes per run); Clarity (biomes differ by
+  ground hue at the same low value). Trades against Strategic Crunch if
+  the bigger land holds empty space; most of the planet sits outside a
+  match's storm until crash sites vary per match.
+- **Why:** The designer asked for biomes sized for music that lasts minutes
+  per category. Open points from review: the tidal coast should move
+  south of the PNW (which needs its own coast), the Arctic should not
+  touch the Plains directly, and a mountain spine between forest and
+  desert/plains would explain the dry side. Not yet regenerated into
+  `assets/maps/planet.tmx` or checked in-game (no build here).
+- **Status:** Proposed
+- **Where:** `tools/maps/generate_planet.py`
+
 ## 2026-11-18: Scenery at real scale against the heroes
 - **Decision:** Everything the planet draws is sized in real metres
   against a 1.8 m hero (1 m = 55 world px, `Config::World::METRE`, same
