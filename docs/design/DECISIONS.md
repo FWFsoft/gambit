@@ -21,6 +21,37 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-18: Music follows the match, the party and the biome
+- **Decision:** The designer's music rules are built (`docs/design/MUSIC.md`,
+  `MusicDirector`): the intermission/character select song in the lobby and
+  between rounds; First Contact from landing until it ends; the landing
+  zone's two songs in the ship's home ring (2,000 px); the biome's songs
+  elsewhere; the ship biome's boss music in the boss fight (any boss music
+  if it has none). Mood: Confident while everyone stands (always, solo),
+  Alone for the last one, Weakened between. Decided with the designer: 3 of
+  4 alive is Weakened; the landing zone is the home ring, not the small
+  crash basin; boss music comes from the ship's biome. Added by me: a new
+  place needs 5 s of standing in it, a worse mood 1.5 s, a better one 6 s,
+  and a biome without music keeps what plays; tracks shuffle and crossfade
+  over 1.5 s. 31 tracks imported (133 min of playlist time, 96 MB of OGG at
+  -16 LUFS) with `tools/music/import_music.py`.
+- **Pillars:** serves Strategic Crunch (the music turns as the crew falls,
+  pressure you hear) and Clarity (the party's state is audible: Weakened
+  and Alone tell you without looking at the HUD). The holds trade a little
+  Clarity (the music lags a death by 1.5 s) for steadiness; without them a
+  revive or a trip home flips the track.
+- **Why:** The designer's spec, with the three open points asked and
+  answered. First Contact (4.4 min) is longer than round 1 (2.5 min), so the
+  intermission song cuts it off; flagged. Short of six minutes: every Tidal
+  category (no boss track), PNW Alone, City Boss. The web build preloads
+  every asset, so it now downloads 96 MB more before it starts; streaming
+  music on demand there is a follow-up.
+- **Status:** Accepted (requested by a human) for the rules; Built, needs
+  review for the holds, crossfade and fallbacks
+- **Where:** `include/MusicDirector.h`, `src/MusicDirector.cpp`,
+  `src/MusicSystem.cpp`, `assets/music/`, `tools/music/import_music.py`,
+  `tests/test_music_director.cpp`
+
 ## 2026-11-18: Genus territories actually load; biome dressing is drawn
 - **Decision:** (1) Fixed the map loader reading every land tile as
   region 15: the generator paints regions with row 1 of `terrain_data`

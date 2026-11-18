@@ -207,6 +207,7 @@ add_executable(Client
     src/AnimationSystem.cpp
     src/AnimationAssetLoader.cpp
     src/MusicSystem.cpp
+    src/MusicDirector.cpp
     src/MusicZoneDebugRenderer.cpp
     src/ObjectiveDebugRenderer.cpp
     src/EnemyInterpolation.cpp
@@ -291,6 +292,7 @@ add_executable(HeadlessClient
     src/AnimationSystem.cpp
     src/AnimationAssetLoader.cpp
     src/MusicSystem.cpp
+    src/MusicDirector.cpp
     src/EnemyInterpolation.cpp
     src/CombatSystem.cpp
     src/CharacterRegistry.cpp
@@ -722,6 +724,7 @@ add_executable(test_headless_movement
     src/AnimationSystem.cpp
     src/AnimationAssetLoader.cpp
     src/MusicSystem.cpp
+    src/MusicDirector.cpp
     src/EnemyInterpolation.cpp
     src/CombatSystem.cpp
     src/CharacterRegistry.cpp
@@ -748,6 +751,13 @@ elseif(TARGET PkgConfig::TMXLITE)
         PkgConfig::TMXLITE
     )
 endif()
+
+# The designer's music rules: which playlist plays when (no audio needed).
+add_executable(test_music_director
+    tests/test_music_director.cpp
+    src/MusicDirector.cpp
+)
+target_include_directories(test_music_director PRIVATE include tests)
 
 # The generated planet as the engine loads it (regions, biomes, nesting).
 add_executable(test_planet_map
@@ -789,6 +799,7 @@ add_test(NAME NyxKit COMMAND test_nyx_kit)
 add_test(NAME GravonKit COMMAND test_gravon_kit)
 add_test(NAME PointsOfInterest COMMAND test_points_of_interest)
 add_test(NAME CharacterSwap COMMAND test_character_swap)
+add_test(NAME MusicDirector COMMAND test_music_director)
 add_test(NAME PlanetMap COMMAND test_planet_map)
 set_tests_properties(PlanetMap PROPERTIES WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
@@ -934,6 +945,7 @@ set(WASM_CLIENT_SOURCES
     src/AnimationSystem.cpp
     src/AnimationAssetLoader.cpp
     src/MusicSystem.cpp
+    src/MusicDirector.cpp
     src/MusicZoneDebugRenderer.cpp
     src/ObjectiveDebugRenderer.cpp
     src/EnemyInterpolation.cpp

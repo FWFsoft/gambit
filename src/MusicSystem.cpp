@@ -1,11 +1,18 @@
 #include "MusicSystem.h"
 
+#include <algorithm>
 #include <cassert>
+#include <cmath>
+#include <fstream>
+#include <sstream>
 
+#include "ArenaClient.h"
+#include "Biome.h"
 #include "ClientPrediction.h"
 #include "EventBus.h"
 #include "GameStateManager.h"
 #include "Logger.h"
+#include "NetworkProtocol.h"
 #include "Player.h"
 #include "TiledMap.h"
 
@@ -14,7 +21,11 @@ MusicSystem::MusicSystem(const ClientPrediction* prediction,
     : clientPrediction(prediction),
       tiledMap(map),
       volume(DEFAULT_VOLUME),
-      muted(false) {
+      muted(false),
+      director(
+          [this](const std::string& key) { return playlists.count(key) > 0; }) {
+  loadPlaylists();
+
   // Initialize SDL_mixer
   if (Mix_OpenAudio(AUDIO_FREQUENCY, MIX_DEFAULT_FORMAT, AUDIO_CHANNELS,
                     AUDIO_CHUNK_SIZE) < 0) {
@@ -47,7 +58,143 @@ MusicSystem::~MusicSystem() {
   Mix_CloseAudio();
 }
 
-void MusicSystem::onUpdate(const UpdateEvent& e) { checkZoneTransition(); }
+void MusicSystem::onUpdate(const UpdateEvent& e) {
+  if (arenaClient && hasPlaylists()) {
+    followMatch(e.deltaTime / 1000.0f);  // deltaTime is in milliseconds
+  } else {
+    checkZoneTransition();
+  }
+}
+
+void MusicSystem::loadPlaylists() {
+  std::ifstream file(PLAYLIST_FILE);
+  if (!file) {
+    Logger::info(std::string("No playlists (") + PLAYLIST_FILE +
+                 "): music follows the map's music zones");
+    return;
+  }
+  std::string line;
+  int tracks = 0;
+  while (std::getline(file, line)) {
+    if (line.empty() || line[0] == '#') continue;
+    std::istringstream row(line);
+    std::string key, path;
+    row >> key;
+    std::getline(row >> std::ws, path);
+    if (key.empty() || path.empty()) continue;
+    playlists[key].push_back(path);
+    tracks++;
+  }
+  // "boss": every biome's boss music, for a biome without its own.
+  if (!playlists.count("boss")) {
+    std::vector<std::string> all;
+    for (const auto& [key, files] : playlists) {
+      if (key.size() > 5 && key.compare(key.size() - 5, 5, ".boss") == 0) {
+        all.insert(all.end(), files.begin(), files.end());
+      }
+    }
+    if (!all.empty()) playlists["boss"] = all;
+  }
+  Logger::info("Loaded " + std::to_string(playlists.size()) + " playlists (" +
+               std::to_string(tracks) + " tracks)");
+}
+
+MusicDirector::Inputs MusicSystem::readMatch() const {
+  MusicDirector::Inputs in;
+  if (!arenaClient || !arenaClient->hasMatch()) return in;
+  const MatchStatePacket& match = arenaClient->match();
+  in.hasMatch = true;
+  in.phase = static_cast<Arena::MatchPhase>(match.phase);
+  in.round = match.round;
+  const uint32_t me = clientPrediction->getLocalPlayerId();
+  const Player& local = clientPrediction->getLocalPlayer();
+  for (const MatchPlayerState& p : match.players) {
+    if (p.characterId == 0) continue;  // not playing (still picking)
+    in.partySize++;
+    bool alive = true;
+    if (p.playerId == me) {
+      alive = !local.isDead();
+    } else {
+      auto it = arenaClient->players().find(p.playerId);
+      if (it != arenaClient->players().end()) {
+        alive = it->second.state.health > 0.0f;
+      }
+    }
+    if (alive) in.alive++;
+  }
+  if (in.partySize == 0) in.partySize = in.alive = 1;
+  in.distToShip = std::hypot(local.x - match.shipX, local.y - match.shipY);
+  const TerrainGrid& grid = tiledMap->terrain();
+  in.biome = biomeKey(biomeFromId(grid.biomeAt(local.x, local.y)));
+  in.shipBiome = biomeKey(biomeFromId(grid.biomeAt(match.shipX, match.shipY)));
+  return in;
+}
+
+void MusicSystem::followMatch(float dtSeconds) {
+  GameState state = GameStateManager::instance().getCurrentState();
+  if (state == GameState::TitleScreen || state == GameState::MainMenu) {
+    // The title screen plays its own music (UISystem).
+    currentPlaylist.clear();
+    pendingPlaylist.clear();
+    return;
+  }
+  // Our track finished (each plays once; the playlist moves on).
+  const bool ended = !currentPlaylist.empty() && pendingPlaylist.empty() &&
+                     !Mix_PlayingMusic();
+
+  MusicDirector::Inputs in = readMatch();
+  in.characterSelect = state == GameState::CharacterSelect;
+  in.trackEnded = ended;
+  std::string want = director.update(in, dtSeconds);
+
+  if (!want.empty() && (want != currentPlaylist || !pendingPlaylist.empty())) {
+    if (want != pendingPlaylist) {
+      pendingPlaylist = want;
+      Logger::info(
+          "Music: " +
+          (currentPlaylist.empty() ? std::string("-") : currentPlaylist) +
+          " -> " + want);
+    }
+    if (Mix_PlayingMusic() && Mix_FadingMusic() != MIX_FADING_OUT) {
+      Mix_FadeOutMusic(PLAYLIST_FADE_MS);
+    }
+  }
+  if (!pendingPlaylist.empty()) {
+    // Never start over a fading track: Mix_FadeInMusic would block on it.
+    if (!Mix_PlayingMusic()) {
+      std::string next = pendingPlaylist;
+      pendingPlaylist.clear();
+      startPlaylist(next);
+    }
+    return;
+  }
+  if (ended) startPlaylist(currentPlaylist);  // next track, same playlist
+}
+
+void MusicSystem::startPlaylist(const std::string& key) {
+  auto it = playlists.find(key);
+  if (it == playlists.end() || it->second.empty()) return;
+  const std::vector<std::string>& files = it->second;
+  // Shuffle, but never the same track twice in a row.
+  std::string file = files[std::uniform_int_distribution<size_t>(
+      0, files.size() - 1)(shuffle)];
+  if (files.size() > 1) {
+    while (file == currentTrack) {
+      file = files[std::uniform_int_distribution<size_t>(
+          0, files.size() - 1)(shuffle)];
+    }
+  }
+  Mix_Music* music = loadMusic(file);
+  if (!music) return;
+  // Play once (0 and 1 both mean once across SDL_mixer versions): the end
+  // of a track is when the playlist moves on.
+  if (Mix_FadeInMusic(music, 1, PLAYLIST_FADE_MS) == -1) {
+    Logger::error("Failed to play music: " + std::string(Mix_GetError()));
+    return;
+  }
+  currentTrack = file;
+  currentPlaylist = key;
+}
 
 void MusicSystem::checkZoneTransition() {
   // Only check zone transitions when actively playing the game

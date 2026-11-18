@@ -25,6 +25,33 @@ inline Biome biomeFromId(int id) {
   return (id > 0 && id < BIOME_KINDS) ? static_cast<Biome>(id) : Biome::None;
 }
 
+// Short key: the generator's biome id and the music playlist prefix
+// (assets/music/music.txt), e.g. "pnw". Empty for None.
+inline const char* biomeKey(Biome b) {
+  switch (b) {
+    case Biome::Plains:
+      return "plains";
+    case Biome::PacificNorthwest:
+      return "pnw";
+    case Biome::Arctic:
+      return "arctic";
+    case Biome::Desert:
+      return "desert";
+    case Biome::Tidal:
+      return "tidal";
+    case Biome::City:
+      return "city";
+    case Biome::Jungle:
+      return "jungle";
+    case Biome::Swamp:
+      return "swamp";
+    case Biome::None:
+      return "";
+  }
+  assert(false && "unknown biome");
+  return "";
+}
+
 inline const char* biomeName(Biome b) {
   switch (b) {
     case Biome::Plains:

@@ -247,8 +247,9 @@ For the designer to accept or change:
 
 ## Known gaps
 
-- **Music does not follow biomes yet.** The engine reads the Biome layer;
-  the music system still plays the map's old rectangle zones.
+- **Music follows biomes for four of eight** (PNW, Desert, Tidal, City;
+  `MUSIC.md`). Plains, Arctic, Jungle and Swamp have no music yet and keep
+  whatever was playing.
 - **One crash site per map.** The candidate sites are written, but the
   game always uses the one the map was generated for. Choosing per match
   is what lets a run see a different biome mix (Creative Builds), and most

@@ -124,6 +124,8 @@ int main(int argc, char* argv[]) {
 
   // The match as the client sees it, and the view that draws it.
   static ArenaClient arenaClient;
+  // Music follows the match: phase, the party's state, the biome.
+  musicSystem.setArena(&arenaClient);
   static ArenaView arenaView(&arenaClient, &clientPrediction, &effectTracker,
                              &camera);
   uiSystem.setArenaView(&arenaView);
