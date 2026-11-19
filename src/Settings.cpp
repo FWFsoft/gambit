@@ -1,5 +1,6 @@
 #include "Settings.h"
 
+#include <algorithm>
 #include <fstream>
 #include <sstream>
 
@@ -55,6 +56,11 @@ bool Settings::load(const std::string& filename) {
       vsync = (value == "true" || value == "1");
     }
   }
+
+  // A hand-edited file must not push audio out of range.
+  masterVolume = std::clamp(masterVolume, 0.0f, 1.0f);
+  musicVolume = std::clamp(musicVolume, 0.0f, 1.0f);
+  sfxVolume = std::clamp(sfxVolume, 0.0f, 1.0f);
 
   Logger::info("Settings loaded from: " + filename);
   return true;

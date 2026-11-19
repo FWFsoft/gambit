@@ -55,7 +55,8 @@ class MusicSystem {
   std::string currentTrack;
   std::string currentZoneName;
   float volume;
-  bool muted;
+  // The player's master x music setting (AudioSettingsChangedEvent).
+  float settingsGain = 1.0f;
 
   // Playlists (assets/music/music.txt): key -> files under assets/music/.
   std::unordered_map<std::string, std::vector<std::string>> playlists;
@@ -65,7 +66,7 @@ class MusicSystem {
   std::mt19937 shuffle{std::random_device{}()};
 
   void onUpdate(const UpdateEvent& e);
-  void onToggleMute(const struct ToggleMuteEvent& e);
+  void applyVolume();  // volume x settingsGain to SDL_mixer
   void checkZoneTransition();
   void loadPlaylists();
   void followMatch(float dtSeconds);

@@ -49,8 +49,16 @@ UISystem::UISystem(Window* window, ClientPrediction* clientPrediction,
       selectionAnimationTime(0.0f),
       keyboardFocusedIndex(-1),
       showCoordinates(false) {
-  // Load settings
+  // Load settings; the music and sound systems (made before us) apply them.
   settings.load(Settings::DEFAULT_FILENAME);
+  publishAudio();
+  // M / F2 (InputSystem): the same mute as the Settings checkbox, saved.
+  EventBus::instance().subscribe<ToggleMuteEvent>(
+      [this](const ToggleMuteEvent&) {
+        settings.muted = !settings.muted;
+        publishAudio();
+        settings.save(Settings::DEFAULT_FILENAME);
+      });
 
   // Subscribe to keyboard events for navigation
   EventBus::instance().subscribe<KeyDownEvent>(
@@ -140,6 +148,15 @@ void UISystem::render() {
 
   // Render UI based on game state
   GameState currentState = GameStateManager::instance().getCurrentState();
+
+  // The settings panel belongs to the title screen, main menu and pause
+  // menu; leaving them (Esc resumes the game) closes it. Changes are
+  // already applied and saved, so nothing is lost.
+  if (currentState != GameState::TitleScreen &&
+      currentState != GameState::MainMenu &&
+      currentState != GameState::Paused) {
+    showSettings = false;
+  }
 
   switch (currentState) {
     case GameState::TitleScreen:
@@ -605,7 +622,6 @@ void UISystem::renderMainMenu() {
 
   // Settings button
   if (ImGui::Button("Settings", ImVec2(-1, 40))) {
-    tempSettings = settings;
     showSettings = true;
   }
 
@@ -619,60 +635,60 @@ void UISystem::renderMainMenu() {
   ImGui::End();
 }
 
+namespace {
+
+// A volume slider shown in percent; stores 0..1. Returns true while it
+// changes.
+bool volumeSlider(const char* label, float* value) {
+  int percent = static_cast<int>(std::lround(*value * 100.0f));
+  bool changed = ImGui::SliderInt(label, &percent, 0, 100, "%d%%",
+                                  ImGuiSliderFlags_AlwaysClamp);
+  if (changed) *value = static_cast<float>(percent) / 100.0f;
+  return changed;
+}
+
+}  // namespace
+
+void UISystem::publishAudio() {
+  EventBus::instance().publish(
+      AudioSettingsChangedEvent{settings.musicGain(), settings.sfxGain()});
+}
+
 void UISystem::renderSettingsPanel() {
-  // Center the settings window
   ImVec2 center = ImGui::GetMainViewport()->GetCenter();
   ImGui::SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-  ImGui::SetNextWindowSize(ImVec2(500, 600), ImGuiCond_Always);
+  ImGui::SetNextWindowSize(ImVec2(420, 0), ImGuiCond_Always);
 
-  ImGui::Begin("Settings", &showSettings,
+  bool open = true;
+  ImGui::Begin("Settings", &open,
                ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
                    ImGuiWindowFlags_NoCollapse);
 
-  // Audio Settings
-  if (ImGui::CollapsingHeader("Audio", ImGuiTreeNodeFlags_DefaultOpen)) {
-    ImGui::SliderFloat("Master Volume", &tempSettings.masterVolume, 0.0f, 1.0f);
-    ImGui::SliderFloat("Music Volume", &tempSettings.musicVolume, 0.0f, 1.0f);
-    ImGui::SliderFloat("SFX Volume", &tempSettings.sfxVolume, 0.0f, 1.0f);
-    ImGui::Checkbox("Muted", &tempSettings.muted);
+  // Changes apply as you drag, so you hear them, and are saved when you let
+  // go: there is no Save button to forget.
+  ImGui::SeparatorText("Audio");
+  bool changed = false;
+  bool finished = false;
+  changed |= volumeSlider("Master", &settings.masterVolume);
+  finished |= ImGui::IsItemDeactivatedAfterEdit();
+  changed |= volumeSlider("Music", &settings.musicVolume);
+  finished |= ImGui::IsItemDeactivatedAfterEdit();
+  changed |= volumeSlider("Sound effects", &settings.sfxVolume);
+  finished |= ImGui::IsItemDeactivatedAfterEdit();
+  if (ImGui::Checkbox("Mute all (M)", &settings.muted)) {
+    changed = true;
+    finished = true;
   }
-
-  // Graphics Settings
-  if (ImGui::CollapsingHeader("Graphics", ImGuiTreeNodeFlags_DefaultOpen)) {
-    ImGui::InputInt("Window Width", &tempSettings.windowWidth);
-    ImGui::InputInt("Window Height", &tempSettings.windowHeight);
-    ImGui::Checkbox("Fullscreen", &tempSettings.fullscreen);
-    ImGui::Checkbox("VSync", &tempSettings.vsync);
-  }
-
-  // Controls Settings
-  if (ImGui::CollapsingHeader("Controls")) {
-    ImGui::Text("WASD / Arrow Keys - Movement");
-    ImGui::Text("Space - Attack");
-    ImGui::Text("ESC - Pause");
-    ImGui::Text("I - Inventory");
-    ImGui::Text("M / F2 - Toggle Mute");
-    ImGui::Text("F1 - Toggle Coordinates & Debug Visualizations");
-  }
+  if (changed) publishAudio();
+  if (finished) settings.save(Settings::DEFAULT_FILENAME);
 
   ImGui::Spacing();
   ImGui::Separator();
   ImGui::Spacing();
-
-  // Save/Cancel buttons
-  if (ImGui::Button("Save", ImVec2(240, 40))) {
-    settings = tempSettings;
-    settings.save(Settings::DEFAULT_FILENAME);
-    showSettings = false;
-  }
-
-  ImGui::SameLine();
-
-  if (ImGui::Button("Cancel", ImVec2(240, 40))) {
-    showSettings = false;
-  }
+  if (ImGui::Button("Done", ImVec2(-1, 36))) open = false;
 
   ImGui::End();
+  if (!open) showSettings = false;
 }
 
 void UISystem::renderHUD() {
@@ -785,7 +801,6 @@ void UISystem::renderPauseMenu() {
 
   // Settings button
   if (ImGui::Button("Settings", ImVec2(-1, 40))) {
-    tempSettings = settings;
     showSettings = true;
   }
 

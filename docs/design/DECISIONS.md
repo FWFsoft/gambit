@@ -21,6 +21,102 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-19: Audio settings in the Esc menu
+- **Decision:** Esc > Settings shows Master, Music and Sound effects
+  sliders (percent) and Mute all. Changes apply live while dragging and are
+  saved to `settings.ini` on release; no Save or Cancel. Slider levels are
+  squared (50 % is about -12 dB), master multiplies both channels. The M
+  key and the checkbox are one mute, now saved. The panel's Graphics
+  fields (window size, fullscreen, VSync) and its controls list were
+  removed from it: nothing applied the Graphics fields, and the controls
+  list was out of date (it said Space attacks). They stay in
+  `settings.ini`.
+- **Pillars:** Clarity: you hear each change as you make it, the mute
+  state is visible, and the panel no longer offers settings that do
+  nothing. Strategic Crunch: in a match the pause menu is a quick in and
+  out; live apply with no Save step keeps it short, and Esc can't throw
+  changes away.
+- **Why:** The sliders already existed but were not connected to any
+  audio, and mute was a separate per-session toggle in each system. The
+  committed `settings.ini` had `muted=true` (someone's saved file), which
+  would have muted everyone once mute was saved and applied; it is now
+  `muted=false`. A squared curve was chosen over linear because linear
+  amplitude sounds almost unchanged across the top half of the slider.
+- **Status:** Accepted (requested by a human) for the sliders; the live
+  apply, the curve and removing the Graphics fields are built, need review
+- **Where:** `src/UISystem.cpp` (`renderSettingsPanel`), `include/Settings.h`,
+  `src/MusicSystem.cpp`, `src/SfxSystem.cpp`, `include/EventBus.h`,
+  `tests/test_settings.cpp`, `docs/design/SFX.md`
+
+## 2026-11-19: Every ability sounds like what it draws
+- **Decision:** Ability casts make sounds, built from what the cast draws
+  rather than picked per ability. The shape (slash, cone, burst, ring,
+  beam, projectile, lob, zone, dash, tether, shield, or a generic blip for
+  a cast that draws nothing) gives the main sound. The theme (Holy, Optic,
+  Fire, Nanite...) adds a tint at 55 % volume, so a theme always sounds the
+  same, as it always has the same colour. Your casts play up front (basic
+  attack 60 %, the rest 90 %); teammates' play at 40 % of that, fading
+  with distance and panned. A cast with nothing drawn yet waits up to
+  450 ms and sounds when its shape appears (wind-ups). Shapes no cast
+  claims (enemy attacks, ship effects, delayed blasts) stay silent. The
+  clips are CC0 placeholders from four Kenney packs. The per-ability
+  result is the table in `docs/design/SFX.md`.
+- **Pillars:** Clarity: every cast is heard and tells you its kind (beam,
+  dash, blast) and its theme, with yours distinct from your teammates'.
+  Creative Builds: new kits, infusion core casts and theme combinations
+  sound with no extra work, and themes keep one identity. Comradery:
+  teammates' casts are audible nearby but never cover yours. Trades
+  against Clarity in one way: with four players there is more sound, so
+  every shape and tint has gaps and voice caps. Enemy telegraphs still have
+  no sound, so for now nothing guarantees an enemy wind-up cuts through.
+  Trades against character identity ("characters should play differently,
+  not just look different"): kits that share a theme and shape sound alike
+  (Isaac's and El Presidente's Holy cones, Wade's and Jeff's Steel), which
+  signature sounds per character should fix.
+- **Why:** About 50 abilities across 12 kits; hand-picking each from stock
+  packs would be slow and would not survive kit changes. The shape and
+  theme are already in the events the client gets. Alternatives rejected:
+  one sound per slot (says nothing about the ability), and per-ability
+  picks now (left for signature sounds). Four abilities send no cast event
+  when tested without their setup and stay silent until they do. Your own
+  casts sound when the server confirms them, so online they lag by the
+  round trip.
+- **Status:** Accepted (requested by a human) for having ability sounds;
+  the rules and numbers above are built, need review
+- **Where:** `include/AbilitySounds.h`, `src/AbilitySounds.cpp`,
+  `src/SfxSystem.cpp`, `assets/sfx/ability/`,
+  `tools/sfx/make_ability_sounds.py`, `docs/design/SFX.md`
+
+## 2026-11-19: Placeholder hit sounds
+- **Decision:** Hits make sounds. A short punch when an enemy is hit
+  (louder for bigger hits), a heavier impact on a crit, and a grunt when
+  your own hero is hit. Teammates being hit and damage-over-time ticks
+  are silent. Enemy hits fade with distance from your hero (silent past
+  1,400 px) and pan with where they land. Each sound has three pitch
+  variants, a minimum gap (35 / 60 / 250 ms) and a voice cap (4 / 2 / 1).
+  The clips are CC0 placeholders from Kenney's Impact Sounds pack.
+- **Pillars:** Clarity: every hit now has sound as well as a flash and a
+  number, and your own hurt sound stands apart from everyone else's hits.
+  Gaps, caps and silent ticks keep a four-player fight readable rather than
+  loud. Comradery is traded a little: you don't hear a teammate getting
+  hit. That keeps the mix clean, but a later "teammate in trouble" cue
+  could fill the gap.
+- **Why:** The user asked for hit feedback from a free library to get
+  started. Kenney's site was unreachable from the build environment, so the
+  clips came from an npm package that bundles Kenney's CC0 packs (credited
+  in `assets/sfx/CREDITS.md`). These are generic clips, not sounds made for
+  this game's inked-heroes-on-a-dark-world look; replace them when real
+  sound design starts. Enemy attack telegraphs are the next sound Clarity
+  needs. Known gap: your own hits on enemies sound the same as your
+  teammates' hits, because the server's Damage event does not say who
+  dealt the hit. Adding the attacker to that event would let your hits be
+  crisp and up front and theirs quieter, which serves both Clarity and
+  Comradery (your contribution is audible).
+- **Status:** Accepted (requested by a human) for having hit sounds; the
+  rules and numbers above are built, need review
+- **Where:** `include/HitSounds.h`, `src/HitSounds.cpp`, `src/SfxSystem.cpp`,
+  `assets/sfx/`, `tools/sfx/make_hit_sounds.py`, `docs/design/SFX.md`
+
 ## 2026-11-18: Every match lands somewhere new; objectives are fixed places
 - **Decision:** The planet has four landing sites; each match lands on a
   different one (random, never the last), so the storm, the zone and the
