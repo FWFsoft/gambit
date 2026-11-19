@@ -5,11 +5,13 @@
 // ignored which row of terrain_data a layer paints with.
 
 #include <cassert>
+#include <cmath>
 #include <iostream>
 #include <map>
 #include <set>
 
 #include "Biome.h"
+#include "CollisionSystem.h"
 #include "Logger.h"
 #include "TiledMap.h"
 
@@ -68,7 +70,59 @@ int main() {
   assert(grid.biomeAt(map.getShipX(), map.getShipY()) != 0);
   assert(!grid.blockedAt(map.getShipX(), map.getShipY() + 200.0f));
 
+  // Landing sites: each match lands on one, bringing its own spawns, hull
+  // and turrets. Objectives and camps are fixed places on the planet, in
+  // play for every site within reach (ServerGameState::chooseLandingSite).
+  const auto& sites = map.getCrashSites();
+  assert(sites.size() >= 3);
+  CollisionSystem solid(map.getCollisionShapes(), &grid);
+  for (int i = 0; i < static_cast<int>(sites.size()); i++) {
+    const auto& site = sites[i];
+    assert(grid.biomeAt(site.x, site.y) != 0);
+    assert(!grid.blockedAt(site.x, site.y + 200.0f));
+    int spawns = 0, objectives = 0, camps = 0;
+    for (const PlayerSpawn& p : map.getPlayerSpawns()) spawns += p.site == i;
+    for (const Objective& o : map.getObjectives()) {
+      if (o.sites == 0 || !o.activeFor(i)) continue;
+      objectives++;
+      // In play for a site means within its reach (the far ring).
+      assert(std::hypot(o.x - site.x, o.y - site.y) < 9100.0f);
+    }
+    for (const EnemySpawn& e : map.getEnemySpawns()) {
+      camps += e.sites != 0 && e.activeFor(i);
+    }
+    assert(spawns >= 4 && objectives >= 20 && camps >= 20);
+    // Only this site's hull is solid while the ship stands here.
+    solid.placeHullNear(site.x, site.y);
+    assert(solid.getHullSite() == i);
+    int here = 0, elsewhere = 0;
+    for (const CollisionShape& shape : map.getCollisionShapes()) {
+      if (CollisionSystem::hullTierOf(shape) != 0) continue;
+      int at = CollisionSystem::hullSiteOf(shape);
+      assert(at >= 0);  // every hull belongs to a site
+      if (solid.isSolid(shape)) {
+        assert(at == i);
+        here++;
+      } else {
+        elsewhere++;
+      }
+    }
+    assert(here > 0 && elsewhere > 0);
+    std::cout << "site " << i << ": " << objectives << " objectives, " << camps
+              << " camp guards, " << spawns << " spawns, "
+              << biomeName(biomeFromId(grid.biomeAt(site.x, site.y))) << "\n";
+  }
+
+  // Fixed places: some objectives are in play from more than one site.
+  int shared = 0;
+  for (const Objective& o : map.getObjectives()) {
+    shared += __builtin_popcount(o.sites) > 1;
+  }
+  assert(shared > 0);
+  std::cout << shared << " objectives are in reach of more than one site\n";
+
   std::cout << "Planet map: " << regions.size() << " territories in "
-            << (biomeCells.size() - 1) << " biomes. OK\n";
+            << (biomeCells.size() - 1) << " biomes, " << sites.size()
+            << " landing sites. OK\n";
   return 0;
 }

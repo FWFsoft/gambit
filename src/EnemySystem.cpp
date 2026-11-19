@@ -49,6 +49,7 @@ EnemySystem::EnemySystem(const std::vector<EnemySpawn>& spawns)
 void EnemySystem::spawnAllEnemies() {
   for (size_t i = 0; i < spawns.size(); ++i) {
     const auto& spawnPoint = spawns[i];
+    if (!spawnPoint.activeFor(activeSite)) continue;  // out of reach
     SpawnOptions options;
     options.campGuard = true;
     options.elite = spawnPoint.elite;

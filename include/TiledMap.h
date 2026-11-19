@@ -44,6 +44,13 @@ class TiledMap {
   // A float map property (Tiled: Map > Map Properties), or `fallback`.
   float getMapFloat(const std::string& name, float fallback) const;
   bool hasShipPosition() const { return hasShip; }
+  // Where the ship can land (layer "CrashSites", objects "Site_<n>"), by
+  // index n. Each match lands on one; its camps, objectives, spawns and hull
+  // carry that index as their "site" property. Empty on one-site maps.
+  struct CrashSite {
+    float x = 0.0f, y = 0.0f;
+  };
+  const std::vector<CrashSite>& getCrashSites() const { return crashSites; }
   float getShipX() const { return shipX; }
   float getShipY() const { return shipY; }
 
@@ -65,6 +72,7 @@ class TiledMap {
   std::vector<EnemySpawn> enemySpawns;
   std::vector<PlayerSpawn> playerSpawns;
   std::vector<Objective> objectives;
+  std::vector<CrashSite> crashSites;
   TerrainGrid terrainGrid;
   std::vector<MapProp> props;
   float shipX = 0.0f;

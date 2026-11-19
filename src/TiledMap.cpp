@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstdlib>
 
 #include "ArenaData.h"
 #include "Logger.h"
@@ -187,6 +188,43 @@ void TiledMap::extractCollisionShapes() {
   }
 }
 
+namespace {
+// An object's int property `name` (Tiled writes ints as "int"), or fallback.
+int intProperty(const tmx::Object& object, const std::string& name,
+                int fallback) {
+  for (const auto& prop : object.getProperties()) {
+    if (prop.getName() == name && prop.getType() == tmx::Property::Type::Int) {
+      return prop.getIntValue();
+    }
+  }
+  return fallback;
+}
+
+// The landing sites an object is in play for: property "sites" ("0,2"), one
+// bit per site; 0 (none given) = every match.
+uint32_t siteMask(const tmx::Object& object) {
+  for (const auto& prop : object.getProperties()) {
+    if (prop.getName() != "sites" ||
+        prop.getType() != tmx::Property::Type::String) {
+      continue;
+    }
+    uint32_t mask = 0;
+    const std::string& list = prop.getStringValue();
+    size_t start = 0;
+    while (start < list.size()) {
+      size_t comma = list.find(',', start);
+      if (comma == std::string::npos) comma = list.size();
+      int site = std::atoi(list.substr(start, comma - start).c_str());
+      assert(site >= 0 && site < 32 && "landing site out of range");
+      mask |= 1u << site;
+      start = comma + 1;
+    }
+    return mask;
+  }
+  return 0;
+}
+}  // namespace
+
 void TiledMap::extractEnemySpawns() {
   enemySpawns.clear();
 
@@ -259,6 +297,7 @@ void TiledMap::extractEnemySpawns() {
         spawn.y = pos.y - centerWorldY;
         spawn.name = object.getName();
         spawn.elite = elite;
+        spawn.sites = siteMask(object);
 
         enemySpawns.push_back(spawn);
 
@@ -327,6 +366,7 @@ void TiledMap::extractPlayerSpawns() {
         spawn.x = pos.x - centerWorldX;
         spawn.y = pos.y - centerWorldY;
         spawn.name = object.getName();
+        spawn.site = intProperty(object, "site", -1);
 
         playerSpawns.push_back(spawn);
 
@@ -340,6 +380,7 @@ void TiledMap::extractPlayerSpawns() {
 
 void TiledMap::extractShip() {
   hasShip = false;
+  crashSites.clear();
 
   float centerTileX = (tmxMap.getTileCount().x - 1) / 2.0f;
   float centerTileY = (tmxMap.getTileCount().y - 1) / 2.0f;
@@ -351,6 +392,20 @@ void TiledMap::extractShip() {
   for (const auto& layer : tmxMap.getLayers()) {
     if (layer->getType() != tmx::Layer::Type::Object) continue;
     const auto& objectLayer = layer->getLayerAs<tmx::ObjectGroup>();
+    if (objectLayer.getName() == "CrashSites") {
+      for (const auto& object : objectLayer.getObjects()) {
+        const std::string& name = object.getName();
+        if (name.rfind("Site_", 0) != 0) continue;
+        int index = std::atoi(name.c_str() + 5);
+        assert(index >= 0 && index < 64 && "crash site index out of range");
+        if (static_cast<int>(crashSites.size()) <= index) {
+          crashSites.resize(index + 1);
+        }
+        const auto& pos = object.getPosition();
+        crashSites[index] = {pos.x - centerWorldX, pos.y - centerWorldY};
+      }
+      continue;
+    }
     if (objectLayer.getName() != "Ship") continue;
 
     for (const auto& object : objectLayer.getObjects()) {
@@ -361,11 +416,15 @@ void TiledMap::extractShip() {
       hasShip = true;
       Logger::info("Loaded ship position at (" + std::to_string(shipX) + ", " +
                    std::to_string(shipY) + ")");
-      return;
+      break;
     }
   }
 
-  Logger::info("No ship position found in map");
+  if (!hasShip) Logger::info("No ship position found in map");
+  if (!crashSites.empty()) {
+    Logger::info("Loaded " + std::to_string(crashSites.size()) +
+                 " crash sites");
+  }
 }
 
 void TiledMap::extractObjectives() {
@@ -446,6 +505,7 @@ void TiledMap::extractObjectives() {
         const auto& pos = object.getPosition();
         Objective objective;
         objective.id = objectiveId++;
+        objective.sites = siteMask(object);
         objective.type = parseObjectiveType(objectiveTypeStr);
         objective.state = ObjectiveState::Inactive;
         objective.name = object.getName();

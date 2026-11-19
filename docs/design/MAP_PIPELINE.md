@@ -35,9 +35,14 @@ default map (`assets/maps/arena.tmx`, the old prototype, still loads with
 - **Biomes** (next section): earth-like places laid out like a compressed
   North America. The genera do not drive them; genus territories sit
   inside them.
-- **Crash sites:** candidate landing spots where two to four biomes meet
-  inside round 3's storm (`CrashSites` layer). The ship sits on one
-  (`--site N`, default 0); the game does not choose per match yet.
+- **Landing sites:** four spots where two to four biomes meet inside
+  round 3's storm (`CrashSites` layer). **Every match lands on a different
+  one** (never the last one), picked by the server
+  (`ServerGameState::chooseLandingSite`). Each site has its own basin, crash
+  trench, hull, player spawns and the ship's own objectives (the two
+  derelict turrets); the trenches of the sites not landed on read as old
+  landing scars. Between them the four sites' storms cover all eight
+  biomes.
 - **Height:** each biome has its own relief, blended across borders. A
   mountain spine runs down the continent (below). Peaks, deep lakes and
   the sea are impassable (the `Blocked` layer). Height is gameplay-neutral,
@@ -51,11 +56,20 @@ default map (`assets/maps/arena.tmx`, the old prototype, still loads with
   colour of the genus holding it this match, the real city's skyline out
   past the shore.
 - **The crash:** a scorched trench, ploughed in from the most open side.
-- **Landmarks, objectives, trails, rocks:** as in v1, around the ship:
-  a monolith, a spire, a ribcage, a crater and a freighter on sight lines;
-  objectives as set pieces in three rings, placed by context and now by
-  biome (frogs and gas by swamp and water, scrap and med pods in the city,
-  outposts on high ground); one shortest-path tree of trails home.
+- **Objectives are fixed places on the planet**, the same every match. An
+  objective is in play whenever the ship lands within reach of it (9,000
+  px, the far ring), so neighbouring sites share the ground between them
+  (property `sites`, e.g. `0,2`). Each site still gets its three rings
+  (near, mid, far), filled to their usual counts: objectives a neighbour
+  already put in the band count toward them, and a site's near ring is only
+  its own. A match has 28 to 34 objectives in play, about as many as one
+  site had before. Placed by context and biome (frogs and gas by swamp and
+  water, scrap and med pods in the city, outposts on high ground); rewards
+  follow the distance from where the ship landed (far ones pay two
+  infusions).
+- **Landmarks, trails, rocks:** five landmarks around each site on sight
+  lines, one shortest-path tree of trails from each site home, lifeline
+  rocks around each.
 - **Discovery:** unchanged from v1 (columns of light through the fog; the
   minimap shows explored land tinted by genus).
 
@@ -250,10 +264,11 @@ For the designer to accept or change:
 - **Music follows biomes for four of eight** (PNW, Desert, Tidal, City;
   `MUSIC.md`). Plains, Arctic, Jungle and Swamp have no music yet and keep
   whatever was playing.
-- **One crash site per map.** The candidate sites are written, but the
-  game always uses the one the map was generated for. Choosing per match
-  is what lets a run see a different biome mix (Creative Builds), and most
-  of the planet sits outside the storm until then.
+- **The crew does not choose the landing.** The server picks a site at
+  random (never the last). A short vote before landing would add a
+  decision (Strategic Crunch).
+- **The landing is a jump:** at the end of a match the ship and crew
+  reappear at the next site, with no flight between.
 - **Genus by biology:** territories are dealt any genus. Weighting the
   deal by biome (which genus can live in snow, swamp, desert) is not done.
 - **Not checked in the client yet.** The engine's map loader opens the
@@ -273,7 +288,8 @@ For the designer to accept or change:
 - **Enemies have no pathfinding:** around lakes and peaks they slide along
   the edge. Camps are local, so this rarely shows; a chase across the map
   would.
-- **One layout per map:** the genus deal changes every match, but site
-  positions do not yet.
+- **One layout per map:** the landing site and the genus deal change every
+  match; the objectives' places do not (by design: they are places to
+  learn).
 - **Placeholders are code-drawn prisms.** They carry silhouette and light,
   not the inked comic look; that comes from art in the slots.

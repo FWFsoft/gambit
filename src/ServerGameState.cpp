@@ -44,6 +44,7 @@ ServerGameState::ServerGameState(NetworkServer* server,
   Logger::info("EffectManager initialized");
 
   // Load ship position from map
+  tiledMap = world.tiledMap;
   if (world.tiledMap != nullptr && world.tiledMap->hasShipPosition()) {
     shipX = world.tiledMap->getShipX();
     shipY = world.tiledMap->getShipY();
@@ -249,6 +250,13 @@ ServerGameState::ServerGameState(NetworkServer* server,
   // Subscribe to update events
   EventBus::instance().subscribe<UpdateEvent>(
       [this](const UpdateEvent& e) { onUpdate(e); });
+
+  // A map with several landing sites: the first match lands on one of them,
+  // with only its camps and objectives.
+  if (tiledMap != nullptr && !tiledMap->getCrashSites().empty()) {
+    resetWorld();
+    return;
+  }
 
   // Link LittleJohn guardian enemies now that both systems are initialized
   if (objectiveSystem && enemySystem) {
@@ -769,10 +777,12 @@ Player ServerGameState::createPlayer(uint32_t playerId) {
   player.lastInputSequence = 0;
 
   // Find spawn position
-  if (playerSpawns && !playerSpawns->empty()) {
+  const std::vector<PlayerSpawn>* spawns =
+      siteSpawns.empty() ? playerSpawns : &siteSpawns;
+  if (spawns && !spawns->empty()) {
     // Use round-robin spawn point selection based on player ID
-    size_t spawnIndex = playerId % playerSpawns->size();
-    const PlayerSpawn& spawn = (*playerSpawns)[spawnIndex];
+    size_t spawnIndex = playerId % spawns->size();
+    const PlayerSpawn& spawn = (*spawns)[spawnIndex];
     player.x = spawn.x;
     player.y = spawn.y;
 
@@ -1434,11 +1444,57 @@ void ServerGameState::updateObjectiveSideEffects(float deltaTime) {
   }
 }
 
+void ServerGameState::chooseLandingSite() {
+  if (tiledMap == nullptr) return;
+  const auto& sites = tiledMap->getCrashSites();
+  if (sites.empty()) return;
+  // Somewhere new every match: never the site just played.
+  const int count = static_cast<int>(sites.size());
+  int next = 0;
+  if (count > 1) {
+    if (landingSite < 0) {
+      next = std::uniform_int_distribution<int>(0, count - 1)(siteRng);
+    } else {
+      next = std::uniform_int_distribution<int>(0, count - 2)(siteRng);
+      if (next >= landingSite) next++;
+    }
+  }
+  assert(next >= 0 && next < count);
+  landingSite = next;
+  shipX = sites[next].x;
+  shipY = sites[next].y;
+  hasShip = true;
+  enemySystem->setActiveSite(next);
+  if (collisionSystem) collisionSystem->setHullSite(next);
+  siteSpawns.clear();
+  for (const PlayerSpawn& spawn : tiledMap->getPlayerSpawns()) {
+    if (spawn.site < 0 || spawn.site == next) siteSpawns.push_back(spawn);
+  }
+  if (director) director->moveShip(shipX, shipY);
+
+  ShipLocationPacket shipPacket;
+  shipPacket.x = shipX;
+  shipPacket.y = shipY;
+  server->broadcastPacket(serialize(shipPacket));
+  Logger::info("Landing site " + std::to_string(next) + " of " +
+               std::to_string(count));
+}
+
+std::vector<Objective> ServerGameState::siteObjectives() const {
+  if (landingSite < 0) return mapObjectives;
+  std::vector<Objective> out;
+  for (const Objective& objective : mapObjectives) {
+    if (objective.activeFor(landingSite)) out.push_back(objective);
+  }
+  return out;
+}
+
 void ServerGameState::resetWorld() {
   if (!enemySystem) return;
+  chooseLandingSite();
   enemySystem->resetCamps();
   if (!objectiveSystem) return;
-  objectiveSystem->initialize(mapObjectives);
+  objectiveSystem->initialize(siteObjectives());
   initializeLittleJohnGuardians();
   for (const auto& [id, player] : players) broadcastAllObjectives(id);
 }
