@@ -280,6 +280,9 @@ class ArenaView {
   void drawBanners();
   void drawMinimap();
   void drawSuitScreen(bool intermission);
+  // Night away from the ship: the camp, who is in it, and what dawn brings.
+  void drawCampPanel();
+  bool localAtShip() const;
   void drawLobby();
   void drawEndScreen();
   void drawDownedOverlay();

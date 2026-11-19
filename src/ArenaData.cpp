@@ -230,7 +230,7 @@ static const KitInfo KITS[] = {
           11000.0f, AbilityMode::Tap, 0.0f, "Reverse Install"},
          {"They See Me Rollin'",
           "Reassemble the legs into tank treads: double base run speed and "
-          "+2 Haste, but no Acquire Biomass. Press again for legs.",
+          "+2 Haste. Press again, or use Acquire Biomass, to stand back up on legs.",
           1200.0f, AbilityMode::Tap, 0.0f, "Rollin'"},
      }},
     {CharacterId::Zephyr,

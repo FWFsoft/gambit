@@ -1244,8 +1244,9 @@ void ArenaView::drawGround(ImDrawList* dl) {
                     72, 2.0f);
     }
 
-    // The Blue Zone: everything outside is tinted and deadly.
-    if (fighting) {
+    // The finale's shield: everything outside is tinted and deadly. A round
+    // has no zone (the crew roams and camps where night finds it).
+    if (phase == Arena::MatchPhase::BossFight) {
       float radius = match.zoneRadius;
       const float band = 2400.0f;
       dl->AddCircle(ship, radius + band * 0.5f, IM_COL32(20, 40, 120, 95), 96,
@@ -3289,6 +3290,17 @@ void ArenaView::drawOverhead(ImDrawList* dl) {
       bar(dl, ImVec2(centre.x - 34, centre.y + 38), 68, 7, objective.progress,
           IM_COL32(90, 220, 255, 255));
     }
+  }
+
+  // Frogs: the pond is where they go, so mark it while one is carried.
+  for (const auto& [id, objective] : prediction->getObjectives()) {
+    if (objective.type != ObjectiveType::SaveTheFrogs) continue;
+    if (objective.state != ObjectiveState::ReadyToDeposit) continue;
+    ImVec2 pond = toZoomedScreen(objective.depositX, objective.depositY);
+    float r = objective.radius * camera->zoom;
+    dl->AddCircle(pond, r, IM_COL32(120, 220, 255, 200), 40, 2.5f);
+    text(dl, ImVec2(pond.x, pond.y - 10.0f), IM_COL32(150, 230, 255, 255),
+         15.0f, "POND");
   }
 
   // Enemies: health bar once hurt (always for elites and the boss)

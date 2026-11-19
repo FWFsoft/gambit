@@ -554,11 +554,13 @@ void ServerGameState::handleEnemyDeaths() {
     if (enemy) {
       director->onEnemyKilled(*enemy, death.killerId);
       abilitySystem->onEnemyDied(*enemy, death.killerId);
-      // A camp guard counts for the place it guards, wherever it fell.
+      // A camp guard counts for the place it guards, wherever it fell,
+      // even after it was provoked into chasing someone out of the camp.
       if (objectiveSystem) {
         objectiveSystem->onEnemyDeath(
-            enemy->campGuard ? enemy->homeX : enemy->x,
-            enemy->campGuard ? enemy->homeY : enemy->y);
+            enemy->fromCamp ? enemy->homeX : enemy->x,
+            enemy->fromCamp ? enemy->homeY : enemy->y, death.killerId);
+        objectiveSystem->onGuardianDeath(enemy->id, death.killerId);
       }
     }
 
@@ -1484,7 +1486,14 @@ std::vector<Objective> ServerGameState::siteObjectives() const {
   if (landingSite < 0) return mapObjectives;
   std::vector<Objective> out;
   for (const Objective& objective : mapObjectives) {
-    if (objective.activeFor(landingSite)) out.push_back(objective);
+    if (!objective.activeFor(landingSite)) continue;
+    out.push_back(objective);
+    // The map baked in one ship position; this match landed elsewhere.
+    if (out.back().depositAtShip) {
+      assert(hasShip);
+      out.back().depositX = shipX;
+      out.back().depositY = shipY;
+    }
   }
   return out;
 }

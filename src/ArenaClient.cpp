@@ -402,7 +402,7 @@ void ArenaClient::onGameEvent(const GameEventPacket& p) {
     case GameEventKind::Announcement: {
       switch (static_cast<Announcement>(p.param)) {
         case Announcement::RoundStart:
-          pushBanner("ROUND START", "Scavenge, fight, and get back before dark",
+          pushBanner("DAYBREAK", "Go anywhere. Night falls where you stand",
                      0xFFFFE0A0);
           break;
         case Announcement::ZoneShrinking:
@@ -411,7 +411,9 @@ void ArenaClient::onGameEvent(const GameEventPacket& p) {
                      0xFFFFB060);
           break;
         case Announcement::ReturnToShip:
-          pushBanner("RETURN TO THE SHIP", "Night is falling", 0xFF60C0FF);
+          pushBanner("NIGHT IS FALLING",
+                     "Camp together, or make for the ship to heal fully",
+                     0xFF60C0FF);
           break;
         case Announcement::ShipUnderAttack:
           pushBanner("SHIP UNDER ATTACK", "", 0xFF5060FF, 2200.0f);
@@ -429,7 +431,9 @@ void ArenaClient::onGameEvent(const GameEventPacket& p) {
                      0xFF90FF90);
           break;
         case Announcement::Intermission:
-          pushBanner("SAFE FOR THE NIGHT", "Slot your infusions", 0xFFFFE0A0);
+          pushBanner("NIGHT", "At the ship: heal and slot infusions. "
+                     "In the wild: rest, and watch for dawn",
+                     0xFFFFE0A0);
           break;
         case Announcement::BossIncoming:
           pushBanner("SOMETHING IS COMING", "The ship is lost. Kill it.",

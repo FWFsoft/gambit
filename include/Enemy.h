@@ -53,6 +53,8 @@ struct Enemy : public Animatable {
   bool targetShip = false;     // marches on the ship instead of players
   bool elite = false;
   bool campGuard = false;      // stays near its camp until provoked
+  bool fromCamp = false;       // spawned as a camp guard (stays true when
+                               // provoked): its death counts for the camp
   float homeX = 0.0f, homeY = 0.0f;
   uint32_t lastHitBy = 0;      // player who last damaged it
   int bossMove = 0;            // boss attack rotation

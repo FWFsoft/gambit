@@ -139,13 +139,38 @@ void campKillsCountBeforeAnyoneInteracts() {
   outpost.enemiesRequired = 3;
   system.initialize({outpost});
   int completions = 0;
+  uint32_t credited = 0;
+  system.setCompletionCallback([&](uint32_t, uint32_t playerId) {
+    completions++;
+    credited = playerId;
+  });
+
+  for (int i = 0; i < 3; i++) {
+    system.onEnemyDeath(1000.0f + 40.0f * i, 1000.0f, HERO);
+  }
+  assert(system.getObjective(1)->state == ObjectiveState::Completed);
+  // Nobody pressed interact: the player who landed the last kill is paid.
+  assert(completions == 1);
+  assert(credited == HERO);
+  std::cout << "  camp: cleared by fighting completes and pays the killer\n";
+}
+
+void guardianDeathOpensGate() {
+  ObjectiveSystem system;
+  Objective gate = objective(ObjectiveType::LittleJohn, 0.0f, 0.0f, 110.0f);
+  gate.guardianEnemyId = 7;
+  system.initialize({gate});
+  int completions = 0;
   system.setCompletionCallback([&](uint32_t, uint32_t) { completions++; });
 
-  for (int i = 0; i < 3; i++) system.onEnemyDeath(1000.0f + 40.0f * i, 1000.0f);
+  system.onGuardianDeath(8, HERO);  // some other enemy
+  assert(system.getObjective(1)->state != ObjectiveState::Completed);
+  system.onGuardianDeath(7, HERO);
   assert(system.getObjective(1)->state == ObjectiveState::Completed);
-  // Nobody was interacting, so there is no one to credit: no payout.
-  assert(completions == 0);
-  std::cout << "  camp: cleared without pressing interact still completes\n";
+  assert(completions == 1);
+  system.onGuardianDeath(7, HERO);  // already open: nothing twice
+  assert(completions == 1);
+  std::cout << "  gate: killing the guardian opens it\n";
 }
 
 void guardianWaitsUntilWoken() {
@@ -175,6 +200,7 @@ int main() {
   scrapIsCarriedSlowedAndBankedInTheShipRing();
   probeIsDeliveredByWalkingIn();
   campKillsCountBeforeAnyoneInteracts();
+  guardianDeathOpensGate();
   guardianWaitsUntilWoken();
   std::cout << "All points-of-interest tests passed\n";
   return 0;

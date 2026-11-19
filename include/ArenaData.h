@@ -477,15 +477,26 @@ namespace Tuning {
 constexpr float LIFELINE_RANGE = 520.0f;
 constexpr int ROUND_COUNT = 3;  // regular rounds before the boss
 constexpr float ROUND_SECONDS[ROUND_COUNT] = {150.0f, 165.0f, 180.0f};
-// The zone is the round's reach: wide enough that each round opens a new
-// ring of points of interest, and it holds for most of the round so there is
-// time to explore. It only closes at the end, as the run home.
+// A round's reach around the ship: where raids march in from and where
+// stray packs may spawn. It is not a wall: there is no Blue Zone in a round
+// (the crew roams the whole planet and camps where night finds them).
 constexpr float ZONE_START_RADIUS[ROUND_COUNT] = {2000.0f, 2500.0f, 2900.0f};
-constexpr float ZONE_END_RADIUS = 300.0f;
-constexpr float ZONE_HOLD_FRACTION = 0.75f;  // of the round before shrinking
+// The finale only: the boss arena's shield, deadly outside.
 constexpr float ZONE_DAMAGE_PER_SECOND = 0.05f;  // fraction of max health
 constexpr float BOSS_ZONE_RADIUS = 950.0f;
-constexpr float INTERMISSION_SECONDS = 40.0f;
+constexpr float INTERMISSION_SECONDS = 40.0f;  // the night
+
+// Camping. Night falls where you are: nobody is teleported home. At the
+// ship (inside its safe radius) the crew heals fully, banks scrap, opens
+// the suit and builds the ship. A camp in the wild heals less, keeps scrap
+// in hand, and the dawn brings an ambush.
+constexpr float CAMP_SHARE_RADIUS = 500.0f;  // crewmates this close share camp
+constexpr float CAMP_HEAL_FRACTION = 0.40f;  // of max health, alone
+constexpr float CAMP_HEAL_PER_ALLY = 0.20f;  // more per crewmate in camp
+// A downed player is carried into a crewmate's camp (revived there at the
+// camp's heal); with nobody near they wake at the ship.
+constexpr int DAWN_AMBUSH_SIZE[ROUND_COUNT] = {0, 4, 5};  // per wild camp
+constexpr float DAWN_AMBUSH_DISTANCE = 420.0f;  // from the camp's centre
 constexpr float LOBBY_COUNTDOWN_SECONDS = 3.0f;
 
 // Enemy pressure. During a round the enemies live in camps at the map's

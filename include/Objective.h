@@ -58,6 +58,9 @@ struct Objective {
   float depositY = 0.0f;
   bool hasDepositPoint = false;  // True if deposit coords are set
   float depositRadius = 0.0f;    // 0 = same as radius
+  // The deposit is the ship, wherever this match landed it (a probe). The
+  // server moves depositX/Y to the ship when it picks the landing site.
+  bool depositAtShip = false;
 
   // For SaveTheFrogs: multi-deposit tracking (reuses enemiesRequired/Killed in
   // packet)

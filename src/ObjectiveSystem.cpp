@@ -1,5 +1,6 @@
 #include "ObjectiveSystem.h"
 
+#include <cassert>
 #include <limits>
 
 #include "Logger.h"
@@ -280,7 +281,23 @@ void ObjectiveSystem::stopInteraction(uint32_t playerId) {
   }
 }
 
-void ObjectiveSystem::onEnemyDeath(float enemyX, float enemyY) {
+void ObjectiveSystem::onGuardianDeath(uint32_t enemyId, uint32_t killerId) {
+  if (enemyId == 0) return;
+  for (auto& obj : objectives) {
+    if (obj.type != ObjectiveType::LittleJohn) continue;
+    if (obj.guardianEnemyId != enemyId) continue;
+    obj.guardianEnemyId = 0;
+    if (obj.state == ObjectiveState::Completed) continue;
+    // Beating the guardian opens the gate; no walk back to press a key.
+    Logger::info("Guardian of '" + obj.name + "' killed - gate opens");
+    // A player who pressed interact before the guardian woke holds a
+    // stale interaction on this gate: the completion clears it.
+    completeObjective(obj, killerId);
+  }
+}
+
+void ObjectiveSystem::onEnemyDeath(float enemyX, float enemyY,
+                                   uint32_t killerId) {
   // Check CaptureOutpost and SalvageMedpacks objectives
   for (auto& obj : objectives) {
     if (obj.type != ObjectiveType::CaptureOutpost &&
@@ -316,7 +333,7 @@ void ObjectiveSystem::onEnemyDeath(float enemyX, float enemyY) {
       if (obj.enemiesKilled >= obj.enemiesRequired) {
         // CaptureOutpost auto-completes when all enemies dead
         if (obj.type == ObjectiveType::CaptureOutpost) {
-          completeObjective(obj);
+          completeObjective(obj, killerId);
         }
         // SalvageMedpacks requires pod interaction after enemies are dead
         else if (obj.type == ObjectiveType::SalvageMedpacks) {
@@ -368,8 +385,12 @@ void ObjectiveSystem::startObjective(Objective& objective, uint32_t playerId) {
   }
 }
 
-void ObjectiveSystem::completeObjective(Objective& objective) {
-  uint32_t completingPlayerId = objective.interactingPlayerId;
+void ObjectiveSystem::completeObjective(Objective& objective,
+                                        uint32_t creditPlayerId) {
+  assert(objective.state != ObjectiveState::Completed);
+  uint32_t completingPlayerId = objective.interactingPlayerId != 0
+                                    ? objective.interactingPlayerId
+                                    : creditPlayerId;
 
   objective.state = ObjectiveState::Completed;
 

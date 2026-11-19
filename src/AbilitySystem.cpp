@@ -239,6 +239,7 @@ void AbilitySystem::updatePlayer(Player& player, float dtMs) {
   if (kit) speed *= kit->speedMultiplier(player);
   speed *= Infusions::speedMultiplier(player);
   if (player.chargeSlot >= 0) speed *= CHARGE_MOVE_MULT;
+  if (movementLocked) speed = 0.0f;
   player.speedMult = std::max(0.0f, speed);
 
   updateForcedMotion(player, dtMs);

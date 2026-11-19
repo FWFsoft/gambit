@@ -15,8 +15,9 @@
 class AbilitySystem;
 class EnemySystem;
 
-// Runs a match: lobby -> rounds (deploy, fight, shrinking Blue Zone, get back
-// to the ship) -> intermission (slot infusions) -> boss -> victory / defeat.
+// Runs a match: lobby -> rounds (roam the planet, fight, bank scrap) ->
+// nights (intermission: the crew camps where it stands; the ship is the safe
+// camp) -> boss -> victory / defeat.
 // It decides *when* and *what* spawns, owns the ship and the scoreboard, and
 // hands out loot. How things fight is AbilitySystem / EnemySystem's job.
 class MatchDirector {
@@ -139,8 +140,7 @@ class MatchDirector {
   };
   RoofTurret roofTurrets[Arena::Tuning::ROOF_TURRET_COUNT];
   float shipAlertCooldown = 0.0f;
-  bool announcedShrink = false;
-  bool announcedReturn = false;
+  bool announcedNightfall = false;
   int killsThisRound = 0;
   int infusionDropsThisRound = 0;
   std::unordered_map<uint32_t, int32_t> roundStartScore;
@@ -187,6 +187,12 @@ class MatchDirector {
   void spawnBoss();
   void dropLoot(const Enemy& enemy);
   void bringPlayersHome(bool reviveAndHeal);
+  // Night falls where the crew stands: heal by camp, revive or send home
+  // the downed, bank scrap only at the ship.
+  void makeCamp();
+  // Dawn: an ambush near every camp out of the ship's reach.
+  void dawnAmbush();
+  bool atShip(const Player& player) const;
   void startCarryingScrap(Player& player);
   void bankScrap(Player& player);
 

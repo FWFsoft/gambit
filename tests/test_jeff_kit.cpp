@@ -242,7 +242,7 @@ void test_Q_PiercesAll_AndDischargesResonance() {
   assert(charged.resonance() == 0);
 }
 
-void test_Treads_DoubleSpeed_Haste_NoHarvest_AndBack() {
+void test_Treads_DoubleSpeed_Haste_HarvestStandsUp() {
   World w;
   w.run(TICK_MS, 0);
   float legs = w.jeff().speedMult;
@@ -252,22 +252,25 @@ void test_Treads_DoubleSpeed_Haste_NoHarvest_AndBack() {
   int haste = w.effects.getPlayerEffects(JEFF_ID).getStacks(EffectType::Haste);
   assert(haste >= 2);
   assert(w.jeff().speedMult >= legs * 2.0f * 1.39f);
-  // No harvesting on treads.
-  w.corpse(60.0f, 0.0f);
-  w.tap(RMB);
-  assert(w.resonance() == 0 && w.piles() == 1);
-  // Still fights.
+  // Still fights on treads.
   uint32_t target = w.foe(150.0f, 0.0f);
   w.tap(LMB);
   assert(w.enemy(target).health < 5000.0f);
-  // Legs again.
+  // Acquire Biomass stands him back up on legs and harvests.
+  w.corpse(60.0f, 0.0f);
+  w.run(1300.0f, 0);
+  w.tap(RMB);
+  assert(!Arena::JeffMode::treads(w.jeff().kitMode));
+  assert(w.resonance() == 1);
+  w.run(1000.0f, 0);
+  // The treads' Haste went with them.
+  assert(w.effects.getPlayerEffects(JEFF_ID).getStacks(EffectType::Haste) == 0);
+  // And LSHIFT still toggles both ways.
+  w.tap(SHIFT);
+  assert(Arena::JeffMode::treads(w.jeff().kitMode));
   w.run(1300.0f, 0);
   w.tap(SHIFT);
   assert(!Arena::JeffMode::treads(w.jeff().kitMode));
-  w.run(1000.0f, 0);
-  assert(w.effects.getPlayerEffects(JEFF_ID).getStacks(EffectType::Haste) == 0);
-  w.tap(RMB);
-  assert(w.resonance() == 1);
 }
 
 }  // namespace
@@ -283,7 +286,7 @@ int main() {
   test_Resonance_CapsAtTen();
   test_Resonance_FasterAndHarder();
   test_Q_PiercesAll_AndDischargesResonance();
-  test_Treads_DoubleSpeed_Haste_NoHarvest_AndBack();
+  test_Treads_DoubleSpeed_Haste_HarvestStandsUp();
   std::cout << "Jeff kit passed" << std::endl;
   return 0;
 }

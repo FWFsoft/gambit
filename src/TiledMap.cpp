@@ -542,6 +542,7 @@ void TiledMap::extractObjectives() {
           objective.hasDepositPoint = true;
           // The ship's hull is solid: drop off anywhere around it.
           objective.depositRadius = Arena::Tuning::SHIP_DROP_RADIUS;
+          objective.depositAtShip = true;
           Logger::info("Objective '" + objective.name +
                        "' using ship as deposit point");
         } else if (isDepositType && !playerSpawns.empty()) {

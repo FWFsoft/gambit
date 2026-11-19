@@ -21,6 +21,105 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-19: No Blue Zone; the crew camps where night finds it
+- **Decision:** A round has no zone. The planet is open, nothing hurts you
+  for being far out, and nobody is teleported home or killed at nightfall.
+  Night falls where each player stands, and nobody can move until dawn.
+  - **At the ship** (inside its safe radius): full heal, carried scrap is
+    banked, the suit opens, and the ship's next tier can be bought (only by
+    someone camped there).
+  - **In the wild:** heal 40% of max health, +20% per crewmate within
+    500 px (one camp). Scrap stays in hand. The suit stays shut.
+  - **The downed:** carried into a crewmate's camp if one is within 500 px
+    (revived there at the camp's heal); otherwise they wake at the ship at
+    full health and lose any scrap they carried.
+  - **Dawn:** the next round starts where everyone camped. Each wild camp
+    (crewmates within 500 px count as one) gets an ambush 420 px away: a
+    pack of size 4 at dawn 2 and 5 at dawn 3 (a thug genus fields about two
+    thirds of that). Nothing comes for the ship's camp. The first morning
+    and the boss fight still start at the ship.
+  - **The finale keeps its shield** (950 px, deadly outside), shown as
+    before. Banners now say "DAYBREAK", "NIGHT IS FALLING" (25 s left) and
+    "NIGHT"; the HUD shows distance to the ship instead of to the zone edge.
+    Away from the ship the night shows a camp panel (who is in camp, the
+    heal, the dawn threat) instead of the suit screen.
+  - The debug skip-phase key no longer sends everyone home.
+- **Pillars:**
+  - **Requested by a human (Noah) after a playtest:** the zone felt small,
+    even in round 3, and the run home every night cut exploration short.
+  - **Strategic Crunch:** trades. The closing zone was the round's main time
+    pressure and is gone. In its place, every nightfall is a decision with a
+    real cost on both sides: walk home (dead time, but full heal, banked
+    scrap, suit, ship tier) or camp out (keep your position and the time,
+    pay with a thinner heal, unslotted infusions and a dawn fight). Removing
+    the forced walk home also removes dead time.
+  - **Comradery in Competition:** serves. Camping together heals more and
+    is the only way a downed crewmate wakes where they fell; a split crew
+    faces more ambushes. Nobody is punished for a teammate's choice.
+  - **Creative Builds & Dynamic Play:** serves. Runs differ by where the
+    crew ends each day; mobile kits can range farther.
+  - **Clarity:** neutral. The rules are new, so the night panel and banners
+    spell them out. The ship's ring still marks the safe camp.
+- **Why:** Requested. The alternative (keep the zone, widen it) kept a
+  pressure that worked against the isolation and exploration the playtest
+  asked for. Risks to watch:
+  - The rounds may feel slack without a closing edge. If so, add pressure
+    that grows with distance from the ship (stronger packs far out) rather
+    than bringing back a wall.
+  - The ship takes raids while the crew is away; that is part of the
+    trade-off.
+  - Bots in `ArenaSim` still head home at dusk; a full match runs to
+    victory, but bot camping behaviour is not simulated.
+  - The numbers (40%, +20%, 500 px, ambush size) are first guesses.
+  - **Not yet playtested.**
+- **Status:** Accepted (requested by a human) for removing the zone and
+  camping in place; the heal, ambush and downed rules are built, need review
+- **Where:** `src/MatchDirector.cpp` (`makeCamp`, `dawnAmbush`,
+  `updateRound`, `updateZoneDamage`), `include/MatchDirector.h`,
+  `include/ArenaData.h` (camp tuning), `include/AbilitySystem.h` and
+  `src/AbilitySystem.cpp` (night movement lock), `src/ArenaHud.cpp`
+  (`drawCampPanel`, HUD line, minimap), `src/ArenaView.cpp`,
+  `src/ArenaClient.cpp` (banners), `tests/test_camping.cpp`, `PLAYTEST.md`
+
+## 2026-11-19: Playtest fixes: stuck objectives say what they want; Jeff stands up to harvest
+- **Decision:** From a playtest where four objectives could not be
+  finished:
+  - **Crashed Probe** drops off at the ship where this match landed. The
+    drop-off was the ship's spot when the map loaded, so after "every match
+    lands somewhere new" it pointed at an empty site.
+  - **Outpost / Med Pod**: a camp guard counts for its camp wherever it
+    dies, even after it was provoked into chasing someone out (it used to
+    count only where it fell). A camp cleared by fighting, with nobody
+    pressing F, now pays the player who landed the last kill (score, loot,
+    camp spawns off); before, it completed with no payout.
+  - **Guarded Gate**: killing the guardian opens the gate. Pressing F at the
+    gate still opens it early and enrages him (Berserk x5), as before.
+  - **Prompts**: each objective says what it wants: outpost and med pod show
+    guards down (n/m); the med pod says when it is unlocked; the gate names
+    both ways to open it; frogs say catch, carry, release, with a POND ring
+    and label drawn while a frog is carried; the probe says "dig out".
+  - **Jeff**: pressing Acquire Biomass on treads stands him back up on legs
+    (dropping the treads' Haste) and harvests, instead of being greyed out.
+- **Pillars:** Clarity (the main one: the game state did not say what to
+  do, and the player was told "hold your ground" at a gate that needed a
+  key press). Comradery: fighting a camp clear pays the team, not nobody.
+  Strategic Crunch: no dead time standing at a finished objective. Jeff's
+  change trades a little of the treads' commitment (Creative Builds:
+  choosing a mode had a cost) for one less disabled button.
+- **Why:** These were bugs or missing feedback rather than tuning. For the
+  gate, opening on the guardian's death was chosen over a "[F] open" prompt
+  after the kill because the player had already done the hard part. The
+  remaining playtest notes (zone and night return, landing-zone biome,
+  music, terrain readability, drops, offence-track pace, turret and probe
+  design) are open questions, not decided here.
+- **Status:** Built, needs review. Not yet checked in a live match.
+- **Where:** `src/ObjectiveSystem.cpp`, `include/ObjectiveSystem.h`,
+  `include/Objective.h`, `src/TiledMap.cpp`, `src/ServerGameState.cpp`,
+  `include/Enemy.h`, `src/EnemySystem.cpp`, `src/ArenaHud.cpp`
+  (`drawPrompts`), `src/ArenaView.cpp`, `src/CharacterKits.cpp` (JeffKit),
+  `src/ArenaData.cpp`, `tests/test_points_of_interest.cpp`,
+  `tests/test_jeff_kit.cpp`
+
 ## 2026-11-19: Audio settings in the Esc menu
 - **Decision:** Esc > Settings shows Master, Music and Sound effects
   sliders (percent) and Mute all. Changes apply live while dragging and are
