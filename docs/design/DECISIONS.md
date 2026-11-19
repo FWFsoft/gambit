@@ -21,6 +21,33 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-19: Audio settings in the Esc menu
+- **Decision:** Esc > Settings shows Master, Music and Sound effects
+  sliders (percent) and Mute all. Changes apply live while dragging and are
+  saved to `settings.ini` on release; no Save or Cancel. Slider levels are
+  squared (50 % is about -12 dB), master multiplies both channels. The M
+  key and the checkbox are one mute, now saved. The panel's Graphics
+  fields (window size, fullscreen, VSync) and its controls list were
+  removed from it: nothing applied the Graphics fields, and the controls
+  list was out of date (it said Space attacks). They stay in
+  `settings.ini`.
+- **Pillars:** Clarity: you hear each change as you make it, the mute
+  state is visible, and the panel no longer offers settings that do
+  nothing. Strategic Crunch: in a match the pause menu is a quick in and
+  out; live apply with no Save step keeps it short, and Esc can't throw
+  changes away.
+- **Why:** The sliders already existed but were not connected to any
+  audio, and mute was a separate per-session toggle in each system. The
+  committed `settings.ini` had `muted=true` (someone's saved file), which
+  would have muted everyone once mute was saved and applied; it is now
+  `muted=false`. A squared curve was chosen over linear because linear
+  amplitude sounds almost unchanged across the top half of the slider.
+- **Status:** Accepted (requested by a human) for the sliders; the live
+  apply, the curve and removing the Graphics fields are built, need review
+- **Where:** `src/UISystem.cpp` (`renderSettingsPanel`), `include/Settings.h`,
+  `src/MusicSystem.cpp`, `src/SfxSystem.cpp`, `include/EventBus.h`,
+  `tests/test_settings.cpp`, `docs/design/SFX.md`
+
 ## 2026-11-19: Every ability sounds like what it draws
 - **Decision:** Ability casts make sounds, built from what the cast draws
   rather than picked per ability. The shape (slash, cone, burst, ring,

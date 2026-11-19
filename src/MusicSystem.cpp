@@ -21,7 +21,6 @@ MusicSystem::MusicSystem(const ClientPrediction* prediction,
     : clientPrediction(prediction),
       tiledMap(map),
       volume(DEFAULT_VOLUME),
-      muted(false),
       director(
           [this](const std::string& key) { return playlists.count(key) > 0; }) {
   loadPlaylists();
@@ -33,7 +32,7 @@ MusicSystem::MusicSystem(const ClientPrediction* prediction,
     return;
   }
 
-  Mix_VolumeMusic(static_cast<int>(volume * SDL_MIXER_MAX_VOLUME));
+  applyVolume();
 
   Logger::info("MusicSystem initialized");
 
@@ -41,9 +40,12 @@ MusicSystem::MusicSystem(const ClientPrediction* prediction,
   EventBus::instance().subscribe<UpdateEvent>(
       [this](const UpdateEvent& e) { onUpdate(e); });
 
-  // Subscribe to ToggleMuteEvent
-  EventBus::instance().subscribe<ToggleMuteEvent>(
-      [this](const ToggleMuteEvent& e) { onToggleMute(e); });
+  // The player's audio settings (UISystem): master x music, and mute.
+  EventBus::instance().subscribe<AudioSettingsChangedEvent>(
+      [this](const AudioSettingsChangedEvent& e) {
+        settingsGain = e.musicGain;
+        applyVolume();
+      });
 }
 
 MusicSystem::~MusicSystem() {
@@ -273,7 +275,13 @@ void MusicSystem::stopMusic(int fadeMs) {
 void MusicSystem::setVolume(float vol) {
   assert(vol >= 0.0f && vol <= 1.0f && "Volume out of range");
   volume = std::clamp(vol, 0.0f, 1.0f);
-  Mix_VolumeMusic(static_cast<int>(volume * SDL_MIXER_MAX_VOLUME));
+  applyVolume();
+}
+
+void MusicSystem::applyVolume() {
+  float gain = volume * settingsGain;
+  assert(gain >= 0.0f && gain <= 1.0f);
+  Mix_VolumeMusic(static_cast<int>(gain * SDL_MIXER_MAX_VOLUME));
 }
 
 Mix_Music* MusicSystem::loadMusic(const std::string& filename) {
@@ -298,16 +306,4 @@ Mix_Music* MusicSystem::loadMusic(const std::string& filename) {
   loadedTracks[filename] = music;
   Logger::info("Loaded music: " + filepath);
   return music;
-}
-
-void MusicSystem::onToggleMute(const ToggleMuteEvent& e) {
-  muted = !muted;
-
-  if (muted) {
-    Mix_VolumeMusic(0);
-    Logger::info("Music muted");
-  } else {
-    Mix_VolumeMusic(static_cast<int>(volume * SDL_MIXER_MAX_VOLUME));
-    Logger::info("Music unmuted");
-  }
 }

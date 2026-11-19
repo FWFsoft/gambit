@@ -56,6 +56,14 @@ struct AttackInputEvent {};
 
 struct ToggleMuteEvent {};
 
+// The audio levels to apply (0..1, curve, master and mute already applied;
+// Settings::musicGain / sfxGain). Published by UISystem when settings load
+// or change, including live while a slider is dragged.
+struct AudioSettingsChangedEvent {
+  float musicGain;
+  float sfxGain;
+};
+
 struct NetworkPacketReceivedEvent {
   uint32_t clientId;  // 0 on client side
   const uint8_t* data;

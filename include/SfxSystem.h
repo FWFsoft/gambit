@@ -13,7 +13,6 @@
 class ClientPrediction;
 struct NetworkPacketReceivedEvent;
 struct UpdateEvent;
-struct ToggleMuteEvent;
 
 // Plays sound effects on SDL_mixer channels beside the music: hit feedback
 // (HitSounds) and ability casts (AbilitySounds). Construct after
@@ -43,7 +42,8 @@ class SfxSystem {
   std::array<SoundBank, 256> tints;  // by VfxTheme
   AbilitySounds::CastGrouper grouper;
   float timeMs = 0.0f;
-  bool muted = false;
+  // The player's master x sound effects setting (AudioSettingsChangedEvent).
+  float settingsGain = 1.0f;
   bool ready = false;
   std::mt19937 rng{std::random_device{}()};
 

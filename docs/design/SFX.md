@@ -120,13 +120,32 @@ A four-player fight makes dozens of hits a second, so:
 - **Variants:** each sound has three pitch variants (0.94x, 1x, 1.07x),
   chosen at random and never the same twice in a row, so repeated hits do
   not sound like a machine gun.
-- Mute (`M` or `F2`) mutes sound effects with the music.
+- Mute (`M` or `F2`, or Mute all in Settings) silences everything.
 
 - Ability shapes and tints have gaps and voice caps too (40 to 90 ms, 2
   or 3 voices; `AbilitySounds::limitsFor`).
 
 The numbers are in `include/HitSounds.h`, `include/AbilitySounds.h` and
 `SfxSystem::MASTER_VOLUME` (0.7, relative to the music's 0.5).
+
+## Player settings
+
+Esc > Settings (also on the title screen and main menu) has the audio
+settings: **Master**, **Music** and **Sound effects** sliders (0 to 100 %)
+and **Mute all**, which is the same switch as the M / F2 key.
+
+- Changes apply as you drag, so you hear what you pick, and are saved to
+  `settings.ini` when you let go. There is no Save button to forget, and
+  Esc closes the panel without losing anything.
+- The sliders go through a curve: a slider's level is squared, so 50 %
+  sounds about half as loud (-12 dB) instead of barely quieter. Master
+  multiplies both channels. `Settings::musicGain` / `sfxGain`, tested by
+  `tests/test_settings.cpp`.
+- `UISystem` owns the settings and sends `AudioSettingsChangedEvent`;
+  `MusicSystem` and `SfxSystem` apply it on top of their own mix
+  (`MusicSystem::DEFAULT_VOLUME` 0.5, `SfxSystem::MASTER_VOLUME` 0.7).
+- In the browser build `settings.ini` lives in memory, so settings reset
+  when the page reloads.
 
 ## Adding or replacing sounds
 

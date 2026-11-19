@@ -45,8 +45,9 @@ SfxSystem::SfxSystem(const ClientPrediction* prediction)
       [this](const NetworkPacketReceivedEvent& e) { onPacket(e); });
   EventBus::instance().subscribe<UpdateEvent>(
       [this](const UpdateEvent& e) { onUpdate(e); });
-  EventBus::instance().subscribe<ToggleMuteEvent>(
-      [this](const ToggleMuteEvent&) { muted = !muted; });
+  // The player's audio settings (UISystem): master x sound effects, and mute.
+  EventBus::instance().subscribe<AudioSettingsChangedEvent>(
+      [this](const AudioSettingsChangedEvent& e) { settingsGain = e.sfxGain; });
   Logger::info("SfxSystem initialized");
 }
 
@@ -98,7 +99,7 @@ void SfxSystem::onGameEvent(const GameEventPacket& event) {
   }
 
   HitSounds::Cue hit = HitSounds::choose(event, localId, local.x, local.y);
-  if (hit.sound == Sound::None || muted) return;
+  if (hit.sound == Sound::None) return;
   HitSounds::Limits limits = HitSounds::limitsFor(hit.sound);
   play(hits[static_cast<size_t>(hit.sound)], limits.minGapMs, limits.maxVoices,
        hit.volume, hit.pan);
@@ -115,7 +116,7 @@ void SfxSystem::onUpdate(const UpdateEvent& e) {
 }
 
 void SfxSystem::playCast(const AbilitySounds::Cue& cue) {
-  if (muted || cue.shape == Shape::None) return;
+  if (cue.shape == Shape::None) return;
   AbilitySounds::Limits limits = AbilitySounds::limitsFor(cue.shape);
   play(shapes[static_cast<size_t>(cue.shape)], limits.minGapMs,
        limits.maxVoices, cue.volume, cue.pan);
@@ -128,7 +129,9 @@ void SfxSystem::playCast(const AbilitySounds::Cue& cue) {
 
 void SfxSystem::play(SoundBank& bank, float minGapMs, int maxVoices,
                      float volume, float pan) {
-  if (bank.variants.empty() || volume <= 0.0f) return;
+  float gain = volume * MASTER_VOLUME * settingsGain;
+  assert(gain >= 0.0f && gain <= 1.0f);
+  if (bank.variants.empty() || gain <= 0.0f) return;
   if (timeMs - bank.lastPlayMs < minGapMs) return;
   bank.channels.erase(
       std::remove_if(bank.channels.begin(), bank.channels.end(),
@@ -146,8 +149,7 @@ void SfxSystem::play(SoundBank& bank, float minGapMs, int maxVoices,
   bank.lastPlayMs = timeMs;
   bank.channels.push_back(channel);
 
-  Mix_Volume(channel,
-             static_cast<int>(volume * MASTER_VOLUME * SDL_MIXER_MAX_VOLUME));
+  Mix_Volume(channel, static_cast<int>(gain * SDL_MIXER_MAX_VOLUME));
   // The far side drops, the near side stays full.
   float left = pan > 0.0f ? 1.0f - 0.7f * pan : 1.0f;
   float right = pan < 0.0f ? 1.0f + 0.7f * pan : 1.0f;

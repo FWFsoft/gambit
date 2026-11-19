@@ -53,6 +53,8 @@ class UISystem {
   void renderCharacterSelect();
   void renderMainMenu();
   void renderSettingsPanel();
+  // Tell the music and sound systems the current audio settings.
+  void publishAudio();
 
   // Game UI rendering
   void renderHUD();
@@ -104,8 +106,7 @@ class UISystem {
   // State shown on the last rendered frame. A key press that changes state
   // (title -> character select) must not also act on the new screen.
   GameState lastRenderedState = GameState::TitleScreen;
-  Settings settings;
-  Settings tempSettings;  // Temporary settings during editing
+  Settings settings;  // applied and saved as they change
   bool showSettings;
   std::deque<Notification> notifications;  // Active pickup notifications
   std::deque<ObjectiveNotification>

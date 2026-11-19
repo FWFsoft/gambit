@@ -776,6 +776,15 @@ add_executable(test_ability_sounds
 )
 target_include_directories(test_ability_sounds PRIVATE include tests)
 
+# Audio settings: slider curve, master x channel, mute, clamped file.
+add_executable(test_settings
+    tests/test_settings.cpp
+    src/Settings.cpp
+    src/Logger.cpp
+)
+target_include_directories(test_settings PRIVATE include tests)
+target_link_libraries(test_settings PRIVATE spdlog::spdlog)
+
 # The generated planet as the engine loads it (regions, biomes, nesting).
 add_executable(test_planet_map
     tests/test_planet_map.cpp
@@ -820,6 +829,7 @@ add_test(NAME CharacterSwap COMMAND test_character_swap)
 add_test(NAME MusicDirector COMMAND test_music_director)
 add_test(NAME HitSounds COMMAND test_hit_sounds)
 add_test(NAME AbilitySounds COMMAND test_ability_sounds)
+add_test(NAME Settings COMMAND test_settings)
 add_test(NAME PlanetMap COMMAND test_planet_map)
 set_tests_properties(PlanetMap PROPERTIES WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
