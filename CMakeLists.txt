@@ -7,6 +7,14 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Code coverage options
 option(ENABLE_COVERAGE "Enable code coverage" OFF)
 
+# A plain `cmake ..` (no build type) is what `make build` and the skills do.
+# Without this it compiles at -O0, and the game runs at a fraction of 60 FPS.
+# -O2 without NDEBUG: optimised, with every assert still on (Tiger Style).
+# Coverage builds and explicit build types (Debug, Release...) are left alone.
+if(NOT CMAKE_BUILD_TYPE AND NOT ENABLE_COVERAGE)
+    add_compile_options(-O2)
+endif()
+
 # Emscripten detection
 if(EMSCRIPTEN)
     message(STATUS "Building for WebAssembly with Emscripten")
