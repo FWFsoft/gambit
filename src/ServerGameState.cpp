@@ -151,14 +151,20 @@ ServerGameState::ServerGameState(NetworkServer* server,
                          std::to_string(obj->y) + ")");
           }
 
-          // RecoverProbe: spawn a loot item at the deposit point
+          // RecoverProbe: it boots and scans; the land around it is mapped
+          // for the whole crew (intel, where a scrapyard pays in scrap).
           if (obj->type == ObjectiveType::RecoverProbe) {
-            float lootX = obj->hasDepositPoint ? obj->depositX : obj->x;
-            float lootY = obj->hasDepositPoint ? obj->depositY : obj->y;
-            spawnWorldItem(1, lootX, lootY);
-            Logger::info("Spawned probe reward at (" +
-                         std::to_string(lootX) + ", " +
-                         std::to_string(lootY) + ")");
+            assert(!obj->hasDepositPoint);
+            GameEventPacket scan;
+            scan.kind = GameEventKind::Reveal;
+            scan.x = obj->x;
+            scan.y = obj->y;
+            scan.value = Arena::Tuning::PROBE_REVEAL_RADIUS;
+            scan.sourceId = playerId;
+            this->server->broadcastPacket(serialize(scan));
+            spawnWorldItem(1, obj->x, obj->y);
+            Logger::info("Probe at (" + std::to_string(obj->x) + ", " +
+                         std::to_string(obj->y) + ") scanned the land");
           }
 
           // NoxiousGas: gas disperses, spawn loot at spore location
@@ -1225,8 +1231,13 @@ void ServerGameState::processObjectiveInteract(uint32_t clientId,
       if (interIt != interactions.end()) {
         const Objective* obj =
             objectiveSystem->getObjective(interIt->second);
-        if (obj && (obj->type == ObjectiveType::AlienScrapyard ||
-                    obj->type == ObjectiveType::RecoverProbe)) {
+        if (obj && obj->type == ObjectiveType::DerelictTurret &&
+            !obj->alarmRaised && director) {
+          // Once per turret: restarting a repair is not a loot farm.
+          objectiveSystem->getObjective(obj->id)->alarmRaised = true;
+          director->onRepairNoise(obj->x, obj->y);
+        }
+        if (obj && obj->type == ObjectiveType::AlienScrapyard) {
           effectManager->applyEffect(playerId, EffectType::Slow, 1, 999999.0f,
                                      0, players);
           Logger::info("Applied Slow to player " + std::to_string(playerId) +

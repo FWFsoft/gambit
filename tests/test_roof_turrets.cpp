@@ -257,6 +257,21 @@ void notEnoughScrapBuysNothing() {
   std::cout << "  tiers: short of the price, nothing is spent\n";
 }
 
+void repairNoiseDrawsAPack() {
+  World w;
+  int before = 0;
+  for (const auto& [id, e] : w.enemies.getEnemies()) {
+    if (e.state != EnemyState::Dead) before++;
+  }
+  w.director.onRepairNoise(300.0f, 300.0f);
+  int after = 0;
+  for (const auto& [id, e] : w.enemies.getEnemies()) {
+    if (e.state != EnemyState::Dead) after++;
+  }
+  assert(after > before);
+  std::cout << "  repair: the noise draws a pack\n";
+}
+
 void strongerTurretsAtHigherTiers() {
   for (int t = 1; t < T::SHIP_TIER_COUNT; t++) {
     assert(T::ROOF_TURRET_DAMAGE[t] > T::ROOF_TURRET_DAMAGE[t - 1]);
@@ -280,6 +295,7 @@ int main() {
   hullFootprintFollowsTheTier();
   scrapBuysTiersBetweenRounds();
   notEnoughScrapBuysNothing();
+  repairNoiseDrawsAPack();
   strongerTurretsAtHigherTiers();
   std::cout << "All roof turret tests passed\n";
   return 0;

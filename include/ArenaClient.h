@@ -19,6 +19,19 @@
 // and enemies.
 class ArenaClient {
  public:
+  // Scans waiting to be marked on the fog (a probe came online): x, y,
+  // radius. The view takes them.
+  struct Reveal {
+    float x, y, radius;
+  };
+  std::vector<Reveal> takeReveals() {
+    std::vector<Reveal> out;
+    out.swap(reveals);
+    return out;
+  }
+  // A banner across the top of the screen (color is IM_COL32).
+  void pushBanner(const std::string& title, const std::string& subtitle,
+                  uint32_t color, float lifeMs = 3200.0f);
   ArenaClient();
 
   struct PlayerView {
@@ -148,6 +161,7 @@ class ArenaClient {
   std::vector<FloatText> texts;
   std::vector<Banner> bannerQueue;
   float timeMs = 0.0f;
+  std::vector<Reveal> reveals;
   uint32_t eventCount = 0;
   uint8_t lastPhase = 255;
 
@@ -156,6 +170,4 @@ class ArenaClient {
   void onStateUpdate(const StateUpdatePacket& packet);
   void onEnemyUpdate(const EnemyStateUpdatePacket& packet);
   void onGameEvent(const GameEventPacket& packet);
-  void pushBanner(const std::string& title, const std::string& subtitle,
-                  uint32_t color, float lifeMs = 3200.0f);
 };

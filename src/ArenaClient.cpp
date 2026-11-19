@@ -196,6 +196,13 @@ void ArenaClient::onGameEvent(const GameEventPacket& p) {
       break;
     }
 
+    case GameEventKind::Reveal: {
+      reveals.push_back({p.x, p.y, p.value});
+      pushBanner("PROBE ONLINE", "Its scan maps the land around it",
+                 0xFFFFD080, 3000.0f);
+      break;
+    }
+
     case GameEventKind::HitStop: {
       auto attacker = playerViews.find(p.sourceId);
       if (attacker != playerViews.end()) {

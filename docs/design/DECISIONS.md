@@ -21,6 +21,84 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-19: Playtest round two: readable ground, drops, pacing, probe, turrets, music
+- **Decision:** The rest of the same playtest's notes.
+  - **Walls and water read as walls and water.** Impassable ground that is
+    not water (peaks, and land the generator seals off as unreachable) was
+    painted with the walkable "high" ground, so it read as a gentle shaded
+    slope you could not climb. It now has its own dark, cracked `cliff`
+    tile. In game every walkable/blocked edge gets a rim: pale rock with an
+    ink shadow on walls, a cyan foam line on water.
+  - **Ground colours:** the PNW forest floor ("moss") was a dark blue-teal,
+    close to the lakes; it is now a dark green. Damp ground by water is
+    earthy instead of blue-grey. Lakes and sea keep the blue and get
+    brighter glints.
+  - **Infusion drops** are a dark token ringed in the genus colour with the
+    genus's mark inside (Venoxarid a venom drop, Cerebrian an eye,
+    Frigidariant a snowflake, Magnarok a flame), a pillar of the genus's
+    light, and the part's name. Picking one up shows a banner ("+ VENOXARID
+    EYE / Infusion! Slot it into your suit at the ship") and the mark
+    bursts out of the hero in a ring; a burst of pickups shows one banner.
+  - **Suit depth is paced by the match:** tree tiers 1 and 2 can be filled
+    from night 1, tier 3 from night 2, tier 4 from night 3. Locked-by-round
+    slots show dimmed with "Tier N opens on night M".
+  - **Derelict turrets** are a hold: 10 s (was 4 s) in a 110 px circle (was
+    70), and starting a repair draws one pack (4 bodies, +1 per extra
+    crewmate) from 650 px out on the side away from the ship, once per
+    turret.
+  - **Crashed probes scan instead of being hauled.** Dig it out (4 s) and
+    it boots where it lies: the land within 3,000 px is mapped for the
+    whole crew (objectives there appear on the map and minimap), plus the
+    usual score and infusion. Scrap is still the one thing you haul.
+  - **A crash site** around every landing: ash ground with a ragged edge to
+    about 1,300 px, cleared of plants, strewn with wreckage. The landing
+    music plays there: it starts inside 1,300 px and holds out to 1,700 px
+    (was a plain 2,000 px circle, which cut across biomes).
+  - **Music is a radio.** Every place playlist is a channel that keeps
+    playing on the match clock. Moving between places is a 0.6 s fade, and
+    the channel picks up where its song would be now; a channel first heard
+    mid-match joins a song partway in.
+- **Pillars:**
+  - **Clarity** decided most of it: invisible walls, water that looked like
+    ground, a drop that did not look like loot, and a pickup with no
+    feedback were all things the playtest could not read. The rims are a
+    line per edge and can look busy in a maze of blocked tiles (the edges
+    are tile steps, so they zigzag on diagonals).
+  - **Creative Builds:** serves. With objectives paying one or two
+    infusions, one tree filled in round 1; capping depth by round keeps
+    early luck going wide across trees, so builds form over the match.
+    Trades a little Crunch: an early lucky run can no longer cash in.
+  - **Strategic Crunch:** serves. A turret is now a defend-the-point
+    trade-off (time and a fight for a permanent ship gun) instead of a
+    free 4 s tap next to the ship. The probe's scan is a time-for-intel
+    choice that suits the explore-and-camp rounds; it no longer plays the
+    same as a scrapyard.
+  - **Comradery:** serves. A turret repair goes best with someone guarding;
+    a probe's map is shared by everyone.
+- **Why:** Alternatives rejected: starving infusion drops (would make the
+  map less rewarding to explore, against the camping change); making the
+  probe a second haul with a different reward (still the same verb as
+  scrap); true overlapping crossfades (SDL_mixer plays one music stream;
+  would need decoding to sound channels). Not verified by playing: the
+  music was only unit tested (no audio device here); the other three
+  genus marks were not seen on screen (only Venoxarid spawns now); the
+  turret pack and probe scan are covered by tests and logs, not a live
+  look. The rims, the crash site, drops and the pickup banner were checked
+  in the running client.
+- **Status:** Built, needs review
+- **Where:** `tools/maps/generate_planet.py` (materials `cliff`, `ash`,
+  crash site, turret props, probe text) and the regenerated
+  `assets/maps/planet.tmx` / `planet_tiles.png`; `src/ArenaView.cpp`
+  (`drawBlockedEdges`, `drawPickup`, `onLocalPickup`), `include/ArenaDraw.h`
+  (`drawGenusGlyph`), `include/ArenaData.h` (`suitTierCap`, turret and
+  probe tuning), `src/ArenaData.cpp`, `src/Infusions.cpp`,
+  `src/ArenaHud.cpp`, `src/MatchDirector.cpp` (`onRepairNoise`),
+  `src/ServerGameState.cpp`, `src/TiledMap.cpp`, `src/FogOfWar.cpp`,
+  `src/ArenaClient.cpp`, `include/NetworkProtocol.h` (`Reveal`),
+  `src/MusicDirector.cpp`, `src/MusicSystem.cpp`, `docs/design/MUSIC.md`,
+  `docs/design/MAP_PIPELINE.md`; tests in `test_infusions`,
+  `test_roof_turrets`, `test_music_director`
+
 ## 2026-11-19: No Blue Zone; the crew camps where night finds it
 - **Decision:** A round has no zone. The planet is open, nothing hurts you
   for being far out, and nobody is teleported home or killed at nightfall.

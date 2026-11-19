@@ -1012,7 +1012,9 @@ struct SuitView {
   Genus nodes[Arena::MAX_SUIT_NODES] = {};
   InfusionPart parts[Arena::MAX_SUIT_NODES] = {};
 
-  explicit SuitView(const MatchPlayerState& p) {
+  int maxTier = 4;
+  SuitView(const MatchPlayerState& p, int round)
+      : maxTier(Arena::suitTierCap(round)) {
     core = static_cast<Genus>(p.coreGenus);
     corePart = static_cast<InfusionPart>(p.corePart);
     for (int i = 0; i < Arena::MAX_SUIT_NODES; i++) {
@@ -1024,7 +1026,7 @@ struct SuitView {
     return nodes[static_cast<int>(talent)] != Genus::None;
   }
   NodeState state(int node) const {
-    return Arena::nodeState(nodes, core != Genus::None, node);
+    return Arena::nodeState(nodes, core != Genus::None, node, maxTier);
   }
   // Same rule as Player::infusionLevel, with `extra` more of `genus` in the
   // tree (to preview a slot).
@@ -1064,7 +1066,7 @@ void ArenaView::drawSuitScreen(bool intermission) {
   const MatchPlayerState* me = arena->matchPlayer(localId());
   if (!me) return;
   const MatchStatePacket& match = arena->match();
-  const SuitView suit(*me);
+  const SuitView suit(*me, match.round);
 
   auto send = [&](int genus, int part, int node) {
     InfusionSlotPacket packet;
@@ -1386,6 +1388,11 @@ void ArenaView::drawSuitScreen(bool intermission) {
         break;
       case NodeState::Locked:
         break;
+      case NodeState::Later:
+        fill = IM_COL32(18, 18, 28, 255);
+        ring = IM_COL32(150, 170, 255, 70);
+        label = IM_COL32(140, 150, 190, 170);
+        break;
     }
     dl->AddCircleFilled(at, nodeRadius, fill, 28);
     dl->AddCircle(at, nodeRadius, ring, 28,
@@ -1414,6 +1421,10 @@ void ArenaView::drawSuitScreen(bool intermission) {
         ImGui::Text("Holds %s (%s).", itemName(genus, suit.parts[i]).c_str(),
                     Arena::partInfo(suit.parts[i]).description);
         genusEffectLine(genus, node.tree, suit.level(genus, node.tree));
+      } else if (state == NodeState::Later) {
+        ImGui::TextColored(ImVec4(0.65f, 0.72f, 1.0f, 1.0f),
+                           "Tier %d opens on night %d.", node.tier,
+                           node.tier == 3 ? 2 : 3);
       } else if (state == NodeState::Open && havePick) {
         ImGui::Text("Click to slot %s here. You get:",
                     itemName(picked, pickedPart).c_str());
@@ -1716,7 +1727,8 @@ void ArenaView::drawPrompts() {
       } else if (scrapyard) {
         prompt = "[F] Salvage scrap  (stay close while you work)";
       } else if (probe) {
-        prompt = "[F] Dig out the probe  (stay close while you work)";
+        prompt = "[F] Dig out the probe and boot it: its scan maps the "
+                 "land around it  (stay close)";
       } else {
         prompt = "[F] Start objective  (stay close while you work)";
       }

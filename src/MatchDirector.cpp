@@ -194,6 +194,29 @@ void MatchDirector::makeCamp() {
   }
 }
 
+void MatchDirector::onRepairNoise(float x, float y) {
+  if (currentPhase != MatchPhase::Round) return;
+  int size = Tuning::REPAIR_NOISE_PACK + std::max(1, participantCount()) - 1;
+  float ax = x - shipX, ay = y - shipY;
+  float len = std::sqrt(ax * ax + ay * ay);
+  if (len < 1.0f) {
+    ax = 0.0f;
+    ay = 1.0f;
+    len = 1.0f;
+  }
+  for (int attempt = 0; attempt < 8; attempt++) {
+    float spread = randomRange(-0.7f, 0.7f);
+    float c = std::cos(spread), s = std::sin(spread);
+    float dx = (ax * c - ay * s) / len, dy = (ax * s + ay * c) / len;
+    float px = x + dx * Tuning::REPAIR_NOISE_DISTANCE;
+    float py = y + dy * Tuning::REPAIR_NOISE_DISTANCE;
+    if (!insideWorld(px, py)) continue;
+    spawnPack(px, py, size, false);
+    Logger::info("Match: a turret repair drew a pack");
+    return;
+  }
+}
+
 void MatchDirector::dawnAmbush() {
   int round = std::min(currentRound, Tuning::ROUND_COUNT);
   int size = Tuning::DAWN_AMBUSH_SIZE[round - 1];
@@ -1030,7 +1053,8 @@ void MatchDirector::onSlotInfusion(Player& player, Genus genus,
       currentPhase == MatchPhase::Intermission) {
     if (!atShip(player)) return;
   }
-  if (Infusions::slotInfusion(player, genus, part, node)) {
+  if (Infusions::slotInfusion(player, genus, part, node,
+                              Arena::suitTierCap(currentRound))) {
     std::string where = node == Arena::CORE_NODE
                             ? std::string("the core")
                             : std::string(Arena::suitNode(node).name);

@@ -430,9 +430,20 @@ enum class NodeState : uint8_t {
   Locked,  // the tier above (or the core) is not filled yet
   Open,    // can take an infusion now
   Filled,
-  Closed  // another option in this tier was chosen
+  Closed,  // another option in this tier was chosen
+  Later    // its tier opens in a later round (suitTierCap)
 };
-NodeState nodeState(const Genus* nodeGenus, bool coreFilled, int node);
+// The deepest tree tier that can be filled this far into the match: two
+// tiers on the first night, a third from the second, all four from the
+// third. Depth is paced by the match, so a lucky first round goes wide
+// across trees instead of finishing one (round 0 = no match: no cap).
+constexpr int SUIT_TIER_CAP[] = {4, 2, 3, 4};
+inline int suitTierCap(int round) {
+  if (round <= 0) return SUIT_TIER_CAP[0];
+  return SUIT_TIER_CAP[round >= 3 ? 3 : round];
+}
+NodeState nodeState(const Genus* nodeGenus, bool coreFilled, int node,
+                    int maxTier = 4);
 
 // World item ids used for arena pickups (reuses ItemSpawned/ItemPickedUp).
 // An infusion's id carries its genus and part: 1000 + genus * 16 + part.
@@ -497,6 +508,13 @@ constexpr float CAMP_HEAL_PER_ALLY = 0.20f;  // more per crewmate in camp
 // camp's heal); with nobody near they wake at the ship.
 constexpr int DAWN_AMBUSH_SIZE[ROUND_COUNT] = {0, 4, 5};  // per wild camp
 constexpr float DAWN_AMBUSH_DISTANCE = 420.0f;  // from the camp's centre
+
+// Derelict turret repair: the noise draws one pack per turret (+1 body per
+// extra crewmate), from this far out on the side away from the ship.
+constexpr int REPAIR_NOISE_PACK = 4;
+// A crashed probe, dug out and booted, maps the land this far around it.
+constexpr float PROBE_REVEAL_RADIUS = 3000.0f;
+constexpr float REPAIR_NOISE_DISTANCE = 650.0f;
 constexpr float LOBBY_COUNTDOWN_SECONDS = 3.0f;
 
 // Enemy pressure. During a round the enemies live in camps at the map's

@@ -85,6 +85,9 @@ LEVEL_PIXELS = 16.0
 ZONE_SCALE = 1.75          # written to the map; scales the storm's radii
 ZONE_RADII = [2000.0 * ZONE_SCALE, 2500.0 * ZONE_SCALE, 2900.0 * ZONE_SCALE]
 BASIN_RADIUS = 950.0       # flat ground around the ship
+# The crash site: scorched ground and wreckage around every landing, its own
+# place on the planet (and the "landing" music's area: MusicDirector).
+CRASH_SITE_RADIUS = 1300.0
 SHIP_CLEAR = 420.0
 COAST = 0.86               # land where the shape metric is below this
 SEA_KEEP = 2600.0          # sea tiles drawn this far out; past it, empty
@@ -168,18 +171,21 @@ MATERIALS = [
     ("scrub",    (52, 62, 60),   (48, 57, 56),   (36, 44, 44),   (78, 92, 84)),
     ("rock",     (70, 70, 82),   (64, 64, 76),   (44, 44, 54),   (96, 96, 110)),
     ("high",     (96, 98, 114),  (90, 92, 108),  (62, 64, 78),   (128, 130, 146)),
-    ("wet",      (44, 54, 62),   (40, 50, 58),   (30, 38, 46),   (64, 84, 96)),
+    # Damp ground by water: earthy, never blue, so it never reads as water.
+    ("wet",      (46, 50, 42),   (43, 47, 39),   (32, 35, 29),   (70, 76, 60)),
     ("path",     (104, 96, 88),  (98, 91, 84),   (78, 72, 66),   (126, 116, 104)),
     ("pad",      (112, 104, 94), (106, 99, 90),  (84, 78, 70),   (138, 128, 112)),
     ("scar",     (36, 30, 30),   (32, 27, 28),   (22, 18, 20),   (150, 70, 40)),
     ("street",   (58, 58, 70),   (54, 54, 66),   (34, 34, 44),   (90, 90, 110)),
     ("river",    (40, 62, 78),   (38, 58, 74),   (30, 46, 62),   (80, 120, 140)),
-    ("water",    (22, 34, 48),   (20, 31, 45),   (16, 25, 38),   (48, 72, 92)),
-    ("sea",      (14, 20, 32),   (13, 19, 30),   (10, 15, 25),   (30, 44, 62)),
+    # Deep water: the bluest grounds, with glints that read as a surface.
+    ("water",    (22, 34, 52),   (20, 31, 49),   (16, 25, 40),   (74, 110, 140)),
+    ("sea",      (14, 20, 34),   (13, 19, 32),   (10, 15, 26),   (46, 70, 98)),
     # Biome grounds.
     ("grass",    (62, 70, 48),   (58, 66, 45),   (44, 50, 34),   (88, 98, 62)),
     ("meadow",   (72, 72, 50),   (67, 68, 47),   (52, 52, 36),   (98, 96, 64)),
-    ("moss",     (34, 50, 54),   (31, 46, 50),   (22, 34, 38),   (56, 78, 80)),
+    # Forest floor: a dark green, kept off the blue-teal the water uses.
+    ("moss",     (38, 52, 38),   (35, 48, 35),   (25, 36, 26),   (62, 82, 56)),
     ("needles",  (50, 46, 44),   (46, 42, 40),   (34, 31, 30),   (74, 66, 58)),
     ("snow",     (110, 118, 134), (104, 112, 128), (82, 90, 108), (136, 144, 160)),
     ("ice",      (70, 92, 112),  (66, 87, 106),  (50, 70, 90),   (110, 136, 156)),
@@ -192,6 +198,12 @@ MATERIALS = [
     ("marsh",    (50, 54, 38),   (46, 50, 35),   (34, 38, 26),   (78, 84, 58)),
     ("bog",      (34, 46, 42),   (32, 43, 40),   (24, 34, 32),   (70, 92, 80)),
     ("vine",     (40, 62, 30),   (37, 58, 28),   (26, 44, 18),   (64, 96, 44)),
+    # Impassable high ground (peaks, sealed-off pockets): darker and cracked,
+    # so a wall never looks like the walkable slope next to it. Appended last
+    # so every other material keeps its tile ids.
+    ("cliff",    (40, 38, 48),   (37, 35, 45),   (20, 18, 24),   (96, 92, 108)),
+    # The crash site: ash and scorch from the landing, embers in the specks.
+    ("ash",      (40, 33, 32),   (37, 31, 30),   (20, 16, 16),   (190, 96, 48)),
 ]
 MAT = {name: i for i, (name, *_rest) in enumerate(MATERIALS)}
 VARIANTS = 4
@@ -209,7 +221,7 @@ POI_KINDS = {
                 200.0),
     "outpost_big": ("capture_outpost", "Wipe out the camp and its enforcer",
                     160.0, 1.0, (4, 1), 230.0),
-    "probe": ("recover_probe", "Dig out the probe and carry it to the ship",
+    "probe": ("recover_probe", "Dig out the probe and boot it: it maps the land around it",
               70.0, 4.0, (2, 0), 170.0),
     "frogs": ("save_the_frogs", "Carry the frogs to the pond", 80.0, 1.5,
               (0, 0), 190.0),
@@ -974,8 +986,16 @@ def build(seed: int, size: int, site_index: int):
     material[lakes] = MAT["water"]
     material[~land] = MAT["sea"]
     material[trench] = MAT["scar"]
+    # What nobody can climb or reach looks like a wall (MAP_PIPELINE.md).
+    material[(peaks | pockets) & land & ~lakes & ~city & ~trench] = MAT["cliff"]
+    crash_ground = np.zeros((size, size), dtype=bool)
     for x, y in site_xy:
-        basin_dust = g.disc(x, y, BASIN_RADIUS * 0.8) & land & ~trench & ~city
+        # Ash out to a ragged edge, the pad the ship sits on left as dust.
+        d = np.hypot(wx - x, wy - y) + 220.0 * n1.fbm(wx * 1.7, wy * 1.7, 700, 2)
+        site_ground = (d <= CRASH_SITE_RADIUS) & land & ~city & ~lakes & ~river
+        crash_ground |= site_ground
+        material[site_ground & ~trench] = MAT["ash"]
+        basin_dust = g.disc(x, y, BASIN_RADIUS * 0.5) & land & ~trench & ~city
         material[basin_dust] = MAT["dust"]
 
     world = dict(g=g, rng=rng, land=land, level=level, region=region, biome=biome,
@@ -987,7 +1007,7 @@ def build(seed: int, size: int, site_index: int):
                  site_xy=site_xy, crash_dirs=crash_dirs,
                  site_index=site_index, sea_dist=sea_dist, marsh=marsh,
                  frozen=frozen, tidepool=tidepool, beach=beach,
-                 land_dist=land_dist)
+                 land_dist=land_dist, crash_ground=crash_ground)
     # Each landing site gets its own rings of objectives, landmarks, trails
     # home and lifeline rocks. Rings are placed across all sites one ring at
     # a time, so every site's near objectives come before anyone's far ones.
@@ -1346,7 +1366,8 @@ def dress(w):
 
     land, mat = w["land"], w["material"]
     biome = w["biome"]
-    wild = land & ~w["city"] & ~w["blocked"]
+    # The crash flattened everything that grew there: wreckage only.
+    wild = land & ~w["city"] & ~w["blocked"] & ~w["crash_ground"]
     soft = ~np.isin(mat, (MAT["rock"], MAT["high"], MAT["redrock"], MAT["path"],
                           MAT["pad"], MAT["scar"], MAT["river"], MAT["ice"],
                           MAT["tidepool"], MAT["bog"], MAT["beach"]))
@@ -1376,6 +1397,9 @@ def dress(w):
     # Crash wreckage: pieces ~2 m across, with room to walk between them.
     scatter("debris", 70, w["trench"] & ~w["blocked"], 4.0 * METRE, cluster=3,
             spread=6.0 * METRE)
+    # ... and thrown wide across the crash site, so it reads as its own place.
+    scatter("debris", 90, w["crash_ground"] & ~w["trench"] & ~w["blocked"],
+            9.0 * METRE, cluster=2, spread=5.0 * METRE)
     scatter("ruin", 260, wild & (w["level"] >= 7) & ~np.isin(biome, (SWAMP, TIDAL)),
             300, cluster=3, spread=160)
     # City dressing: a lamp every ~15 m of street, and the odd neon sign.
@@ -1415,6 +1439,11 @@ def draw_tile(rng, mat, variant):
     if name == "street":
         line(2, cy, cx, 17, seam)            # paving seams along the grid
         line(cx, 47, TILE - 3, cy, seam)
+    elif name == "cliff":
+        # Heavy vertical cracks: a rock face, not a slope.
+        for _ in range(2 + variant % 2):
+            x0, y0 = rng.uniform(16, 48), rng.uniform(20, 30)
+            line(x0, y0, x0 + rng.uniform(-3, 3), y0 + rng.uniform(10, 16), seam, 2)
     elif name in ("rock", "high", "redrock", "ice"):
         for _ in range(1 + variant % 3):
             x0, y0 = rng.uniform(14, 50), rng.uniform(22, 42)
@@ -1424,6 +1453,11 @@ def draw_tile(rng, mat, variant):
         for _ in range(1 + variant % 2):
             x0, y0 = rng.uniform(12, 40), rng.uniform(24, 40)
             line(x0, y0, x0 + rng.uniform(10, 18), y0 + rng.uniform(-2, 2), seam)
+    elif name == "ash":
+        # Scorch streaks, all one way: thrown out by the landing.
+        for _ in range(1 + variant % 2):
+            x0, y0 = rng.uniform(14, 40), rng.uniform(24, 40)
+            line(x0, y0, x0 + rng.uniform(12, 20), y0 + rng.uniform(-3, 1), seam, 2)
     elif name in ("dust", "pad", "path", "scrub", "wet", "grass", "meadow", "moss",
                   "needles", "jungle", "mud", "vine"):
         if variant >= 2:
@@ -1577,8 +1611,11 @@ def write_tmx(w, path, seed, size_arg):
                                            sx_ + math.cos(a) * 420,
                                            sy_ + math.sin(a) * 420, cy, [
                 ("objective_type", "string", "derelict_turret"),
-                ("description", "string", "Repair the derelict turret"),
-                ("radius", "float", "70.0"), ("interaction_time", "float", "4.0"),
+                ("description", "string",
+                 "Repair the derelict turret: the noise draws a pack"),
+                # A hold, not a tap: long enough that the pack it draws
+                # arrives mid-repair, wide enough to fight inside.
+                ("radius", "float", "110.0"), ("interaction_time", "float", "10.0"),
                 ("sites", "string", str(site))]))
             next_id += 1
         # The hull: solid only at the site the ship stands on ("hull@<site>").

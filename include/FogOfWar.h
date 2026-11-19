@@ -36,6 +36,10 @@ class FogOfWar {
   // explored and rebuilds texels().
   void update(const std::vector<Source>& sources);
 
+  // Mark a circle as explored without giving sight there (a probe's scan):
+  // the ground and its objectives are known; what walks there stays hidden.
+  void reveal(float x, float y, float radius);
+
   // 0 = not in sight, 1 = fully seen, in between on the soft edge.
   // `reach` is the size of the thing asked about: a telegraph of radius 80
   // is seen as soon as its rim enters sight, not only its centre.

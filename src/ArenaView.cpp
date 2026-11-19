@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <fstream>
@@ -19,6 +20,7 @@
 #include "CollisionSystem.h"
 #include "ClientPrediction.h"
 #include "Effect.h"
+#include "EventBus.h"
 #include "EffectTracker.h"
 #include "Logger.h"
 #include "PresentationLayer.h"
@@ -274,7 +276,31 @@ int directionFrame(float dirX, float dirY) {
 
 ArenaView::ArenaView(ArenaClient* arena, ClientPrediction* prediction,
                      EffectTracker* effects, Camera* camera)
-    : arena(arena), prediction(prediction), effects(effects), camera(camera) {}
+    : arena(arena), prediction(prediction), effects(effects), camera(camera) {
+  // Picking up an infusion says what it is and what to do with it.
+  EventBus::instance().subscribe<ItemPickedUpEvent>(
+      [this](const ItemPickedUpEvent& e) { onLocalPickup(e.itemId); });
+}
+
+void ArenaView::onLocalPickup(uint32_t itemId) {
+  if (!Arena::PickupId::isInfusion(itemId)) return;
+  Arena::Genus genus = Arena::PickupId::infusionGenus(itemId);
+  const Arena::InfusionPartInfo& part =
+      Arena::partInfo(Arena::PickupId::infusionPart(itemId));
+  std::string title = std::string("+ ") + Arena::genusName(genus) + " " +
+                      part.name;
+  for (char& ch : title) ch = static_cast<char>(std::toupper(ch));
+  // A handful at once is one banner, not a stack of them; each still
+  // flashes.
+  if (timeSeconds - lastPickupBanner > 2.0f) {
+    arena->pushBanner(title,
+                      "Infusion! Slot it into your suit at the ship  [B]",
+                      themeHot(genusTheme(genus), 1.0f), 2600.0f);
+    lastPickupBanner = timeSeconds;
+  }
+  pickupFlashGenus = genus;
+  pickupFlashUntil = timeSeconds + 0.7f;
+}
 
 // ---------------------------------------------------------------------------
 // Sprites
@@ -984,6 +1010,9 @@ void ArenaView::updateFog() {
   if (inLobby && !fogWasInLobby) fog->reset();
   fogWasInLobby = inLobby;
 
+  for (const ArenaClient::Reveal& scan : arena->takeReveals()) {
+    fog->reveal(scan.x, scan.y, scan.radius);
+  }
   std::vector<FogOfWar::Source> sources;
   collectSight(sources);
   fog->update(sources);
@@ -1225,7 +1254,74 @@ void ArenaView::collectLights(
 // Ground layer: zone, hazards, telegraphs, objectives
 // ---------------------------------------------------------------------------
 
+void ArenaView::drawBlockedEdges(ImDrawList* dl) {
+  const TerrainGrid* grid = terrain();
+  if (!grid || !grid->active()) return;
+  const float W = Config::Screen::WIDTH, H = Config::Screen::HEIGHT;
+  const float zoom = std::max(0.1f, camera->zoom);
+  // The visible world, padded for lifted ground drawn from below the screen.
+  const float halfW = W * 0.5f / zoom + 64.0f;
+  const float halfH = H * 0.5f / zoom + 64.0f;
+  const float maxLift =
+      (TerrainGrid::LEVEL_COUNT - TerrainGrid::BASE_LEVEL) *
+      TerrainGrid::LEVEL_PIXELS;
+  float minCx = 1e9f, minCy = 1e9f, maxCx = -1e9f, maxCy = -1e9f;
+  for (float sx : {-halfW, halfW}) {
+    for (float sy : {-halfH, halfH + maxLift}) {
+      float cx, cy;
+      grid->worldToCorner(camera->x + sx, camera->y + sy, cx, cy);
+      minCx = std::min(minCx, cx);
+      maxCx = std::max(maxCx, cx);
+      minCy = std::min(minCy, cy);
+      maxCy = std::max(maxCy, cy);
+    }
+  }
+  const int x0 = std::max(0, static_cast<int>(minCx) - 1);
+  const int y0 = std::max(0, static_cast<int>(minCy) - 1);
+  const int x1 = std::min(grid->width() - 1, static_cast<int>(maxCx) + 1);
+  const int y1 = std::min(grid->height() - 1, static_cast<int>(maxCy) + 1);
+
+  auto corner = [&](int cx, int cy) {
+    float wx, wy;
+    grid->cornerToWorld(static_cast<float>(cx), static_cast<float>(cy), wx, wy);
+    wy -= grid->cornerLift(cx, cy);
+    return ImVec2(wx - camera->x + W * 0.5f, wy - camera->y + H * 0.5f);
+  };
+  const ImU32 shadow = IM_COL32(0, 0, 0, 150);
+  const ImU32 rock = IM_COL32(205, 196, 180, 190);
+  const ImU32 foam = IM_COL32(140, 205, 235, 170);
+  // Neighbour offsets and the corners of the shared edge, from TerrainGrid's
+  // corner layout: top (tx,ty), right (tx+1,ty), bottom (tx+1,ty+1), left
+  // (tx,ty+1).
+  struct Side {
+    int dx, dy, ax, ay, bx, by;
+  };
+  static const Side SIDES[4] = {
+      {1, 0, 1, 0, 1, 1},   // lower right
+      {-1, 0, 0, 0, 0, 1},  // upper left
+      {0, 1, 0, 1, 1, 1},   // lower left
+      {0, -1, 0, 0, 1, 0},  // upper right
+  };
+  for (int ty = y0; ty <= y1; ty++) {
+    for (int tx = x0; tx <= x1; tx++) {
+      if (grid->blockedTile(tx, ty)) continue;
+      for (const Side& side : SIDES) {
+        int nx = tx + side.dx, ny = ty + side.dy;
+        if (!grid->inBounds(nx, ny) || !grid->blockedTile(nx, ny)) continue;
+        ImVec2 a = corner(tx + side.ax, ty + side.ay);
+        ImVec2 b = corner(tx + side.bx, ty + side.by);
+        // Sea and lakes sit low (level 2 and under); anything else blocked
+        // is a wall: a cliff, a sealed pocket, a building, a landmark.
+        bool water = grid->levelOf(nx, ny) <= 3;
+        dl->AddLine(a, b, shadow, 4.0f);
+        dl->AddLine(a, b, water ? foam : rock, 1.75f);
+      }
+    }
+  }
+}
+
 void ArenaView::drawGround(ImDrawList* dl) {
+  drawBlockedEdges(dl);
   const MatchStatePacket& match = arena->match();
   Arena::MatchPhase phase = arena->phase();
   bool fighting = phase == Arena::MatchPhase::Round ||
@@ -1732,16 +1828,30 @@ void ArenaView::drawPickup(ImDrawList* dl, uint32_t itemId, float worldX,
   drawShadow(dl, feet, 9.0f, 0.3f);
 
   if (Arena::PickupId::isInfusion(itemId)) {
-    VfxTheme theme = genusTheme(Arena::PickupId::infusionGenus(itemId));
+    // An infusion is the run's most valuable drop: a pillar of its genus's
+    // light marks it from across the screen, and the token carries the
+    // genus's mark and the part's name (Clarity).
+    Arena::Genus genus = Arena::PickupId::infusionGenus(itemId);
+    VfxTheme theme = genusTheme(genus);
     float pulse = 0.5f + 0.5f * std::sin(timeSeconds * 5.0f + worldY * 0.03f);
-    dl->AddCircleFilled(centre, 14.0f + 3.0f * pulse, themeColor(theme, 0.22f));
-    // Diamond gem
-    ImVec2 gem[4] = {ImVec2(centre.x, centre.y - 10), ImVec2(centre.x + 8, centre.y),
-                     ImVec2(centre.x, centre.y + 10), ImVec2(centre.x - 8, centre.y)};
-    dl->AddConvexPolyFilled(gem, 4, themeColor(theme, 1.0f));
-    dl->AddPolyline(gem, 4, IM_COL32(20, 14, 24, 255), ImDrawFlags_Closed, 2.0f);
-    dl->AddLine(ImVec2(centre.x - 3, centre.y - 3), ImVec2(centre.x, centre.y - 7),
-                themeHot(theme, 1.0f), 2.0f);
+    const float pillar = 90.0f + 10.0f * pulse;
+    dl->AddRectFilledMultiColor(ImVec2(centre.x - 5, centre.y - pillar),
+                                ImVec2(centre.x + 5, centre.y),
+                                themeColor(theme, 0.0f), themeColor(theme, 0.0f),
+                                themeColor(theme, 0.45f), themeColor(theme, 0.45f));
+    dl->AddRectFilledMultiColor(ImVec2(centre.x - 1.5f, centre.y - pillar),
+                                ImVec2(centre.x + 1.5f, centre.y),
+                                themeHot(theme, 0.0f), themeHot(theme, 0.0f),
+                                themeHot(theme, 0.9f), themeHot(theme, 0.9f));
+    dl->AddCircleFilled(centre, 18.0f + 4.0f * pulse, themeColor(theme, 0.22f), 24);
+    dl->AddCircleFilled(centre, 13.0f, IM_COL32(14, 10, 18, 255), 24);
+    dl->AddCircle(centre, 13.0f, themeColor(theme, 1.0f), 24, 2.5f);
+    drawGenusGlyph(dl, centre, 8.5f, genus, themeHot(theme, 1.0f),
+                   IM_COL32(14, 10, 18, 255));
+    const Arena::InfusionPartInfo& part =
+        Arena::partInfo(Arena::PickupId::infusionPart(itemId));
+    text(dl, ImVec2(centre.x, centre.y - 32), themeHot(theme, 1.0f), 13.0f,
+         part.name);
   } else if (itemId == Arena::PickupId::Scrap) {
     dl->AddRectFilled(ImVec2(centre.x - 9, centre.y - 7),
                       ImVec2(centre.x + 9, centre.y + 7),
@@ -3270,6 +3380,20 @@ void ArenaView::drawAir(ImDrawList* dl) {
 void ArenaView::drawOverhead(ImDrawList* dl) {
   uint32_t me = localId();
   const Player& local = prediction->getLocalPlayer();
+
+  // An infusion just picked up: its genus's ring bursts out from the hero.
+  if (timeSeconds < pickupFlashUntil) {
+    float t = 1.0f - (pickupFlashUntil - timeSeconds) / 0.7f;
+    VfxTheme theme = genusTheme(pickupFlashGenus);
+    ImVec2 at = toZoomedScreen(local.x, local.y);
+    at.y -= 30.0f * camera->zoom;
+    dl->AddCircle(at, (20.0f + 70.0f * t) * camera->zoom,
+                  themeHot(theme, 1.0f - t), 32, 3.0f);
+    drawGenusGlyph(dl, ImVec2(at.x, at.y - 40.0f * t * camera->zoom),
+                   14.0f * camera->zoom, pickupFlashGenus,
+                   themeHot(theme, 1.0f - t * 0.6f),
+                   IM_COL32(14, 10, 18, static_cast<int>(255 * (1.0f - t))));
+  }
 
 
   // Objectives: name and progress

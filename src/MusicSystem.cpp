@@ -148,6 +148,14 @@ void MusicSystem::followMatch(float dtSeconds) {
   in.characterSelect = state == GameState::CharacterSelect;
   in.trackEnded = ended;
   std::string want = director.update(in, dtSeconds);
+  // The radio's clock runs through the match; a new match starts it again.
+  if (in.characterSelect ||
+      (in.hasMatch && in.phase == Arena::MatchPhase::Lobby)) {
+    channels.clear();
+    radioClock = 0.0;
+  } else {
+    radioClock += dtSeconds;
+  }
 
   if (!want.empty() && (want != currentPlaylist || !pendingPlaylist.empty())) {
     if (want != pendingPlaylist) {
@@ -158,7 +166,8 @@ void MusicSystem::followMatch(float dtSeconds) {
           " -> " + want);
     }
     if (Mix_PlayingMusic() && Mix_FadingMusic() != MIX_FADING_OUT) {
-      Mix_FadeOutMusic(PLAYLIST_FADE_MS);
+      bool dial = isRadioPlaylist(currentPlaylist) && isRadioPlaylist(want);
+      Mix_FadeOutMusic(dial ? RADIO_FADE_MS : PLAYLIST_FADE_MS);
     }
   }
   if (!pendingPlaylist.empty()) {
@@ -170,29 +179,85 @@ void MusicSystem::followMatch(float dtSeconds) {
     }
     return;
   }
-  if (ended) startPlaylist(currentPlaylist);  // next track, same playlist
+  if (ended) {
+    // Next track, same playlist. On the radio the channel moves on too.
+    auto channel = channels.find(currentPlaylist);
+    auto files = playlists.find(currentPlaylist);
+    if (channel != channels.end() && files != playlists.end()) {
+      channel->second = {pickTrack(files->second, currentTrack), radioClock};
+    }
+    startPlaylist(currentPlaylist);
+  }
+}
+
+std::string MusicSystem::pickTrack(const std::vector<std::string>& files,
+                                   const std::string& avoid) {
+  assert(!files.empty());
+  // Shuffle, but never the same track twice in a row.
+  std::string file = files[std::uniform_int_distribution<size_t>(
+      0, files.size() - 1)(shuffle)];
+  if (files.size() > 1) {
+    while (file == avoid) {
+      file = files[std::uniform_int_distribution<size_t>(
+          0, files.size() - 1)(shuffle)];
+    }
+  }
+  return file;
 }
 
 void MusicSystem::startPlaylist(const std::string& key) {
   auto it = playlists.find(key);
   if (it == playlists.end() || it->second.empty()) return;
   const std::vector<std::string>& files = it->second;
-  // Shuffle, but never the same track twice in a row.
-  std::string file = files[std::uniform_int_distribution<size_t>(
-      0, files.size() - 1)(shuffle)];
-  if (files.size() > 1) {
-    while (file == currentTrack) {
-      file = files[std::uniform_int_distribution<size_t>(
-          0, files.size() - 1)(shuffle)];
+  const bool radio = isRadioPlaylist(key);
+
+  std::string file;
+  double position = 0.0;
+  if (!radio) {
+    file = pickTrack(files, currentTrack);
+  } else {
+    auto channel = channels.find(key);
+    if (channel == channels.end()) {
+      // A channel first tuned in mid-match has been playing all along:
+      // join a track somewhere in its first two thirds.
+      file = pickTrack(files, "");
+      Mix_Music* probe = loadMusic(file);
+      double duration = probe ? musicDuration(probe) : 0.0;
+      position = duration > 0.0
+                     ? std::uniform_real_distribution<double>(
+                           0.0, duration * 0.66)(shuffle)
+                     : 0.0;
+      channels[key] = {file, radioClock - position};
+    } else {
+      Mix_Music* playing = loadMusic(channel->second.file);
+      double duration = playing ? musicDuration(playing) : 0.0;
+      RadioTune tune =
+          radioTune(channel->second.startedAt, radioClock, duration);
+      if (tune.onAir) {
+        file = channel->second.file;
+        position = tune.position;
+      } else {
+        // That track ended while we were away: the channel's next one,
+        // from its start.
+        file = pickTrack(files, channel->second.file);
+        channel->second = {file, radioClock};
+      }
     }
   }
+
   Mix_Music* music = loadMusic(file);
   if (!music) return;
+  const bool dial = radio && isRadioPlaylist(currentPlaylist);
   // Play once (0 and 1 both mean once across SDL_mixer versions): the end
   // of a track is when the playlist moves on.
-  if (Mix_FadeInMusic(music, 1, PLAYLIST_FADE_MS) == -1) {
+  if (Mix_FadeInMusicPos(music, 1, dial ? RADIO_FADE_MS : PLAYLIST_FADE_MS,
+                         position) == -1) {
     Logger::error("Failed to play music: " + std::string(Mix_GetError()));
     return;
+  }
+  if (radio && position > 0.0) {
+    Logger::info("Music: " + key + " picks up " + file + " at " +
+                 std::to_string(static_cast<int>(position)) + "s");
   }
   currentTrack = file;
   currentPlaylist = key;
@@ -282,6 +347,15 @@ void MusicSystem::applyVolume() {
   float gain = volume * settingsGain;
   assert(gain >= 0.0f && gain <= 1.0f);
   Mix_VolumeMusic(static_cast<int>(gain * SDL_MIXER_MAX_VOLUME));
+}
+
+double MusicSystem::musicDuration(Mix_Music* music) {
+#if SDL_MIXER_VERSION_ATLEAST(2, 6, 0)
+  return Mix_MusicDuration(music);
+#else
+  (void)music;
+  return 0.0;  // no seeking on old SDL_mixer: channels restart
+#endif
 }
 
 Mix_Music* MusicSystem::loadMusic(const std::string& filename) {

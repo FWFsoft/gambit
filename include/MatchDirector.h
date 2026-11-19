@@ -72,6 +72,9 @@ class MatchDirector {
   // A Derelict Turret objective was repaired: the next roof turret stands
   // up on the ship. Returns false if every roof turret is already up.
   bool onTurretRepaired(Player& player);
+  // Someone started hammering on a derelict turret: a pack comes for the
+  // noise, from the side away from the ship.
+  void onRepairNoise(float x, float y);
   // Spend banked scrap on the ship's next tier. Intermission only; returns
   // false if it is not intermission, the ship is at its top tier, or the
   // crew has not banked enough.

@@ -362,6 +362,9 @@ enum class GameEventKind : uint8_t {
   // the enemy hit. value = how long the attacker's swing holds (ms), value2
   // = how long the target holds.
   HitStop = 24,
+  // A recovered probe scans: the land within value px of x,y is mapped
+  // (explored in every client's fog), objectives there included.
+  Reveal = 25,
   // Client-only (never sent): impact flash where a hit landed.
   HitSpark = 200
 };

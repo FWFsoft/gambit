@@ -55,7 +55,16 @@ default map (`assets/maps/arena.tmx`, the old prototype, still loads with
   8 m streets around 14 m blocks, two to five storeys, its neon in the
   colour of the genus holding it this match, the real city's skyline out
   past the shore.
-- **The crash:** a scorched trench, ploughed in from the most open side.
+- **The crash:** a scorched trench, ploughed in from the most open side,
+  and around every landing a **crash site**: ash ground with a ragged edge
+  out to about 1,300 px (`CRASH_SITE_RADIUS`), cleared of plants and strewn
+  with wreckage. It is its own place: the "landing" music plays there.
+- **Walls read as walls:** ground nobody can cross that is not water
+  (peaks, sealed-off pockets) is painted with the dark, cracked `cliff`
+  ground, never the walkable `high` ground. In game, every edge between
+  walkable and blocked ground gets a rim: pale rock on walls, a foam line
+  on water (`ArenaView::drawBlockedEdges`). Water is the bluest ground with
+  surface glints; damp ground and the PNW forest floor are kept off blue.
 - **Objectives are fixed places on the planet**, the same every match. An
   objective is in play whenever the ship lands within reach of it (9,000
   px, the far ring), so neighbouring sites share the ground between them
