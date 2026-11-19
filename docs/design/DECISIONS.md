@@ -21,6 +21,45 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-19: Every ability sounds like what it draws
+- **Decision:** Ability casts make sounds, built from what the cast draws
+  rather than picked per ability. The shape (slash, cone, burst, ring,
+  beam, projectile, lob, zone, dash, tether, shield, or a generic blip for
+  a cast that draws nothing) gives the main sound. The theme (Holy, Optic,
+  Fire, Nanite...) adds a tint at 55 % volume, so a theme always sounds the
+  same, as it always has the same colour. Your casts play up front (basic
+  attack 60 %, the rest 90 %); teammates' play at 40 % of that, fading
+  with distance and panned. A cast with nothing drawn yet waits up to
+  450 ms and sounds when its shape appears (wind-ups). Shapes no cast
+  claims (enemy attacks, ship effects, delayed blasts) stay silent. The
+  clips are CC0 placeholders from four Kenney packs. The per-ability
+  result is the table in `docs/design/SFX.md`.
+- **Pillars:** Clarity: every cast is heard and tells you its kind (beam,
+  dash, blast) and its theme, with yours distinct from your teammates'.
+  Creative Builds: new kits, infusion core casts and theme combinations
+  sound with no extra work, and themes keep one identity. Comradery:
+  teammates' casts are audible nearby but never cover yours. Trades
+  against Clarity in one way: with four players there is more sound, so
+  every shape and tint has gaps and voice caps. Enemy telegraphs still have
+  no sound, so for now nothing guarantees an enemy wind-up cuts through.
+  Trades against character identity ("characters should play differently,
+  not just look different"): kits that share a theme and shape sound alike
+  (Isaac's and El Presidente's Holy cones, Wade's and Jeff's Steel), which
+  signature sounds per character should fix.
+- **Why:** About 50 abilities across 12 kits; hand-picking each from stock
+  packs would be slow and would not survive kit changes. The shape and
+  theme are already in the events the client gets. Alternatives rejected:
+  one sound per slot (says nothing about the ability), and per-ability
+  picks now (left for signature sounds). Four abilities send no cast event
+  when tested without their setup and stay silent until they do. Your own
+  casts sound when the server confirms them, so online they lag by the
+  round trip.
+- **Status:** Accepted (requested by a human) for having ability sounds;
+  the rules and numbers above are built, need review
+- **Where:** `include/AbilitySounds.h`, `src/AbilitySounds.cpp`,
+  `src/SfxSystem.cpp`, `assets/sfx/ability/`,
+  `tools/sfx/make_ability_sounds.py`, `docs/design/SFX.md`
+
 ## 2026-11-19: Placeholder hit sounds
 - **Decision:** Hits make sounds. A short punch when an enemy is hit
   (louder for bigger hits), a heavier impact on a crit, and a grunt when
