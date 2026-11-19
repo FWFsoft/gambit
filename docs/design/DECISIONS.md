@@ -21,6 +21,36 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-19: Placeholder hit sounds
+- **Decision:** Hits make sounds. A short punch when an enemy is hit
+  (louder for bigger hits), a heavier impact on a crit, and a grunt when
+  your own hero is hit. Teammates being hit and damage-over-time ticks
+  are silent. Enemy hits fade with distance from your hero (silent past
+  1,400 px) and pan with where they land. Each sound has three pitch
+  variants, a minimum gap (35 / 60 / 250 ms) and a voice cap (4 / 2 / 1).
+  The clips are CC0 placeholders from Kenney's Impact Sounds pack.
+- **Pillars:** Clarity: every hit now has sound as well as a flash and a
+  number, and your own hurt sound stands apart from everyone else's hits.
+  Gaps, caps and silent ticks keep a four-player fight readable rather than
+  loud. Comradery is traded a little: you don't hear a teammate getting
+  hit. That keeps the mix clean, but a later "teammate in trouble" cue
+  could fill the gap.
+- **Why:** The user asked for hit feedback from a free library to get
+  started. Kenney's site was unreachable from the build environment, so the
+  clips came from an npm package that bundles Kenney's CC0 packs (credited
+  in `assets/sfx/CREDITS.md`). These are generic clips, not sounds made for
+  this game's inked-heroes-on-a-dark-world look; replace them when real
+  sound design starts. Enemy attack telegraphs are the next sound Clarity
+  needs. Known gap: your own hits on enemies sound the same as your
+  teammates' hits, because the server's Damage event does not say who
+  dealt the hit. Adding the attacker to that event would let your hits be
+  crisp and up front and theirs quieter, which serves both Clarity and
+  Comradery (your contribution is audible).
+- **Status:** Accepted (requested by a human) for having hit sounds; the
+  rules and numbers above are built, need review
+- **Where:** `include/HitSounds.h`, `src/HitSounds.cpp`, `src/SfxSystem.cpp`,
+  `assets/sfx/`, `tools/sfx/make_hit_sounds.py`, `docs/design/SFX.md`
+
 ## 2026-11-18: Every match lands somewhere new; objectives are fixed places
 - **Decision:** The planet has four landing sites; each match lands on a
   different one (random, never the last), so the storm, the zone and the

@@ -207,6 +207,8 @@ add_executable(Client
     src/AnimationSystem.cpp
     src/AnimationAssetLoader.cpp
     src/MusicSystem.cpp
+    src/HitSounds.cpp
+    src/SfxSystem.cpp
     src/MusicDirector.cpp
     src/MusicZoneDebugRenderer.cpp
     src/ObjectiveDebugRenderer.cpp
@@ -759,6 +761,13 @@ add_executable(test_music_director
 )
 target_include_directories(test_music_director PRIVATE include tests)
 
+# Hit sound rules: which hits sound, how loud, where they pan.
+add_executable(test_hit_sounds
+    tests/test_hit_sounds.cpp
+    src/HitSounds.cpp
+)
+target_include_directories(test_hit_sounds PRIVATE include tests)
+
 # The generated planet as the engine loads it (regions, biomes, nesting).
 add_executable(test_planet_map
     tests/test_planet_map.cpp
@@ -801,6 +810,7 @@ add_test(NAME GravonKit COMMAND test_gravon_kit)
 add_test(NAME PointsOfInterest COMMAND test_points_of_interest)
 add_test(NAME CharacterSwap COMMAND test_character_swap)
 add_test(NAME MusicDirector COMMAND test_music_director)
+add_test(NAME HitSounds COMMAND test_hit_sounds)
 add_test(NAME PlanetMap COMMAND test_planet_map)
 set_tests_properties(PlanetMap PROPERTIES WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
@@ -954,6 +964,8 @@ set(WASM_CLIENT_SOURCES
     src/AnimationSystem.cpp
     src/AnimationAssetLoader.cpp
     src/MusicSystem.cpp
+    src/HitSounds.cpp
+    src/SfxSystem.cpp
     src/MusicDirector.cpp
     src/MusicZoneDebugRenderer.cpp
     src/ObjectiveDebugRenderer.cpp

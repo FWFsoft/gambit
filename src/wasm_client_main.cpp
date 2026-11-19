@@ -30,6 +30,7 @@
 #include "Logger.h"
 #include "MapSelectionState.h"
 #include "MusicSystem.h"
+#include "SfxSystem.h"
 #include "MusicZoneDebugRenderer.h"
 #include "NetworkClient.h"
 #include "NetworkProtocol.h"
@@ -104,6 +105,8 @@ int main(int argc, char* argv[]) {
 
   AnimationSystem animationSystem;
   MusicSystem musicSystem(&clientPrediction, &map);
+  // Hit sounds; MusicSystem has opened the audio device.
+  SfxSystem sfxSystem(&clientPrediction);
 
   RemotePlayerInterpolation remoteInterpolation(localPlayerId,
                                                 &animationSystem);
