@@ -122,6 +122,14 @@ void testFirstContact() {
   r.round = 2;
   assert(e.update(r, 0.016f) == "landing.confident");
 
+  // It starts with the crash intro and carries on into round 1 unbroken.
+  MusicDirector f = director();
+  MusicDirector::Inputs intro = round1();
+  intro.phase = MatchPhase::Intro;
+  intro.round = 0;
+  assert(run(f, intro, 12.0f) == "first_contact");
+  assert(run(f, round1(), 30.0f) == "first_contact");
+
   // A new match lands with First Contact again.
   r.phase = MatchPhase::Lobby;
   e.update(r, 0.016f);

@@ -506,7 +506,7 @@ void test_Soulblade_TheMatchGoesOnWhileTheBladeLives() {
       w.combat.update(TICK_MS);
     }
   };
-  tick(Arena::Tuning::LOBBY_COUNTDOWN_SECONDS * 1000.0f + 500.0f);
+  tick(Arena::Intro::LENGTH * 1000.0f + 500.0f);
   assert(director.phase() == Arena::MatchPhase::Round);
 
   w.gravon().health = 0.0f;  // as EffectManager leaves a DoT death

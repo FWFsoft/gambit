@@ -479,8 +479,26 @@ enum class MatchPhase : uint8_t {
   Intermission = 2,  // back at the ship: slot infusions, ready up
   BossFight = 3,     // final round
   Victory = 4,
-  Defeat = 5
+  Defeat = 5,
+  Intro = 6  // the crash: a cutscene, then the crew gets up (ArenaIntro.cpp)
 };
+
+// The crash intro's timeline, seconds from the start of MatchPhase::Intro.
+// The soundtrack (tools/cutscene/make_intro_audio.py) is cut to these times.
+namespace Intro {
+constexpr float LENGTH = 16.8f;      // control at the end; no count-in
+constexpr float FADE_UP = 3.5f;      // the planet fades up out of black
+constexpr float SHIP_ENTER = 7.0f;   // the ship bursts past the camera
+constexpr float SHIP_PASS = 7.1f;    // loudest, the Doppler drop
+constexpr float SHIP_IMPACT = 12.5f; // it reaches the planet
+constexpr float CRASH = 12.7f;       // cut to black, the crash
+constexpr float FADE_START = 13.3f;  // the world fades in
+constexpr float FADE_END = 16.0f;
+constexpr float GETUP_START = 13.9f; // the crew stands up from the wreck
+constexpr float GETUP_END = 16.0f;
+// Skipping jumps here (the fade-in): nobody misses getting up.
+constexpr float SKIP_TO = FADE_START;
+}  // namespace Intro
 
 namespace Tuning {
 // Isaac's Lifeline: how far a bond reaches (Isaac to an ally, or to the
@@ -515,7 +533,6 @@ constexpr int REPAIR_NOISE_PACK = 4;
 // A crashed probe, dug out and booted, maps the land this far around it.
 constexpr float PROBE_REVEAL_RADIUS = 3000.0f;
 constexpr float REPAIR_NOISE_DISTANCE = 650.0f;
-constexpr float LOBBY_COUNTDOWN_SECONDS = 3.0f;
 
 // Enemy pressure. During a round the enemies live in camps at the map's
 // points of interest (placed in arena.tmx); nothing spawns around the

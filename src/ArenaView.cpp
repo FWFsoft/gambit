@@ -903,8 +903,11 @@ bool ArenaView::localPosition(float& x, float& y) const {
 
 void ArenaView::render() {
   loadManifest();
-  timeSeconds = arena->nowMs() / 1000.0f;
+  float now = arena->nowMs() / 1000.0f;
+  float dt = std::clamp(now - timeSeconds, 0.0f, 0.1f);
+  timeSeconds = now;
 
+  if (renderIntro(dt)) return;
   updateFog();
   // The background draw list sits under every ImGui window: the world.
   renderWorld(ImGui::GetBackgroundDrawList());
@@ -2121,7 +2124,17 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
     }
     const ActorAnim* clip = nullptr;
     float elapsed = 0.0f;
-    if (dead) {
+    if (introGetUp >= 0.0f && !dead) {
+      // The crash intro: everyone gets up off the ground. Their fall,
+      // played backwards.
+      clip = actor->find("death");
+      if (clip) {
+        float length = static_cast<float>(clip->frames) / clip->fps;
+        elapsed = (1.0f - introGetUp) * length * 0.999f;
+        anim.clip.clear();
+      }
+    }
+    if (!clip && dead) {
       clip = actor->find("death");
       elapsed = view.deadMs / 1000.0f;
     }

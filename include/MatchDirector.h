@@ -127,7 +127,6 @@ class MatchDirector {
   int tier = 0;         // the ship's upgrade tier
   uint32_t bossId = 0;
   bool bossSpawned = false;
-  bool lobbyCountingDown = false;
 
   // Cadence timers (milliseconds)
   float spawnTimer = 0.0f;
@@ -162,6 +161,7 @@ class MatchDirector {
   std::mt19937 rng{4242};
 
   // Phase transitions
+  void startIntro();
   void startRound(int round);
   void endRound();
   void startIntermission();
@@ -171,6 +171,7 @@ class MatchDirector {
 
   // Per-phase updates
   void updateLobby(float dtMs);
+  void updateIntro(float dtMs);
   void updateRound(float dtMs);
   void updateIntermission(float dtMs);
   void updateBossFight(float dtMs);

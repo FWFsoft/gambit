@@ -203,6 +203,19 @@ class ArenaView {
   std::unordered_map<std::string, FxSprite> fxSprites;
   Texture* shipTexture = nullptr;
 
+  // The crash intro (ArenaIntro.cpp), drawn for MatchPhase::Intro: a shot
+  // of the planet from space, the burning ship falling into it, black, then
+  // the world fades in as the crew gets up from the wreck.
+  float introClock = -1.0f;    // seconds; smooth, follows the server's
+  float introGetUp = -1.0f;    // 0 (down) to 1 (standing); -1 outside it
+  float introSkipHeld = 0.0f;  // seconds the skip key has been held
+  bool introSkipSent = false;
+  unsigned int introGlowTexture = 0;
+  bool renderIntro(float dt);  // true while the intro owns the frame
+  void drawIntroSpace(ImDrawList* dl, float elapsed);
+  void drawIntroSkip(ImDrawList* dl, float elapsed, float dt);
+  unsigned int introGlow();
+
   // HUD state
   int selectedGenus = 0;        // infusion item picked in the suit screen
   int selectedPart = 0;         // (genus 0 = none)

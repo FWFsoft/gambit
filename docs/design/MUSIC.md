@@ -9,7 +9,7 @@ Which music plays when. The rules are the designer's; the code is
 | When | Plays |
 | --- | --- |
 | Character select, the lobby, intermission between rounds | the intermission and character select song, looping |
-| Landing (the start of round 1) | **First Contact**, once, until it ends, wherever the crew goes |
+| The crash (the intro, then round 1) | **First Contact**, once, until it ends, wherever the crew goes: it starts with the crash intro and plays on into round 1 unbroken |
 | At the crash site (the ash ground around the ship: in at 1,300 px, out past 1,700 px) | the landing zone's songs: one for Confident, one for Weakened and Alone |
 | Anywhere else | the biome's songs for the crew's mood |
 | The boss fight | the boss music of the biome the ship landed in; any biome's boss music if it has none |

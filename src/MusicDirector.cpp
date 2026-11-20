@@ -120,6 +120,16 @@ std::string MusicDirector::update(const Inputs& in, float dt) {
     want = has("lobby") ? "lobby" : "";
   } else if (!in.hasMatch) {
     want = "";
+  } else if (in.phase == MatchPhase::Intro) {
+    // The crash intro: First Contact starts with it and plays on into
+    // round 1 unbroken (the Round branch keeps asking for the same track).
+    if (firstContactPlaying && in.trackEnded && current == "first_contact") {
+      firstContactDone = true;
+      firstContactPlaying = false;
+    } else if (!firstContactDone && has("first_contact")) {
+      firstContactPlaying = true;
+    }
+    want = firstContactPlaying ? "first_contact" : "";
   } else if (in.phase == MatchPhase::Intermission) {
     // Back at the ship. First Contact, if still going, is over for good.
     if (firstContactPlaying) firstContactDone = true;

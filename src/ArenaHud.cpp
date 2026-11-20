@@ -523,6 +523,7 @@ void ArenaView::drawStatusBar() {
   ImU32 titleColor = IM_COL32(255, 255, 255, 255);
   switch (phase) {
     case MatchPhase::Lobby:
+    case MatchPhase::Intro:  // the HUD is hidden under the intro
       std::snprintf(title, sizeof(title), "CRASH SITE");
       break;
     case MatchPhase::Round:

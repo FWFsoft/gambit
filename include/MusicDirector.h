@@ -10,7 +10,7 @@
 // The rules are the designer's (docs/design/MUSIC.md):
 //
 //   Character select, lobby, intermission    "lobby" (loops)
-//   The first round, from landing             "first_contact" until it ends
+//   The crash intro and the first round       "first_contact" until it ends
 //   In the ship's home ring                   "landing.<mood>"
 //   Elsewhere                                 "<biome>.<mood>"
 //   Boss fight                                "<ship biome>.boss", else "boss"
