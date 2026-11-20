@@ -53,7 +53,9 @@ std::string MusicDirector::placePlaylist(const std::string& place,
 
 void MusicDirector::track(const Inputs& in, float dt) {
   std::string place;
-  if (in.distToShip <= LANDING_RADIUS && hasPlaceMusic("landing")) {
+  const float landingReach =
+      settledPlace == "landing" ? LANDING_EXIT_RADIUS : LANDING_RADIUS;
+  if (in.distToShip <= landingReach && hasPlaceMusic("landing")) {
     place = "landing";
   } else if (hasPlaceMusic(in.biome)) {
     place = in.biome;

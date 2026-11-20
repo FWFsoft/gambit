@@ -10,7 +10,7 @@ Which music plays when. The rules are the designer's; the code is
 | --- | --- |
 | Character select, the lobby, intermission between rounds | the intermission and character select song, looping |
 | Landing (the start of round 1) | **First Contact**, once, until it ends, wherever the crew goes |
-| In the ship's home ring (2,000 px, about 36 m, around the ship) | the landing zone's songs: one for Confident, one for Weakened and Alone |
+| At the crash site (the ash ground around the ship: in at 1,300 px, out past 1,700 px) | the landing zone's songs: one for Confident, one for Weakened and Alone |
 | Anywhere else | the biome's songs for the crew's mood |
 | The boss fight | the boss music of the biome the ship landed in; any biome's boss music if it has none |
 | Victory, defeat | whatever was playing carries on |
@@ -44,7 +44,19 @@ border and every revive), so changes wait:
   keeps whatever was playing.
 
 The numbers are `MusicDirector::ZONE_HOLD_S`, `WORSEN_HOLD_S`,
-`IMPROVE_HOLD_S` and `LANDING_RADIUS`.
+`IMPROVE_HOLD_S`, `LANDING_RADIUS` and `LANDING_EXIT_RADIUS`.
+
+## The radio
+
+Every place playlist (`<place>.<mood>`, not the lobby, First Contact or
+boss music) is a channel that plays on whether anyone is tuned in, on a
+clock that starts with the match. Moving between places turns the dial:
+a 0.6 s fade out and in, and the new channel picks up where its song
+would be by now, not from the start. A channel first heard mid-match
+joins a song somewhere in its first two thirds, as if it had been on all
+along. A song that ended while you were away has moved on to the
+channel's next one. (SDL_mixer plays one song at a time, so the dial is a
+short fade out then in, not an overlap.)
 
 ## Adding music
 

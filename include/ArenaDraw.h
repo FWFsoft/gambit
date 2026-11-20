@@ -92,6 +92,66 @@ inline VfxTheme genusTheme(Arena::Genus genus) {
   }
 }
 
+// A genus's mark, drawn in a box of half-size r around c: Venoxarid a
+// venom drop, Cerebrian an eye, Frigidariant a snowflake, Magnarok a flame.
+// The same mark on a drop, in the pack and on the pickup banner, so an item
+// says where it came from at a glance.
+inline void drawGenusGlyph(ImDrawList* dl, ImVec2 c, float r,
+                           Arena::Genus genus, ImU32 fill, ImU32 ink) {
+  auto at = [&](float x, float y) { return ImVec2(c.x + x * r, c.y + y * r); };
+  switch (genus) {
+    case Arena::Genus::Venoxarid: {
+      ImVec2 drop[] = {at(0, -1.0f), at(0.42f, -0.2f), at(0.55f, 0.25f),
+                       at(0.38f, 0.72f), at(0, 0.88f), at(-0.38f, 0.72f),
+                       at(-0.55f, 0.25f), at(-0.42f, -0.2f)};
+      dl->AddConvexPolyFilled(drop, 8, fill);
+      dl->AddPolyline(drop, 8, ink, ImDrawFlags_Closed, 1.5f);
+      break;
+    }
+    case Arena::Genus::Cerebrian: {
+      ImVec2 eye[12];
+      for (int i = 0; i < 12; i++) {
+        float t = static_cast<float>(i) / 12.0f * 6.2831853f;
+        float x = std::cos(t), y = std::sin(t);
+        eye[i] = at(x * 0.95f, y * 0.5f * (0.6f + 0.4f * std::abs(y)));
+      }
+      dl->AddConvexPolyFilled(eye, 12, fill);
+      dl->AddPolyline(eye, 12, ink, ImDrawFlags_Closed, 1.5f);
+      dl->AddCircleFilled(c, r * 0.28f, ink, 12);
+      break;
+    }
+    case Arena::Genus::Frigidariant: {
+      for (int i = 0; i < 3; i++) {
+        float a = static_cast<float>(i) * 1.0471976f;  // 60 degrees
+        float x = std::cos(a), y = std::sin(a);
+        dl->AddLine(at(-x, -y), at(x, y), ink, 4.0f);
+        dl->AddLine(at(-x, -y), at(x, y), fill, 2.0f);
+        for (float s : {-0.6f, 0.6f}) {
+          // A tick across each arm, near its end.
+          float px = -y * 0.25f, py = x * 0.25f;
+          dl->AddLine(at(x * s + px, y * s + py), at(x * s - px, y * s - py),
+                      fill, 1.5f);
+        }
+      }
+      break;
+    }
+    case Arena::Genus::Magnarok: {
+      ImVec2 flame[] = {at(0.05f, -1.0f), at(0.45f, -0.35f), at(0.62f, 0.25f),
+                        at(0.4f, 0.8f),   at(-0.4f, 0.8f),   at(-0.62f, 0.25f),
+                        at(-0.35f, -0.2f), at(-0.15f, 0.05f)};
+      dl->AddConcavePolyFilled(flame, 8, fill);
+      dl->AddPolyline(flame, 8, ink, ImDrawFlags_Closed, 1.5f);
+      ImVec2 core[] = {at(0, -0.15f), at(0.25f, 0.35f), at(0, 0.7f),
+                       at(-0.25f, 0.35f)};
+      dl->AddConvexPolyFilled(core, 4, ink);
+      break;
+    }
+    default:
+      dl->AddCircleFilled(c, r * 0.6f, fill, 12);
+      break;
+  }
+}
+
 inline ImU32 withAlpha(ImU32 color, float alpha) {
   alpha = std::max(0.0f, std::min(1.0f, alpha));
   ImU32 a = static_cast<ImU32>(((color >> IM_COL32_A_SHIFT) & 0xFF) * alpha);

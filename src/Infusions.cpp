@@ -247,7 +247,8 @@ bool addToInventory(Player& player, Genus genus, InfusionPart part) {
   return true;
 }
 
-bool slotInfusion(Player& player, Genus genus, InfusionPart part, int node) {
+bool slotInfusion(Player& player, Genus genus, InfusionPart part, int node,
+                  int maxTier) {
   int g = static_cast<int>(genus);
   int p = static_cast<int>(part);
   if (g < 1 || g > Arena::GENUS_COUNT || p < 0 || p >= Arena::PART_COUNT) {
@@ -264,7 +265,7 @@ bool slotInfusion(Player& player, Genus genus, InfusionPart part, int node) {
   } else {
     if (node < 0 || node >= Arena::suitNodeCount()) return false;
     Arena::NodeState state = Arena::nodeState(
-        player.nodeGenus, player.coreGenus != Genus::None, node);
+        player.nodeGenus, player.coreGenus != Genus::None, node, maxTier);
     if (state != Arena::NodeState::Open) return false;
     player.nodeGenus[node] = genus;
     player.nodePart[node] = part;

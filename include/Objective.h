@@ -58,6 +58,9 @@ struct Objective {
   float depositY = 0.0f;
   bool hasDepositPoint = false;  // True if deposit coords are set
   float depositRadius = 0.0f;    // 0 = same as radius
+  // The deposit is the ship, wherever this match landed it (a probe). The
+  // server moves depositX/Y to the ship when it picks the landing site.
+  bool depositAtShip = false;
 
   // For SaveTheFrogs: multi-deposit tracking (reuses enemiesRequired/Killed in
   // packet)
@@ -73,6 +76,9 @@ struct Objective {
   // For DigPitTrap: whether the completed trap has already been triggered
   bool pitTrapArmed = false;      // True after trap fires (one-time use)
   bool tripwireArmed = false;     // True after tripwire fires (one-time use)
+
+  // DerelictTurret: the repair's noise has already drawn its pack.
+  bool alarmRaised = false;
 
   // Player currently interacting (0 = none)
   uint32_t interactingPlayerId = 0;

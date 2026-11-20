@@ -7,6 +7,14 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Code coverage options
 option(ENABLE_COVERAGE "Enable code coverage" OFF)
 
+# A plain `cmake ..` (no build type) is what `make build` and the skills do.
+# Without this it compiles at -O0, and the game runs at a fraction of 60 FPS.
+# -O2 without NDEBUG: optimised, with every assert still on (Tiger Style).
+# Coverage builds and explicit build types (Debug, Release...) are left alone.
+if(NOT CMAKE_BUILD_TYPE AND NOT ENABLE_COVERAGE)
+    add_compile_options(-O2)
+endif()
+
 # Emscripten detection
 if(EMSCRIPTEN)
     message(STATUS "Building for WebAssembly with Emscripten")
@@ -583,6 +591,25 @@ add_executable(test_roof_turrets
 target_include_directories(test_roof_turrets PRIVATE include tests)
 target_link_libraries(test_roof_turrets PRIVATE spdlog::spdlog SDL2::SDL2)
 
+add_executable(test_camping
+    tests/test_camping.cpp
+    src/Logger.cpp
+    src/EnemySystem.cpp
+    src/Effect.cpp
+    src/EffectManager.cpp
+    src/ArenaData.cpp
+    src/AbilitySystem.cpp
+    src/CharacterKits.cpp
+    src/Infusions.cpp
+    src/CollisionSystem.cpp
+    src/ItemRegistry.cpp
+    src/AnimationController.cpp
+    src/MatchDirector.cpp
+    src/ObjectiveSystem.cpp
+)
+target_include_directories(test_camping PRIVATE include tests)
+target_link_libraries(test_camping PRIVATE spdlog::spdlog SDL2::SDL2)
+
 add_executable(test_character_swap
     tests/test_character_swap.cpp
     src/Logger.cpp
@@ -818,6 +845,7 @@ add_test(NAME GameLoop COMMAND test_gameloop)
 add_test(NAME WadeKit COMMAND test_wade_kit)
 add_test(NAME Infusions COMMAND test_infusions)
 add_test(NAME RoofTurrets COMMAND test_roof_turrets)
+add_test(NAME Camping COMMAND test_camping)
 add_test(NAME NolanKit COMMAND test_nolan_kit)
 add_test(NAME IsaacKit COMMAND test_isaac_kit)
 add_test(NAME KadeKit COMMAND test_kade_kit)

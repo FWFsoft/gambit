@@ -19,10 +19,15 @@ built to be cheap to change.
    back to repair the ship (it starts badly damaged and burning). Repair a
    **derelict turret** and it goes up on the ship's roof. Raids march on
    the ship every ~45s.
-   After about a third of the round the **Blue Zone** starts closing on the
-   ship; outside it you take damage. When the timer runs out, anyone not
-   near the ship is lost for the night.
-3. **Night (intermission).** Open the suit screen. Infusions are items
+   There is no zone: go anywhere on the planet. When the timer runs out,
+   night falls **where you stand**.
+3. **Night (intermission).** Nobody moves. Camped at the ship you heal
+   fully, bank any scrap you carried home, can build the ship's next tier
+   and open the suit. Camped in the wild you heal part-way (more with
+   crewmates within about 50 m), keep your scrap in hand, can't open the
+   suit, and something attacks the camp at dawn. A downed player is carried
+   into a crewmate's camp, or wakes at the ship if nobody was near. The
+   next round starts where you camped. At the ship, open the suit screen. Infusions are items
    (a genus and a body part, like "Venoxarid Talon"); the part gives a
    small stat wherever it goes. Your first infusion becomes your **core**
    ability (E). The rest go into the Offense / Defense / Mobility /

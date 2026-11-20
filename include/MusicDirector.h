@@ -24,6 +24,29 @@
 // no music of its own keeps whatever was playing.
 enum class MusicMood : uint8_t { Confident = 0, Weakened = 1, Alone = 2 };
 
+// The radio: every place's playlist ("<place>.<mood>") is a channel that
+// plays on whether anyone is listening. Coming back to one picks up where it
+// would be now, not from the start (MusicSystem keeps the clock).
+inline bool isRadioPlaylist(const std::string& key) {
+  const size_t dot = key.find('.');
+  return dot != std::string::npos && key.compare(dot, 5, ".boss") != 0;
+}
+// Where a channel's track is, `now` seconds into the match, if it started
+// at `startedAt` and lasts `duration` (<= 0: unknown). `onAir` is false
+// when the track is over (or too near its end to bother): play the next.
+struct RadioTune {
+  bool onAir;
+  double position;
+};
+inline RadioTune radioTune(double startedAt, double now, double duration) {
+  constexpr double TAIL_S = 4.0;  // closer to the end than this: next track
+  const double position = now - startedAt;
+  if (position < 0.0) return {true, 0.0};
+  if (duration <= 0.0) return {true, 0.0};  // cannot seek: from the top
+  if (position >= duration - TAIL_S) return {false, 0.0};
+  return {true, position};
+}
+
 const char* moodKey(MusicMood mood);
 
 // The mood for a party of `partySize` heroes with `alive` standing.
@@ -31,7 +54,11 @@ MusicMood moodFor(int partySize, int alive);
 
 class MusicDirector {
  public:
-  static constexpr float LANDING_RADIUS = 2000.0f;  // world px from the ship
+  // The crash site (the map's ash ground, generate_planet.py
+  // CRASH_SITE_RADIUS): its music starts inside LANDING_RADIUS and holds out
+  // to LANDING_EXIT_RADIUS, so walking its edge never flips the music.
+  static constexpr float LANDING_RADIUS = 1300.0f;  // world px from the ship
+  static constexpr float LANDING_EXIT_RADIUS = 1700.0f;
   static constexpr float ZONE_HOLD_S = 5.0f;
   static constexpr float WORSEN_HOLD_S = 1.5f;
   static constexpr float IMPROVE_HOLD_S = 6.0f;

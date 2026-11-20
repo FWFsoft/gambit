@@ -1486,9 +1486,16 @@ class JeffKit : public Kit {
   bool canCast(AbilitySystem& sys, const Player& self, int slot) override {
     (void)sys;
     if (slot == 0) return !Arena::JeffMode::overheated(self.kitMode);
-    // The vacuum is part of his legs: no harvesting on treads.
-    if (slot == 1) return !Arena::JeffMode::treads(self.kitMode);
+    // The vacuum is part of his legs: pressing it on treads stands him back
+    // up (chargeTick), so it is never refused.
     return slot >= 0 && slot <= 3;
+  }
+
+  void chargeTick(AbilityContext& ctx, int slot, float dtMs) override {
+    (void)dtMs;
+    if (slot == 1 && Arena::JeffMode::treads(ctx.self.kitMode)) {
+      standUp(ctx);
+    }
   }
 
   float speedMultiplier(const Player& self) const override {
@@ -1635,6 +1642,8 @@ class JeffKit : public Kit {
   void acquireBiomass(AbilityContext& ctx) {
     AbilitySystem& sys = ctx.sys;
     Player& self = ctx.self;
+    // A tap released before the first charge tick still leaves the treads.
+    if (Arena::JeffMode::treads(self.kitMode)) standUp(ctx);
     const float radius = Arena::JeffMode::harvestRadius(ctx.charge);
     std::vector<uint32_t> piles;
     for (const AbilitySystem::Zone& zone : sys.allZones()) {
@@ -1696,6 +1705,13 @@ class JeffKit : public Kit {
       sys.damageEnemy(selfId, enemy, damage);
     });
     self.actionLockMs = std::max(self.actionLockMs, BLAST_LOCK_MS);
+  }
+
+  // Treads back to legs, as if LSHIFT were pressed again.
+  void standUp(AbilityContext& ctx) {
+    assert(Arena::JeffMode::treads(ctx.self.kitMode));
+    rollOut(ctx);
+    assert(!Arena::JeffMode::treads(ctx.self.kitMode));
   }
 
   // LSHIFT: legs to treads and back.

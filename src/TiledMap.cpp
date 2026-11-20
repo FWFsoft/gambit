@@ -528,8 +528,9 @@ void TiledMap::extractObjectives() {
         // Set deposit point — AlienScrapyard and RecoverProbe default to ship
         // Scrap is not on this list: salvaging finishes the scrapyard and
         // the player carries the scrap home (MatchDirector banks it).
-        bool isDepositType = (objective.type == ObjectiveType::RecoverProbe ||
-                              objective.type == ObjectiveType::SaveTheFrogs);
+        // A probe is not hauled: it boots where it lies and scans
+        // (ServerGameState, GameEventKind::Reveal).
+        bool isDepositType = objective.type == ObjectiveType::SaveTheFrogs;
 
         if (hasDepositPoint) {
           objective.depositX = depositX - centerWorldX;
@@ -542,6 +543,7 @@ void TiledMap::extractObjectives() {
           objective.hasDepositPoint = true;
           // The ship's hull is solid: drop off anywhere around it.
           objective.depositRadius = Arena::Tuning::SHIP_DROP_RADIUS;
+          objective.depositAtShip = true;
           Logger::info("Objective '" + objective.name +
                        "' using ship as deposit point");
         } else if (isDepositType && !playerSpawns.empty()) {

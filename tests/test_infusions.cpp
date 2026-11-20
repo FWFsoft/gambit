@@ -80,6 +80,26 @@ void slot(Player &player, Genus genus, InfusionPart part, int where) {
   }
 }
 
+// Depth is paced by the match: on the first night a tree stops at tier 2.
+void testTierCapByRound() {
+  World w;
+  Player &me = w.p(P1);
+  CHECK(Arena::suitTierCap(1) == 2 && Arena::suitTierCap(2) == 3 &&
+        Arena::suitTierCap(3) == 4 && Arena::suitTierCap(4) == 4);
+  slot(me, Genus::Venoxarid, InfusionPart::Talon, Arena::CORE_NODE);
+  slot(me, Genus::Venoxarid, InfusionPart::Talon, node(Talent::KillerInstinct));
+  slot(me, Genus::Venoxarid, InfusionPart::Talon, node(Talent::Relentless));
+  const int t3 = node(Talent::Affliction);
+  CHECK(Arena::nodeState(me.nodeGenus, true, t3, Arena::suitTierCap(1)) ==
+        NodeState::Later);
+  CHECK(Infusions::addToInventory(me, Genus::Venoxarid, InfusionPart::Sinew));
+  CHECK(!Infusions::slotInfusion(me, Genus::Venoxarid, InfusionPart::Sinew, t3,
+                                 Arena::suitTierCap(1)));
+  CHECK(Infusions::slotInfusion(me, Genus::Venoxarid, InfusionPart::Sinew, t3,
+                                Arena::suitTierCap(2)));
+  std::cout << "  tier cap by round ok\n";
+}
+
 void testLayout() {
   // Tier 1 is one leg per tree; every later tier is a real choice; tiers
   // run 1..N with no gaps; four tiers in each tree for now.
@@ -155,6 +175,7 @@ void testSlotRules() {
   CHECK(
       !Infusions::slotInfusion(me, Genus::Venoxarid, InfusionPart::Hide, t2a));
   CHECK(Arena::nodeState(me.nodeGenus, true, t3) == NodeState::Open);
+
 
   // Other trees are untouched by this one.
   CHECK(Arena::nodeState(me.nodeGenus, true, node(Talent::Plating)) ==
@@ -294,6 +315,7 @@ int main() {
   std::cout << "Infusions:\n";
   testLayout();
   testSlotRules();
+  testTierCapByRound();
   testItemStats();
   testApexMutation();
   testMixedGeneraInOneTree();

@@ -65,6 +65,19 @@ float FogOfWar::explored(float x, float y) const {
   return seen[static_cast<size_t>(row) * columns + column];
 }
 
+void FogOfWar::reveal(float x, float y, float radius) {
+  assert(radius > 0.0f);
+  for (int row = 0; row < rows; row++) {
+    const float cy = top + (row + 0.5f) * cell;
+    for (int column = 0; column < columns; column++) {
+      const float cx = left + (column + 0.5f) * cell;
+      const float dx = cx - x, dy = cy - y;
+      if (dx * dx + dy * dy > radius * radius) continue;
+      seen[static_cast<size_t>(row) * columns + column] = 1.0f;
+    }
+  }
+}
+
 void FogOfWar::update(const std::vector<Source>& sources) {
   current = sources;
   assert(seen.size() == static_cast<size_t>(columns) * rows);

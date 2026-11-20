@@ -230,7 +230,7 @@ static const KitInfo KITS[] = {
           11000.0f, AbilityMode::Tap, 0.0f, "Reverse Install"},
          {"They See Me Rollin'",
           "Reassemble the legs into tank treads: double base run speed and "
-          "+2 Haste, but no Acquire Biomass. Press again for legs.",
+          "+2 Haste. Press again, or use Acquire Biomass, to stand back up on legs.",
           1200.0f, AbilityMode::Tap, 0.0f, "Rollin'"},
      }},
     {CharacterId::Zephyr,
@@ -648,8 +648,10 @@ int treeTierCount(InfusionTree tree) {
   return tiers;
 }
 
-NodeState nodeState(const Genus* nodeGenus, bool coreFilled, int node) {
+NodeState nodeState(const Genus* nodeGenus, bool coreFilled, int node,
+                    int maxTier) {
   assert(nodeGenus != nullptr);
+  assert(maxTier >= 1);
   const SuitNode& self = suitNode(node);
   if (nodeGenus[node] != Genus::None) return NodeState::Filled;
   if (!coreFilled) return NodeState::Locked;
@@ -660,7 +662,8 @@ NodeState nodeState(const Genus* nodeGenus, bool coreFilled, int node) {
     if (other.tier == self.tier) return NodeState::Closed;
     if (other.tier + 1 == self.tier) parentFilled = true;
   }
-  return parentFilled ? NodeState::Open : NodeState::Locked;
+  if (!parentFilled) return NodeState::Locked;
+  return self.tier > maxTier ? NodeState::Later : NodeState::Open;
 }
 
 const AbilityInfo& coreAbility(Genus g) {

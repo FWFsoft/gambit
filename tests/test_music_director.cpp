@@ -152,6 +152,40 @@ void testPlaces() {
   assert(run(d, in, 20.0f) == "desert.confident");
 }
 
+void testRadio() {
+  // Place playlists are channels; the lobby, First Contact and boss are not.
+  assert(isRadioPlaylist("pnw.confident") && isRadioPlaylist("landing.alone"));
+  assert(!isRadioPlaylist("lobby") && !isRadioPlaylist("first_contact"));
+  assert(!isRadioPlaylist("desert.boss"));
+  // A channel tuned back into picks up where it would be now.
+  RadioTune t = radioTune(10.0, 70.0, 200.0);
+  assert(t.onAir && t.position == 60.0);
+  // A track that ended while away: the next one.
+  assert(!radioTune(10.0, 300.0, 200.0).onAir);
+  assert(!radioTune(10.0, 208.0, 200.0).onAir);  // too near the end
+  // Unknown length: from the top.
+  t = radioTune(10.0, 70.0, 0.0);
+  assert(t.onAir && t.position == 0.0);
+}
+
+void testCrashSiteEdge() {
+  MusicDirector d = director();
+  MusicDirector::Inputs in = round1();
+  pastFirstContact(d, in);
+  assert(d.update(in, 0.016f) == "landing.confident");
+  // Wandering just past the crash site's edge keeps its music...
+  in.distToShip = MusicDirector::LANDING_RADIUS + 200.0f;
+  assert(run(d, in, MusicDirector::ZONE_HOLD_S + 2.0f) == "landing.confident");
+  // ... until well clear of it.
+  in.distToShip = MusicDirector::LANDING_EXIT_RADIUS + 100.0f;
+  assert(run(d, in, MusicDirector::ZONE_HOLD_S + 0.5f) == "pnw.confident");
+  // Coming back, the edge band is not enough: inside the site it is.
+  in.distToShip = MusicDirector::LANDING_RADIUS + 200.0f;
+  assert(run(d, in, MusicDirector::ZONE_HOLD_S + 2.0f) == "pnw.confident");
+  in.distToShip = MusicDirector::LANDING_RADIUS - 100.0f;
+  assert(run(d, in, MusicDirector::ZONE_HOLD_S + 0.5f) == "landing.confident");
+}
+
 void testDeaths() {
   MusicDirector d = director();
   MusicDirector::Inputs in = round1(4, 4, 3000.0f, "city");
@@ -206,6 +240,8 @@ int main() {
   testLobbyAndIntermission();
   testFirstContact();
   testPlaces();
+  testCrashSiteEdge();
+  testRadio();
   testDeaths();
   testSolo();
   testBoss();

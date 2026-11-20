@@ -93,7 +93,11 @@ void ArenaView::renderHud() {
     lastShipTier = tier;
   }
   if (phase == MatchPhase::Intermission) {
-    if (timeSeconds >= shipRevealUntil) drawSuitScreen(true);
+    if (!localAtShip()) {
+      drawCampPanel();
+    } else if (timeSeconds >= shipRevealUntil) {
+      drawSuitScreen(true);
+    }
   } else if (suitScreenOpen) {
     drawSuitScreen(false);
   }
@@ -424,10 +428,9 @@ void ArenaView::drawAbilityBar() {
     }
     if (state.characterId == Arena::CharacterId::Jeff && slot == 1 &&
         Arena::JeffMode::treads(state.kitMode)) {
-      // No vacuum on treads.
-      dl->AddRectFilled(a, b, IM_COL32(0, 0, 0, 170), 6.0f);
+      // Usable on treads: it stands him up first.
       text(dl, ImVec2(a.x + box * 0.5f, a.y + 38.0f), IM_COL32(200, 200, 210, 255),
-           11.0f, "treads");
+           11.0f, "legs");
     }
     if (charging && !(kade && slot == 0)) {
       float progress = state.charge / 255.0f;
@@ -579,14 +582,19 @@ void ArenaView::drawStatusBar() {
   float shipDistance = std::sqrt(dx * dx + dy * dy);
   bool fighting = phase == MatchPhase::Round || phase == MatchPhase::BossFight;
   if (fighting) {
+    const bool finale = phase == MatchPhase::BossFight;
     char line[64];
-    std::snprintf(line, sizeof(line), "Ship %.0fm   Zone edge %.0fm",
-                  shipDistance / 10.0f,
-                  std::max(0.0f, match.zoneRadius - shipDistance) / 10.0f);
+    if (finale) {
+      std::snprintf(line, sizeof(line), "Ship %.0fm   Shield edge %.0fm",
+                    shipDistance / 10.0f,
+                    std::max(0.0f, match.zoneRadius - shipDistance) / 10.0f);
+    } else {
+      std::snprintf(line, sizeof(line), "Ship %.0fm", shipDistance / 10.0f);
+    }
     text(dl, ImVec2(SCREEN_W * 0.5f, a.y + 48.0f), IM_COL32(190, 200, 220, 255),
          12.0f, line);
 
-    if (shipDistance > match.zoneRadius) {
+    if (finale && shipDistance > match.zoneRadius) {
       float pulse = 0.5f + 0.5f * std::sin(timeSeconds * 8.0f);
       text(dl, ImVec2(SCREEN_W * 0.5f, 120.0f),
            IM_COL32(255, 90, 80, static_cast<int>(170 + 85 * pulse)), 24.0f,
@@ -843,9 +851,9 @@ void ArenaView::drawMinimap() {
     }
   }
 
-  // Zone
+  // Zone: the finale's shield only (a round has none).
   MatchPhase phase = arena->phase();
-  if (phase == MatchPhase::Round || phase == MatchPhase::BossFight) {
+  if (phase == MatchPhase::BossFight) {
     dl->AddCircle(centre, std::min(radius, match.zoneRadius * scale),
                   IM_COL32(90, 170, 255, 255), 48, 2.0f);
   }
@@ -1004,7 +1012,9 @@ struct SuitView {
   Genus nodes[Arena::MAX_SUIT_NODES] = {};
   InfusionPart parts[Arena::MAX_SUIT_NODES] = {};
 
-  explicit SuitView(const MatchPlayerState& p) {
+  int maxTier = 4;
+  SuitView(const MatchPlayerState& p, int round)
+      : maxTier(Arena::suitTierCap(round)) {
     core = static_cast<Genus>(p.coreGenus);
     corePart = static_cast<InfusionPart>(p.corePart);
     for (int i = 0; i < Arena::MAX_SUIT_NODES; i++) {
@@ -1016,7 +1026,7 @@ struct SuitView {
     return nodes[static_cast<int>(talent)] != Genus::None;
   }
   NodeState state(int node) const {
-    return Arena::nodeState(nodes, core != Genus::None, node);
+    return Arena::nodeState(nodes, core != Genus::None, node, maxTier);
   }
   // Same rule as Player::infusionLevel, with `extra` more of `genus` in the
   // tree (to preview a slot).
@@ -1056,7 +1066,7 @@ void ArenaView::drawSuitScreen(bool intermission) {
   const MatchPlayerState* me = arena->matchPlayer(localId());
   if (!me) return;
   const MatchStatePacket& match = arena->match();
-  const SuitView suit(*me);
+  const SuitView suit(*me, match.round);
 
   auto send = [&](int genus, int part, int node) {
     InfusionSlotPacket packet;
@@ -1378,6 +1388,11 @@ void ArenaView::drawSuitScreen(bool intermission) {
         break;
       case NodeState::Locked:
         break;
+      case NodeState::Later:
+        fill = IM_COL32(18, 18, 28, 255);
+        ring = IM_COL32(150, 170, 255, 70);
+        label = IM_COL32(140, 150, 190, 170);
+        break;
     }
     dl->AddCircleFilled(at, nodeRadius, fill, 28);
     dl->AddCircle(at, nodeRadius, ring, 28,
@@ -1406,6 +1421,10 @@ void ArenaView::drawSuitScreen(bool intermission) {
         ImGui::Text("Holds %s (%s).", itemName(genus, suit.parts[i]).c_str(),
                     Arena::partInfo(suit.parts[i]).description);
         genusEffectLine(genus, node.tree, suit.level(genus, node.tree));
+      } else if (state == NodeState::Later) {
+        ImGui::TextColored(ImVec4(0.65f, 0.72f, 1.0f, 1.0f),
+                           "Tier %d opens on night %d.", node.tier,
+                           node.tier == 3 ? 2 : 3);
       } else if (state == NodeState::Open && havePick) {
         ImGui::Text("Click to slot %s here. You get:",
                     itemName(picked, pickedPart).c_str());
@@ -1630,36 +1649,105 @@ void ArenaView::drawPrompts() {
   const float y = SCREEN_H - 176.0f;
 
   const char* prompt = nullptr;
+  static char line[160];
   ImU32 colour = IM_COL32(255, 235, 150, 255);
+  const ImU32 todo = IM_COL32(255, 190, 110, 255);
+  const ImU32 working = IM_COL32(150, 220, 255, 255);
   for (const auto& [id, objective] : prediction->getObjectives()) {
     float dx = px - objective.x, dy = py - objective.y;
     bool inRange = dx * dx + dy * dy <= objective.radius * objective.radius;
+    const ObjectiveState state = objective.state;
+    const int done = objective.enemiesKilled, need = objective.enemiesRequired;
+    if (state == ObjectiveState::Completed) continue;
+
+    // Each objective says what it wants in its own words (Clarity): a
+    // generic "start objective" left players stuck at camps, gates and frogs.
+    switch (objective.type) {
+      case ObjectiveType::CaptureOutpost:
+        if (!inRange) break;
+        std::snprintf(line, sizeof line,
+                      "Outpost: kill every guard in the camp  (%d/%d down)",
+                      done, need);
+        prompt = line;
+        colour = todo;
+        continue;
+      case ObjectiveType::SalvageMedpacks:
+        if (!inRange) break;
+        if (done >= need && state == ObjectiveState::InProgress) {
+          prompt = "[F] Open the med pod: healing for the crew";
+        } else {
+          std::snprintf(line, sizeof line,
+                        "Med pod is locked: kill its guards first  (%d/%d down)",
+                        done, need);
+          prompt = line;
+          colour = todo;
+        }
+        continue;
+      case ObjectiveType::LittleJohn:
+        if (!inRange) break;
+        prompt = "[F] Open the gate now (wakes its guardian in a rage), "
+                 "or kill the guardian to open it";
+        continue;
+      case ObjectiveType::SaveTheFrogs:
+        if (state == ObjectiveState::ReadyToDeposit) {
+          float sx = px - objective.depositX, sy = py - objective.depositY;
+          if (sx * sx + sy * sy <= objective.radius * objective.radius) {
+            std::snprintf(line, sizeof line,
+                          "[F] Release the frog into the pond  (%d/%d saved)",
+                          done, need);
+            prompt = line;
+          } else if (!prompt) {
+            std::snprintf(line, sizeof line,
+                          "Carrying a frog: take it to the POND marker and "
+                          "press [F]  (%d/%d saved)",
+                          done, need);
+            prompt = line;
+            colour = todo;
+          }
+        } else if (inRange) {
+          // progress is frogs saved, not the catch timer, so one line
+          // covers both catching and idle.
+          std::snprintf(line, sizeof line,
+                        "[F] Catch a frog (stay close), then carry it to "
+                        "the pond  (%d/%d saved)",
+                        done, need);
+          prompt = line;
+        }
+        continue;
+      default:
+        break;
+    }
+
     bool scrapyard = objective.type == ObjectiveType::AlienScrapyard;
-    if (objective.state == ObjectiveState::Inactive && inRange) {
+    bool probe = objective.type == ObjectiveType::RecoverProbe;
+    if (state == ObjectiveState::Inactive && inRange) {
       if (scrapyard && me && me->carryingScrap) {
         prompt = "Your hands are full: bank this scrap at the ship first";
-        colour = IM_COL32(255, 190, 110, 255);
+        colour = todo;
+      } else if (scrapyard) {
+        prompt = "[F] Salvage scrap  (stay close while you work)";
+      } else if (probe) {
+        prompt = "[F] Dig out the probe and boot it: its scan maps the "
+                 "land around it  (stay close)";
       } else {
-        prompt = scrapyard ? "[F] Salvage scrap  (stay close while you work)"
-                           : "[F] Start objective  (stay close while you work)";
+        prompt = "[F] Start objective  (stay close while you work)";
       }
-    } else if (objective.state == ObjectiveState::InProgress && inRange) {
-      prompt = "Working... hold your ground";
-      colour = IM_COL32(150, 220, 255, 255);
-    } else if (objective.state == ObjectiveState::ReadyToDeposit &&
-               objective.type == ObjectiveType::RecoverProbe) {
+    } else if (state == ObjectiveState::InProgress && inRange) {
+      prompt = "Working... stay close";
+      colour = working;
+    } else if (state == ObjectiveState::ReadyToDeposit && probe) {
       // Delivered by walking into the ship's ring.
       if (!prompt) {
         prompt = "Probe recovered: carry it into the ring around the ship";
-        colour = IM_COL32(255, 190, 110, 255);
+        colour = todo;
       }
-    } else if (objective.state == ObjectiveState::ReadyToDeposit) {
+    } else if (state == ObjectiveState::ReadyToDeposit) {
       float sx = px - objective.depositX, sy = py - objective.depositY;
       if (sx * sx + sy * sy <= objective.radius * objective.radius) {
         prompt = "[F] Drop it off";
       } else if (!prompt) {
         prompt = "Carry it to the drop-off and press [F]";
-        colour = IM_COL32(255, 190, 110, 255);
+        colour = todo;
       }
     }
   }
@@ -1682,11 +1770,88 @@ void ArenaView::drawPrompts() {
   if (prompt) text(dl, ImVec2(SCREEN_W * 0.5f, y), colour, 16.0f, prompt);
 }
 
+bool ArenaView::localAtShip() const {
+  if (!arena->hasMatch()) return true;
+  const MatchStatePacket& match = arena->match();
+  float px, py;
+  // localPosition is not const; the predicted player is the same thing.
+  const Player& local = prediction->getLocalPlayer();
+  px = local.x;
+  py = local.y;
+  float dx = px - match.shipX, dy = py - match.shipY;
+  float r = shipSafeRadius();
+  return dx * dx + dy * dy <= r * r;
+}
+
+void ArenaView::drawCampPanel() {
+  const MatchStatePacket& match = arena->match();
+  const MatchPlayerState* me = arena->matchPlayer(localId());
+  if (!me) return;
+  const Player& local = prediction->getLocalPlayer();
+
+  // Who shares this camp (the server uses the same radius).
+  int allies = 0;
+  for (const auto& [id, view] : arena->players()) {
+    if (id == localId() || view.state.characterId == 0) continue;
+    if (view.state.health <= 0.0f) continue;
+    float dx = view.x - local.x, dy = view.y - local.y;
+    float r = Arena::Tuning::CAMP_SHARE_RADIUS;
+    if (dx * dx + dy * dy <= r * r) allies++;
+  }
+
+  ImGui::SetNextWindowPos(ImVec2(SCREEN_W * 0.5f, SCREEN_H * 0.30f),
+                          ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+  ImGui::SetNextWindowSize(ImVec2(560.0f, 0.0f), ImGuiCond_Always);
+  ImGui::SetNextWindowBgAlpha(0.88f);
+  ImGui::Begin("Camp", nullptr,
+               ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+                   ImGuiWindowFlags_NoSavedSettings);
+  ImGui::SetWindowFontScale(1.5f);
+  ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.4f, 1.0f), "CAMPED IN THE WILD");
+  ImGui::SetWindowFontScale(1.0f);
+  ImGui::Separator();
+  if (allies > 0) {
+    ImGui::Text("%d crewmate%s by your fire: a better night's rest.", allies,
+                allies == 1 ? "" : "s");
+  } else {
+    ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.5f, 1.0f),
+                       "Alone out here. Rest is thin.");
+  }
+  ImGui::BulletText("Healed %.0f%% of your health tonight (the ship heals fully).",
+                    100.0f * std::min(1.0f, Arena::Tuning::CAMP_HEAL_FRACTION +
+                                                Arena::Tuning::CAMP_HEAL_PER_ALLY *
+                                                    static_cast<float>(allies)));
+  ImGui::BulletText("Your suit opens only at the ship.");
+  if (me->carryingScrap) {
+    ImGui::BulletText("Your scrap stays in your hands until you bank it.");
+  }
+  int round = std::min<int>(match.round + 1, Arena::Tuning::ROUND_COUNT);
+  if (match.round < Arena::Tuning::ROUND_COUNT &&
+      Arena::Tuning::DAWN_AMBUSH_SIZE[round - 1] > 0) {
+    ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.4f, 1.0f),
+                       "Something is circling the camp. Expect it at dawn.");
+  } else if (match.round >= Arena::Tuning::ROUND_COUNT) {
+    ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.4f, 1.0f),
+                       "The finale is at the ship: you will be called home.");
+  }
+  ImGui::Spacing();
+  ImGui::Text("Dawn in %s", formatTime(match.timeRemaining).c_str());
+  ImGui::SameLine(400.0f);
+  bool ready = me->ready != 0;
+  if (ImGui::Button(ready ? "READY  [R]" : "READY UP  [R]", ImVec2(140.0f, 28.0f))) {
+    PlayerReadyPacket packet;
+    packet.ready = ready ? 0 : 1;
+    prediction->sendToServer(serialize(packet));
+  }
+  ImGui::End();
+}
+
 bool ArenaView::canUpgradeShip() const {
   if (!arena->hasMatch()) return false;
   const MatchStatePacket& match = arena->match();
   int tier = match.shipTier;
-  return match.phase == static_cast<uint8_t>(Arena::MatchPhase::Intermission) &&
+  return localAtShip() &&
+         match.phase == static_cast<uint8_t>(Arena::MatchPhase::Intermission) &&
          tier + 1 < Arena::Tuning::SHIP_TIER_COUNT &&
          match.scrapBanked >= Arena::Tuning::SHIP_TIER_COST[tier + 1];
 }

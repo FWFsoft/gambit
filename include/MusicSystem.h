@@ -30,6 +30,9 @@ class MusicSystem {
   // Crossfade between playlists: the old track fades out, then the new one
   // fades in.
   static constexpr int PLAYLIST_FADE_MS = 1500;
+  // Turning the radio dial between two place channels: quicker, so it feels
+  // like a change of station, not a new song.
+  static constexpr int RADIO_FADE_MS = 600;
   static constexpr const char* PLAYLIST_FILE = "assets/music/music.txt";
 
   MusicSystem(const ClientPrediction* prediction, const TiledMap* map);
@@ -64,6 +67,17 @@ class MusicSystem {
   std::string currentPlaylist;  // what our music is playing ("" = none)
   std::string pendingPlaylist;  // waiting for a fade out to finish
   std::mt19937 shuffle{std::random_device{}()};
+  // The radio (isRadioPlaylist): each channel's track and when it started,
+  // on the match clock.
+  struct RadioChannel {
+    std::string file;
+    double startedAt = 0.0;
+  };
+  std::unordered_map<std::string, RadioChannel> channels;
+  double radioClock = 0.0;  // seconds since the match's first round began
+
+  std::string pickTrack(const std::vector<std::string>& files,
+                        const std::string& avoid);
 
   void onUpdate(const UpdateEvent& e);
   void applyVolume();  // volume x settingsGain to SDL_mixer
@@ -73,4 +87,6 @@ class MusicSystem {
   MusicDirector::Inputs readMatch() const;
   void startPlaylist(const std::string& key);
   Mix_Music* loadMusic(const std::string& filename);
+  // Seconds, or 0 if SDL_mixer cannot tell (then the radio cannot seek).
+  static double musicDuration(Mix_Music* music);
 };

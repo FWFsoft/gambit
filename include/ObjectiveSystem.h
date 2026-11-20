@@ -57,8 +57,12 @@ class ObjectiveSystem {
   // Player stops interacting (moved away or cancelled)
   void stopInteraction(uint32_t playerId);
 
-  // Called when an enemy dies - checks for CaptureOutpost progress
-  void onEnemyDeath(float enemyX, float enemyY);
+  // Called when an enemy dies - checks for CaptureOutpost progress. The
+  // killer is credited when the kill clears a camp nobody was working.
+  void onEnemyDeath(float enemyX, float enemyY, uint32_t killerId = 0);
+
+  // A Guarded Gate's guardian died: the gate is open, credited to the killer.
+  void onGuardianDeath(uint32_t enemyId, uint32_t killerId);
 
   // Get all objectives (for network sync)
   const std::vector<Objective>& getObjectives() const { return objectives; }
@@ -106,7 +110,9 @@ class ObjectiveSystem {
   ObjectiveStopCallback stopCallback;
 
   // Helper to complete an objective
-  void completeObjective(Objective& objective);
+  // creditPlayerId is used when nobody is interacting (a camp cleared by
+  // fighting, a guardian killed).
+  void completeObjective(Objective& objective, uint32_t creditPlayerId = 0);
 
   // Helper to start an objective
   void startObjective(Objective& objective, uint32_t playerId);

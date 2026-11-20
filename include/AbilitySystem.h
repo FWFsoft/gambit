@@ -194,6 +194,9 @@ class AbilitySystem {
   void settleDeaths();
   // When false, players cannot use abilities (lobby / intermission / end).
   void setCombatEnabled(bool enabled) { combatEnabled = enabled; }
+  // Night: the crew is camped and nobody walks (speedMult 0, which client
+  // prediction also uses).
+  void setMovementLocked(bool locked) { movementLocked = locked; }
 
   // ---- damage pipeline ---------------------------------------------------
   // All return the amount actually applied.
@@ -380,6 +383,7 @@ class AbilitySystem {
   float worldWidth, worldHeight;
   EmitFn emitFn;
   bool combatEnabled = true;
+  bool movementLocked = false;
 
   float timeMs = 0.0f;
   uint32_t nextSpawnId = 1;

@@ -130,6 +130,125 @@ void MatchDirector::bringPlayersHome(bool reviveAndHeal) {
   }
 }
 
+bool MatchDirector::atShip(const Player& player) const {
+  return dist(player.x, player.y, shipX, shipY) <= safeRadius();
+}
+
+void MatchDirector::makeCamp() {
+  // Who is still standing, and where.
+  std::vector<uint32_t> standing;
+  for (auto& [id, player] : players) {
+    if (isParticipant(player) && !player.isDead()) standing.push_back(id);
+  }
+  auto alliesNear = [&](const Player& player) {
+    int n = 0;
+    for (uint32_t other : standing) {
+      if (other == player.id) continue;
+      const Player& p = players.at(other);
+      if (dist(p.x, p.y, player.x, player.y) <= Tuning::CAMP_SHARE_RADIUS) n++;
+    }
+    return n;
+  };
+  auto campHeal = [&](Player& player, int allies) {
+    float fraction = Tuning::CAMP_HEAL_FRACTION +
+                     Tuning::CAMP_HEAL_PER_ALLY * static_cast<float>(allies);
+    player.health = std::min(player.maxHealth,
+                             player.health + player.maxHealth * fraction);
+  };
+
+  // The downed first, against who was standing at nightfall.
+  int index = 0;
+  for (auto& [id, player] : players) {
+    if (!isParticipant(player) || !player.isDead()) continue;
+    player.deathTime = 0.0f;
+    player.reviveProgress = 0.0f;
+    wasDead[id] = false;
+    player.vx = player.vy = 0.0f;
+    player.forcedVx = player.forcedVy = 0.0f;
+    player.forcedMs = 100.0f;
+    int allies = alliesNear(player);
+    if (allies > 0) {
+      // Carried into the camp: they wake there, at the camp's heal.
+      player.health = 0.0f;
+      campHeal(player, allies - 1);
+      assert(player.health > 0.0f);
+    } else {
+      // Nobody came for them: they limp home through the dark.
+      player.x = shipX - 120.0f + 80.0f * static_cast<float>(index++ % 4);
+      player.y = shipY + 190.0f;
+      player.health = player.maxHealth;
+      player.carryingScrap = false;  // dropped somewhere out there
+    }
+  }
+
+  for (uint32_t id : standing) {
+    Player& player = players.at(id);
+    player.vx = player.vy = 0.0f;
+    if (atShip(player)) {
+      player.health = player.maxHealth;
+      // Scrap carried home tonight still counts.
+      if (player.carryingScrap) bankScrap(player);
+    } else {
+      campHeal(player, alliesNear(player));
+    }
+  }
+}
+
+void MatchDirector::onRepairNoise(float x, float y) {
+  if (currentPhase != MatchPhase::Round) return;
+  int size = Tuning::REPAIR_NOISE_PACK + std::max(1, participantCount()) - 1;
+  float ax = x - shipX, ay = y - shipY;
+  float len = std::sqrt(ax * ax + ay * ay);
+  if (len < 1.0f) {
+    ax = 0.0f;
+    ay = 1.0f;
+    len = 1.0f;
+  }
+  for (int attempt = 0; attempt < 8; attempt++) {
+    float spread = randomRange(-0.7f, 0.7f);
+    float c = std::cos(spread), s = std::sin(spread);
+    float dx = (ax * c - ay * s) / len, dy = (ax * s + ay * c) / len;
+    float px = x + dx * Tuning::REPAIR_NOISE_DISTANCE;
+    float py = y + dy * Tuning::REPAIR_NOISE_DISTANCE;
+    if (!insideWorld(px, py)) continue;
+    spawnPack(px, py, size, false);
+    Logger::info("Match: a turret repair drew a pack");
+    return;
+  }
+}
+
+void MatchDirector::dawnAmbush() {
+  int round = std::min(currentRound, Tuning::ROUND_COUNT);
+  int size = Tuning::DAWN_AMBUSH_SIZE[round - 1];
+  if (size <= 0) return;
+  // One ambush per camp: crewmates within sharing range are one camp.
+  std::vector<std::pair<float, float>> camps;
+  for (auto& [id, player] : players) {
+    if (!isParticipant(player) || player.isDead() || atShip(player)) continue;
+    bool joined = false;
+    for (auto& camp : camps) {
+      if (dist(camp.first, camp.second, player.x, player.y) <=
+          Tuning::CAMP_SHARE_RADIUS) {
+        joined = true;
+        break;
+      }
+    }
+    if (!joined) camps.emplace_back(player.x, player.y);
+  }
+  for (const auto& [cx, cy] : camps) {
+    // Try a few directions for a spot on the planet.
+    for (int attempt = 0; attempt < 8; attempt++) {
+      float angle = randomRange(0.0f, 6.2831853f);
+      float x = cx + std::cos(angle) * Tuning::DAWN_AMBUSH_DISTANCE;
+      float y = cy + std::sin(angle) * Tuning::DAWN_AMBUSH_DISTANCE;
+      if (!insideWorld(x, y)) continue;
+      spawnPack(x, y, size, false);
+      Logger::info("Match: dawn ambush near a wild camp");
+      break;
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Phase transitions
 // ---------------------------------------------------------------------------
@@ -143,8 +262,7 @@ void MatchDirector::startRound(int round) {
   spawnTimer = 800.0f;
   raidTimer = Tuning::RAID_FIRST_MS;
   zoneTickTimer = 0.0f;
-  announcedShrink = false;
-  announcedReturn = false;
+  announcedNightfall = false;
   killsThisRound = 0;
   infusionDropsThisRound = 0;
   bossId = 0;
@@ -153,34 +271,29 @@ void MatchDirector::startRound(int round) {
   enemies->despawnAll();
   abilities->effects().clearAllEnemies();
   abilities->clearTransient();
+  abilities->setMovementLocked(false);
   if (hooks.clearPickups) hooks.clearPickups();
 
-  bringPlayersHome(true);
+  // The first morning is at the crash. After that the crew wakes wherever
+  // it camped, still holding any scrap it did not bring home.
+  if (round == 1) bringPlayersHome(true);
   for (auto& [id, player] : players) {
     if (!isParticipant(player)) continue;
     abilities->resetPlayerForRound(player);
     player.ready = false;
-    player.carryingScrap = false;
+    if (round == 1) player.carryingScrap = false;
     roundStartScore[id] = player.score;
   }
 
   enemies->setShip(shipX, shipY, true);
+  if (round > 1) dawnAmbush();
   abilities->setCombatEnabled(true);
   abilities->fxAnnounce(Announcement::RoundStart);
   Logger::info("Match: round " + std::to_string(round) + " started");
 }
 
 void MatchDirector::endRound() {
-  // Night falls. Anyone who is not back at the ship is lost to the dark.
-  for (auto& [id, player] : players) {
-    if (!isParticipant(player) || player.isDead()) continue;
-    if (dist(player.x, player.y, shipX, shipY) > safeRadius()) {
-      player.health = 0.0f;
-      player.deaths++;
-      player.score += Tuning::SCORE_DEATH;
-    }
-  }
-
+  // Night falls where everyone stands (makeCamp, in startIntermission).
   // "When I win, we win": the round's top scorer earns an extra infusion.
   uint32_t mvp = 0;
   int32_t best = 0;
@@ -215,13 +328,12 @@ void MatchDirector::startIntermission() {
   enemies->setShip(shipX, shipY, false);
   if (hooks.clearPickups) hooks.clearPickups();
 
-  bringPlayersHome(true);
+  makeCamp();
+  abilities->setMovementLocked(true);
   for (auto& [id, player] : players) {
     if (!isParticipant(player)) continue;
     abilities->resetPlayerForRound(player);
     player.ready = false;
-    // Scrap in hand when the round ends still counts.
-    if (player.carryingScrap) bankScrap(player);
   }
   abilities->fxAnnounce(Announcement::Intermission);
   Logger::info("Match: intermission after round " +
@@ -240,11 +352,14 @@ void MatchDirector::startBossFight() {
 
   enemies->despawnAll();
   abilities->clearTransient();
+  abilities->setMovementLocked(false);
+  // The finale is at the ship, whoever camped where.
   bringPlayersHome(true);
   for (auto& [id, player] : players) {
     if (!isParticipant(player)) continue;
     abilities->resetPlayerForRound(player);
     player.ready = false;
+    if (player.carryingScrap) bankScrap(player);
   }
   // The ship is beyond saving in the finale: nothing left to raid.
   enemies->setShip(shipX, shipY, false);
@@ -258,6 +373,7 @@ void MatchDirector::finishMatch(bool victory) {
   phaseTimeLeft = END_SCREEN_SECONDS;
   phaseElapsed = 0.0f;
   abilities->setCombatEnabled(false);
+  abilities->setMovementLocked(false);
   abilities->clearTransient();
   enemies->setShip(shipX, shipY, false);
   if (victory) {
@@ -292,6 +408,7 @@ void MatchDirector::resetMatch() {
   if (hooks.resetWorld) hooks.resetWorld();
   abilities->clearTransient();
   abilities->setCombatEnabled(false);
+  abilities->setMovementLocked(false);
   if (hooks.clearPickups) hooks.clearPickups();
 
   for (auto& [id, player] : players) {
@@ -370,27 +487,14 @@ void MatchDirector::updateRound(float dtMs) {
   phaseTimeLeft -= dt;
   phaseElapsed += dt;
 
-  // The Blue Zone holds, then closes in on the ship.
-  float total = Tuning::ROUND_SECONDS[currentRound - 1];
-  float startRadius = Tuning::ZONE_START_RADIUS[currentRound - 1] * zoneScale;
-  float holdUntil = total * Tuning::ZONE_HOLD_FRACTION;
-  if (phaseElapsed <= holdUntil) {
-    zone = startRadius;
-  } else {
-    float t = std::min(1.0f, (phaseElapsed - holdUntil) / (total - holdUntil));
-    zone = startRadius + (Tuning::ZONE_END_RADIUS - startRadius) * t;
-    if (!announcedShrink) {
-      announcedShrink = true;
-      abilities->fxAnnounce(Announcement::ZoneShrinking);
-    }
-  }
-  if (!announcedReturn && phaseTimeLeft <= 25.0f) {
-    announcedReturn = true;
-    abilities->fxAnnounce(Announcement::ReturnToShip);
+  // No Blue Zone in a round: the crew may go anywhere. Night is the clock.
+  if (!announcedNightfall && phaseTimeLeft <= 25.0f) {
+    announcedNightfall = true;
+    abilities->fxAnnounce(Announcement::ReturnToShip);  // "night is falling"
   }
 
   updateSpawning(dtMs, false);
-  updateZoneDamage(dtMs);
+  updateZoneDamage(dtMs);  // the ship's healing ring only
   updateScrapDelivery();
   updateDeathsAndRevives(dtMs);
 
@@ -624,8 +728,10 @@ void MatchDirector::updateZoneDamage(float dtMs) {
           0, player,
           player.maxHealth * Tuning::SHIP_TIER_HEAL_PER_SECOND[tier] * 0.5f);
     }
+    // Only the finale has a shield to stay inside.
+    if (currentPhase != MatchPhase::BossFight) continue;
     if (shipDistance <= zone) continue;
-    // Outside the Blue Zone the planet itself is killing you.
+    // Outside the boss arena's shield the planet itself is killing you.
     abilities->damagePlayer(
         player, player.maxHealth * Tuning::ZONE_DAMAGE_PER_SECOND * 0.5f, 0,
         DamageFlag::Dot);
@@ -656,6 +762,8 @@ bool MatchDirector::onTurretRepaired(Player& player) {
 
 bool MatchDirector::onShipUpgrade(Player& player) {
   if (currentPhase != MatchPhase::Intermission) return false;
+  // Built by hand: only someone who camped at the ship can do it.
+  if (!atShip(player)) return false;
   if (tier + 1 >= Tuning::SHIP_TIER_COUNT) return false;
   int cost = Tuning::SHIP_TIER_COST[tier + 1];
   if (scrapBanked < cost) return false;
@@ -939,14 +1047,14 @@ void MatchDirector::onReady(Player& player, bool ready) {
 
 void MatchDirector::onSlotInfusion(Player& player, Genus genus,
                                    Arena::InfusionPart part, int node) {
-  // The suit can only be opened up back at the ship.
+  // The suit can only be opened up back at the ship, night or day.
   if (currentPhase == MatchPhase::Round ||
-      currentPhase == MatchPhase::BossFight) {
-    if (dist(player.x, player.y, shipX, shipY) > safeRadius()) {
-      return;
-    }
+      currentPhase == MatchPhase::BossFight ||
+      currentPhase == MatchPhase::Intermission) {
+    if (!atShip(player)) return;
   }
-  if (Infusions::slotInfusion(player, genus, part, node)) {
+  if (Infusions::slotInfusion(player, genus, part, node,
+                              Arena::suitTierCap(currentRound))) {
     std::string where = node == Arena::CORE_NODE
                             ? std::string("the core")
                             : std::string(Arena::suitNode(node).name);
@@ -1185,8 +1293,7 @@ void MatchDirector::onDebugCommand(Player& player, DebugCommandKind command,
       if (currentPhase == MatchPhase::Lobby) {
         if (participantCount() > 0) startRound(1);
       } else if (currentPhase == MatchPhase::Round) {
-        phaseTimeLeft = 0.0f;
-        bringPlayersHome(false);  // skipping should not strand anyone
+        phaseTimeLeft = 0.0f;  // night falls where everyone stands
       } else if (currentPhase == MatchPhase::Intermission) {
         phaseTimeLeft = 0.0f;
       } else if (currentPhase == MatchPhase::BossFight) {

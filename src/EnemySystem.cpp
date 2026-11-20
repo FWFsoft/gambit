@@ -78,6 +78,7 @@ uint32_t EnemySystem::spawn(EnemyKind kind, float x, float y,
   enemy.detectionRange = AGGRO_RANGE;
   enemy.targetShip = options.targetShip;
   enemy.campGuard = options.campGuard;
+  enemy.fromCamp = options.campGuard;
   enemy.elite = options.elite;
   if (options.elite) {
     const Arena::EliteTuning& tuning = Arena::eliteTuning(kind);

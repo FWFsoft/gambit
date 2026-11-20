@@ -211,6 +211,11 @@ class ArenaView {
   // to show a freshly upgraded ship.
   int lastShipTier = 0;
   float shipRevealUntil = 0.0f;
+  // The local player just picked up an infusion: a ring of its genus.
+  float pickupFlashUntil = 0.0f;
+  float lastPickupBanner = -100.0f;
+  Arena::Genus pickupFlashGenus = Arena::Genus::None;
+  void onLocalPickup(uint32_t itemId);
   bool effectLab = false;       // F12: number keys drive effect verbs
   void drawEffectLabPanel();
   float timeSeconds = 0.0f;
@@ -280,6 +285,12 @@ class ArenaView {
   void drawBanners();
   void drawMinimap();
   void drawSuitScreen(bool intermission);
+  // Night away from the ship: the camp, who is in it, and what dawn brings.
+  void drawCampPanel();
+  // Where walkable ground meets ground nobody can cross: a rock rim on
+  // walls, a foam line on water, so a blocked edge never looks walkable.
+  void drawBlockedEdges(ImDrawList* dl);
+  bool localAtShip() const;
   void drawLobby();
   void drawEndScreen();
   void drawDownedOverlay();

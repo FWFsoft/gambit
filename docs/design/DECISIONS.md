@@ -21,6 +21,183 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-19: Playtest round two: readable ground, drops, pacing, probe, turrets, music
+- **Decision:** The rest of the same playtest's notes.
+  - **Walls and water read as walls and water.** Impassable ground that is
+    not water (peaks, and land the generator seals off as unreachable) was
+    painted with the walkable "high" ground, so it read as a gentle shaded
+    slope you could not climb. It now has its own dark, cracked `cliff`
+    tile. In game every walkable/blocked edge gets a rim: pale rock with an
+    ink shadow on walls, a cyan foam line on water.
+  - **Ground colours:** the PNW forest floor ("moss") was a dark blue-teal,
+    close to the lakes; it is now a dark green. Damp ground by water is
+    earthy instead of blue-grey. Lakes and sea keep the blue and get
+    brighter glints.
+  - **Infusion drops** are a dark token ringed in the genus colour with the
+    genus's mark inside (Venoxarid a venom drop, Cerebrian an eye,
+    Frigidariant a snowflake, Magnarok a flame), a pillar of the genus's
+    light, and the part's name. Picking one up shows a banner ("+ VENOXARID
+    EYE / Infusion! Slot it into your suit at the ship") and the mark
+    bursts out of the hero in a ring; a burst of pickups shows one banner.
+  - **Suit depth is paced by the match:** tree tiers 1 and 2 can be filled
+    from night 1, tier 3 from night 2, tier 4 from night 3. Locked-by-round
+    slots show dimmed with "Tier N opens on night M".
+  - **Derelict turrets** are a hold: 10 s (was 4 s) in a 110 px circle (was
+    70), and starting a repair draws one pack (4 bodies, +1 per extra
+    crewmate) from 650 px out on the side away from the ship, once per
+    turret.
+  - **Crashed probes scan instead of being hauled.** Dig it out (4 s) and
+    it boots where it lies: the land within 3,000 px is mapped for the
+    whole crew (objectives there appear on the map and minimap), plus the
+    usual score and infusion. Scrap is still the one thing you haul.
+  - **A crash site** around every landing: ash ground with a ragged edge to
+    about 1,300 px, cleared of plants, strewn with wreckage. The landing
+    music plays there: it starts inside 1,300 px and holds out to 1,700 px
+    (was a plain 2,000 px circle, which cut across biomes).
+  - **Music is a radio.** Every place playlist is a channel that keeps
+    playing on the match clock. Moving between places is a 0.6 s fade, and
+    the channel picks up where its song would be now; a channel first heard
+    mid-match joins a song partway in.
+- **Pillars:**
+  - **Clarity** decided most of it: invisible walls, water that looked like
+    ground, a drop that did not look like loot, and a pickup with no
+    feedback were all things the playtest could not read. The rims are a
+    line per edge and can look busy in a maze of blocked tiles (the edges
+    are tile steps, so they zigzag on diagonals).
+  - **Creative Builds:** serves. With objectives paying one or two
+    infusions, one tree filled in round 1; capping depth by round keeps
+    early luck going wide across trees, so builds form over the match.
+    Trades a little Crunch: an early lucky run can no longer cash in.
+  - **Strategic Crunch:** serves. A turret is now a defend-the-point
+    trade-off (time and a fight for a permanent ship gun) instead of a
+    free 4 s tap next to the ship. The probe's scan is a time-for-intel
+    choice that suits the explore-and-camp rounds; it no longer plays the
+    same as a scrapyard.
+  - **Comradery:** serves. A turret repair goes best with someone guarding;
+    a probe's map is shared by everyone.
+- **Why:** Alternatives rejected: starving infusion drops (would make the
+  map less rewarding to explore, against the camping change); making the
+  probe a second haul with a different reward (still the same verb as
+  scrap); true overlapping crossfades (SDL_mixer plays one music stream;
+  would need decoding to sound channels). Not verified by playing: the
+  music was only unit tested (no audio device here); the other three
+  genus marks were not seen on screen (only Venoxarid spawns now); the
+  turret pack and probe scan are covered by tests and logs, not a live
+  look. The rims, the crash site, drops and the pickup banner were checked
+  in the running client.
+- **Status:** Built, needs review
+- **Where:** `tools/maps/generate_planet.py` (materials `cliff`, `ash`,
+  crash site, turret props, probe text) and the regenerated
+  `assets/maps/planet.tmx` / `planet_tiles.png`; `src/ArenaView.cpp`
+  (`drawBlockedEdges`, `drawPickup`, `onLocalPickup`), `include/ArenaDraw.h`
+  (`drawGenusGlyph`), `include/ArenaData.h` (`suitTierCap`, turret and
+  probe tuning), `src/ArenaData.cpp`, `src/Infusions.cpp`,
+  `src/ArenaHud.cpp`, `src/MatchDirector.cpp` (`onRepairNoise`),
+  `src/ServerGameState.cpp`, `src/TiledMap.cpp`, `src/FogOfWar.cpp`,
+  `src/ArenaClient.cpp`, `include/NetworkProtocol.h` (`Reveal`),
+  `src/MusicDirector.cpp`, `src/MusicSystem.cpp`, `docs/design/MUSIC.md`,
+  `docs/design/MAP_PIPELINE.md`; tests in `test_infusions`,
+  `test_roof_turrets`, `test_music_director`
+
+## 2026-11-19: No Blue Zone; the crew camps where night finds it
+- **Decision:** A round has no zone. The planet is open, nothing hurts you
+  for being far out, and nobody is teleported home or killed at nightfall.
+  Night falls where each player stands, and nobody can move until dawn.
+  - **At the ship** (inside its safe radius): full heal, carried scrap is
+    banked, the suit opens, and the ship's next tier can be bought (only by
+    someone camped there).
+  - **In the wild:** heal 40% of max health, +20% per crewmate within
+    500 px (one camp). Scrap stays in hand. The suit stays shut.
+  - **The downed:** carried into a crewmate's camp if one is within 500 px
+    (revived there at the camp's heal); otherwise they wake at the ship at
+    full health and lose any scrap they carried.
+  - **Dawn:** the next round starts where everyone camped. Each wild camp
+    (crewmates within 500 px count as one) gets an ambush 420 px away: a
+    pack of size 4 at dawn 2 and 5 at dawn 3 (a thug genus fields about two
+    thirds of that). Nothing comes for the ship's camp. The first morning
+    and the boss fight still start at the ship.
+  - **The finale keeps its shield** (950 px, deadly outside), shown as
+    before. Banners now say "DAYBREAK", "NIGHT IS FALLING" (25 s left) and
+    "NIGHT"; the HUD shows distance to the ship instead of to the zone edge.
+    Away from the ship the night shows a camp panel (who is in camp, the
+    heal, the dawn threat) instead of the suit screen.
+  - The debug skip-phase key no longer sends everyone home.
+- **Pillars:**
+  - **Requested by a human (Noah) after a playtest:** the zone felt small,
+    even in round 3, and the run home every night cut exploration short.
+  - **Strategic Crunch:** trades. The closing zone was the round's main time
+    pressure and is gone. In its place, every nightfall is a decision with a
+    real cost on both sides: walk home (dead time, but full heal, banked
+    scrap, suit, ship tier) or camp out (keep your position and the time,
+    pay with a thinner heal, unslotted infusions and a dawn fight). Removing
+    the forced walk home also removes dead time.
+  - **Comradery in Competition:** serves. Camping together heals more and
+    is the only way a downed crewmate wakes where they fell; a split crew
+    faces more ambushes. Nobody is punished for a teammate's choice.
+  - **Creative Builds & Dynamic Play:** serves. Runs differ by where the
+    crew ends each day; mobile kits can range farther.
+  - **Clarity:** neutral. The rules are new, so the night panel and banners
+    spell them out. The ship's ring still marks the safe camp.
+- **Why:** Requested. The alternative (keep the zone, widen it) kept a
+  pressure that worked against the isolation and exploration the playtest
+  asked for. Risks to watch:
+  - The rounds may feel slack without a closing edge. If so, add pressure
+    that grows with distance from the ship (stronger packs far out) rather
+    than bringing back a wall.
+  - The ship takes raids while the crew is away; that is part of the
+    trade-off.
+  - Bots in `ArenaSim` still head home at dusk; a full match runs to
+    victory, but bot camping behaviour is not simulated.
+  - The numbers (40%, +20%, 500 px, ambush size) are first guesses.
+  - **Not yet playtested.**
+- **Status:** Accepted (requested by a human) for removing the zone and
+  camping in place; the heal, ambush and downed rules are built, need review
+- **Where:** `src/MatchDirector.cpp` (`makeCamp`, `dawnAmbush`,
+  `updateRound`, `updateZoneDamage`), `include/MatchDirector.h`,
+  `include/ArenaData.h` (camp tuning), `include/AbilitySystem.h` and
+  `src/AbilitySystem.cpp` (night movement lock), `src/ArenaHud.cpp`
+  (`drawCampPanel`, HUD line, minimap), `src/ArenaView.cpp`,
+  `src/ArenaClient.cpp` (banners), `tests/test_camping.cpp`, `PLAYTEST.md`
+
+## 2026-11-19: Playtest fixes: stuck objectives say what they want; Jeff stands up to harvest
+- **Decision:** From a playtest where four objectives could not be
+  finished:
+  - **Crashed Probe** drops off at the ship where this match landed. The
+    drop-off was the ship's spot when the map loaded, so after "every match
+    lands somewhere new" it pointed at an empty site.
+  - **Outpost / Med Pod**: a camp guard counts for its camp wherever it
+    dies, even after it was provoked into chasing someone out (it used to
+    count only where it fell). A camp cleared by fighting, with nobody
+    pressing F, now pays the player who landed the last kill (score, loot,
+    camp spawns off); before, it completed with no payout.
+  - **Guarded Gate**: killing the guardian opens the gate. Pressing F at the
+    gate still opens it early and enrages him (Berserk x5), as before.
+  - **Prompts**: each objective says what it wants: outpost and med pod show
+    guards down (n/m); the med pod says when it is unlocked; the gate names
+    both ways to open it; frogs say catch, carry, release, with a POND ring
+    and label drawn while a frog is carried; the probe says "dig out".
+  - **Jeff**: pressing Acquire Biomass on treads stands him back up on legs
+    (dropping the treads' Haste) and harvests, instead of being greyed out.
+- **Pillars:** Clarity (the main one: the game state did not say what to
+  do, and the player was told "hold your ground" at a gate that needed a
+  key press). Comradery: fighting a camp clear pays the team, not nobody.
+  Strategic Crunch: no dead time standing at a finished objective. Jeff's
+  change trades a little of the treads' commitment (Creative Builds:
+  choosing a mode had a cost) for one less disabled button.
+- **Why:** These were bugs or missing feedback rather than tuning. For the
+  gate, opening on the guardian's death was chosen over a "[F] open" prompt
+  after the kill because the player had already done the hard part. The
+  remaining playtest notes (zone and night return, landing-zone biome,
+  music, terrain readability, drops, offence-track pace, turret and probe
+  design) are open questions, not decided here.
+- **Status:** Built, needs review. Not yet checked in a live match.
+- **Where:** `src/ObjectiveSystem.cpp`, `include/ObjectiveSystem.h`,
+  `include/Objective.h`, `src/TiledMap.cpp`, `src/ServerGameState.cpp`,
+  `include/Enemy.h`, `src/EnemySystem.cpp`, `src/ArenaHud.cpp`
+  (`drawPrompts`), `src/ArenaView.cpp`, `src/CharacterKits.cpp` (JeffKit),
+  `src/ArenaData.cpp`, `tests/test_points_of_interest.cpp`,
+  `tests/test_jeff_kit.cpp`
+
 ## 2026-11-19: Audio settings in the Esc menu
 - **Decision:** Esc > Settings shows Master, Music and Sound effects
   sliders (percent) and Mute all. Changes apply live while dragging and are

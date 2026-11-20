@@ -22,8 +22,9 @@ bool addToInventory(Player& player, Arena::Genus genus,
                     Arena::InfusionPart part);
 // Slot one item from the pack into `node` (Arena::CORE_NODE for the core).
 // Returns false, changing nothing, if the move is not allowed.
+// maxTier: the deepest tree tier allowed now (Arena::suitTierCap).
 bool slotInfusion(Player& player, Arena::Genus genus, Arena::InfusionPart part,
-                  int node);
+                  int node, int maxTier = 4);
 // Empty the suit and the pack (a new match).
 void resetLoadout(Player& player);
 // Clear per-round talent state (cooldowns, once-per-round uses).
