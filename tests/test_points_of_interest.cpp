@@ -47,7 +47,7 @@ struct World {
     director.onPlayerJoined(players[HERO]);
     director.onCharacterSelected(players[HERO], Arena::CharacterId::Wade);
     director.onReady(players[HERO], true);
-    run(Arena::Tuning::LOBBY_COUNTDOWN_SECONDS * 1000.0f + 500.0f);
+    run(Arena::Intro::LENGTH * 1000.0f + 500.0f);
     assert(director.phase() == Arena::MatchPhase::Round);
   }
 

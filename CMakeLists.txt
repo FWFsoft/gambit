@@ -255,6 +255,7 @@ add_executable(Client
     src/FogOfWar.cpp
     src/EffectVisuals.cpp
     src/ArenaHud.cpp
+    src/ArenaIntro.cpp
     src/ArenaWorld.cpp
 )
 target_include_directories(Client SYSTEM PRIVATE ${ENET_INCLUDE_DIR})
@@ -1050,6 +1051,7 @@ set(WASM_CLIENT_SOURCES
     src/FogOfWar.cpp
     src/EffectVisuals.cpp
     src/ArenaHud.cpp
+    src/ArenaIntro.cpp
     src/ArenaWorld.cpp
 )
 

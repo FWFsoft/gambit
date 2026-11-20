@@ -51,6 +51,13 @@ class SfxSystem {
   void load(SoundBank& bank, const std::string& stem);
   void onPacket(const NetworkPacketReceivedEvent& e);
   void onGameEvent(const GameEventPacket& event);
+  void onMatchState(const MatchStatePacket& match);
+
+  // The crash intro's soundtrack (assets/cutscene/intro.ogg): one track on
+  // a reserved channel, started with MatchPhase::Intro, cut if skipped.
+  static constexpr int INTRO_CHANNEL = 0;
+  Mix_Chunk* introTrack = nullptr;
+  float introElapsed = -1.0f;  // last seen; -1 outside the intro
   void onUpdate(const UpdateEvent& e);
   void playCast(const AbilitySounds::Cue& cue);
   void play(SoundBank& bank, float minGapMs, int maxVoices, float volume,

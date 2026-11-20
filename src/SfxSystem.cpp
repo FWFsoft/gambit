@@ -24,6 +24,12 @@ SfxSystem::SfxSystem(const ClientPrediction* prediction)
     return;
   }
   Mix_AllocateChannels(CHANNEL_COUNT);
+  Mix_ReserveChannels(INTRO_CHANNEL + 1);  // random sounds never take it
+  introTrack = Mix_LoadWAV("assets/cutscene/intro.ogg");
+  if (!introTrack) {
+    Logger::error(std::string("SfxSystem: no intro soundtrack: ") +
+                  Mix_GetError());
+  }
 
   // assets/sfx/: see docs/design/SFX.md.
   load(hits[static_cast<size_t>(Sound::EnemyHit)], "assets/sfx/hit");
@@ -53,6 +59,7 @@ SfxSystem::SfxSystem(const ClientPrediction* prediction)
 
 SfxSystem::~SfxSystem() {
   Mix_HaltChannel(-1);
+  if (introTrack) Mix_FreeChunk(introTrack);
   auto freeAll = [](auto& banks) {
     for (SoundBank& bank : banks) {
       for (Mix_Chunk* chunk : bank.variants) Mix_FreeChunk(chunk);
@@ -85,8 +92,40 @@ void SfxSystem::onPacket(const NetworkPacketReceivedEvent& e) {
   // In embedded mode the server shares this EventBus; packets travelling
   // client -> server carry a non-zero client id and are not for us.
   if (!ready || e.size == 0 || e.clientId != 0) return;
-  if (static_cast<PacketType>(e.data[0]) != PacketType::GameEvent) return;
+  PacketType type = static_cast<PacketType>(e.data[0]);
+  if (type == PacketType::MatchState) {
+    onMatchState(deserializeMatchState(e.data, e.size));
+    return;
+  }
+  if (type != PacketType::GameEvent) return;
   onGameEvent(deserializeGameEvent(e.data, e.size));
+}
+
+void SfxSystem::onMatchState(const MatchStatePacket& match) {
+  namespace I = Arena::Intro;
+  if (static_cast<Arena::MatchPhase>(match.phase) != Arena::MatchPhase::Intro) {
+    introElapsed = -1.0f;
+    return;
+  }
+  float elapsed = I::LENGTH - match.timeRemaining;
+  bool started = introElapsed < 0.0f;
+  float previous = introElapsed;
+  introElapsed = elapsed;
+  if (!introTrack) return;
+  if (started) {
+    // Joining partway through: the soundtrack is one take, so only start
+    // it at the start (a late joiner sees the shot in silence).
+    if (elapsed > 0.5f) return;
+    float gain = MASTER_VOLUME * settingsGain;
+    Mix_Volume(INTRO_CHANNEL,
+               static_cast<int>(gain * SDL_MIXER_MAX_VOLUME + 0.5f));
+    Mix_PlayChannel(INTRO_CHANNEL, introTrack, 0);
+    return;
+  }
+  // Skipped: the clock jumps to the fade-in. The sirens stop; no crash.
+  if (elapsed - previous > 1.0f && previous < I::CRASH) {
+    Mix_FadeOutChannel(INTRO_CHANNEL, 150);
+  }
 }
 
 void SfxSystem::onGameEvent(const GameEventPacket& event) {

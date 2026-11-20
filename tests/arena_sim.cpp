@@ -451,6 +451,8 @@ const char* phaseName(Arena::MatchPhase phase) {
   switch (phase) {
     case Arena::MatchPhase::Lobby:
       return "Lobby";
+    case Arena::MatchPhase::Intro:
+      return "Intro";
     case Arena::MatchPhase::Round:
       return "Round";
     case Arena::MatchPhase::Intermission:

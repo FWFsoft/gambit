@@ -21,6 +21,56 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-20: Crash intro between character select and the first round
+- **Decision:** When the whole crew has picked, the match plays a 16.8 s
+  crash intro (new `MatchPhase::Intro`) in place of the 3 s lobby count-in:
+  - 0 to 7 s: the planet from space, fading up out of black over 3.5 s,
+    still, letterboxed; distress sirens far off behind the camera, getting
+    closer.
+  - About 7 s: the ship (ShipPatched, the intact RV, before it crashes)
+    bursts past the camera from the lower right on fire, hull burning and
+    boosters streaming flame, and falls away into the planet over 5.5 s.
+    The siren and fire roar peak, sweep across the speakers and drop in
+    pitch (Doppler).
+  - 12.5 s: a flash where it hits. 12.7 s: cut to black, the crash.
+  - 13.3 to 16 s: the world fades in on the burning wreck; every player
+    gets up off the ground (their death clip played backwards).
+  - 16.8 s: round 1 starts and control unlocks. No count-in.
+  - Between confirming a character and the intro starting, the screen holds
+    black (the lobby used to flash for a frame while sprites loaded).
+  - **Hold Space 0.6 s to skip**, for the whole crew. Skipping jumps to the
+    fade-in, so everyone still sees the crew get up.
+  - The server owns the clock; every client draws the same moment, and the
+    round timer only starts after the intro. **First Contact starts with
+    the intro** (under the sirens) and plays on into round 1 without a
+    break, as the landing's music.
+  - First playtest (2026-11-20): 12 s felt rushed and jarring; lengthened
+    to 16.8 s with a slower fade-up and a slower fall.
+- **Pillars:** Clarity: it shows where you are (a planet), why (you
+  crashed) and that the burning wreck is your ship, before the HUD asks
+  anything of you. Comradery: one shared moment for the crew, and one
+  skip for everyone, so nobody waits on anyone. It trades against
+  **Strategic Crunch**: 16.8 s of no decisions at the start of every match.
+  To limit that, it is short, skippable by anyone, replaces the old 3 s
+  count-in, and the round clock does not run during it.
+- **Why:** Requested. The art is not hand-painted. The planet is the Meshy
+  model "Earthlike Planet" (fetched free, cut down with `shrink.py`, no
+  credits spent) and the ship is ShipPatched, both rendered by
+  `tools/cutscene/render_intro.py`. The planet's day/night line and rim are
+  computed, not lit in Blender, so they can be placed exactly. Flames,
+  smoke and glow are drawn live by the game (effects are light, per the art
+  direction). The soundtrack is synthesised (`make_intro_audio.py`), so
+  nothing needs crediting; it is the weakest part and a recorded siren and
+  crash would improve it. Rejected: a pre-rendered video (big, and it
+  cannot cut to the live world for the get-up); skip by Esc (Esc opens the
+  pause menu); a skip vote (slower, and the intro is short).
+  Known shortcut: the get-up is the death clip reversed, not a real
+  get-up animation; a proper `getup` clip per character would read better.
+- **Status:** Accepted (requested by a human)
+- **Where:** `src/ArenaIntro.cpp`, `MatchDirector::startIntro`,
+  `SfxSystem::onMatchState`, `MusicSystem`, `Arena::Intro` in
+  `include/ArenaData.h`, `tools/cutscene/`, `assets/cutscene/`
+
 ## 2026-11-19: Playtest round two: readable ground, drops, pacing, probe, turrets, music
 - **Decision:** The rest of the same playtest's notes.
   - **Walls and water read as walls and water.** Impassable ground that is

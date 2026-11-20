@@ -393,7 +393,6 @@ void MatchDirector::resetMatch() {
   currentPhase = MatchPhase::Lobby;
   currentRound = 0;
   phaseTimeLeft = 0.0f;
-  lobbyCountingDown = false;
   shipHp = Tuning::SHIP_START_HEALTH;
   scrapBanked = 0;
   tier = 0;
@@ -444,6 +443,9 @@ void MatchDirector::update(float dtMs) {
     case MatchPhase::Lobby:
       updateLobby(dtMs);
       break;
+    case MatchPhase::Intro:
+      updateIntro(dtMs);
+      break;
     case MatchPhase::Round:
       updateRound(dtMs);
       break;
@@ -461,25 +463,31 @@ void MatchDirector::update(float dtMs) {
 }
 
 void MatchDirector::updateLobby(float dtMs) {
-  // Start once everyone connected has picked a character.
+  (void)dtMs;
+  // Start once everyone connected has picked a character: straight into
+  // the crash intro, which is the count-in.
   int total = static_cast<int>(players.size());
   int picked = participantCount();
-  bool everyonePicked = total > 0 && picked == total;
+  if (total > 0 && picked == total) startIntro();
+}
 
-  if (!everyonePicked) {
-    lobbyCountingDown = false;
-    phaseTimeLeft = 0.0f;
-    return;
-  }
-  if (!lobbyCountingDown) {
-    lobbyCountingDown = true;
-    phaseTimeLeft = Tuning::LOBBY_COUNTDOWN_SECONDS;
-  }
+void MatchDirector::startIntro() {
+  // The crash (ArenaIntro.cpp draws it). The crew lies at the wreck, held
+  // still, until the intro ends with everyone on their feet.
+  currentPhase = MatchPhase::Intro;
+  phaseTimeLeft = Arena::Intro::LENGTH;
+  phaseElapsed = 0.0f;
+  bringPlayersHome(true);
+  abilities->setCombatEnabled(false);
+  abilities->setMovementLocked(true);
+  for (auto& [id, player] : players) player.ready = false;
+  Logger::info("Match: intro");
+}
+
+void MatchDirector::updateIntro(float dtMs) {
   phaseTimeLeft -= dtMs / 1000.0f;
-  if (phaseTimeLeft <= 0.0f) {
-    lobbyCountingDown = false;
-    startRound(1);
-  }
+  phaseElapsed += dtMs / 1000.0f;
+  if (phaseTimeLeft <= 0.0f) startRound(1);
 }
 
 void MatchDirector::updateRound(float dtMs) {
@@ -1043,6 +1051,16 @@ void MatchDirector::onCharacterSelected(Player& player, uint32_t characterId) {
 
 void MatchDirector::onReady(Player& player, bool ready) {
   player.ready = ready;
+  // During the intro, ready is "skip": anyone skipping skips it for the
+  // whole crew, straight to the fade-in (everyone still gets up).
+  if (currentPhase == MatchPhase::Intro && ready && isParticipant(player)) {
+    float skipLeft = Arena::Intro::LENGTH - Arena::Intro::SKIP_TO;
+    if (phaseTimeLeft > skipLeft) {
+      phaseTimeLeft = skipLeft;
+      phaseElapsed = Arena::Intro::SKIP_TO;
+      Logger::info("Match: intro skipped");
+    }
+  }
 }
 
 void MatchDirector::onSlotInfusion(Player& player, Genus genus,
@@ -1292,6 +1310,8 @@ void MatchDirector::onDebugCommand(Player& player, DebugCommandKind command,
     case DebugCommandKind::SkipPhase:
       if (currentPhase == MatchPhase::Lobby) {
         if (participantCount() > 0) startRound(1);
+      } else if (currentPhase == MatchPhase::Intro) {
+        startRound(1);
       } else if (currentPhase == MatchPhase::Round) {
         phaseTimeLeft = 0.0f;  // night falls where everyone stands
       } else if (currentPhase == MatchPhase::Intermission) {
