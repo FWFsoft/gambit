@@ -21,6 +21,24 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-22: Esc always closes whatever is on top
+- **Decision:** Esc closes the top-most thing on screen before it does
+  anything else, in this order: the settings panel, the suit screen (B),
+  the inventory (I), the pause menu. With nothing open, it pauses. The
+  intermission suit screen is the night itself, so Esc there still opens
+  the pause menu. On the title screen, Esc with settings open closes them
+  instead of moving on to character select.
+- **Pillars:** Clarity: one key always gets you out, with no menu that
+  traps you (playtest, issue #40).
+- **Why:** In playtest, Esc did nothing on the inventory screen, and with
+  the suit screen open it paused the game behind the suit. Each system that
+  draws an overlay closes its own (`UISystem::closeTopOverlay`), and
+  `InputSystem` asks it first, so the input code doesn't need to know
+  every panel.
+- **Status:** Accepted (requested by a human)
+- **Where:** `src/InputSystem.cpp`, `src/UISystem.cpp`, `src/ArenaHud.cpp`,
+  `tests/test_inputsystem.cpp`
+
 ## 2026-11-20: Crash intro between character select and the first round
 - **Decision:** When the whole crew has picked, the match plays a 16.8 s
   crash intro (new `MatchPhase::Intro`) in place of the 3 s lobby count-in:

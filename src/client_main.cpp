@@ -184,6 +184,9 @@ int main(int argc, char* argv[]) {
   musicSystem.setArena(&arenaClient);
   ArenaView arenaView(&arenaClient, &clientPrediction, &effectTracker, &camera);
   uiSystem.setArenaView(&arenaView);
+  // Esc closes the settings panel or suit screen before it pauses.
+  inputSystem.setOverlayCloser(
+      [&uiSystem](GameState state) { return uiSystem.closeTopOverlay(state); });
   // The look: dark world, light pools, cast shadows, bloom and grade.
   arenaView.setPresentation(renderSystem.getPresentation());
   arenaView.setProps(&map.getProps());

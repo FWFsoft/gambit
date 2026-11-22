@@ -39,6 +39,9 @@ class ArenaView {
 
   // World layer + HUD for the Playing state.
   void render();
+  // Closes the suit screen opened with B; false if it wasn't showing. The
+  // intermission suit screen is the phase itself and isn't closed by this.
+  bool closeSuitScreen();
 
   // The look (docs/design/ART_DIRECTION.md): with a presentation layer the
   // world is drawn into its scene target, actors cast shadows, effects

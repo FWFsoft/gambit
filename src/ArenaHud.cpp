@@ -63,6 +63,17 @@ void panel(ImDrawList* dl, ImVec2 a, ImVec2 b, float alpha = 0.72f) {
 
 // ---------------------------------------------------------------------------
 
+bool ArenaView::closeSuitScreen() {
+  if (!suitScreenOpen) return false;
+  // During intermission at the ship the suit screen is the night itself;
+  // Esc then falls through to the pause menu.
+  if (arena->hasMatch() && arena->phase() == MatchPhase::Intermission) {
+    return false;
+  }
+  suitScreenOpen = false;
+  return true;
+}
+
 void ArenaView::renderHud() {
   handleHotkeys();
   if (!arena->hasMatch()) {
