@@ -257,6 +257,16 @@ class ArenaView {
   void drawShipWreckage(ImDrawList* dl, ImVec2 centre, float damage, int tier,
                         bool smoke);
   void drawRoofTurrets(ImDrawList* dl, ImVec2 anchor, int tier, ImU32 tint);
+  // A derelict turret objective: the roof turret's own sprites, broken. The
+  // gun slumps on its mount, barrel tipped down, smoking and sparking; once
+  // repaired the gun is up on the ship's roof and only the empty mount is
+  // left. False if the turret sprites are missing (the caller draws a
+  // stand-in).
+  bool drawDerelictTurret(ImDrawList* dl, ImVec2 foot, bool repaired,
+                          uint32_t salt);
+  // The baked salvage pile (tools/sprite_forge/actors/scrap.py); false if
+  // the sheet is missing.
+  bool scrapSprite(const ActorSheet** sheet, const ActorAnim** idle);
   // ---- The planet's scenery (ArenaWorld.cpp) -----------------------------
   // Set dressing from the map's Props layer (not owned; may be null).
   const std::vector<MapProp>* props = nullptr;

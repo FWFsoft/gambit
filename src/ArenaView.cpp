@@ -1362,7 +1362,9 @@ void ArenaView::drawGround(ImDrawList* dl) {
   // point the way from the hauler's feet.
   {
     const MatchPlayerState* mine = arena->matchPlayer(localId());
-    bool hauling = mine && mine->carryingScrap;
+    bool heavyLoad =
+        mine && mine->scrapCarried >= Arena::Tuning::SCRAP_HEAVY_LOAD;
+    bool hauling = heavyLoad;
     for (const auto& [id, objective] : prediction->getObjectives()) {
       if (objective.type == ObjectiveType::RecoverProbe &&
           objective.state == ObjectiveState::ReadyToDeposit) {
@@ -1390,7 +1392,7 @@ void ArenaView::drawGround(ImDrawList* dl) {
       localPosition(px, py);
       float dx = match.shipX - px, dy = match.shipY - py;
       float d = std::sqrt(dx * dx + dy * dy);
-      if (mine && mine->carryingScrap && d > r) {
+      if (heavyLoad && d > r) {
         // A chevron at the feet, leaning toward home.
         ImVec2 feet = toScreen(px, py);
         float ux = dx / d, uy = dy / d;
@@ -1754,6 +1756,33 @@ void ArenaView::drawRoofTurrets(ImDrawList* dl, ImVec2 anchor, int tier,
   }
 }
 
+bool ArenaView::drawDerelictTurret(ImDrawList* dl, ImVec2 foot, bool repaired,
+                                   uint32_t salt) {
+  const ActorSheet* base = actorFor("ShipTurretBase");
+  const ActorSheet* head = actorFor("ShipTurret");
+  if (!base || !head) return false;
+  const ActorAnim* baseIdle = base->find("idle");
+  const ActorAnim* headIdle = head->find("idle");
+  if (!baseIdle || !headIdle) return false;
+  // Out in the dark and dead: dimmer and cooler than the live roof guns.
+  const ImU32 tint = IM_COL32(150, 146, 150, 255);
+  drawActorFrame(dl, *base, *baseIdle, 0, 0.0f, foot, 1.0f, tint, true, -1,
+                 0.0f, true);
+  if (repaired) return true;  // the gun is on the ship's roof now
+  // Knocked off true: sat low on the mount, facing down-screen and tipped
+  // forward so the barrel points at the ground.
+  constexpr int SLUMP_HEADING = 1;  // head sheet direction (of 8)
+  ImVec2 seat(foot.x + 3.0f, foot.y + 5.0f);
+  drawActorFrame(dl, *head, *headIdle, SLUMP_HEADING, 0.0f, seat, 1.0f, tint,
+                 true, -1, 0.35f, false);
+  // A thin column of smoke and the odd spark from the breech.
+  ImVec2 breech(foot.x, foot.y - Arena::Tuning::ROOF_TURRET_MUZZLE_LIFT_PX);
+  drawWreckSmoke(dl, breech, timeSeconds, 0.5f, 0.8f, salt);
+  drawWreckFire(dl, ImVec2(breech.x + 4.0f, breech.y + 6.0f), timeSeconds,
+                0.12f, 0.35f, salt);
+  return true;
+}
+
 void ArenaView::drawRock(ImDrawList* dl, const CollisionShape& rock,
                          bool inReach, bool bonding) {
   const AABB& b = rock.aabb;
@@ -1823,12 +1852,20 @@ void ArenaView::drawRock(ImDrawList* dl, const CollisionShape& rock,
   }
 }
 
+bool ArenaView::scrapSprite(const ActorSheet** sheet, const ActorAnim** idle) {
+  *sheet = actorFor("Scrap");
+  *idle = *sheet ? (*sheet)->find("idle") : nullptr;
+  return *sheet && *idle;
+}
+
 void ArenaView::drawPickup(ImDrawList* dl, uint32_t itemId, float worldX,
                            float worldY) {
   float bob = std::sin(timeSeconds * 4.0f + worldX * 0.05f) * 3.0f;
   ImVec2 feet = toScreen(worldX, worldY);
   ImVec2 centre(feet.x, feet.y - 14.0f + bob);
   drawShadow(dl, feet, 9.0f, 0.3f);
+  const ActorSheet* sheet = nullptr;
+  const ActorAnim* idle = nullptr;
 
   if (Arena::PickupId::isInfusion(itemId)) {
     // An infusion is the run's most valuable drop: a pillar of its genus's
@@ -1855,17 +1892,42 @@ void ArenaView::drawPickup(ImDrawList* dl, uint32_t itemId, float worldX,
         Arena::partInfo(Arena::PickupId::infusionPart(itemId));
     text(dl, ImVec2(centre.x, centre.y - 32), themeHot(theme, 1.0f), 13.0f,
          part.name);
-  } else if (itemId == Arena::PickupId::Scrap) {
-    dl->AddRectFilled(ImVec2(centre.x - 9, centre.y - 7),
-                      ImVec2(centre.x + 9, centre.y + 7),
+  } else if (Arena::PickupId::isScrap(itemId) && scrapSprite(&sheet, &idle)) {
+    // The salvage pile (art/models/Scrap.glb): a bigger pile for more, its
+    // facing varied by amount so a field of drops is not one stamp. It
+    // sits on the ground, no bob: it is heavy.
+    int amount = Arena::PickupId::scrapAmount(itemId);
+    float scale =
+        std::clamp(0.7f + 0.06f * static_cast<float>(amount), 0.75f, 1.25f);
+    // Loot glows on the dark ground: a warm pool under the pile.
+    float pulse = 0.5f + 0.5f * std::sin(timeSeconds * 3.0f + worldX * 0.05f);
+    dl->AddEllipseFilled(
+        feet, ImVec2(30.0f * scale, 14.0f * scale),
+        IM_COL32(255, 170, 70, static_cast<int>(40 + 30 * pulse)), 0.0f, 24);
+    drawActorFrame(dl, *sheet, *idle, amount % 8, 0.0f, feet, scale,
+                   IM_COL32_WHITE, true, -1, 0.0f, true);
+    char label[24];
+    std::snprintf(label, sizeof label, "SCRAP +%d", amount);
+    text(dl, ImVec2(feet.x, feet.y - 52.0f * scale - 12.0f),
+         IM_COL32(255, 215, 150, 255), 12.0f, label);
+  } else if (Arena::PickupId::isScrap(itemId)) {
+    // A bigger pile is a bigger plate; the label says how much.
+    int amount = Arena::PickupId::scrapAmount(itemId);
+    float w = std::min(16.0f, 7.0f + 2.0f * static_cast<float>(amount));
+    float h = w * 0.75f;
+    dl->AddRectFilled(ImVec2(centre.x - w, centre.y - h),
+                      ImVec2(centre.x + w, centre.y + h),
                       IM_COL32(150, 150, 165, 255), 2.0f);
-    dl->AddRect(ImVec2(centre.x - 9, centre.y - 7),
-                ImVec2(centre.x + 9, centre.y + 7), IM_COL32(20, 14, 24, 255),
+    dl->AddRect(ImVec2(centre.x - w, centre.y - h),
+                ImVec2(centre.x + w, centre.y + h), IM_COL32(20, 14, 24, 255),
                 2.0f, 0, 2.0f);
-    dl->AddLine(ImVec2(centre.x - 5, centre.y - 3), ImVec2(centre.x + 5, centre.y + 3),
+    dl->AddLine(ImVec2(centre.x - w * 0.55f, centre.y - h * 0.4f),
+                ImVec2(centre.x + w * 0.55f, centre.y + h * 0.4f),
                 IM_COL32(90, 90, 105, 255), 2.0f);
-    text(dl, ImVec2(centre.x, centre.y - 24), IM_COL32(220, 220, 235, 255),
-         11.0f, "SCRAP");
+    char label[24];
+    std::snprintf(label, sizeof label, "SCRAP +%d", amount);
+    text(dl, ImVec2(centre.x, centre.y - h - 17.0f),
+         IM_COL32(220, 220, 235, 255), 11.0f, label);
   } else if (itemId == Arena::PickupId::Medkit) {
     dl->AddRectFilled(ImVec2(centre.x - 8, centre.y - 8),
                       ImVec2(centre.x + 8, centre.y + 8),
@@ -3544,20 +3606,25 @@ void ArenaView::drawOverhead(ImDrawList* dl) {
                           effects->getEffects(id, false), 4);
     }
     const MatchPlayerState* mp = arena->matchPlayer(id);
-    if (mp && mp->carryingScrap) {
+    if (mp && mp->scrapCarried >= Arena::Tuning::SCRAP_HEAVY_LOAD) {
       // A bundle of scrap held overhead, bobbing with the walk.
       float bob = std::sin(timeSeconds * 6.0f + id) * 2.0f;
       ImVec2 c(feet.x, top - (id == me ? 26.0f : 52.0f) + bob);
-      ImVec2 a(c.x - 15.0f, c.y - 10.0f), b(c.x + 15.0f, c.y + 10.0f);
-      dl->AddRectFilled(ImVec2(a.x - 2, a.y - 2), ImVec2(b.x + 2, b.y + 2),
-                        IM_COL32(20, 14, 10, 255), 3.0f);
-      dl->AddRectFilled(a, b, IM_COL32(176, 112, 54, 255), 2.0f);
-      dl->AddRectFilled(ImVec2(a.x, c.y - 2.0f), ImVec2(b.x, c.y + 2.0f),
-                        IM_COL32(205, 210, 220, 255));
-      dl->AddRectFilled(ImVec2(c.x - 2.0f, a.y), ImVec2(c.x + 2.0f, b.y),
-                        IM_COL32(205, 210, 220, 255));
-      text(dl, ImVec2(c.x, c.y - 22.0f), IM_COL32(255, 200, 110, 255), 11.0f,
-           "SCRAP");
+      const ActorSheet* pile = nullptr;
+      const ActorAnim* pileIdle = nullptr;
+      if (scrapSprite(&pile, &pileIdle)) {
+        drawActorFrame(dl, *pile, *pileIdle, 0, 0.0f, ImVec2(c.x, c.y + 10.0f),
+                       0.75f, IM_COL32_WHITE, true, -1, 0.0f, false);
+      } else {
+        ImVec2 a(c.x - 15.0f, c.y - 10.0f), b(c.x + 15.0f, c.y + 10.0f);
+        dl->AddRectFilled(ImVec2(a.x - 2, a.y - 2), ImVec2(b.x + 2, b.y + 2),
+                          IM_COL32(20, 14, 10, 255), 3.0f);
+        dl->AddRectFilled(a, b, IM_COL32(176, 112, 54, 255), 2.0f);
+      }
+      char load[24];
+      std::snprintf(load, sizeof load, "SCRAP %d", mp->scrapCarried);
+      text(dl, ImVec2(c.x, c.y - 34.0f), IM_COL32(255, 200, 110, 255), 11.0f,
+           load);
     }
   }
 

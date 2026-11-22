@@ -90,7 +90,7 @@ void nightFallsWhereYouStand() {
   w.place(C, 9000.0f, 1000.0f);   // alone elsewhere
   w.p(A).health = 10.0f;
   w.p(B).health = 10.0f;
-  w.p(B).carryingScrap = true;
+  w.p(B).scrapCarried = 5;
   w.nightfall();
 
   // Nobody moved, nobody died.
@@ -100,7 +100,7 @@ void nightFallsWhereYouStand() {
   assert(w.p(A).health == w.p(A).maxHealth);
   float expected = 10.0f + w.p(B).maxHealth * T::CAMP_HEAL_FRACTION;
   assert(std::abs(w.p(B).health - expected) < 0.5f);
-  assert(w.p(B).carryingScrap);
+  assert(w.p(B).scrapCarried == 5);
   assert(w.director.scrapInBank() == 0);
 
   // Nobody walks at night.
@@ -128,13 +128,13 @@ void downedAreCarriedInOrWakeAtShip() {
   w.place(C, 12000.0f, 12000.0f); // down and alone
   w.p(B).health = 0.0f;
   w.p(C).health = 0.0f;
-  w.p(C).carryingScrap = true;
+  w.p(C).scrapCarried = 5;
   w.nightfall();
   assert(!w.p(B).isDead() && w.p(B).x == 5100.0f);
   assert(w.p(B).health < w.p(B).maxHealth);
   assert(!w.p(C).isDead());
   assert(std::hypot(w.p(C).x, w.p(C).y) < w.director.safeRadius());
-  assert(!w.p(C).carryingScrap);
+  assert(w.p(C).scrapCarried == 0);
   std::cout << "  night: the downed are carried into camp, or wake at the ship\n";
 }
 

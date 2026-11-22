@@ -120,7 +120,7 @@ struct Player : public Animatable {
   uint16_t kills = 0;
   uint8_t deaths = 0;
   bool ready = false;
-  bool carryingScrap = false;
+  int scrapCarried = 0;  // picked up, not yet banked at the ship or spent
 
   // Level of the `genus` effect in `tree`: how many infusions of that genus
   // fill the tree's nodes (0 = none). Apex Mutation adds one for the core's

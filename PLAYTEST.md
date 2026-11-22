@@ -15,10 +15,13 @@ built to be cheap to change.
 2. **Round (3 of them, ~2.5 to 3 min each).** You start at the crashed ship.
    Aliens pour in from all sides; each quarter of the map belongs to one
    genus (north ice, east fire, south poison, west psychic; the minimap
-   shows it). Kill things, grab the **infusions** they drop, haul **scrap**
-   back to repair the ship (it starts badly damaged and burning). Repair a
-   **derelict turret** and it goes up on the ship's roof. Raids march on
-   the ship every ~45s.
+   shows it). Kill things and grab what they drop: **infusions**, and
+   **scrap**, the crew's currency. Every kill can drop a little scrap; a
+   scrapyard pays a 10-scrap bundle. Carry 10 or more and you are slowed
+   until you bank it in the ring around the ship (it starts badly damaged
+   and burning; banked scrap patches it and pays for its tiers) or spend
+   it: 8 carried scrap repairs a **derelict turret** in a second, and the
+   gun goes up on the ship's roof. Raids march on the ship every ~45s.
    There is no zone: go anywhere on the planet. When the timer runs out,
    night falls **where you stand**.
 3. **Night (intermission).** Nobody moves. Camped at the ship you heal
@@ -60,7 +63,7 @@ win, we win".
 | F | Interact with objectives (scrapyards, turrets) |
 | B | Suit screen (only works beside the ship mid-round) |
 | R | Ready up (night / end screen) |
-| U | Upgrade the ship with banked scrap (night only: 3 to dig it out, 5 more to fortify it) |
+| U | Upgrade the ship with banked scrap (night only: 30 to dig it out, 50 more to fortify it) |
 | Tab (hold) | Full scoreboard |
 | Esc | Pause |
 | F3 | Fog of war on / off (for comparing) |
@@ -70,7 +73,7 @@ the ship slowly heals you.
 
 **Playtest cheats** (for poking at things, not for real tests):
 F2 stand up both roof turrets, set the ship burning (60% hull damage)
-and bank 8 scrap (enough for both ship tiers),
+and bank 80 scrap (enough for both ship tiers),
 F5 skip phase, F6 one of every infusion item, F7 spawn a pack near you,
 F8 god mode, F9 kill everything, F10 spawn the boss, F11 spawn a swarm
 of Toxliths where you are aiming.

@@ -99,6 +99,13 @@ ServerGameState::ServerGameState(NetworkServer* server,
   if (world.tiledMap != nullptr) {
     objectiveSystem = std::make_unique<ObjectiveSystem>();
     mapObjectives = world.tiledMap->getObjectives();
+    // A turret repair is quick; its price is scrap, not time
+    // (Arena::Tuning::TURRET_REPAIR_*), whatever the map says.
+    for (Objective& objective : mapObjectives) {
+      if (objective.type == ObjectiveType::DerelictTurret) {
+        objective.interactionTime = Arena::Tuning::TURRET_REPAIR_SECONDS;
+      }
+    }
     objectiveSystem->initialize(mapObjectives);
 
     // Set up callbacks for state changes
@@ -204,9 +211,11 @@ ServerGameState::ServerGameState(NetworkServer* server,
                          "' armed and waiting for victims");
           }
 
-          // DerelictTurret: the repaired gun stands up on the ship's roof
+          // DerelictTurret: the repair is paid for in scrap and the gun
+          // stands up on the ship's roof.
           if (obj->type == ObjectiveType::DerelictTurret && director &&
               completer != players.end()) {
+            director->payForTurretRepair(completer->second);
             director->onTurretRepaired(completer->second);
           }
 
@@ -524,21 +533,27 @@ void ServerGameState::onUpdate(const UpdateEvent& e) {
 
   // Update objective system (handles interaction timers)
   if (objectiveSystem) {
-    objectiveSystem->update(e.deltaTime);
-
-    // Check if players moved out of objective range
+    // Stop work by anyone who walked out of range, went down or left the
+    // match, before the timers tick: nobody finishes a job they are no
+    // longer doing (a turret repair is paid from scrap they would have
+    // dropped).
     auto interactions =
         objectiveSystem->getPlayerInteractions();  // copy — stopInteraction
                                                    // mutates
     for (const auto& [playerId, objId] : interactions) {
       auto playerIt = players.find(playerId);
       const Objective* obj = objectiveSystem->getObjective(objId);
-      if (playerIt != players.end() && obj) {
-        if (!obj->isInRange(playerIt->second.x, playerIt->second.y)) {
+      if (playerIt == players.end()) {
+        objectiveSystem->stopInteraction(playerId);  // disconnected
+      } else if (obj) {
+        const Player& worker = playerIt->second;
+        if (!obj->isInRange(worker.x, worker.y) || worker.isDead() ||
+            worker.characterId == 0) {
           objectiveSystem->stopInteraction(playerId);
         }
       }
     }
+    objectiveSystem->update(e.deltaTime);
 
     for (const auto& [playerId, player] : players) {
       if (player.isAlive()) {
@@ -1204,12 +1219,13 @@ void ServerGameState::processObjectiveInteract(uint32_t clientId,
     return;
   }
 
-  // One piece of scrap at a time: no salvaging with your hands full.
-  if (player.carryingScrap) {
+  // A derelict turret is repaired with carried scrap: no scrap, no start.
+  if (director) {
     const Objective* near =
         objectiveSystem->findObjectiveNear(player.x, player.y);
-    if (near && near->type == ObjectiveType::AlienScrapyard &&
-        near->state == ObjectiveState::Inactive) {
+    if (near && near->type == ObjectiveType::DerelictTurret &&
+        near->state == ObjectiveState::Inactive &&
+        !director->canAffordTurretRepair(player)) {
       return;
     }
   }

@@ -950,6 +950,8 @@ void ArenaView::drawObjectiveSite(ImDrawList* dl, const ClientObjective& o,
       break;
     }
     case ObjectiveType::DerelictTurret: {
+      // The roof turret itself, broken (one turret look to learn).
+      if (drawDerelictTurret(dl, c, done, id)) break;
       // A 2.5 m gun emplacement on a chest-high base.
       footprintBox(o.x, o.y, 1.1f * M, 1.1f * M, 0.0f, pts);
       groundShadow(dl, c, 1.6f * M);

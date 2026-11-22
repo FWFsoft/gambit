@@ -21,6 +21,63 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-22: Scrap is a counted currency; turret repairs cost scrap
+- **Decision:** Scrap is a count, not one heavy piece.
+  - Every kill can drop a little: swarmers 35% for 1, casters 50% for 2,
+    brutes always 3, elites always 4.
+  - A scrapyard pays a bundle of 10.
+  - Carried scrap is banked by walking into the ship's ring, as before.
+  - Carrying 10 or more slows you; less is light.
+  - Going down drops your whole pile as one pickup.
+  - Units went up tenfold: ship tiers cost 30 and 50 (were 3 and 5), the
+    hull repairs 18 per scrap (was 180 per piece), score is 10 per scrap
+    banked.
+  - A derelict turret repair costs 8 carried scrap and takes 1 s (was
+    free and a 10 s channel). The cost is checked when you start and paid
+    when you finish, so walking away costs nothing.
+  - Anyone who goes down, leaves or disconnects now stops working on an
+    objective, before its timer ticks.
+- **Pillars:** Strategic Crunch serves: every kill moves you toward a
+  choice, and scrap in hand is a live trade-off (repair a turret now,
+  carry it home for the ship, or stay light). The 10 s sit-and-channel was
+  dead time, and is gone. Clarity serves: the carry prompt says how much
+  you hold and the crew's progress toward the next tier ("ship 18/30"),
+  the turret says its price, and drops are labelled "SCRAP +n".
+  Comradery: neutral; scrap is per carrier, banked for the crew.
+- **Why:** Playtest (#37, #38). Kill income is tuned to match the old one:
+  a thug pack used to pay about 5 units (a 10-unit piece at 50% from the
+  elite) and now pays about 5.75. Turrets now compete with the ship for
+  scrap, so ship tiers come a little later if the crew buys turrets. The
+  heavy-load slow keeps the old "the haul home is the cost" for big loads
+  without punishing pocket change. **Trade-off:** the repair noise's pack
+  used to arrive mid-repair (fight while you channel); it now arrives
+  after a 1 s repair, so you fight it on the way home. Bots in ArenaSim
+  kill too little to measure the economy; it needs a playtest.
+- **Status:** Built, needs review
+- **Where:** `include/ArenaData.h` (Tuning, PickupId::scrap),
+  `src/MatchDirector.cpp`, `src/ServerGameState.cpp`, `src/ArenaHud.cpp`,
+  `tests/test_points_of_interest.cpp`
+
+## 2026-11-22: Derelict turrets are the roof turret, broken; scrap has a model
+- **Decision:**
+  - The derelict turret objective draws the roof turret's own sprites,
+    dimmed. The gun slumps on its mount with the barrel tipped down,
+    smoking and sparking. Once repaired, only the empty mount is left (the
+    gun is on the ship's roof).
+  - Scrap pickups and big carried loads use a new baked sprite from the
+    team's Meshy model (`art/models/Scrap.glb`, fetched free and cut from
+    3 million to 20,000 triangles with `shrink.py`; actor
+    `tools/sprite_forge/actors/scrap.py`). The pile grows with the amount
+    and sits in a soft amber glow.
+- **Pillars:** Clarity: one turret look to learn, broken and then fixed on
+  the roof; loot reads on the dark ground.
+- **Why:** Playtest (#39): the objective had its own code-drawn gun that
+  looked nothing like the turret it becomes. The scrap model was supplied
+  by a human.
+- **Status:** Accepted (requested by a human)
+- **Where:** `src/ArenaView.cpp` (`drawDerelictTurret`, `drawPickup`),
+  `src/ArenaWorld.cpp`, `assets/sprites/actors/Scrap.png`
+
 ## 2026-11-22: Esc always closes whatever is on top
 - **Decision:** Esc closes the top-most thing on screen before it does
   anything else, in this order: the settings panel, the suit screen (B),

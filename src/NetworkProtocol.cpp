@@ -982,7 +982,7 @@ std::vector<uint8_t> serialize(const MatchStatePacket& packet) {
       writeUint8(buffer,
                  static_cast<uint8_t>((p.nodeGenus[i] << 4) | p.nodePart[i]));
     }
-    writeUint8(buffer, p.carryingScrap);
+    writeUint8(buffer, p.scrapCarried);
     writeFloat(buffer, p.reviveProgress);
   }
   return buffer;
@@ -1047,7 +1047,7 @@ MatchStatePacket deserializeMatchState(const uint8_t* data, size_t size) {
       p.nodeGenus[index] = static_cast<uint8_t>(item >> 4);
       p.nodePart[index] = static_cast<uint8_t>(item & 0x0F);
     }
-    p.carryingScrap = readUint8(data + offset);
+    p.scrapCarried = readUint8(data + offset);
     offset += 1;
     p.reviveProgress = readFloat(data + offset);
     offset += 4;

@@ -1732,12 +1732,27 @@ void ArenaView::drawPrompts() {
 
     bool scrapyard = objective.type == ObjectiveType::AlienScrapyard;
     bool probe = objective.type == ObjectiveType::RecoverProbe;
+    bool turret = objective.type == ObjectiveType::DerelictTurret;
     if (state == ObjectiveState::Inactive && inRange) {
-      if (scrapyard && me && me->carryingScrap) {
-        prompt = "Your hands are full: bank this scrap at the ship first";
+      int carried = me ? me->scrapCarried : 0;
+      if (scrapyard) {
+        std::snprintf(line, sizeof line,
+                      "[F] Salvage a bundle of scrap (+%d)  (stay close "
+                      "while you work)",
+                      Arena::Tuning::SCRAP_BUNDLE);
+        prompt = line;
+      } else if (turret && carried < Arena::Tuning::TURRET_REPAIR_SCRAP) {
+        std::snprintf(line, sizeof line,
+                      "Repairing this turret takes %d scrap: you carry %d. "
+                      "Kill aliens for scrap",
+                      Arena::Tuning::TURRET_REPAIR_SCRAP, carried);
+        prompt = line;
         colour = todo;
-      } else if (scrapyard) {
-        prompt = "[F] Salvage scrap  (stay close while you work)";
+      } else if (turret) {
+        std::snprintf(line, sizeof line,
+                      "[F] Repair the turret for %d scrap  (you carry %d)",
+                      Arena::Tuning::TURRET_REPAIR_SCRAP, carried);
+        prompt = line;
       } else if (probe) {
         prompt = "[F] Dig out the probe and boot it: its scan maps the "
                  "land around it  (stay close)";
@@ -1763,9 +1778,28 @@ void ArenaView::drawPrompts() {
       }
     }
   }
-  if (!prompt && me && me->carryingScrap) {
-    prompt = "Carrying scrap: walk it into the ring around the ship";
-    colour = IM_COL32(255, 190, 110, 255);
+  if (!prompt && me && me->scrapCarried > 0) {
+    // What you carry, and what it buys once banked.
+    const MatchStatePacket& match = arena->match();
+    int tier =
+        std::min<int>(match.shipTier, Arena::Tuning::SHIP_TIER_COUNT - 1);
+    bool heavy = me->scrapCarried >= Arena::Tuning::SCRAP_HEAVY_LOAD;
+    if (tier + 1 < Arena::Tuning::SHIP_TIER_COUNT) {
+      std::snprintf(line, sizeof line,
+                    "Carrying %d scrap%s: bank it in the ring around the "
+                    "ship  (ship %d/%d to the next tier)",
+                    me->scrapCarried, heavy ? " (heavy)" : "",
+                    match.scrapBanked + me->scrapCarried,
+                    Arena::Tuning::SHIP_TIER_COST[tier + 1]);
+    } else {
+      std::snprintf(line, sizeof line,
+                    "Carrying %d scrap%s: bank it at the ship to patch the "
+                    "hull",
+                    me->scrapCarried, heavy ? " (heavy)" : "");
+    }
+    prompt = line;
+    colour =
+        heavy ? IM_COL32(255, 190, 110, 255) : IM_COL32(225, 220, 205, 230);
   }
   if (!prompt && me && me->coreGenus == 0) {
     int unslotted = 0;
@@ -1834,8 +1868,9 @@ void ArenaView::drawCampPanel() {
                                                 Arena::Tuning::CAMP_HEAL_PER_ALLY *
                                                     static_cast<float>(allies)));
   ImGui::BulletText("Your suit opens only at the ship.");
-  if (me->carryingScrap) {
-    ImGui::BulletText("Your scrap stays in your hands until you bank it.");
+  if (me->scrapCarried > 0) {
+    ImGui::BulletText("Your %d scrap stays in your hands until you bank it.",
+                      me->scrapCarried);
   }
   int round = std::min<int>(match.round + 1, Arena::Tuning::ROUND_COUNT);
   if (match.round < Arena::Tuning::ROUND_COUNT &&

@@ -177,7 +177,7 @@ void MatchDirector::makeCamp() {
       player.x = shipX - 120.0f + 80.0f * static_cast<float>(index++ % 4);
       player.y = shipY + 190.0f;
       player.health = player.maxHealth;
-      player.carryingScrap = false;  // dropped somewhere out there
+      player.scrapCarried = 0;  // dropped somewhere out there
     }
   }
 
@@ -187,7 +187,7 @@ void MatchDirector::makeCamp() {
     if (atShip(player)) {
       player.health = player.maxHealth;
       // Scrap carried home tonight still counts.
-      if (player.carryingScrap) bankScrap(player);
+      if (player.scrapCarried > 0) bankScrap(player);
     } else {
       campHeal(player, alliesNear(player));
     }
@@ -281,7 +281,7 @@ void MatchDirector::startRound(int round) {
     if (!isParticipant(player)) continue;
     abilities->resetPlayerForRound(player);
     player.ready = false;
-    if (round == 1) player.carryingScrap = false;
+    if (round == 1) player.scrapCarried = 0;
     roundStartScore[id] = player.score;
   }
 
@@ -359,7 +359,7 @@ void MatchDirector::startBossFight() {
     if (!isParticipant(player)) continue;
     abilities->resetPlayerForRound(player);
     player.ready = false;
-    if (player.carryingScrap) bankScrap(player);
+    if (player.scrapCarried > 0) bankScrap(player);
   }
   // The ship is beyond saving in the finale: nothing left to raid.
   enemies->setShip(shipX, shipY, false);
@@ -416,7 +416,7 @@ void MatchDirector::resetMatch() {
     player.kills = 0;
     player.deaths = 0;
     player.ready = false;
-    player.carryingScrap = false;
+    player.scrapCarried = 0;
     Infusions::resetLoadout(player);
     if (isParticipant(player)) abilities->applyKitStats(player);
   }
@@ -859,21 +859,63 @@ void MatchDirector::updateRoofTurrets(float dtMs) {
   }
 }
 
-void MatchDirector::startCarryingScrap(Player& player) {
-  player.carryingScrap = true;
-  // It is heavy: the haul home is the cost of the scrap.
-  abilities->applyToPlayer(player, EffectType::Slow, 1, 0, 600000.0f);
+void MatchDirector::addScrap(Player& player, int amount) {
+  assert(amount > 0);
+  bool wasHeavy = player.scrapCarried >= Tuning::SCRAP_HEAVY_LOAD;
+  player.scrapCarried =
+      std::min(player.scrapCarried + amount, Tuning::SCRAP_CARRY_MAX);
+  updateScrapLoad(player, wasHeavy);
+}
+
+void MatchDirector::spendScrap(Player& player, int amount) {
+  assert(amount > 0 && amount <= player.scrapCarried);
+  bool wasHeavy = player.scrapCarried >= Tuning::SCRAP_HEAVY_LOAD;
+  player.scrapCarried -= amount;
+  updateScrapLoad(player, wasHeavy);
+}
+
+void MatchDirector::updateScrapLoad(Player& player, bool wasHeavy) {
+  assert(player.scrapCarried >= 0 &&
+         player.scrapCarried <= Tuning::SCRAP_CARRY_MAX);
+  bool heavy = player.scrapCarried >= Tuning::SCRAP_HEAVY_LOAD;
+  if (heavy == wasHeavy) return;
+  // A full load is heavy: the haul home is the cost of a big pile.
+  if (heavy) {
+    abilities->applyToPlayer(player, EffectType::Slow, 1, 0, 600000.0f);
+  } else {
+    abilities->effects().cleanseDebuff(player.id, EffectType::Slow);
+  }
+}
+
+void MatchDirector::payForTurretRepair(Player& player) {
+  // Checked at the start; only walking away (which cancels the repair) or
+  // going down could lose scrap in between, so the bill always fits.
+  assert(canAffordTurretRepair(player));
+  spendScrap(player, Tuning::TURRET_REPAIR_SCRAP);
+}
+
+void MatchDirector::dropCarriedScrap(Player& player) {
+  if (player.scrapCarried <= 0) return;
+  int amount = player.scrapCarried;
+  spendScrap(player, amount);
+  if (hooks.spawnPickup) {
+    hooks.spawnPickup(Arena::PickupId::scrap(amount), player.x, player.y);
+  }
 }
 
 void MatchDirector::bankScrap(Player& player) {
-  player.carryingScrap = false;
-  abilities->effects().cleanseDebuff(player.id, EffectType::Slow);
-  scrapBanked++;
-  float repaired =
-      std::min(shipMaxHealth() - shipHp, Tuning::SHIP_REPAIR_PER_SCRAP);
+  int amount = player.scrapCarried;
+  assert(amount > 0);
+  spendScrap(player, amount);
+  scrapBanked += amount;
+  float repaired = std::min(shipMaxHealth() - shipHp,
+                            Tuning::SHIP_REPAIR_PER_SCRAP * amount);
   shipHp += repaired;
-  player.score += Tuning::SCORE_SCRAP;
-  abilities->fxAnnounce(Announcement::ScrapDelivered);
+  player.score += Tuning::SCORE_SCRAP * amount;
+  // A full load gets the banner; pocket change just flares the hull.
+  if (amount >= Tuning::SCRAP_HEAVY_LOAD) {
+    abilities->fxAnnounce(Announcement::ScrapDelivered);
+  }
   // The scrap is heaved onto the hull, which flares as it is welded on.
   abilities->fxLob(player.x, player.y, shipX, shipY - 30.0f, 22.0f, 380.0f,
                    VfxTheme::Heal, 0);
@@ -884,13 +926,14 @@ void MatchDirector::bankScrap(Player& player) {
   hull.kind = GameEventKind::Heal;
   hull.x = shipX;
   hull.y = shipY - 40.0f;
-  hull.value = repaired > 0.0f ? repaired : Tuning::SHIP_REPAIR_PER_SCRAP;
+  hull.value =
+      repaired > 0.0f ? repaired : Tuning::SHIP_REPAIR_PER_SCRAP * amount;
   abilities->emit(hull);
 }
 
 void MatchDirector::updateScrapDelivery() {
   for (auto& [id, player] : players) {
-    if (!player.carryingScrap || player.isDead()) continue;
+    if (player.scrapCarried <= 0 || player.isDead()) continue;
     if (dist(player.x, player.y, shipX, shipY) <= Tuning::SHIP_DROP_RADIUS) {
       bankScrap(player);
     }
@@ -915,12 +958,7 @@ void MatchDirector::updateDeathsAndRevives(float dtMs) {
       player.reviveProgress = 0.0f;
       player.deathTime = 1.0f;
       abilities->effects().clearEntity(id, false);
-      if (player.carryingScrap) {
-        player.carryingScrap = false;
-        if (hooks.spawnPickup) {
-          hooks.spawnPickup(Arena::PickupId::Scrap, player.x, player.y);
-        }
-      }
+      dropCarriedScrap(player);
       abilities->fxAnnounce(Announcement::PlayerDown);
     }
     if (!dead) {
@@ -978,12 +1016,7 @@ void MatchDirector::leaveToMenu(Player& player) {
   if (inCombat()) {
     leftForMenu[player.id] = MenuLeave{currentRound, player.isDead()};
   }
-  if (player.carryingScrap) {
-    player.carryingScrap = false;
-    if (hooks.spawnPickup) {
-      hooks.spawnPickup(Arena::PickupId::Scrap, player.x, player.y);
-    }
-  }
+  dropCarriedScrap(player);
   abilities->effects().clearEntity(player.id, false);
   player.characterId = 0;
   player.ready = false;
@@ -1123,11 +1156,19 @@ void MatchDirector::dropLoot(const Enemy& enemy) {
     hooks.spawnPickup(Arena::PickupId::infusion(lootGenus, randomPart()),
                       enemy.x, enemy.y);
   }
-  // Scrap comes off the pack's heavy: a brute, or a thug pack's elite.
-  bool heavy = def.tier == EnemyTier::Brute || (thug && enemy.elite);
-  if (heavy && random01() < 0.5f) {
-    hooks.spawnPickup(Arena::PickupId::Scrap, enemy.x + 24.0f, enemy.y);
-  } else if (random01() < 0.05f) {
+  // Every kill can drop a little scrap; the heavier the body, the more.
+  // An elite always drops its own pile.
+  int tierIndex = std::min(static_cast<int>(def.tier), 2);
+  int scrap = 0;
+  if (enemy.elite) {
+    scrap = Tuning::SCRAP_DROP_ELITE;
+  } else if (random01() < Tuning::SCRAP_DROP_CHANCE[tierIndex]) {
+    scrap = Tuning::SCRAP_DROP_AMOUNT[tierIndex];
+  }
+  if (scrap > 0) {
+    hooks.spawnPickup(Arena::PickupId::scrap(scrap), enemy.x + 24.0f, enemy.y);
+  }
+  if (random01() < 0.05f) {
     hooks.spawnPickup(Arena::PickupId::Medkit, enemy.x - 20.0f, enemy.y);
   }
 }
@@ -1144,9 +1185,9 @@ bool MatchDirector::onPickup(Player& player, uint32_t itemId) {
     player.score += 15;
     return true;
   }
-  if (itemId == Arena::PickupId::Scrap) {
-    if (player.carryingScrap) return false;  // one piece at a time
-    startCarryingScrap(player);
+  if (Arena::PickupId::isScrap(itemId)) {
+    if (player.scrapCarried >= Tuning::SCRAP_CARRY_MAX) return false;
+    addScrap(player, Arena::PickupId::scrapAmount(itemId));
     return true;
   }
   if (itemId == Arena::PickupId::Medkit) {
@@ -1162,7 +1203,7 @@ void MatchDirector::onObjectiveCompleted(Player& player, bool salvagedScrap,
   player.score += Tuning::SCORE_OBJECTIVE;
   if (salvagedScrap) {
     abilities->fxAnnounce(Announcement::ScrapSalvaged);
-    startCarryingScrap(player);
+    addScrap(player, Tuning::SCRAP_BUNDLE);
     return;
   }
   abilities->fxAnnounce(Announcement::ObjectiveComplete);
@@ -1470,7 +1511,9 @@ MatchStatePacket MatchDirector::buildState() const {
         p.inventory[g][part] = player.infusionInventory[g][part];
       }
     }
-    p.carryingScrap = player.carryingScrap ? 1 : 0;
+    assert(player.scrapCarried >= 0 &&
+           player.scrapCarried <= Tuning::SCRAP_CARRY_MAX);
+    p.scrapCarried = static_cast<uint8_t>(player.scrapCarried);
     p.reviveProgress = player.reviveProgress;
     packet.players.push_back(p);
   }
