@@ -1401,6 +1401,19 @@ void UISystem::renderObjectiveActivity() {
   ImGui::End();
 }
 
+bool UISystem::closeTopOverlay(GameState state) {
+  if (showSettings) {
+    showSettings = false;
+    return true;
+  }
+  // The suit screen only shows while playing; under the pause menu the
+  // pause menu is on top, so Esc resumes first.
+  if (state == GameState::Playing && arenaView) {
+    return arenaView->closeSuitScreen();
+  }
+  return false;
+}
+
 void UISystem::onKeyDown(const KeyDownEvent& e) {
   GameState currentState = GameStateManager::instance().getCurrentState();
 

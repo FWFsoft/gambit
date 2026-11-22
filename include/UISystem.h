@@ -40,6 +40,11 @@ class UISystem {
   // (replacing the old placeholder HUD).
   void setArenaView(ArenaView* view) { arenaView = view; }
 
+  // Closes the top-most overlay this system draws in `state` (the settings
+  // panel, then the arena's suit screen); false if none was open. Wired to
+  // InputSystem::setOverlayCloser so Esc always closes what's on top.
+  bool closeTopOverlay(GameState state);
+
   // The look's scene target is resolved to the screen inside the ImGui
   // pass. ArenaView queues that; UISystem does it when ArenaView did not
   // draw (menus over the world).

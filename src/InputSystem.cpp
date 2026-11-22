@@ -42,6 +42,11 @@ void InputSystem::onKeyDown(const KeyDownEvent& e) {
   GameStateManager& gsm = GameStateManager::instance();
   GameState currentState = gsm.getCurrentState();
 
+  // Esc closes the top-most overlay before it means anything else.
+  if (e.key == SDLK_ESCAPE && overlayCloser && overlayCloser(currentState)) {
+    return;
+  }
+
   // TitleScreen: any key advances to character select
   if (currentState == GameState::TitleScreen) {
     gsm.transitionTo(GameState::CharacterSelect);
@@ -56,7 +61,7 @@ void InputSystem::onKeyDown(const KeyDownEvent& e) {
     return;  // All other input handled by ImGui clicks
   }
 
-  // ESC: Toggle pause (Playing <-> Paused)
+  // ESC: Toggle pause (Playing <-> Paused); also closes the inventory
   if (e.key == SDLK_ESCAPE) {
     if (currentState == GameState::Playing) {
       // Clear movement state and reset animation to idle when pausing
@@ -68,7 +73,8 @@ void InputSystem::onKeyDown(const KeyDownEvent& e) {
         localPlayer.getAnimationController()->updateAnimationState(0.0f, 0.0f);
       }
       gsm.transitionTo(GameState::Paused);
-    } else if (currentState == GameState::Paused) {
+    } else if (currentState == GameState::Paused ||
+               currentState == GameState::Inventory) {
       gsm.transitionTo(GameState::Playing);
     }
     return;
