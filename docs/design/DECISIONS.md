@@ -21,6 +21,59 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-23: Infusion grades: combine to go deep; deeper effects differ and lock you in
+- **Decision** (spec only, issue #44; full text in
+  `specs/infusion-grades.md`):
+  - **Grades.** Drops are Raw (I). Two infusions of the same genus and
+    grade combine into one of the next grade at the ship: Raw → Refined
+    (II) → Exalted (III). The target item's part survives; part stats
+    scale with the Raw inside (×1, ×2, ×4), so combining moves stats but
+    never loses them. Nothing splits back.
+  - **Depth needs grade.** Tree tiers 1 and 2 take any grade, tier 3
+    needs Refined, tier 4 needs Exalted. A full tree costs 8 Raw (was 4).
+  - **Different effects per grade.** Each genus × tree gets a Refined and
+    an Exalted effect (32 new effects) on top of today's Raw effect.
+    Raw builds something (stacks, a status), Refined pays it off in a new
+    way (a burst, a team effect), Exalted changes how you play (Plague
+    Carrier, Phantom, Glacier, Inferno Heart...).
+  - **Lock-outs.** Combining is permanent. The first Refined in a tree
+    attunes it to that genus (only that genus after). The first Exalted
+    slotted makes you that genus's Ascendant: one capstone genus per
+    match.
+  - The round depth cap (2 / 3 / 4) stays for the first build, to be
+    removed if sims show it never binds.
+- **Pillars:**
+  - **Creative Builds** decided it (main pillar of the issue): builds now
+    form over the match instead of all being open the whole time, and
+    Exalted effects make a deep build play differently, not just hit
+    harder. It trades a little of the 2026-11-17 freedom to mix genera:
+    a tree's deep half is now one genus. The shallow suit stays mixed, so
+    Purebred vs Hybrid Vigor is still a real fork.
+  - **Strategic Crunch:** serves. Every pair of infusions is wide (two
+    slots, two talents) vs deep (one slot, a tier-3 node, a new effect),
+    and Ascension is a one-way door with a confirm step.
+  - **Comradery:** serves. Five of the new effects help the team
+    (Corrosion, Symbiote, Psychic Link, Brittle, Cryo Sanctuary); none can
+    hurt or block an ally. The Ascendant title shows off a player's build.
+  - **Clarity:** weakens slightly. Grades and attunement are two more
+    rules on the suit screen; the spec answers with one pip language
+    everywhere, a "why is this blocked" tooltip and a confirm before
+    Ascension. 32 new effects need hit feedback of their own when built.
+- **Why:** Playtest 2026-11-22: upgrades came too fast; with one slot per
+  drop a player fills 13 to 17 of 17 slots in a match (estimate from the
+  drop code; the sim could not be built here). Rejected: 3 → 1 recipe
+  (an Exalted would cost 9 Raw, so almost nobody would reach a capstone);
+  locking the whole suit to one genus at the first Refined (kills mixed
+  builds); starving drops instead (makes exploring less rewarding, against
+  the camping decision of 2026-11-19). **Against the Genera and Infusion
+  doc:** the doc's scaling is "more infusions of the genus, a stronger
+  effect" and the doc never mentions grades or lock-outs; this keeps that
+  rule for Raw effects and adds grades on top. Pacing numbers are
+  estimates and must be measured with ArenaSim once built. Four open
+  questions are listed at the end of the spec.
+- **Status:** Proposed (spec; not built)
+- **Where:** `specs/infusion-grades.md`
+
 ## 2026-11-22: Scrap is a counted currency; turret repairs cost scrap
 - **Decision:** Scrap is a count, not one heavy piece.
   - Every kill can drop a little: swarmers 35% for 1, casters 50% for 2,
