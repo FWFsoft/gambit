@@ -129,12 +129,16 @@ TEST(ArenaPacketsRoundTrip) {
     a.ready = 1;
     a.coreGenus = 4;
     a.corePart = 2;
+    a.coreGrade = 3;
     a.nodeGenus[0] = 3;
     a.nodePart[0] = 1;
+    a.nodeGrade[0] = 2;
     a.nodeGenus[Arena::MAX_SUIT_NODES - 1] = 1;
     a.nodePart[Arena::MAX_SUIT_NODES - 1] = 3;
-    a.inventory[0][2] = 7;
-    a.inventory[3][3] = 99;
+    a.nodeGrade[Arena::MAX_SUIT_NODES - 1] = 3;
+    a.inventory[0][2][0] = 7;
+    a.inventory[1][1][1] = 5;
+    a.inventory[3][3][2] = 99;
     a.scrapCarried = 37;
     a.reviveProgress = 0.5f;
     m.players.push_back(a);
@@ -151,14 +155,19 @@ TEST(ArenaPacketsRoundTrip) {
     assert(out.players.size() == 2);
     assert(out.players[0].score == -150 && out.players[0].kills == 300);
     assert(out.players[0].coreGenus == 4 && out.players[0].corePart == 2);
+    assert(out.players[0].coreGrade == 3);
+    assert(out.players[0].nodeGrade[0] == 2);
+    assert(out.players[0].nodeGrade[Arena::MAX_SUIT_NODES - 1] == 3);
     assert(out.players[0].nodeGenus[0] == 3 && out.players[0].nodePart[0] == 1);
     assert(out.players[0].nodeGenus[Arena::MAX_SUIT_NODES - 1] == 1);
     assert(out.players[0].nodePart[Arena::MAX_SUIT_NODES - 1] == 3);
     for (int i = 1; i < Arena::MAX_SUIT_NODES - 1; i++) {
       assert(out.players[0].nodeGenus[i] == 0);
     }
-    assert(out.players[0].inventory[0][2] == 7);
-    assert(out.players[0].inventory[3][3] == 99);
+    assert(out.players[0].inventory[0][2][0] == 7);
+    assert(out.players[0].inventory[1][1][1] == 5);
+    assert(out.players[0].inventory[0][2][1] == 0);
+    assert(out.players[0].inventory[3][3][2] == 99);
     assert(out.players[1].coreGenus == 0 && out.players[1].nodeGenus[0] == 0);
     assert(out.players[0].scrapCarried == 37);
     assert(out.players[0].reviveProgress == 0.5f);
@@ -168,9 +177,23 @@ TEST(ArenaPacketsRoundTrip) {
     slot.genus = 2;
     slot.part = 3;
     slot.node = Arena::CORE_NODE;
+    slot.grade = 2;
     auto bytes = serialize(slot);
     auto out = deserializeInfusionSlot(bytes.data(), bytes.size());
     assert(out.genus == 2 && out.part == 3 && out.node == Arena::CORE_NODE);
+    assert(out.grade == 2);
+
+    InfusionCombinePacket combine;
+    combine.genus = 4;
+    combine.grade = 2;
+    combine.targetPart = 1;
+    combine.otherPart = 3;
+    auto combineBytes = serialize(combine);
+    assert(combineBytes.size() == 5);
+    auto combined =
+        deserializeInfusionCombine(combineBytes.data(), combineBytes.size());
+    assert(combined.genus == 4 && combined.grade == 2 &&
+           combined.targetPart == 1 && combined.otherPart == 3);
 
     PlayerReadyPacket ready;
     ready.ready = 1;

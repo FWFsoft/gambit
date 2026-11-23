@@ -1,8 +1,11 @@
 # STATUS
 
-**PROPOSED** (issue #44). Not built. Extends
-`specs/genera-and-infusion-system.md`; where the two disagree, this one is
-newer but still needs a human yes.
+**ACCEPTED** (issue #44; spec approved by a human on 2026-11-23, with the
+defaults for the four open questions at the end). **Step 1 built**: grades,
+combining, depth requirements, attunement, Ascension and the suit screen.
+**Step 2 not built**: the 32 Refined and Exalted effects exist as text
+only; the suit screen marks them "not in the game yet". Extends
+`specs/genera-and-infusion-system.md`.
 
 # Infusion grades: combine, go deep, become something
 
@@ -264,6 +267,10 @@ Targets: average slots filled 8 to 11 (was ~13+), most players reach tier
   text; (2) the 32 effects, a genus at a time.
 
 ## Open questions for a human
+
+Answered on 2026-11-23 by accepting the spec as written: 2 → 1, no core
+grade, one capstone genus per match, keep the round cap. Revisit after a
+playtest.
 
 1. Is 2 → 1 the right recipe, or should Exalted cost more (e.g. 3
    Refined)? This spec chose 2 → 1 so a capstone is reachable at all.

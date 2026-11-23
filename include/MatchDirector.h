@@ -62,7 +62,10 @@ class MatchDirector {
   void onReady(Player& player, bool ready);
   // node: an Arena::suitNode index, or Arena::CORE_NODE.
   void onSlotInfusion(Player& player, Arena::Genus genus,
-                      Arena::InfusionPart part, int node);
+                      Arena::InfusionPart part, int grade, int node);
+  void onCombineInfusion(Player& player, Arena::Genus genus, int grade,
+                         Arena::InfusionPart targetPart,
+                         Arena::InfusionPart otherPart);
   void onEnemyKilled(const Enemy& enemy, uint32_t killerId);
   // Returns true if the pickup was consumed.
   bool onPickup(Player& player, uint32_t itemId);
@@ -210,6 +213,8 @@ class MatchDirector {
   // Dawn: an ambush near every camp out of the ship's reach.
   void dawnAmbush();
   bool atShip(const Player& player) const;
+  // Slotting and combining only happen beside the ship during a match.
+  bool canWorkOnSuit(const Player& player) const;
   void bankScrap(Player& player);
   // Applies or lifts the heavy-load slow after the carried amount changed.
   void updateScrapLoad(Player& player, bool wasHeavy);

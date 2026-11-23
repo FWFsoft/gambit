@@ -924,10 +924,10 @@ static constexpr size_t MATCH_REGION_OFFSET =
     36 + 2 * Arena::Tuning::ROOF_TURRET_COUNT;
 static constexpr size_t MATCH_HEADER_BYTES =
     MATCH_REGION_OFFSET + Arena::REGION_SLOTS / 2 + 1;
-// Fixed part of a player entry; then 2 bytes per filled suit node.
+// Fixed part of a player entry; then 3 bytes per filled suit node.
 static constexpr size_t MATCH_PLAYER_BYTES =
-    4 + 1 + 4 + 2 + 1 + 1 + 1 + 1 + Arena::GENUS_COUNT * Arena::PART_COUNT + 1 +
-    1 + 4;
+    4 + 1 + 4 + 2 + 1 + 1 + 1 + 1 + 1 +
+    Arena::GENUS_COUNT * Arena::PART_COUNT * Arena::GRADE_COUNT + 1 + 1 + 4;
 
 std::vector<uint8_t> serialize(const MatchStatePacket& packet) {
   std::vector<uint8_t> buffer;
@@ -968,10 +968,13 @@ std::vector<uint8_t> serialize(const MatchStatePacket& packet) {
     writeUint8(buffer, p.ready);
     writeUint8(buffer, p.coreGenus);
     writeUint8(buffer, p.corePart);
-    for (const auto& row : p.inventory) {
-      for (uint8_t v : row) writeUint8(buffer, v);
+    writeUint8(buffer, p.coreGrade);
+    for (const auto& genusRow : p.inventory) {
+      for (const auto& partRow : genusRow) {
+        for (uint8_t v : partRow) writeUint8(buffer, v);
+      }
     }
-    // Filled nodes only: index, then genus (high nibble) and part (low).
+    // Filled nodes only: index, genus (high nibble) and part (low), grade.
     uint8_t filled = 0;
     for (uint8_t g : p.nodeGenus) filled += g != 0 ? 1 : 0;
     writeUint8(buffer, filled);
@@ -981,6 +984,7 @@ std::vector<uint8_t> serialize(const MatchStatePacket& packet) {
       writeUint8(buffer, static_cast<uint8_t>(i));
       writeUint8(buffer,
                  static_cast<uint8_t>((p.nodeGenus[i] << 4) | p.nodePart[i]));
+      writeUint8(buffer, p.nodeGrade[i]);
     }
     writeUint8(buffer, p.scrapCarried);
     writeFloat(buffer, p.reviveProgress);
@@ -1035,17 +1039,21 @@ MatchStatePacket deserializeMatchState(const uint8_t* data, size_t size) {
     offset += 1;
     p.coreGenus = readUint8(data + offset++);
     p.corePart = readUint8(data + offset++);
-    for (auto& row : p.inventory) {
-      for (uint8_t& v : row) v = readUint8(data + offset++);
+    p.coreGrade = readUint8(data + offset++);
+    for (auto& genusRow : p.inventory) {
+      for (auto& partRow : genusRow) {
+        for (uint8_t& v : partRow) v = readUint8(data + offset++);
+      }
     }
     uint8_t filled = readUint8(data + offset++);
-    assert(size >= offset + filled * 2u);
+    assert(size >= offset + filled * 3u);
     for (uint8_t n = 0; n < filled; n++) {
       uint8_t index = readUint8(data + offset++);
       uint8_t item = readUint8(data + offset++);
       assert(index < Arena::MAX_SUIT_NODES);
       p.nodeGenus[index] = static_cast<uint8_t>(item >> 4);
       p.nodePart[index] = static_cast<uint8_t>(item & 0x0F);
+      p.nodeGrade[index] = readUint8(data + offset++);
     }
     p.scrapCarried = readUint8(data + offset);
     offset += 1;
@@ -1062,16 +1070,41 @@ std::vector<uint8_t> serialize(const InfusionSlotPacket& packet) {
   writeUint8(buffer, packet.genus);
   writeUint8(buffer, packet.part);
   writeUint8(buffer, packet.node);
+  writeUint8(buffer, packet.grade);
   return buffer;
 }
 
 InfusionSlotPacket deserializeInfusionSlot(const uint8_t* data, size_t size) {
-  assert(size >= 4);
+  assert(size >= 5);
   assert(data[0] == static_cast<uint8_t>(PacketType::InfusionSlot));
   InfusionSlotPacket packet;
   packet.genus = readUint8(data + 1);
   packet.part = readUint8(data + 2);
   packet.node = readUint8(data + 3);
+  packet.grade = readUint8(data + 4);
+  return packet;
+}
+
+std::vector<uint8_t> serialize(const InfusionCombinePacket& packet) {
+  std::vector<uint8_t> buffer;
+  writeUint8(buffer, static_cast<uint8_t>(packet.type));
+  writeUint8(buffer, packet.genus);
+  writeUint8(buffer, packet.grade);
+  writeUint8(buffer, packet.targetPart);
+  writeUint8(buffer, packet.otherPart);
+  return buffer;
+}
+
+InfusionCombinePacket deserializeInfusionCombine(const uint8_t* data,
+                                                 size_t size) {
+  assert(size >= 5);
+  assert(data[0] == static_cast<uint8_t>(PacketType::InfusionCombine));
+  (void)size;
+  InfusionCombinePacket packet;
+  packet.genus = readUint8(data + 1);
+  packet.grade = readUint8(data + 2);
+  packet.targetPart = readUint8(data + 3);
+  packet.otherPart = readUint8(data + 4);
   return packet;
 }
 

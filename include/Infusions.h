@@ -17,14 +17,24 @@
 namespace Infusions {
 
 // ---- loadout ---------------------------------------------------------------
-// Put a picked-up item in the pack. False if the pack is full of that item.
+// Put an item in the pack. False if the pack is full of that item. Drops
+// are always Raw; higher grades come from combining.
 bool addToInventory(Player& player, Arena::Genus genus,
-                    Arena::InfusionPart part);
+                    Arena::InfusionPart part, int grade = Arena::GRADE_RAW);
+// Combine two `grade` items of `genus` from the pack into one of the next
+// grade (specs/infusion-grades.md). The result keeps `targetPart`; the
+// `otherPart` item is used up (the two parts may be the same). Returns
+// false, changing nothing, if the pack lacks the items or the rules forbid
+// it (Exalted is the top; one Exalted genus per suit).
+bool combineInfusions(Player& player, Arena::Genus genus, int grade,
+                      Arena::InfusionPart targetPart,
+                      Arena::InfusionPart otherPart);
 // Slot one item from the pack into `node` (Arena::CORE_NODE for the core).
-// Returns false, changing nothing, if the move is not allowed.
+// Returns false, changing nothing, if the move is not allowed
+// (Arena::slotBlock says why).
 // maxTier: the deepest tree tier allowed now (Arena::suitTierCap).
 bool slotInfusion(Player& player, Arena::Genus genus, Arena::InfusionPart part,
-                  int node, int maxTier = 4);
+                  int grade, int node, int maxTier = 4);
 // Empty the suit and the pack (a new match).
 void resetLoadout(Player& player);
 // Clear per-round talent state (cooldowns, once-per-round uses).

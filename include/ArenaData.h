@@ -336,13 +336,43 @@ const char* treeName(InfusionTree t);
 struct InfusionText {
   const char* name;
   const char* description;
+  // False for effects that are designed but not in the game yet (the HUD
+  // says so instead of promising them).
+  bool built = true;
 };
+
+// ---- Grades (specs/infusion-grades.md) ------------------------------------
+// Drops are Raw. Two infusions of one genus and grade combine into one of
+// the next grade: Raw (1) -> Refined (2) -> Exalted (3).
+constexpr int GRADE_RAW = 1;
+constexpr int GRADE_REFINED = 2;
+constexpr int GRADE_EXALTED = 3;
+constexpr int GRADE_COUNT = 3;
+inline bool validGrade(int grade) {
+  return grade >= GRADE_RAW && grade <= GRADE_EXALTED;
+}
+const char* gradeName(int grade);
+// How many Raw infusions went into one of this grade (1, 2, 4). The item's
+// part stat is multiplied by it, so combining never loses stats.
+inline int gradeRawCount(int grade) {
+  assert(validGrade(grade));
+  return 1 << (grade - 1);
+}
+// The lowest grade a tree node of this tier takes: tiers 1-2 any, tier 3
+// Refined, tier 4 Exalted.
+inline int tierMinGrade(int tier) {
+  assert(tier >= 1);
+  return tier >= 4 ? GRADE_EXALTED : tier == 3 ? GRADE_REFINED : GRADE_RAW;
+}
 
 // Core ability granted by the first infusion (activated with E).
 const AbilityInfo& coreAbility(Genus g);
-// Genus effect granted by slotting an infusion of `g` anywhere in `tree`.
-// Every further infusion of `g` in the same tree raises its level.
-const InfusionText& infusionText(Genus g, InfusionTree tree);
+// Genus effect granted by slotting an infusion of `g` anywhere in `tree`, at
+// `grade`. An infusion gives the effect of its own grade and every grade
+// below it. Every further infusion of `g` in the same tree raises the Raw
+// effect's level; Refined and Exalted effects have no levels.
+const InfusionText& infusionText(Genus g, InfusionTree tree,
+                                 int grade = GRADE_RAW);
 
 // ---- Infusion items --------------------------------------------------------
 // An infusion is an item: a genus (what it does when slotted) and a body
@@ -445,6 +475,38 @@ inline int suitTierCap(int round) {
 }
 NodeState nodeState(const Genus* nodeGenus, bool coreFilled, int node,
                     int maxTier = 4);
+
+// ---- Lock-outs (specs/infusion-grades.md, "Lock-out rules") ----------------
+// A suit as the grade rules see it: the core and every node, genus and
+// grade (grade is ignored where the genus is None).
+struct SuitSlots {
+  Genus core = Genus::None;
+  int coreGrade = GRADE_RAW;
+  const Genus* nodeGenus = nullptr;    // indexed like suitNode
+  const uint8_t* nodeGrade = nullptr;  // indexed like suitNode
+};
+// The genus a tree is attuned to: that of the Refined-or-better infusion
+// in it (Genus::None until one is slotted). An attuned tree only takes its
+// genus.
+Genus treeAttunement(const SuitSlots& suit, InfusionTree tree);
+// The genus of the Exalted infusion slotted anywhere in the suit (the
+// player's Ascendant genus), or Genus::None. Only one genus can ever be
+// Exalted in a suit.
+Genus ascendedGenus(const SuitSlots& suit);
+
+// Why an item cannot go into a node now (None = it can).
+enum class SlotBlock : uint8_t {
+  None,
+  NodeNotOpen,  // nodeState is not Open (or the core is taken)
+  GradeTooLow,  // the node's tier needs a higher grade
+  Attuned,      // the tree is attuned to another genus
+  Ascended,     // an Exalted of another genus when already Ascendant
+};
+SlotBlock slotBlock(const SuitSlots& suit, int node, Genus genus, int grade,
+                    int maxTier = 4);
+// Whether two `grade` infusions of `genus` may combine into the next grade
+// for a suit whose Ascendant genus is `ascended`.
+bool canCombine(Genus ascended, Genus genus, int grade);
 
 // World item ids used for arena pickups (reuses ItemSpawned/ItemPickedUp).
 // An infusion's id carries its genus and part: 1000 + genus * 16 + part.

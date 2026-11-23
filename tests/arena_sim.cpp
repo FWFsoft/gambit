@@ -245,30 +245,59 @@ class Simulation {
       if (bot.slotTimerMs <= 0.0f) {
         bot.slotTimerMs = 300.0f;
         bool slotted = false;
-        // Core first, then a random open node in any tree.
-        std::vector<int> open;
-        for (int n = 0; n < Arena::suitNodeCount(); n++) {
-          if (Arena::nodeState(me.nodeGenus, me.coreGenus != Arena::Genus::None,
-                               n) == Arena::NodeState::Open) {
-            open.push_back(n);
+        // Core first, then a random node in any tree that takes the item.
+        // When nothing fits, combine a pair to reach deeper tiers.
+        const Arena::SuitSlots suit = me.suitSlots();
+        const int maxTier = Arena::suitTierCap(director.round());
+        for (int g = 0; g < Arena::GENUS_COUNT && !slotted; g++) {
+          Arena::Genus genus = static_cast<Arena::Genus>(g + 1);
+          for (int p = 0; p < Arena::PART_COUNT && !slotted; p++) {
+            for (int grade = 1; grade <= Arena::GRADE_COUNT && !slotted;
+                 grade++) {
+              if (me.infusionInventory[g][p][grade - 1] == 0) continue;
+              std::vector<int> fits;
+              if (me.coreGenus == Arena::Genus::None) {
+                fits.push_back(Arena::CORE_NODE);
+              } else {
+                for (int n = 0; n < Arena::suitNodeCount(); n++) {
+                  if (Arena::slotBlock(suit, n, genus, grade, maxTier) ==
+                      Arena::SlotBlock::None) {
+                    fits.push_back(n);
+                  }
+                }
+              }
+              if (fits.empty()) continue;
+              int pick = std::uniform_int_distribution<int>(
+                  0, static_cast<int>(fits.size()) - 1)(rng);
+              InfusionSlotPacket slot;
+              slot.genus = static_cast<uint8_t>(g + 1);
+              slot.part = static_cast<uint8_t>(p);
+              slot.grade = static_cast<uint8_t>(grade);
+              slot.node = static_cast<uint8_t>(fits[pick]);
+              sendPacket(bot.id, serialize(slot));
+              slotted = true;
+            }
           }
         }
-        bool wantsCore = me.coreGenus == Arena::Genus::None;
         for (int g = 0; g < Arena::GENUS_COUNT && !slotted; g++) {
-          for (int p = 0; p < Arena::PART_COUNT && !slotted; p++) {
-            if (me.infusionInventory[g][p] == 0) continue;
-            if (!wantsCore && open.empty()) continue;
-            InfusionSlotPacket slot;
-            slot.genus = static_cast<uint8_t>(g + 1);
-            slot.part = static_cast<uint8_t>(p);
-            if (wantsCore) {
-              slot.node = Arena::CORE_NODE;
-            } else {
-              int pick = std::uniform_int_distribution<int>(
-                  0, static_cast<int>(open.size()) - 1)(rng);
-              slot.node = static_cast<uint8_t>(open[pick]);
+          Arena::Genus genus = static_cast<Arena::Genus>(g + 1);
+          for (int grade = 1; grade < Arena::GRADE_COUNT && !slotted; grade++) {
+            if (!Arena::canCombine(me.ascendedGenus, genus, grade)) continue;
+            int parts[2], found = 0;
+            for (int p = 0; p < Arena::PART_COUNT && found < 2; p++) {
+              for (int k = 0;
+                   k < me.infusionInventory[g][p][grade - 1] && found < 2;
+                   k++) {
+                parts[found++] = p;
+              }
             }
-            sendPacket(bot.id, serialize(slot));
+            if (found < 2) continue;
+            InfusionCombinePacket combine;
+            combine.genus = static_cast<uint8_t>(g + 1);
+            combine.grade = static_cast<uint8_t>(grade);
+            combine.targetPart = static_cast<uint8_t>(parts[0]);
+            combine.otherPart = static_cast<uint8_t>(parts[1]);
+            sendPacket(bot.id, serialize(combine));
             slotted = true;
           }
         }
@@ -555,16 +584,27 @@ int main(int argc, char** argv) {
                     director.shipHealth(),
                     sim.game().getEnemySystem()->livingCount());
         for (const auto& [id, player] : sim.game().getPlayers()) {
-          int nodes = 0;
+          int nodes = 0, deepest = 0, unslotted = 0;
           for (int n = 0; n < Arena::suitNodeCount(); n++) {
-            nodes += player.nodeGenus[n] != Arena::Genus::None ? 1 : 0;
+            if (player.nodeGenus[n] == Arena::Genus::None) continue;
+            nodes++;
+            deepest = std::max<int>(deepest, Arena::suitNode(n).tier);
+          }
+          for (const auto& genusRow : player.infusionInventory) {
+            for (const auto& partRow : genusRow) {
+              for (uint8_t count : partRow) unslotted += count;
+            }
           }
           std::printf(
               "           p%u %-8s hp %3.0f/%3.0f score %5d kills %3d deaths "
-              "%d core %s +%d nodes\n",
+              "%d core %s +%d nodes (deepest tier %d, %d in pack)%s%s\n",
               id, sim.allBots()[id - 1].name.c_str(), player.health,
               player.maxHealth, player.score, player.kills, player.deaths,
-              Arena::genusName(player.coreGenus), nodes);
+              Arena::genusName(player.coreGenus), nodes, deepest, unslotted,
+              player.ascendedGenus != Arena::Genus::None ? " ascended " : "",
+              player.ascendedGenus != Arena::Genus::None
+                  ? Arena::genusName(player.ascendedGenus)
+                  : "");
         }
       }
       lastPhase = phase;

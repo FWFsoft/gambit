@@ -35,7 +35,8 @@ enum class PacketType : uint8_t {
   InfusionSlot = 26,       // Client → Server (slot an infusion)
   PlayerReady = 27,        // Client → Server (ready up in lobby/intermission)
   DebugCommand = 28,       // Client → Server (playtest shortcuts)
-  ShipUpgrade = 29         // Client → Server (spend banked scrap on a tier)
+  ShipUpgrade = 29,        // Client → Server (spend banked scrap on a tier)
+  InfusionCombine = 30     // Client → Server (two infusions → next grade)
 };
 
 // Ability buttons carried in ClientInputPacket::buttons (held state).
@@ -444,12 +445,29 @@ struct MatchPlayerState {
   uint8_t ready = 0;
   uint8_t coreGenus = 0;  // Arena::Genus
   uint8_t corePart = 0;   // Arena::InfusionPart
+  uint8_t coreGrade = 1;  // Arena::GRADE_*
   // Suit nodes, indexed like Arena::suitNode (genus 0 = empty). Only filled
   // nodes go on the wire.
   uint8_t nodeGenus[Arena::MAX_SUIT_NODES] = {};
   uint8_t nodePart[Arena::MAX_SUIT_NODES] = {};
-  // Unslotted infusion items by genus (index genus - 1) and part.
-  uint8_t inventory[Arena::GENUS_COUNT][Arena::PART_COUNT] = {};
+  uint8_t nodeGrade[Arena::MAX_SUIT_NODES] = {};
+  // Unslotted infusion items by genus (index genus - 1), part and grade
+  // (index grade - 1).
+  uint8_t inventory[Arena::GENUS_COUNT][Arena::PART_COUNT][Arena::GRADE_COUNT] =
+      {};
+  // The grade rules' view of this suit (attunement, ascension, slotBlock).
+  // Points into this struct: do not keep it past a copy.
+  Arena::SuitSlots suitSlots(Arena::Genus* genusBuffer) const {
+    for (int i = 0; i < Arena::MAX_SUIT_NODES; i++) {
+      genusBuffer[i] = static_cast<Arena::Genus>(nodeGenus[i]);
+    }
+    Arena::SuitSlots suit;
+    suit.core = static_cast<Arena::Genus>(coreGenus);
+    suit.coreGrade = coreGrade;
+    suit.nodeGenus = genusBuffer;
+    suit.nodeGrade = nodeGrade;
+    return suit;
+  }
   uint8_t scrapCarried = 0;     // Arena::Tuning::SCRAP_CARRY_MAX at most
   float reviveProgress = 0.0f;  // 0-1 while being revived
 };
@@ -484,6 +502,17 @@ struct InfusionSlotPacket {
   uint8_t genus = 0;  // Arena::Genus
   uint8_t part = 0;   // Arena::InfusionPart
   uint8_t node = 0;   // Arena::suitNode index, or Arena::CORE_NODE
+  uint8_t grade = 1;  // Arena::GRADE_*
+};
+
+// Combine two infusions of one genus and grade from the pack into one of
+// the next grade. The result keeps targetPart (specs/infusion-grades.md).
+struct InfusionCombinePacket {
+  PacketType type = PacketType::InfusionCombine;
+  uint8_t genus = 0;       // Arena::Genus
+  uint8_t grade = 1;       // grade of the two inputs
+  uint8_t targetPart = 0;  // Arena::InfusionPart that survives
+  uint8_t otherPart = 0;   // Arena::InfusionPart used up
 };
 
 // Spend banked scrap on the ship's next tier (intermission only).
@@ -543,6 +572,9 @@ InfusionSlotPacket deserializeInfusionSlot(const uint8_t* data, size_t size);
 PlayerReadyPacket deserializePlayerReady(const uint8_t* data, size_t size);
 std::vector<uint8_t> serialize(const ShipUpgradePacket& packet);
 ShipUpgradePacket deserializeShipUpgrade(const uint8_t* data, size_t size);
+std::vector<uint8_t> serialize(const InfusionCombinePacket& packet);
+InfusionCombinePacket deserializeInfusionCombine(const uint8_t* data,
+                                                 size_t size);
 DebugCommandPacket deserializeDebugCommand(const uint8_t* data, size_t size);
 
 std::vector<uint8_t> serialize(const ClientInputPacket& packet);

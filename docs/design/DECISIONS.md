@@ -22,7 +22,7 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 ---
 
 ## 2026-11-23: Infusion grades: combine to go deep; deeper effects differ and lock you in
-- **Decision** (spec only, issue #44; full text in
+- **Decision** (issue #44; full text in
   `specs/infusion-grades.md`):
   - **Grades.** Drops are Raw (I). Two infusions of the same genus and
     grade combine into one of the next grade at the ship: Raw → Refined
@@ -71,8 +71,38 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
   rule for Raw effects and adds grades on top. Pacing numbers are
   estimates and must be measured with ArenaSim once built. Four open
   questions are listed at the end of the spec.
-- **Status:** Proposed (spec; not built)
-- **Where:** `specs/infusion-grades.md`
+- **Built (step 1, 2026-11-23):** grades, combining (drag an item onto a
+  twin in the pack, or press C), the depth requirements, attunement,
+  Ascension with a confirm step, grade dots on every item and slot, the
+  "why is this blocked" tooltips, an Ascension flash plus a banner the
+  whole crew sees, and the Ascendant title on the scoreboard and suit
+  summary. F6 now gives one of every item at every grade. Checked in the
+  running client (slot, block reasons, combine by key and by drag,
+  Ascension, banner, scoreboard) and in `test_infusions`.
+  - **Not built yet (step 2):** the 32 Refined and Exalted effects. Their
+    text shows, marked "not in the game yet" / "(soon)", so a Refined
+    item today gives its Raw effect, its talent and a doubled part stat.
+    Until step 2 lands, going deep is weaker than the spec intends.
+  - **Differs from the spec:** the Ascendant title is not drawn over the
+    health bar at night (scoreboard, suit and banner only). An Exalted or
+    Refined item in a shallow slot also attunes that tree (the rule is
+    "the first Refined-or-better in a tree"); the slot tooltip warns.
+  - **Pacing still unmeasured.** ArenaSim bots now combine when nothing
+    else fits, but they only collect 1 to 9 infusions a match (they do not
+    chase loot or objectives), so the sim cannot judge pacing. One bot
+    reached tier 3 in a seed-11 run; none ascended. Needs a human
+    playtest.
+- **Status:** Accepted (spec approved by a human, 2026-11-23); step 1
+  Built, needs review
+- **Where:** `specs/infusion-grades.md`; `include/ArenaData.h`,
+  `src/ArenaData.cpp` (grades, `slotBlock`, attunement, Ascension, graded
+  text), `include/Player.h`, `src/Infusions.cpp` (`combineInfusions`,
+  grade-aware `slotInfusion`), `include/NetworkProtocol.h`,
+  `src/NetworkProtocol.cpp` (`InfusionCombinePacket`, grades on the
+  wire), `src/MatchDirector.cpp`, `src/ServerGameState.cpp`,
+  `src/ArenaHud.cpp` (suit screen, scoreboard, banner),
+  `tests/test_infusions.cpp`, `tests/test_network_protocol.cpp`,
+  `tests/arena_sim.cpp`
 
 ## 2026-11-22: Scrap is a counted currency; turret repairs cost scrap
 - **Decision:** Scrap is a count, not one heavy piece.

@@ -61,17 +61,42 @@ void recount(Player& player) {
   for (auto& row : player.genusInTree) {
     for (uint8_t& count : row) count = 0;
   }
+  for (auto& row : player.genusGradeInTree) {
+    for (uint8_t& grade : row) grade = 0;
+  }
   for (uint8_t& count : player.partsSlotted) count = 0;
   if (player.coreGenus != Genus::None) {
-    player.partsSlotted[static_cast<int>(player.corePart)]++;
+    player.partsSlotted[static_cast<int>(player.corePart)] +=
+        Arena::gradeRawCount(player.coreGrade);
   }
   for (int i = 0; i < Arena::suitNodeCount(); i++) {
     Genus genus = player.nodeGenus[i];
     if (genus == Genus::None) continue;
     int tree = static_cast<int>(Arena::suitNode(i).tree);
-    player.genusInTree[tree][static_cast<int>(genus)]++;
-    player.partsSlotted[static_cast<int>(player.nodePart[i])]++;
+    int g = static_cast<int>(genus);
+    player.genusInTree[tree][g]++;
+    player.genusGradeInTree[tree][g] =
+        std::max(player.genusGradeInTree[tree][g], player.nodeGrade[i]);
+    player.partsSlotted[static_cast<int>(player.nodePart[i])] +=
+        Arena::gradeRawCount(player.nodeGrade[i]);
   }
+  Arena::SuitSlots suit = player.suitSlots();
+  for (int t = 0; t < Arena::TREE_COUNT; t++) {
+    player.treeAttunement[t] =
+        Arena::treeAttunement(suit, static_cast<InfusionTree>(t));
+  }
+  player.ascendedGenus = Arena::ascendedGenus(suit);
+}
+
+// The pack count for one item, or nullptr if the item is out of range.
+uint8_t* packCount(Player& player, Genus genus, InfusionPart part, int grade) {
+  int g = static_cast<int>(genus);
+  int p = static_cast<int>(part);
+  if (g < 1 || g > Arena::GENUS_COUNT || p < 0 || p >= Arena::PART_COUNT ||
+      !Arena::validGrade(grade)) {
+    return nullptr;
+  }
+  return &player.infusionInventory[g - 1][p][grade - 1];
 }
 
 // Sum of one part stat over every slotted item.
@@ -235,46 +260,60 @@ namespace Infusions {
 // Loadout
 // ---------------------------------------------------------------------------
 
-bool addToInventory(Player& player, Genus genus, InfusionPart part) {
-  int g = static_cast<int>(genus);
-  int p = static_cast<int>(part);
-  if (g < 1 || g > Arena::GENUS_COUNT || p < 0 || p >= Arena::PART_COUNT) {
-    return false;
-  }
-  uint8_t& count = player.infusionInventory[g - 1][p];
-  if (count >= INVENTORY_MAX) return false;
-  count++;
+bool addToInventory(Player& player, Genus genus, InfusionPart part, int grade) {
+  uint8_t* count = packCount(player, genus, part, grade);
+  if (!count || *count >= INVENTORY_MAX) return false;
+  (*count)++;
   return true;
 }
 
-bool slotInfusion(Player& player, Genus genus, InfusionPart part, int node,
-                  int maxTier) {
-  int g = static_cast<int>(genus);
-  int p = static_cast<int>(part);
-  if (g < 1 || g > Arena::GENUS_COUNT || p < 0 || p >= Arena::PART_COUNT) {
+bool combineInfusions(Player& player, Genus genus, int grade,
+                      InfusionPart targetPart, InfusionPart otherPart) {
+  if (!Arena::canCombine(player.ascendedGenus, genus, grade)) return false;
+  uint8_t* target = packCount(player, genus, targetPart, grade);
+  uint8_t* other = packCount(player, genus, otherPart, grade);
+  if (!target || !other) return false;
+  // Two items: both counts are the same slot when the parts match.
+  int needed = target == other ? 2 : 1;
+  if (*target < needed || *other < 1) return false;
+  uint8_t* result = packCount(player, genus, targetPart, grade + 1);
+  assert(result != nullptr);
+  if (*result >= INVENTORY_MAX) return false;
+  (*target)--;
+  (*other)--;
+  (*result)++;
+  return true;
+}
+
+bool slotInfusion(Player& player, Genus genus, InfusionPart part, int grade,
+                  int node, int maxTier) {
+  uint8_t* count = packCount(player, genus, part, grade);
+  if (!count || *count == 0) return false;
+  if (node != Arena::CORE_NODE &&
+      (node < 0 || node >= Arena::suitNodeCount())) {
     return false;
   }
-  uint8_t& count = player.infusionInventory[g - 1][p];
-  if (count == 0) return false;
+  if (Arena::slotBlock(player.suitSlots(), node, genus, grade, maxTier) !=
+      Arena::SlotBlock::None) {
+    return false;
+  }
 
   if (node == Arena::CORE_NODE) {
     // The first infusion must go in the core, and the core is permanent.
-    if (player.coreGenus != Genus::None) return false;
     player.coreGenus = genus;
     player.corePart = part;
+    player.coreGrade = static_cast<uint8_t>(grade);
   } else {
-    if (node < 0 || node >= Arena::suitNodeCount()) return false;
-    Arena::NodeState state = Arena::nodeState(
-        player.nodeGenus, player.coreGenus != Genus::None, node, maxTier);
-    if (state != Arena::NodeState::Open) return false;
     player.nodeGenus[node] = genus;
     player.nodePart[node] = part;
+    player.nodeGrade[node] = static_cast<uint8_t>(grade);
   }
-  count--;
+  (*count)--;
   recount(player);
 
   // A Hide raises max health at once, and fills the new health in.
-  float hide = Arena::partInfo(part).maxHealthBonus;
+  float hide = Arena::partInfo(part).maxHealthBonus *
+               static_cast<float>(Arena::gradeRawCount(grade));
   if (hide > 0.0f) {
     player.maxHealth += hide;
     if (!player.isDead()) player.health += hide;
@@ -283,14 +322,18 @@ bool slotInfusion(Player& player, Genus genus, InfusionPart part, int node,
 }
 
 void resetLoadout(Player& player) {
-  for (auto& row : player.infusionInventory) {
-    for (uint8_t& count : row) count = 0;
+  for (auto& genusRow : player.infusionInventory) {
+    for (auto& partRow : genusRow) {
+      for (uint8_t& count : partRow) count = 0;
+    }
   }
   player.coreGenus = Genus::None;
   player.corePart = InfusionPart::Talon;
+  player.coreGrade = Arena::GRADE_RAW;
   for (int i = 0; i < Arena::MAX_SUIT_NODES; i++) {
     player.nodeGenus[i] = Genus::None;
     player.nodePart[i] = InfusionPart::Talon;
+    player.nodeGrade[i] = 0;
   }
   for (auto& row : player.infusionCounter) {
     for (int& counter : row) counter = 0;

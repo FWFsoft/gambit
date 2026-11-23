@@ -222,6 +222,18 @@ class ArenaView {
   // HUD state
   int selectedGenus = 0;        // infusion item picked in the suit screen
   int selectedPart = 0;         // (genus 0 = none)
+  int selectedGrade = 1;        // Arena::GRADE_*
+  // An Exalted slot waiting for the player to confirm Ascension: the node
+  // (Arena::CORE_NODE for the core; -1 = none) and the item.
+  int pendingAscendNode = -1;
+  int pendingAscendGenus = 0, pendingAscendPart = 0;
+  bool openAscendPopup = false;
+  // Each player's Ascendant genus last frame (for the banner when one
+  // ascends), and the local player's own Ascension flash.
+  std::unordered_map<uint32_t, uint8_t> knownAscended;
+  float ascendFlashUntil = 0.0f;
+  Arena::Genus ascendFlashGenus = Arena::Genus::None;
+  void trackAscensions();
   bool suitScreenOpen = false;  // toggled with B outside intermission
   // The ship's tier last frame, and until when the suit screen stands aside
   // to show a freshly upgraded ship.

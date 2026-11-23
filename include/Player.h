@@ -96,16 +96,25 @@ struct Player : public Animatable {
   float reviveProgress = 0.0f;
 
   // Infusions (suit loadout). See Infusions.h for the rules.
-  // Unslotted infusion items, by genus (index genus - 1) and part.
-  uint8_t infusionInventory[Arena::GENUS_COUNT][Arena::PART_COUNT] = {};
+  // Unslotted infusion items, by genus (index genus - 1), part and grade
+  // (index grade - 1).
+  uint8_t infusionInventory[Arena::GENUS_COUNT][Arena::PART_COUNT]
+                           [Arena::GRADE_COUNT] = {};
   Arena::Genus coreGenus = Arena::Genus::None;
   Arena::InfusionPart corePart = Arena::InfusionPart::Talon;
+  uint8_t coreGrade = Arena::GRADE_RAW;
   // What fills each suit node (index = Arena::suitNode index).
   Arena::Genus nodeGenus[Arena::MAX_SUIT_NODES] = {};
   Arena::InfusionPart nodePart[Arena::MAX_SUIT_NODES] = {};
+  uint8_t nodeGrade[Arena::MAX_SUIT_NODES] = {};
   // Derived from the above by Infusions::recount; never set by hand.
   uint8_t genusInTree[Arena::TREE_COUNT][Arena::GENUS_COUNT + 1] = {};
+  // Highest grade of each genus in each tree (0 = none there).
+  uint8_t genusGradeInTree[Arena::TREE_COUNT][Arena::GENUS_COUNT + 1] = {};
+  // Part stats count the Raw infusions inside each item (Arena::gradeRawCount).
   uint8_t partsSlotted[Arena::PART_COUNT] = {};
+  Arena::Genus treeAttunement[Arena::TREE_COUNT] = {};
+  Arena::Genus ascendedGenus = Arena::Genus::None;
   // Genus effect state, per tree and genus: internal cooldowns/accumulators.
   float infusionTimer[Arena::TREE_COUNT][Arena::GENUS_COUNT + 1] = {};
   int infusionCounter[Arena::TREE_COUNT][Arena::GENUS_COUNT + 1] = {};
@@ -134,6 +143,21 @@ struct Player : public Animatable {
       level++;
     }
     return level;
+  }
+  // Highest grade of `genus` slotted in `tree` (0 = none). The player has
+  // that genus's effect for this grade and every grade below it.
+  int infusionGrade(Arena::Genus genus, Arena::InfusionTree tree) const {
+    int g = static_cast<int>(genus);
+    if (g < 1 || g > Arena::GENUS_COUNT) return 0;
+    return genusGradeInTree[static_cast<int>(tree)][g];
+  }
+  Arena::SuitSlots suitSlots() const {
+    Arena::SuitSlots suit;
+    suit.core = coreGenus;
+    suit.coreGrade = coreGrade;
+    suit.nodeGenus = nodeGenus;
+    suit.nodeGrade = nodeGrade;
+    return suit;
   }
   bool hasTalent(Arena::Talent talent) const {
     return nodeGenus[static_cast<int>(talent)] != Arena::Genus::None;
