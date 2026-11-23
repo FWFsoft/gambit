@@ -242,12 +242,10 @@ void notEnoughScrapBuysNothing() {
   World w;
   w.hero().x = 0.0f;
   w.hero().y = 150.0f;
-  // Two hauls home: one short of the first tier.
-  for (int i = 0; i < T::SHIP_TIER_COST[1] - 1; i++) {
-    w.director.onObjectiveCompleted(w.hero(), true, 900.0f, 0.0f);
-    w.run(100.0f);
-    assert(!w.hero().carryingScrap);
-  }
+  // Hauled home: one short of the first tier.
+  w.director.addScrap(w.hero(), T::SHIP_TIER_COST[1] - 1);
+  w.run(100.0f);
+  assert(w.hero().scrapCarried == 0);
   assert(w.director.scrapInBank() == T::SHIP_TIER_COST[1] - 1);
   w.director.onDebugCommand(w.hero(), DebugCommandKind::SkipPhase, 0);
   w.run(100.0f);

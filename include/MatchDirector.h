@@ -66,12 +66,25 @@ class MatchDirector {
   void onEnemyKilled(const Enemy& enemy, uint32_t killerId);
   // Returns true if the pickup was consumed.
   bool onPickup(Player& player, uint32_t itemId);
-  // salvagedScrap: the player now carries scrap home (banked at the ship).
+  // salvagedScrap: the player picks up a scrapyard's bundle
+  // (Tuning::SCRAP_BUNDLE), carried until banked at the ship or spent.
   void onObjectiveCompleted(Player& player, bool salvagedScrap,
                             float objectiveX, float objectiveY);
   // A Derelict Turret objective was repaired: the next roof turret stands
-  // up on the ship. Returns false if every roof turret is already up.
+  // up on the ship. Returns false if every roof turret is already up. The
+  // repair's scrap is paid by the caller (payForTurretRepair) before this.
   bool onTurretRepaired(Player& player);
+  // A derelict turret repair costs Tuning::TURRET_REPAIR_SCRAP of the
+  // repairer's carried scrap: checked when the repair starts, paid when it
+  // finishes (walking away costs nothing).
+  bool canAffordTurretRepair(const Player& player) const {
+    return player.scrapCarried >= Arena::Tuning::TURRET_REPAIR_SCRAP;
+  }
+  void payForTurretRepair(Player& player);
+  // Carried scrap: picked up, then banked at the ship or spent in the field.
+  // Carrying Tuning::SCRAP_HEAVY_LOAD or more slows the player.
+  void addScrap(Player& player, int amount);
+  void spendScrap(Player& player, int amount);
   // Someone started hammering on a derelict turret: a pack comes for the
   // noise, from the side away from the ship.
   void onRepairNoise(float x, float y);
@@ -197,8 +210,11 @@ class MatchDirector {
   // Dawn: an ambush near every camp out of the ship's reach.
   void dawnAmbush();
   bool atShip(const Player& player) const;
-  void startCarryingScrap(Player& player);
   void bankScrap(Player& player);
+  // Applies or lifts the heavy-load slow after the carried amount changed.
+  void updateScrapLoad(Player& player, bool wasHeavy);
+  // Drops everything the player carries on the ground where they stand.
+  void dropCarriedScrap(Player& player);
 
   int participantCount() const;
   int livingParticipants() const;

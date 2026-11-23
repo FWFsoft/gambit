@@ -390,7 +390,7 @@
         <property name="objective_type" type="string" value="derelict_turret" />
         <property name="description" type="string" value="Repair the derelict turret" />
         <property name="radius" type="float" value="70.0" />
-        <property name="interaction_time" type="float" value="4.0" />
+        <property name="interaction_time" type="float" value="1.0" />
       </properties>
     </object>
     <object id="70" name="Turret_2" x="297.0" y="3097.0">
@@ -399,7 +399,7 @@
         <property name="objective_type" type="string" value="derelict_turret" />
         <property name="description" type="string" value="Repair the derelict turret" />
         <property name="radius" type="float" value="70.0" />
-        <property name="interaction_time" type="float" value="4.0" />
+        <property name="interaction_time" type="float" value="1.0" />
       </properties>
     </object>
   </objectgroup>

@@ -135,7 +135,7 @@ TEST(ArenaPacketsRoundTrip) {
     a.nodePart[Arena::MAX_SUIT_NODES - 1] = 3;
     a.inventory[0][2] = 7;
     a.inventory[3][3] = 99;
-    a.carryingScrap = 1;
+    a.scrapCarried = 37;
     a.reviveProgress = 0.5f;
     m.players.push_back(a);
     m.players.push_back(MatchPlayerState());
@@ -160,7 +160,7 @@ TEST(ArenaPacketsRoundTrip) {
     assert(out.players[0].inventory[0][2] == 7);
     assert(out.players[0].inventory[3][3] == 99);
     assert(out.players[1].coreGenus == 0 && out.players[1].nodeGenus[0] == 0);
-    assert(out.players[0].carryingScrap == 1);
+    assert(out.players[0].scrapCarried == 37);
     assert(out.players[0].reviveProgress == 0.5f);
   }
   {

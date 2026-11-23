@@ -1612,10 +1612,11 @@ def write_tmx(w, path, seed, size_arg):
                                            sy_ + math.sin(a) * 420, cy, [
                 ("objective_type", "string", "derelict_turret"),
                 ("description", "string",
-                 "Repair the derelict turret: the noise draws a pack"),
-                # A hold, not a tap: long enough that the pack it draws
-                # arrives mid-repair, wide enough to fight inside.
-                ("radius", "float", "110.0"), ("interaction_time", "float", "10.0"),
+                 "Repair the derelict turret with scrap: the noise draws a pack"),
+                # Quick: the price is scrap, not time (Tuning::TURRET_REPAIR_*,
+                # which the server applies whatever this says). The pack the
+                # noise draws arrives after, to fight off on the way home.
+                ("radius", "float", "110.0"), ("interaction_time", "float", "1.0"),
                 ("sites", "string", str(site))]))
             next_id += 1
         # The hull: solid only at the site the ship stands on ("hull@<site>").

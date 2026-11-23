@@ -339,10 +339,10 @@ class Simulation {
         }
       }
 
-      bool mustReturn =
-          phase == Arena::MatchPhase::Round &&
-          (match.timeRemaining < 12.0f + shipDist / 200.0f ||
-           shipDist > match.zoneRadius - 110.0f || me.carryingScrap);
+      bool mustReturn = phase == Arena::MatchPhase::Round &&
+                        (match.timeRemaining < 12.0f + shipDist / 200.0f ||
+                         shipDist > match.zoneRadius - 110.0f ||
+                         me.scrapCarried >= Arena::Tuning::SCRAP_HEAVY_LOAD);
       if (phase == Arena::MatchPhase::BossFight &&
           shipDist > match.zoneRadius - 110.0f) {
         mustReturn = true;

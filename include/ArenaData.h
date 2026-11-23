@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cassert>
 #include <cmath>
 #include <cstdint>
 
@@ -449,8 +450,23 @@ NodeState nodeState(const Genus* nodeGenus, bool coreFilled, int node,
 // An infusion's id carries its genus and part: 1000 + genus * 16 + part.
 namespace PickupId {
 constexpr uint32_t InfusionBase = 1000;
-constexpr uint32_t Scrap = 2000;
 constexpr uint32_t Medkit = 2001;
+// Scrap is a count: a pickup's id carries how much is in the pile,
+// ScrapBase + amount (1 .. SCRAP_PICKUP_MAX).
+constexpr uint32_t ScrapBase = 2100;
+constexpr int SCRAP_PICKUP_MAX = 255;
+inline uint32_t scrap(int amount) {
+  assert(amount >= 1 && amount <= SCRAP_PICKUP_MAX);
+  return ScrapBase + static_cast<uint32_t>(amount);
+}
+inline bool isScrap(uint32_t id) {
+  return id > ScrapBase &&
+         id <= ScrapBase + static_cast<uint32_t>(SCRAP_PICKUP_MAX);
+}
+inline int scrapAmount(uint32_t id) {
+  assert(isScrap(id));
+  return static_cast<int>(id - ScrapBase);
+}
 inline uint32_t infusion(Genus genus, InfusionPart part) {
   return InfusionBase + static_cast<uint32_t>(genus) * 16u +
          static_cast<uint32_t>(part);
@@ -527,6 +543,23 @@ constexpr float CAMP_HEAL_PER_ALLY = 0.20f;  // more per crewmate in camp
 constexpr int DAWN_AMBUSH_SIZE[ROUND_COUNT] = {0, 4, 5};  // per wild camp
 constexpr float DAWN_AMBUSH_DISTANCE = 420.0f;  // from the camp's centre
 
+// Scrap is the crew's currency: counted, carried, banked at the ship.
+// Every kill can drop a little (by tier: swarmer, caster, brute; an elite
+// always drops its own amount), and a scrapyard pays out one big bundle.
+// Carry a full bundle's weight or more and you are slowed until you bank
+// or spend it: the haul home is the cost of a big load.
+constexpr int SCRAP_BUNDLE = 10;      // a salvaged scrapyard
+constexpr int SCRAP_HEAVY_LOAD = 10;  // carrying this much slows you
+constexpr int SCRAP_CARRY_MAX = 200;  // fits the network byte
+constexpr float SCRAP_DROP_CHANCE[3] = {0.35f, 0.5f, 1.0f};
+constexpr int SCRAP_DROP_AMOUNT[3] = {1, 2, 3};
+constexpr int SCRAP_DROP_ELITE = 4;
+
+// Derelict turret repair: paid in carried scrap and quick (a moment's
+// work, not a channel to sit through); the bill is the decision. Paid when
+// the repair finishes, so walking away costs nothing.
+constexpr int TURRET_REPAIR_SCRAP = 8;
+constexpr float TURRET_REPAIR_SECONDS = 1.0f;
 // Derelict turret repair: the noise draws one pack per turret (+1 body per
 // extra crewmate), from this far out on the side away from the ship.
 constexpr int REPAIR_NOISE_PACK = 4;
@@ -560,7 +593,7 @@ constexpr float SHIP_DAMAGE_SCALE = 0.5f;  // hull armor vs. enemy hits
 // type "hull", "hull1", "hull2").
 constexpr int SHIP_TIER_COUNT = 3;
 // Scrap spent (at intermission) to reach each tier from the one before.
-constexpr int SHIP_TIER_COST[SHIP_TIER_COUNT] = {0, 3, 5};
+constexpr int SHIP_TIER_COST[SHIP_TIER_COUNT] = {0, 30, 50};
 constexpr float SHIP_TIER_MAX_HEALTH[SHIP_TIER_COUNT] = {1500.0f, 2000.0f,
                                                          2600.0f};
 // "Inside for the night", and where standing heals you.
@@ -578,7 +611,7 @@ constexpr float SHIP_START_HEALTH = SHIP_TIER_MAX_HEALTH[0] * 0.35f;
 constexpr float SHIP_RADIUS = 240.0f;  // enemies attack inside this
 // Walk anything you are hauling (scrap, a probe) inside this to deliver it.
 constexpr float SHIP_DROP_RADIUS = 300.0f;
-constexpr float SHIP_REPAIR_PER_SCRAP = 180.0f;
+constexpr float SHIP_REPAIR_PER_SCRAP = 18.0f;
 
 // Roof turrets. Each Derelict Turret objective the crew repairs stands one
 // up on the ship's roof. It swivels on its round base to the nearest enemy
@@ -611,7 +644,7 @@ constexpr float PLAYER_RADIUS = 16.0f;
 constexpr float PICKUP_RADIUS = 40.0f;
 
 constexpr int SCORE_OBJECTIVE = 150;
-constexpr int SCORE_SCRAP = 100;
+constexpr int SCORE_SCRAP = 10;  // per scrap banked
 constexpr int SCORE_REVIVE = 120;
 constexpr int SCORE_DEATH = -100;
 constexpr int SCORE_BOSS = 500;

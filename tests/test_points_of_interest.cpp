@@ -36,8 +36,17 @@ struct World {
       8000.0f,
       4000.0f,
       [this](const GameEventPacket& p) { events.push_back(p); }};
+  std::vector<uint32_t> pickups;  // item ids the director dropped
   MatchDirector director{players, &enemies, &combat, 0.0f,
-                         0.0f,    8000.0f,  4000.0f, MatchDirector::Hooks{}};
+                         0.0f,    8000.0f,  4000.0f, hooks()};
+
+  MatchDirector::Hooks hooks() {
+    MatchDirector::Hooks h;
+    h.spawnPickup = [this](uint32_t id, float, float) {
+      pickups.push_back(id);
+    };
+    return h;
+  }
 
   World() {
     enemies.setCombat(&combat);
@@ -71,19 +80,19 @@ void scrapIsCarriedSlowedAndBankedInTheShipRing() {
   w.hero().x = 900.0f;
   w.hero().y = 0.0f;
   w.director.onObjectiveCompleted(w.hero(), true, 900.0f, 0.0f);
-  assert(w.hero().carryingScrap);
+  assert(w.hero().scrapCarried == Arena::Tuning::SCRAP_BUNDLE);
   assert(w.slowed());
 
   // Out in the field nothing is banked.
   w.run(500.0f);
-  assert(w.hero().carryingScrap);
+  assert(w.hero().scrapCarried == Arena::Tuning::SCRAP_BUNDLE);
   assert(w.director.shipHealth() == before);
 
   // Anywhere inside the ring counts: the hull itself is solid.
   w.hero().x = Arena::Tuning::SHIP_DROP_RADIUS - 10.0f;
   w.events.clear();
   w.run(100.0f);
-  assert(!w.hero().carryingScrap);
+  assert(w.hero().scrapCarried == 0);
   assert(!w.slowed());
   assert(w.director.shipHealth() > before);
 
@@ -107,6 +116,84 @@ Objective objective(ObjectiveType type, float x, float y, float radius) {
   o.radius = radius;
   o.interactionTime = 0.1f;
   return o;
+}
+
+void smallScrapAddsUpAndOnlyAFullLoadIsHeavy() {
+  namespace T = Arena::Tuning;
+  World w;
+  w.hero().x = 900.0f;
+  w.hero().y = 0.0f;
+  // Pocket change from kills: light, and it adds up.
+  assert(w.director.onPickup(w.hero(), Arena::PickupId::scrap(3)));
+  assert(w.hero().scrapCarried == 3 && !w.slowed());
+  assert(w.director.onPickup(w.hero(), Arena::PickupId::scrap(4)));
+  assert(w.hero().scrapCarried == 7 && !w.slowed());
+  // A full load is heavy...
+  w.director.addScrap(w.hero(), T::SCRAP_HEAVY_LOAD - 7);
+  assert(w.hero().scrapCarried == T::SCRAP_HEAVY_LOAD && w.slowed());
+  // ...until some of it is spent in the field.
+  w.director.spendScrap(w.hero(), 1);
+  assert(!w.slowed());
+  // Banking it all repairs the ship by the amount.
+  w.director.damageShip(1000.0f);
+  float before = w.director.shipHealth();
+  int carried = w.hero().scrapCarried;
+  w.hero().x = 0.0f;
+  w.hero().y = 150.0f;
+  w.run(100.0f);
+  assert(w.hero().scrapCarried == 0);
+  assert(w.director.scrapInBank() == carried);
+  assert(std::abs(w.director.shipHealth() - before -
+                  T::SHIP_REPAIR_PER_SCRAP * carried) < 0.5f);
+  std::cout << "  scrap: small amounts add up; a full load is heavy\n";
+}
+
+void downedPlayersDropTheirWholePile() {
+  World w;
+  w.hero().x = 900.0f;
+  w.hero().y = 0.0f;
+  w.director.addScrap(w.hero(), 6);
+  w.pickups.clear();
+  w.hero().health = 0.0f;
+  w.run(50.0f);
+  assert(w.hero().scrapCarried == 0);
+  assert(w.pickups.size() == 1 && w.pickups[0] == Arena::PickupId::scrap(6));
+  std::cout << "  scrap: going down drops the whole pile as one pickup\n";
+}
+
+void elitesAlwaysDropScrap() {
+  World w;
+  Enemy elite = Enemy();
+  elite.type = static_cast<Arena::EnemyKind>(0);
+  elite.elite = true;
+  elite.x = 900.0f;
+  elite.y = 0.0f;
+  w.pickups.clear();
+  w.director.onEnemyKilled(elite, HERO);
+  bool scrap = false;
+  for (uint32_t id : w.pickups) {
+    if (Arena::PickupId::isScrap(id)) {
+      assert(Arena::PickupId::scrapAmount(id) ==
+             Arena::Tuning::SCRAP_DROP_ELITE);
+      scrap = true;
+    }
+  }
+  assert(scrap);
+  std::cout << "  scrap: an elite always drops its pile\n";
+}
+
+void turretRepairIsPaidInCarriedScrap() {
+  namespace T = Arena::Tuning;
+  World w;
+  w.hero().x = 900.0f;
+  w.hero().y = 0.0f;
+  assert(!w.director.canAffordTurretRepair(w.hero()));
+  w.director.addScrap(w.hero(), T::TURRET_REPAIR_SCRAP + 2);
+  assert(w.director.canAffordTurretRepair(w.hero()));
+  w.director.payForTurretRepair(w.hero());
+  assert(w.hero().scrapCarried == 2);
+  assert(w.director.onTurretRepaired(w.hero()));
+  std::cout << "  turret: the repair is paid from carried scrap\n";
 }
 
 void probeIsDeliveredByWalkingIn() {
@@ -198,6 +285,10 @@ int main() {
   Logger::init();
   std::cout << "Points of interest\n";
   scrapIsCarriedSlowedAndBankedInTheShipRing();
+  smallScrapAddsUpAndOnlyAFullLoadIsHeavy();
+  downedPlayersDropTheirWholePile();
+  elitesAlwaysDropScrap();
+  turretRepairIsPaidInCarriedScrap();
   probeIsDeliveredByWalkingIn();
   campKillsCountBeforeAnyoneInteracts();
   guardianDeathOpensGate();

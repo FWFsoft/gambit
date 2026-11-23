@@ -450,7 +450,7 @@ struct MatchPlayerState {
   uint8_t nodePart[Arena::MAX_SUIT_NODES] = {};
   // Unslotted infusion items by genus (index genus - 1) and part.
   uint8_t inventory[Arena::GENUS_COUNT][Arena::PART_COUNT] = {};
-  uint8_t carryingScrap = 0;
+  uint8_t scrapCarried = 0;     // Arena::Tuning::SCRAP_CARRY_MAX at most
   float reviveProgress = 0.0f;  // 0-1 while being revived
 };
 

@@ -129,7 +129,12 @@ void testLayout() {
       CHECK(Arena::PickupId::infusionPart(id) == static_cast<InfusionPart>(p));
     }
   }
-  CHECK(!Arena::PickupId::isInfusion(Arena::PickupId::Scrap));
+  CHECK(!Arena::PickupId::isInfusion(Arena::PickupId::scrap(1)));
+  CHECK(!Arena::PickupId::isInfusion(
+      Arena::PickupId::scrap(Arena::PickupId::SCRAP_PICKUP_MAX)));
+  CHECK(Arena::PickupId::isScrap(Arena::PickupId::scrap(7)));
+  CHECK(Arena::PickupId::scrapAmount(Arena::PickupId::scrap(7)) == 7);
+  CHECK(!Arena::PickupId::isScrap(Arena::PickupId::Medkit));
   CHECK(!Arena::PickupId::isInfusion(Arena::PickupId::Medkit));
   CHECK(!Arena::PickupId::isInfusion(Arena::PickupId::InfusionBase));
   std::cout << "  layout ok\n";
