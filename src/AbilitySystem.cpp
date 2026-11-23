@@ -144,6 +144,8 @@ void AbilitySystem::clearTransient() {
 }
 
 void AbilitySystem::onEnemyDied(const Enemy& enemy, uint32_t killerId) {
+  // Before its effects go: some infusions read what it carried.
+  Infusions::onEnemyDied(*this, enemy, killerId);
   effectManager->clearEntity(enemy.id, true);
   for (auto& [id, player] : players) {
     if (player.characterId == 0) continue;

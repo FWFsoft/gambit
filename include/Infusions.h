@@ -63,6 +63,12 @@ float onPlayerDamaged(AbilitySystem& sys, Player& player, float damage,
 // The player stunned or snared an enemy.
 void onHardCrowdControl(AbilitySystem& sys, Player& player, Enemy& enemy);
 void onKill(AbilitySystem& sys, Player& player, const Enemy& enemy);
+// Any enemy died (before its effects are cleared): effects that read what
+// it carried (Plague Carrier, Symbiote, Cauterizing Wounds).
+void onEnemyDied(AbilitySystem& sys, const Enemy& enemy, uint32_t killerId);
+// The player whose Puppeteer owns a Confused enemy's attacks (0 = none):
+// its hits on other enemies deal double and count as that player's.
+uint32_t puppeteerOf(AbilitySystem& sys, const Enemy& enemy);
 // The player dashed or blinked from a to b.
 void onDash(AbilitySystem& sys, Player& player, float x0, float y0, float x1,
             float y1);

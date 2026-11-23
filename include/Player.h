@@ -118,6 +118,11 @@ struct Player : public Animatable {
   // Genus effect state, per tree and genus: internal cooldowns/accumulators.
   float infusionTimer[Arena::TREE_COUNT][Arena::GENUS_COUNT + 1] = {};
   int infusionCounter[Arena::TREE_COUNT][Arena::GENUS_COUNT + 1] = {};
+  // Refined/Exalted effect state, per tree and genus (see the map at the top
+  // of Infusions.cpp).
+  float gradeTimer[Arena::TREE_COUNT][Arena::GENUS_COUNT + 1] = {};
+  int gradeCounter[Arena::TREE_COUNT][Arena::GENUS_COUNT + 1] = {};
+  uint32_t dominateTarget = 0;  // Dominate: the enemy being counted
   // Talent state, per talent.
   float talentTimer[Arena::TALENT_COUNT] = {};
   int talentCounter[Arena::TALENT_COUNT] = {};

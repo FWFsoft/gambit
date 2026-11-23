@@ -524,6 +524,430 @@ void testGradeText() {
   std::cout << "  grade text ok\n";
 }
 
+// ---- Refined and Exalted effects (one check each) --------------------------
+
+constexpr int REFINED = Arena::GRADE_REFINED;
+constexpr int EXALTED = Arena::GRADE_EXALTED;
+
+// Core (if empty) plus one item of `grade` in `tree`'s tier-1 slot: the
+// genus's Raw effect at level 1 and its effects up to `grade`.
+void grant(Player &p, Genus genus, InfusionTree tree, int grade) {
+  static const Talent TIER1[Arena::TREE_COUNT] = {
+      Talent::KillerInstinct, Talent::Plating, Talent::LightFrame,
+      Talent::Bloodline};
+  if (p.coreGenus == Genus::None) {
+    slot(p, genus, InfusionPart::Talon, Arena::CORE_NODE);
+  }
+  slot(p, genus, InfusionPart::Talon, node(TIER1[static_cast<int>(tree)]),
+       grade);
+  CHECK(p.infusionGrade(genus, tree) == grade);
+}
+
+int poison(World &w, uint32_t enemyId) {
+  return w.effects.getEnemyEffects(enemyId).getStacks(EffectType::Poison);
+}
+bool hasFx(World &w, uint32_t enemyId, EffectType type) {
+  return w.effects.getEnemyEffects(enemyId).hasEffect(type);
+}
+bool playerHas(World &w, uint32_t playerId, EffectType type) {
+  return w.effects.getPlayerEffects(playerId).hasEffect(type);
+}
+float hp(World &w, uint32_t enemyId) {
+  return w.enemies.getEnemies().at(enemyId).health;
+}
+AbilityContext coreContext(World &w, Player &p) {
+  return AbilityContext{w.combat, p, p.x + 1.0f, p.y, 1.0f, 0.0f, 1.0f};
+}
+
+void testVenoxaridGrades() {
+  {  // Rupture: 10+ stacks pop for burst damage and spread.
+    World w;
+    Player &me = w.p(P1);
+    grant(me, Genus::Venoxarid, InfusionTree::Offense, REFINED);
+    Enemy &target = w.spawnEnemy(100.0f, 0.0f);
+    Enemy &near = w.spawnEnemy(150.0f, 0.0f);
+    uint32_t t = target.id, n = near.id;
+    w.combat.applyToEnemy(target, EffectType::Poison, 12, me.id);
+    w.combat.damageEnemy(me.id, w.enemies.getEnemies().at(t), 1.0f,
+                         DamageFlag::Basic);
+    CHECK(poison(w, t) < 12);  // popped (Toxic Blade adds a fresh stack)
+    CHECK(hp(w, t) <= 1000.0f - 72.0f);
+    CHECK(poison(w, n) >= 6);
+  }
+  {  // Plague Carrier: a poisoned death passes the poison on.
+    World w;
+    Player &me = w.p(P1);
+    grant(me, Genus::Venoxarid, InfusionTree::Offense, EXALTED);
+    Enemy &dying = w.spawnEnemy(500.0f, 0.0f);
+    uint32_t a = w.spawnEnemy(560.0f, 0.0f).id;
+    uint32_t b = w.spawnEnemy(500.0f, 80.0f).id;
+    uint32_t far = w.spawnEnemy(1500.0f, 0.0f).id;
+    w.combat.applyToEnemy(dying, EffectType::Poison, 8, me.id);
+    w.combat.onEnemyDied(dying, me.id);
+    CHECK(poison(w, a) == 8 && poison(w, b) == 8 && poison(w, far) == 0);
+  }
+  {  // Corrosion: poisoned enemies near you are Weakened.
+    World w;
+    Player &me = w.p(P1);
+    grant(me, Genus::Venoxarid, InfusionTree::Defense, REFINED);
+    Enemy &e = w.spawnEnemy(100.0f, 0.0f);
+    Enemy &clean = w.spawnEnemy(0.0f, 120.0f);
+    w.combat.applyToEnemy(e, EffectType::Poison, 1, me.id);
+    Infusions::tick(w.combat, me, 600.0f);
+    CHECK(hasFx(w, e.id, EffectType::Weakened));
+    CHECK(!hasFx(w, clean.id, EffectType::Weakened));
+  }
+  {  // Symbiote: a poisoned death near you heals you and your crew.
+    World w;
+    Player &me = w.p(P1);
+    Player &ally = w.p(P2);
+    grant(me, Genus::Venoxarid, InfusionTree::Defense, EXALTED);
+    me.health = me.maxHealth * 0.5f;
+    ally.health = ally.maxHealth * 0.5f;
+    float mine = me.health, theirs = ally.health;
+    Enemy &dying = w.spawnEnemy(40.0f, 40.0f);
+    w.combat.applyToEnemy(dying, EffectType::Poison, 1, 0);
+    w.combat.onEnemyDied(dying, 0);
+    CHECK(me.health > mine && ally.health > theirs);
+  }
+  {  // Toxic Wake: running past enemies poisons them.
+    World w;
+    Player &me = w.p(P1);
+    grant(me, Genus::Venoxarid, InfusionTree::Mobility, REFINED);
+    Enemy &e = w.spawnEnemy(30.0f, 0.0f);
+    me.vx = 200.0f;
+    Infusions::tick(w.combat, me, 16.0f);
+    CHECK(poison(w, e.id) >= 1);
+  }
+  {  // Swarm Rider: five poisoned enemies around: unstoppable, fast SHIFT.
+    World w;
+    Player &me = w.p(P1);
+    grant(me, Genus::Venoxarid, InfusionTree::Mobility, EXALTED);
+    float before = Infusions::rechargeMultiplier(me, 3);
+    for (int i = 0; i < 5; i++) {
+      Enemy &e = w.spawnEnemy(100.0f + 30.0f * i, 100.0f);
+      w.combat.applyToEnemy(e, EffectType::Poison, 1, me.id);
+    }
+    Infusions::tick(w.combat, me, 300.0f);
+    Infusions::tick(w.combat, me, 16.0f);
+    CHECK(playerHas(w, me.id, EffectType::Unbounded));
+    CHECK(Infusions::rechargeMultiplier(me, 3) >= before + 0.49f);
+  }
+  {  // Toxic Catalyst: core damage doubles on 3+ poison stacks.
+    World w;
+    Player &me = w.p(P1);
+    grant(me, Genus::Venoxarid, InfusionTree::Genealogy, REFINED);
+    Enemy &e = w.spawnEnemy(100.0f, 0.0f);
+    float plain =
+        Infusions::damageMultiplier(w.combat, me, e, DamageFlag::Core);
+    w.combat.applyToEnemy(e, EffectType::Poison, 3, me.id);
+    float soaked =
+        Infusions::damageMultiplier(w.combat, me, e, DamageFlag::Core);
+    CHECK(std::fabs(soaked - plain - 1.0f) < 0.001f);
+  }
+  {  // Miasma Heart: a cloud that never leaves you.
+    World w;
+    Player &me = w.p(P1);
+    grant(me, Genus::Venoxarid, InfusionTree::Genealogy, EXALTED);
+    Enemy &e = w.spawnEnemy(50.0f, 0.0f);
+    Infusions::tick(w.combat, me, 16.0f);
+    CHECK(poison(w, e.id) >= 1);
+  }
+  std::cout << "  venoxarid grades ok\n";
+}
+
+void testCerebrianGrades() {
+  {  // Dominate: the 6th hit on one enemy confuses it.
+    World w;
+    Player &me = w.p(P1);
+    grant(me, Genus::Cerebrian, InfusionTree::Offense, REFINED);
+    uint32_t id = w.spawnEnemy(100.0f, 0.0f).id;
+    for (int i = 0; i < 5; i++) {
+      w.combat.damageEnemy(me.id, w.enemies.getEnemies().at(id), 1.0f,
+                           DamageFlag::Basic);
+    }
+    CHECK(!hasFx(w, id, EffectType::Confused));
+    w.combat.damageEnemy(me.id, w.enemies.getEnemies().at(id), 1.0f,
+                         DamageFlag::Basic);
+    CHECK(hasFx(w, id, EffectType::Confused));
+  }
+  {  // Puppeteer: you own the attacks of enemies you confused.
+    World w;
+    Player &me = w.p(P1);
+    grant(me, Genus::Cerebrian, InfusionTree::Offense, EXALTED);
+    Enemy &mine = w.spawnEnemy(100.0f, 0.0f);
+    Enemy &theirs = w.spawnEnemy(300.0f, 0.0f);
+    w.combat.applyToEnemy(mine, EffectType::Confused, 1, me.id, 3000.0f);
+    w.combat.applyToEnemy(theirs, EffectType::Confused, 1, P2, 3000.0f);
+    CHECK(Infusions::puppeteerOf(w.combat, mine) == me.id);
+    CHECK(Infusions::puppeteerOf(w.combat, theirs) == 0);
+  }
+  {  // Backlash: the shield breaking stuns enemies close by.
+    World w;
+    Player &me = w.p(P1);
+    grant(me, Genus::Cerebrian, InfusionTree::Defense, REFINED);
+    Enemy &e = w.spawnEnemy(80.0f, 0.0f);
+    w.combat.grantShield(me, 20.0f, 100000.0f);
+    w.combat.damagePlayer(me, 50.0f, e.id);
+    CHECK(hasFx(w, e.id, EffectType::Stunned));
+  }
+  {  // Psychic Link: the barrier recharging shields allies too.
+    World w;
+    Player &me = w.p(P1);
+    Player &ally = w.p(P2);
+    grant(me, Genus::Cerebrian, InfusionTree::Defense, EXALTED);
+    ally.shield = 0.0f;
+    Infusions::tick(w.combat, me, 6100.0f);
+    CHECK(me.shield > 0.0f && ally.shield > 0.0f);
+  }
+  {  // Ghost Step: enemies lose you after a dash.
+    World w;
+    Player &me = w.p(P1);
+    grant(me, Genus::Cerebrian, InfusionTree::Mobility, REFINED);
+    Infusions::onDash(w.combat, me, 0.0f, 0.0f, 100.0f, 0.0f);
+    CHECK(me.hiddenMs > 0.0f && !w.combat.isTargetable(me));
+  }
+  {  // Phantom: touching enemies hurts them.
+    World w;
+    Player &me = w.p(P1);
+    grant(me, Genus::Cerebrian, InfusionTree::Mobility, EXALTED);
+    uint32_t id = w.spawnEnemy(10.0f, 0.0f).id;
+    Infusions::tick(w.combat, me, 16.0f);
+    CHECK(hp(w, id) < 1000.0f);
+  }
+  {  // Mind Echo: core damage repeats 1.5 s later.
+    World w;
+    Player &me = w.p(P1);
+    grant(me, Genus::Cerebrian, InfusionTree::Genealogy, REFINED);
+    uint32_t id = w.spawnEnemy(100.0f, 0.0f).id;
+    w.combat.damageEnemy(me.id, w.enemies.getEnemies().at(id), 100.0f,
+                         DamageFlag::Core);
+    float after = hp(w, id);
+    for (int i = 0; i < 100; i++) w.combat.update(16.0f);
+    CHECK(hp(w, id) < after);
+  }
+  {  // Overmind: confused enemies share the hit.
+    World w;
+    Player &me = w.p(P1);
+    grant(me, Genus::Cerebrian, InfusionTree::Genealogy, EXALTED);
+    Enemy &a = w.spawnEnemy(1000.0f, 0.0f);
+    Enemy &b = w.spawnEnemy(1200.0f, 0.0f);
+    uint32_t aid = a.id, bid = b.id;
+    w.combat.applyToEnemy(a, EffectType::Confused, 1, me.id, 3000.0f);
+    w.combat.applyToEnemy(b, EffectType::Confused, 1, me.id, 3000.0f);
+    w.combat.damageEnemy(me.id, w.enemies.getEnemies().at(aid), 100.0f,
+                         DamageFlag::Basic);
+    CHECK(hp(w, bid) < 1000.0f);
+  }
+  std::cout << "  cerebrian grades ok\n";
+}
+
+void testFrigidariantGrades() {
+  {  // Splinter: hitting a frozen enemy shatters the freeze outward.
+    World w;
+    Player &me = w.p(P1);
+    grant(me, Genus::Frigidariant, InfusionTree::Offense, REFINED);
+    Enemy &e = w.spawnEnemy(100.0f, 0.0f);
+    uint32_t id = e.id, near = w.spawnEnemy(150.0f, 0.0f).id;
+    w.combat.applyToEnemy(e, EffectType::Stunned, 1, me.id, 3000.0f);
+    w.combat.damageEnemy(me.id, w.enemies.getEnemies().at(id), 1.0f,
+                         DamageFlag::Basic);
+    CHECK(!hasFx(w, id, EffectType::Stunned));
+    CHECK(hp(w, near) < 1000.0f);
+  }
+  {  // Glacier: planted, you are Fortified and hits freeze at once.
+    World w;
+    Player &me = w.p(P1);
+    grant(me, Genus::Frigidariant, InfusionTree::Offense, EXALTED);
+    me.vx = me.vy = 0.0f;
+    Infusions::tick(w.combat, me, 600.0f);
+    CHECK(playerHas(w, me.id, EffectType::Fortified));
+    uint32_t id = w.spawnEnemy(100.0f, 0.0f).id;
+    w.combat.damageEnemy(me.id, w.enemies.getEnemies().at(id), 1.0f,
+                         DamageFlag::Basic);
+    CHECK(hasFx(w, id, EffectType::Stunned));
+  }
+  {  // Permafrost: enemies close to you are Slowed.
+    World w;
+    Player &me = w.p(P1);
+    grant(me, Genus::Frigidariant, InfusionTree::Defense, REFINED);
+    uint32_t id = w.spawnEnemy(100.0f, 0.0f).id;
+    Infusions::tick(w.combat, me, 16.0f);
+    CHECK(hasFx(w, id, EffectType::Slow));
+  }
+  {  // Cryo Sanctuary: dropping below half raises an ice dome.
+    World w;
+    Player &me = w.p(P1);
+    grant(me, Genus::Frigidariant, InfusionTree::Defense, EXALTED);
+    w.combat.damagePlayer(me, me.health * 0.7f, 0);
+    bool dome = false;
+    for (const AbilitySystem::Zone &zone : w.combat.allZones()) {
+      dome |= zone.ownerId == me.id && zone.theme == VfxTheme::Ice &&
+              zone.variant == 2;
+    }
+    CHECK(dome);
+  }
+  {  // ...but not on the blow Last Stand catches: one big save per hit.
+    World w;
+    Player &me = w.p(P1);
+    const Genus F = Genus::Frigidariant;
+    slot(me, F, InfusionPart::Hide, Arena::CORE_NODE);
+    slot(me, F, InfusionPart::Hide, node(Talent::Plating));
+    slot(me, F, InfusionPart::Hide, node(Talent::Regrowth));
+    slot(me, F, InfusionPart::Hide, node(Talent::Guardian));
+    slot(me, F, InfusionPart::Hide, node(Talent::LastStand));
+    w.combat.damagePlayer(me, 100000.0f, 0);
+    CHECK(!me.isDead());
+    for (const AbilitySystem::Zone &zone : w.combat.allZones()) {
+      CHECK(!(zone.ownerId == me.id && zone.variant == 2));
+    }
+  }
+  {  // Ice Skate: faster and unstoppable on your own ice.
+    World w;
+    Player &me = w.p(P1);
+    grant(me, Genus::Frigidariant, InfusionTree::Mobility, REFINED);
+    float before = Infusions::speedMultiplier(me);
+    AbilitySystem::Zone ice;
+    ice.ownerId = me.id;
+    ice.x = me.x;
+    ice.y = me.y;
+    ice.radius = 42.0f;
+    ice.theme = VfxTheme::Ice;
+    ice.variant = 1;
+    w.combat.spawnZone(ice);
+    me.vx = me.vy = 0.0f;
+    Infusions::tick(w.combat, me, 16.0f);
+    CHECK(Infusions::speedMultiplier(me) > before * 1.19f);
+    CHECK(playerHas(w, me.id, EffectType::Unbounded));
+  }
+  {  // Avalanche: two seconds moving, then a freezing cone.
+    World w;
+    Player &me = w.p(P1);
+    grant(me, Genus::Frigidariant, InfusionTree::Mobility, EXALTED);
+    me.vx = 200.0f;
+    for (int i = 0; i < 130; i++) Infusions::tick(w.combat, me, 16.0f);
+    uint32_t target = w.spawnEnemy(100.0f, 0.0f).id;
+    uint32_t cone = w.spawnEnemy(140.0f, 30.0f).id;
+    w.combat.damageEnemy(me.id, w.enemies.getEnemies().at(target), 1.0f,
+                         DamageFlag::Basic);
+    CHECK(hasFx(w, target, EffectType::Stunned));
+    CHECK(hasFx(w, cone, EffectType::Stunned));
+  }
+  {  // Brittle: what you lock down is Vulnerable.
+    World w;
+    Player &me = w.p(P1);
+    grant(me, Genus::Frigidariant, InfusionTree::Genealogy, REFINED);
+    Enemy &e = w.spawnEnemy(100.0f, 0.0f);
+    Infusions::onHardCrowdControl(w.combat, me, e);
+    CHECK(hasFx(w, e.id, EffectType::Vulnerable));
+  }
+  {  // Diamond Heart: the core freezes; shields hold near the frozen.
+    World w;
+    Player &me = w.p(P1);
+    grant(me, Genus::Frigidariant, InfusionTree::Genealogy, EXALTED);
+    uint32_t id = w.spawnEnemy(100.0f, 0.0f).id;
+    w.combat.damageEnemy(me.id, w.enemies.getEnemies().at(id), 10.0f,
+                         DamageFlag::Core);
+    CHECK(hasFx(w, id, EffectType::Stunned));
+    w.combat.grantShield(me, 30.0f, 50.0f);
+    Infusions::tick(w.combat, me, 16.0f);
+    CHECK(me.shieldMs >= 250.0f);
+  }
+  std::cout << "  frigidariant grades ok\n";
+}
+
+void testMagnarokGrades() {
+  {  // Flashpoint: a burn reaching 5 stacks detonates.
+    World w;
+    Player &me = w.p(P1);
+    grant(me, Genus::Magnarok, InfusionTree::Offense, REFINED);
+    Enemy &e = w.spawnEnemy(100.0f, 0.0f);
+    uint32_t id = e.id, near = w.spawnEnemy(150.0f, 0.0f).id;
+    w.combat.applyToEnemy(e, EffectType::Wound, 4, me.id);
+    w.combat.damageEnemy(me.id, w.enemies.getEnemies().at(id), 1.0f,
+                         DamageFlag::Basic);
+    CHECK(!hasFx(w, id, EffectType::Wound));
+    CHECK(hp(w, near) < 1000.0f);
+  }
+  {  // Inferno Heart: hits leave molten ground that Empowers you.
+    World w;
+    Player &me = w.p(P1);
+    grant(me, Genus::Magnarok, InfusionTree::Offense, EXALTED);
+    uint32_t id = w.spawnEnemy(30.0f, 0.0f).id;
+    w.combat.damageEnemy(me.id, w.enemies.getEnemies().at(id), 1.0f,
+                         DamageFlag::Basic);
+    bool molten = false;
+    for (const AbilitySystem::Zone &zone : w.combat.allZones()) {
+      molten |= zone.ownerId == me.id && zone.theme == VfxTheme::Fire;
+    }
+    CHECK(molten);
+    Infusions::tick(w.combat, me, 16.0f);
+    CHECK(playerHas(w, me.id, EffectType::Empowered));
+  }
+  {  // Cauterizing Wounds: a burning kill clears held-back damage.
+    World w;
+    Player &me = w.p(P1);
+    grant(me, Genus::Magnarok, InfusionTree::Defense, REFINED);
+    me.infusionTimer[1][4] = 100.0f;  // Slow Burn's pool
+    Enemy &e = w.spawnEnemy(100.0f, 0.0f);
+    w.combat.applyToEnemy(e, EffectType::Wound, 1, me.id);
+    w.combat.onEnemyDied(e, me.id);
+    CHECK(std::fabs(me.infusionTimer[1][4] - 70.0f) < 0.01f);
+  }
+  {  // Heat Sink: held-back damage vents as a nova.
+    World w;
+    Player &me = w.p(P1);
+    grant(me, Genus::Magnarok, InfusionTree::Defense, EXALTED);
+    uint32_t id = w.spawnEnemy(150.0f, 0.0f).id;
+    // 40% of each hit is held back (after Plating): three hits pass 100.
+    for (int i = 0; i < 3; i++) w.combat.damagePlayer(me, 120.0f, 0);
+    CHECK(hp(w, id) < 1000.0f);
+    CHECK(playerHas(w, me.id, EffectType::Fortified));
+  }
+  {  // Eruption Dash: landing erupts.
+    World w;
+    Player &me = w.p(P1);
+    grant(me, Genus::Magnarok, InfusionTree::Mobility, REFINED);
+    uint32_t id = w.spawnEnemy(300.0f, 0.0f).id;
+    Infusions::onDash(w.combat, me, 0.0f, 0.0f, 300.0f, 0.0f);
+    CHECK(hp(w, id) < 1000.0f);
+  }
+  {  // Firewalker: among burning enemies, always in Burning Rush.
+    World w;
+    Player &me = w.p(P1);
+    grant(me, Genus::Magnarok, InfusionTree::Mobility, EXALTED);
+    float before = Infusions::speedMultiplier(me);
+    for (int i = 0; i < 3; i++) {
+      Enemy &e = w.spawnEnemy(100.0f + 40.0f * i, 100.0f);
+      w.combat.applyToEnemy(e, EffectType::Wound, 1, me.id);
+    }
+    Infusions::tick(w.combat, me, 16.0f);
+    CHECK(Infusions::speedMultiplier(me) > before * 1.39f);
+  }
+  {  // Fuel: the core ability ignites.
+    World w;
+    Player &me = w.p(P1);
+    grant(me, Genus::Magnarok, InfusionTree::Genealogy, REFINED);
+    uint32_t id = w.spawnEnemy(100.0f, 0.0f).id;
+    w.combat.damageEnemy(me.id, w.enemies.getEnemies().at(id), 10.0f,
+                         DamageFlag::Core);
+    CHECK(hasFx(w, id, EffectType::Wound));
+  }
+  {  // Supernova: every third core cast erupts.
+    World w;
+    Player &me = w.p(P1);
+    grant(me, Genus::Magnarok, InfusionTree::Genealogy, EXALTED);
+    uint32_t id = w.spawnEnemy(250.0f, 0.0f).id;  // out of Cauterize's way
+    AbilityContext ctx = coreContext(w, me);
+    Infusions::castCore(ctx);
+    Infusions::castCore(ctx);
+    CHECK(hp(w, id) == 1000.0f);
+    Infusions::castCore(ctx);
+    CHECK(hp(w, id) < 1000.0f);
+  }
+  std::cout << "  magnarok grades ok\n";
+}
+
 }  // namespace
 
 int main() {
@@ -543,6 +967,10 @@ int main() {
   testAscension();
   testGradeStats();
   testGradeText();
+  testVenoxaridGrades();
+  testCerebrianGrades();
+  testFrigidariantGrades();
+  testMagnarokGrades();
   std::cout << "All infusion tests passed\n";
   return 0;
 }

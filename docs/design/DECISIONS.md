@@ -21,6 +21,59 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-23: Infusion grades step 2: the 32 Refined and Exalted effects
+- **Decision** (requested by a human: "move to step 2" of issue #44): every
+  genus now has a Refined and an Exalted effect in every tree, as tabled in
+  `specs/infusion-grades.md` section 3. Raw builds something, Refined pays
+  it off, Exalted changes how you play. Numbers are first guesses.
+  Differences from the tables (listed in the spec under "Built as"):
+  - **Rupture** pops at 10 poison stacks (the poison cap is 30, which play
+    never reaches) and **Flashpoint** at 5 burn stacks (burns refresh
+    their time instead of adding to it, so a 10 s burn never happens).
+  - **Puppeteer** doubles the confused enemy's already-doubled hits on its
+    friends and gives you the kill. **Ghost Step** hides you from
+    targeting. **Phantom** is contact damage only: nothing body-blocks
+    players already. **Supernova** is a 300-radius blast plus the molten
+    field on every third cast, since the four cores differ too much for
+    "double radius".
+  - Cryo Sanctuary does not fire on the blow Last Stand catches (the
+    overlap the spec flagged).
+- **Pillars:**
+  - **Creative Builds:** serves; this is what step 1 was waiting for. Deep
+    builds now play differently (Glacier plants you, Phantom wants you in
+    the crowd, Avalanche wants you moving), and several cross genera:
+    Brittle and Corrosion help any teammate, Splinter and Diamond Heart
+    feed on any freeze, Fuel feeds a Magnarok core's Cauterize. Risk: some
+    effects may dominate; nothing is balance-tested yet.
+  - **Strategic Crunch:** serves. Combining now buys a real new effect, so
+    wide vs deep is a real choice instead of "deep is a trap".
+  - **Comradery:** serves. Corrosion, Symbiote, Psychic Link, Brittle and
+    Cryo Sanctuary help the crew; none hurts or blocks an ally. Puppeteer
+    gives you kills your confused enemies make, which were nobody's before;
+    it takes nothing from a teammate.
+  - **Clarity:** weakens slightly. Each effect shows with existing effect
+    visuals (rings, bursts, beams, zones, status icons), but Miasma Heart
+    pulses a ring every second and several Exalted auras stack around one
+    player; that may be busy with four ascended players. Not checked on
+    screen in this step.
+- **Why:** Alternatives rejected: changing burns to add duration (would
+  change the Raw effect and the Cauterize core, out of scope);
+  per-core "double radius" Supernovas (four special cases for one
+  effect).
+- **Verified:** one test per effect plus the Last Stand overlap in
+  `test_infusions` (Debug, asserts on); full suite passes. `ArenaSim
+  --suits` (new: bots start with every item at every grade) ran two full
+  matches in a Debug build with each bot ascending a different genus, no
+  crashes. Balance is not measured: the sim's bots do not play well
+  enough to judge it.
+- **Status:** Accepted (requested by a human); numbers Built, needs review
+- **Where:** `src/Infusions.cpp` (effects), `include/Player.h`
+  (`gradeTimer`, `gradeCounter`, `dominateTarget`), `include/Infusions.h`
+  (`onEnemyDied`, `puppeteerOf`), `src/AbilitySystem.cpp`,
+  `src/EnemySystem.cpp` (Puppeteer), `src/ArenaData.cpp` (text),
+  `tests/test_infusions.cpp`, `tests/arena_sim.cpp` (`--suits`),
+  `specs/infusion-grades.md`
+
 ## 2026-11-23: Infusion grades: combine to go deep; deeper effects differ and lock you in
 - **Decision** (issue #44; full text in
   `specs/infusion-grades.md`):
@@ -79,10 +132,8 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
   summary. F6 now gives one of every item at every grade. Checked in the
   running client (slot, block reasons, combine by key and by drag,
   Ascension, banner, scoreboard) and in `test_infusions`.
-  - **Not built yet (step 2):** the 32 Refined and Exalted effects. Their
-    text shows, marked "not in the game yet" / "(soon)", so a Refined
-    item today gives its Raw effect, its talent and a doubled part stat.
-    Until step 2 lands, going deep is weaker than the spec intends.
+  - **Step 2** (the 32 Refined and Exalted effects) is built: see the
+    entry above.
   - **Differs from the spec:** the Ascendant title is not drawn over the
     health bar at night (scoreboard, suit and banner only). An Exalted or
     Refined item in a shallow slot also attunes that tree (the rule is

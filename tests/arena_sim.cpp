@@ -60,6 +60,7 @@ struct Bot {
   float wanderAngle = 0.0f;
   float wanderTimerMs = 0.0f;
   float slotTimerMs = 0.0f;
+  bool gaveSuit = false;  // --suits: handed out once the match is on
   // stats
   int abilityCasts[Arena::SLOT_COUNT] = {0, 0, 0, 0, 0};
 };
@@ -149,6 +150,9 @@ class Simulation {
   }
 
   void setGodMode() { godMode = true; }
+  // --suits: every bot starts with one of every infusion at every grade,
+  // so the graded effects run in real fights.
+  void setFullSuits() { fullSuits = true; }
 
   void step() {
     for (Bot& bot : bots) driveBot(bot);
@@ -174,6 +178,7 @@ class Simulation {
   std::mt19937 rng;
   uint64_t tick = 0;
   bool godMode = false;
+  bool fullSuits = false;
   uint64_t outboundBytes = 0;
   uint64_t outboundPackets = 0;
   std::map<int, uint64_t> typeBytes;
@@ -238,6 +243,14 @@ class Simulation {
       }
     }
 
+    // A new match empties suits, so hand them out once it is under way.
+    if (fullSuits && !bot.gaveSuit && phase == Arena::MatchPhase::Round) {
+      DebugCommandPacket give;
+      give.command = static_cast<uint8_t>(DebugCommandKind::GiveInfusions);
+      sendPacket(bot.id, serialize(give));
+      bot.gaveSuit = true;
+    }
+
     // Between fights: slot whatever was picked up, then ready up.
     if (phase != Arena::MatchPhase::Round &&
         phase != Arena::MatchPhase::BossFight) {
@@ -249,7 +262,10 @@ class Simulation {
         // When nothing fits, combine a pair to reach deeper tiers.
         const Arena::SuitSlots suit = me.suitSlots();
         const int maxTier = Arena::suitTierCap(director.round());
-        for (int g = 0; g < Arena::GENUS_COUNT && !slotted; g++) {
+        // Each bot favours its own genus first, so all four get played.
+        const int favourite = static_cast<int>(bot.id % Arena::GENUS_COUNT);
+        for (int k = 0; k < Arena::GENUS_COUNT && !slotted; k++) {
+          int g = (k + favourite) % Arena::GENUS_COUNT;
           Arena::Genus genus = static_cast<Arena::Genus>(g + 1);
           for (int p = 0; p < Arena::PART_COUNT && !slotted; p++) {
             for (int grade = 1; grade <= Arena::GRADE_COUNT && !slotted;
@@ -503,6 +519,7 @@ int main(int argc, char** argv) {
   std::string mapPath = "assets/maps/arena.tmx";
   std::string expect;
   bool god = false;
+  bool suits = false;
   bool quiet = false;
   int matches = 1;
   float minutes = 20.0f;
@@ -516,6 +533,8 @@ int main(int argc, char** argv) {
     if (arg == "--bots") botList = next();
     else if (arg == "--map") mapPath = next();
     else if (arg == "--god") god = true;
+    else if (arg == "--suits")
+      suits = true;
     else if (arg == "--quiet") quiet = true;
     else if (arg == "--matches")
       matches = std::max(1, std::stoi(next()));
@@ -530,6 +549,7 @@ int main(int argc, char** argv) {
 
   Simulation sim(mapPath, seed);
   if (god) sim.setGodMode();
+  if (suits) sim.setFullSuits();
   std::stringstream names(botList);
   std::string name;
   while (std::getline(names, name, ',')) {

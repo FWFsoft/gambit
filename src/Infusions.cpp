@@ -22,6 +22,24 @@ using Arena::Talent;
 //   Genealogy Magnarok timer: Cataclysm internal cooldown
 //   Genealogy Frigidariant timer: Unbreakable internal cooldown
 // Player::talentTimer / talentCounter are indexed by Talent; see each talent.
+//
+// Refined/Exalted effects (specs/infusion-grades.md) keep their state in
+// Player::gradeTimer / gradeCounter [tree][genus]:
+//   Offense   Venoxarid timer: Rupture internal cooldown
+//             Cerebrian counter: Dominate hits on Player::dominateTarget
+//             Frigidariant timer: Glacier, time standing still
+//             Magnarok timer: Inferno Heart patch cooldown
+//   Defense   Venoxarid timer: Corrosion pulse
+//             Cerebrian timer: Backlash cooldown
+//             Frigidariant timer: Cryo Sanctuary cooldown
+//             Magnarok timer: Heat Sink heat (not a countdown)
+//   Mobility  Venoxarid timer: Toxic Wake pulse
+//             Cerebrian timer: Phantom contact pulse
+//             Frigidariant timer/counter: Avalanche momentum / flags
+//               (MOMENTUM_READY, ON_ICE)
+//             Magnarok timer: Firewalker recount
+//   Genealogy Venoxarid timer: Miasma Heart pulse
+//             Magnarok counter: core casts, for Supernova
 
 namespace {
 
@@ -41,6 +59,15 @@ constexpr int CORE_SLOT = static_cast<int>(Arena::AbilitySlot::Core);
 constexpr float FORTRESS_DURATION_MS = 4500.0f;
 constexpr float FORTRESS_DAMAGE_TAKEN = 0.3f;
 constexpr int BURNING_RUSH_KILLS = 12;
+// Refined/Exalted tuning (specs/infusion-grades.md; first guesses).
+constexpr int RUPTURE_STACKS = 10;
+constexpr int DOMINATE_HITS = 6;
+constexpr float GLACIER_STILL_MS = 500.0f;
+constexpr int FLASHPOINT_STACKS = 5;
+constexpr float AVALANCHE_MOVE_MS = 2000.0f;
+constexpr float CRYO_COOLDOWN_MS = 25000.0f;
+constexpr float HEAT_SINK_HEAT = 100.0f;
+constexpr int SUPERNOVA_EVERY = 3;
 constexpr uint8_t INVENTORY_MAX = 99;
 
 int t(Talent talent) { return static_cast<int>(talent); }
@@ -54,6 +81,43 @@ int& talentCounter(Player& player, Talent talent) {
 
 int level(const Player& player, Genus genus, InfusionTree tree) {
   return player.infusionLevel(genus, tree);
+}
+
+// Whether the player has `genus`'s effect of `grade` in `tree`.
+bool has(const Player& player, Genus genus, InfusionTree tree, int grade) {
+  return player.infusionGrade(genus, tree) >= grade;
+}
+constexpr int REFINED = Arena::GRADE_REFINED;
+constexpr int EXALTED = Arena::GRADE_EXALTED;
+
+// Avalanche flags in gradeCounter[MOBILITY][FRIGIDARIANT].
+constexpr int MOMENTUM_READY = 1;
+constexpr int ON_ICE = 2;
+
+int poisonStacks(AbilitySystem& sys, const Enemy& enemy) {
+  return sys.effects().getEnemyEffects(enemy.id).getStacks(EffectType::Poison);
+}
+
+// True if `player` stands in one of their own zones of this theme/variant.
+bool inOwnZone(AbilitySystem& sys, const Player& player, VfxTheme theme,
+               uint8_t variant) {
+  for (const AbilitySystem::Zone& zone : sys.allZones()) {
+    if (zone.ownerId != player.id || zone.theme != theme ||
+        zone.variant != variant || zone.fromEnemy) {
+      continue;
+    }
+    if (std::hypot(zone.x - player.x, zone.y - player.y) <= zone.radius) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// The Confused effect on `enemy`, if `playerId` applied it.
+bool confusedBy(AbilitySystem& sys, const Enemy& enemy, uint32_t playerId) {
+  const EffectInstance* confused =
+      sys.effects().getEnemyEffects(enemy.id).findEffect(EffectType::Confused);
+  return confused != nullptr && confused->sourceId == playerId;
 }
 
 // Recompute the derived counts after the suit changes.
@@ -182,8 +246,30 @@ void forAllies(AbilitySystem& sys, const Player& self, float radius, Fn fn) {
 }
 
 // Genealogy: core ability damage carries each genus slotted there.
-void genealogyOnCoreHit(AbilitySystem& sys, Player& player, Enemy& enemy) {
+void genealogyOnCoreHit(AbilitySystem& sys, Player& player, Enemy& enemy,
+                        float damage) {
   uint32_t playerId = player.id;
+  uint32_t enemyId = enemy.id;
+  if (has(player, Genus::Cerebrian, InfusionTree::Genealogy, REFINED) &&
+      damage > 0.0f) {
+    // Mind Echo: the hit repeats as a psychic echo.
+    AbilitySystem* s = &sys;
+    float echo = damage * 0.4f;
+    sys.schedule(1500.0f, [s, playerId, enemyId, echo]() {
+      Enemy* still = s->findEnemy(enemyId);
+      if (!still) return;
+      s->fxRing(still->x, still->y, 40.0f, VfxTheme::Psychic);
+      s->damageEnemy(playerId, *still, echo, DamageFlag::Proc);
+    });
+  }
+  if (has(player, Genus::Magnarok, InfusionTree::Genealogy, REFINED)) {
+    // Fuel: the core ability ignites.
+    sys.applyToEnemy(enemy, EffectType::Wound, 1, playerId, 4000.0f);
+  }
+  if (has(player, Genus::Frigidariant, InfusionTree::Genealogy, EXALTED)) {
+    // Diamond Heart: the core ability freezes.
+    sys.applyToEnemy(enemy, EffectType::Stunned, 1, playerId, 1200.0f);
+  }
   int venom = level(player, Genus::Venoxarid, InfusionTree::Genealogy);
   if (venom > 0) {
     // Venom Infusion
@@ -209,6 +295,44 @@ void offenseOnHit(AbilitySystem& sys, Player& player, Enemy& enemy) {
   uint32_t playerId = player.id;
   uint32_t enemyId = enemy.id;
   float ex = enemy.x, ey = enemy.y;
+
+  // Rupture: a heavily poisoned target pops before more venom goes on.
+  float& rupture = player.gradeTimer[OFFENSE][VENOXARID];
+  if (has(player, Genus::Venoxarid, InfusionTree::Offense, REFINED) &&
+      rupture <= 0.0f) {
+    int stacks = poisonStacks(sys, enemy);
+    if (stacks >= RUPTURE_STACKS) {
+      rupture = 300.0f;
+      sys.effects().removeEffect(enemyId, true, EffectType::Poison);
+      sys.fxBurst(ex, ey, 90.0f, VfxTheme::Poison);
+      sys.enemiesInCircle(ex, ey, 90.0f, [&](Enemy& other) {
+        if (other.id != enemyId) {
+          sys.applyToEnemy(other, EffectType::Poison, stacks / 2, playerId);
+        }
+      });
+      if (Enemy* still = sys.findEnemy(enemyId)) {
+        sys.damageEnemy(playerId, *still, 6.0f * stacks,
+                        DamageFlag::Proc | DamageFlag::Explosion);
+      }
+      if (!sys.findEnemy(enemyId)) return;
+    }
+  }
+
+  // Dominate: every 6th hit on one enemy turns it.
+  if (has(player, Genus::Cerebrian, InfusionTree::Offense, REFINED)) {
+    int& hits = player.gradeCounter[OFFENSE][CEREBRIAN];
+    if (player.dominateTarget != enemyId) {
+      player.dominateTarget = enemyId;
+      hits = 0;
+    }
+    if (++hits >= DOMINATE_HITS) {
+      hits = 0;
+      if (Enemy* still = sys.findEnemy(enemyId)) {
+        sys.fxRing(still->x, still->y, 45.0f, VfxTheme::Psychic);
+        sys.applyToEnemy(*still, EffectType::Confused, 1, playerId, 2000.0f);
+      }
+    }
+  }
 
   int venom = level(player, Genus::Venoxarid, InfusionTree::Offense);
   if (venom > 0) {
@@ -236,8 +360,29 @@ void offenseOnHit(AbilitySystem& sys, Player& player, Enemy& enemy) {
   }
   int frost = level(player, Genus::Frigidariant, InfusionTree::Offense);
   if (frost > 0) {
-    // Icy Strikes
-    if (Enemy* still = sys.findEnemy(enemyId)) {
+    Enemy* still = sys.findEnemy(enemyId);
+    bool frozen = still && sys.effects().getEnemyEffects(enemyId).hasEffect(
+                               EffectType::Stunned);
+    if (still && frozen &&
+        has(player, Genus::Frigidariant, InfusionTree::Offense, REFINED)) {
+      // Splinter: the freeze shatters outward.
+      float burst = std::min(60.0f, still->maxHealth * 0.12f);
+      float sx = still->x, sy = still->y;
+      sys.effects().removeEffect(enemyId, true, EffectType::Stunned);
+      sys.fxBurst(sx, sy, 80.0f, VfxTheme::Ice);
+      sys.enemiesInCircle(sx, sy, 80.0f, [&](Enemy& other) {
+        sys.damageEnemy(playerId, other, burst,
+                        DamageFlag::Proc | DamageFlag::Explosion);
+      });
+    } else if (still &&
+               has(player, Genus::Frigidariant, InfusionTree::Offense,
+                   EXALTED) &&
+               player.gradeTimer[OFFENSE][FRIGIDARIANT] >= GLACIER_STILL_MS) {
+      // Glacier: planted, every hit freezes outright.
+      sys.applyToEnemy(*still, EffectType::Stunned, 1, playerId,
+                       800.0f * (1.0f + 0.25f * (frost - 1)));
+    } else if (still) {
+      // Icy Strikes
       frostEscalate(sys, player, *still, frost);
     }
   }
@@ -249,7 +394,41 @@ void offenseOnHit(AbilitySystem& sys, Player& player, Enemy& enemy) {
                        4000.0f + 2000.0f * molten);
       sys.damageEnemy(playerId, *still, 3.0f * molten, DamageFlag::Proc);
     }
+    Enemy* still = sys.findEnemy(enemyId);
+    const EffectInstance* burn =
+        still ? sys.effects().getEnemyEffects(enemyId).findEffect(
+                    EffectType::Wound)
+              : nullptr;
+    if (burn && burn->stacks >= FLASHPOINT_STACKS &&
+        has(player, Genus::Magnarok, InfusionTree::Offense, REFINED)) {
+      // Flashpoint: the burn goes up all at once.
+      float blast = std::min(
+          150.0f, burn->remainingDuration / 1000.0f * burn->stacks * 2.0f);
+      float bx = still->x, by = still->y;
+      sys.effects().removeEffect(enemyId, true, EffectType::Wound);
+      sys.fxBurst(bx, by, 70.0f, VfxTheme::Fire);
+      sys.enemiesInCircle(bx, by, 70.0f, [&](Enemy& other) {
+        sys.damageEnemy(playerId, other, blast,
+                        DamageFlag::Proc | DamageFlag::Explosion);
+      });
+    }
+    float& inferno = player.gradeTimer[OFFENSE][MAGNAROK];
+    if (has(player, Genus::Magnarok, InfusionTree::Offense, EXALTED) &&
+        inferno <= 0.0f) {
+      // Inferno Heart: hits leave molten ground.
+      if (Enemy* target = sys.findEnemy(enemyId)) {
+        inferno = 500.0f;
+        spawnMoltenPatch(sys, playerId, target->x, target->y, 55.0f, 3000.0f,
+                         4.0f);
+      }
+    }
   }
+}
+
+// Swarm Rider: enough poisoned enemies around (counted by Speed Siphon).
+bool swarmRiding(const Player& player) {
+  return has(player, Genus::Venoxarid, InfusionTree::Mobility, EXALTED) &&
+         player.infusionCounter[MOBILITY][VENOXARID] >= 5;
 }
 
 }  // namespace
@@ -338,12 +517,19 @@ void resetLoadout(Player& player) {
   for (auto& row : player.infusionCounter) {
     for (int& counter : row) counter = 0;
   }
+  for (auto& row : player.gradeCounter) {
+    for (int& counter : row) counter = 0;
+  }
+  player.dominateTarget = 0;
   recount(player);
   resetForRound(player);
 }
 
 void resetForRound(Player& player) {
   for (auto& row : player.infusionTimer) {
+    for (float& timer : row) timer = 0.0f;
+  }
+  for (auto& row : player.gradeTimer) {
     for (float& timer : row) timer = 0.0f;
   }
   for (float& timer : player.talentTimer) timer = 0.0f;
@@ -482,6 +668,22 @@ void castCore(AbilityContext& ctx) {
       break;
   }
 
+  if (has(self, Genus::Magnarok, InfusionTree::Genealogy, EXALTED)) {
+    // Supernova: every third cast erupts around you.
+    int& casts = self.gradeCounter[GENEALOGY][MAGNAROK];
+    if (++casts >= SUPERNOVA_EVERY) {
+      casts = 0;
+      const float radius = 300.0f;
+      sys.fxBurst(self.x, self.y, radius, VfxTheme::Fire);
+      sys.fxRing(self.x, self.y, radius + 30.0f, VfxTheme::Fire);
+      sys.enemiesInCircle(self.x, self.y, radius, [&](Enemy& enemy) {
+        sys.damageEnemy(selfId, enemy, 40.0f,
+                        DamageFlag::Core | DamageFlag::Explosion);
+      });
+      spawnMoltenPatch(sys, selfId, self.x, self.y, 200.0f, 6000.0f, 6.0f);
+    }
+  }
+
   // Shared Gift: the core ability heals the team around you.
   if (self.hasTalent(Talent::SharedGift)) {
     forAllies(sys, self, 300.0f, [&](Player& ally) {
@@ -510,6 +712,12 @@ float damageMultiplier(AbilitySystem& sys, const Player& player,
   }
   if (player.hasTalent(Talent::Overcharge) && (flags & DamageFlag::Core)) {
     mult += 0.30f;
+  }
+  if ((flags & DamageFlag::Core) &&
+      has(player, Genus::Venoxarid, InfusionTree::Genealogy, REFINED) &&
+      sys.effects().getEnemyEffects(enemy.id).getStacks(EffectType::Poison) >=
+          3) {
+    mult += 1.0f;  // Toxic Catalyst
   }
   if (player.hasTalent(Talent::OpeningStrike) && direct &&
       enemy.health >= enemy.maxHealth) {
@@ -541,6 +749,7 @@ float rechargeMultiplier(const Player& player, int slot) {
     mult += 0.25f;
   }
   if (slot == CORE_SLOT && player.hasTalent(Talent::Bloodline)) mult += 0.15f;
+  if (slot == SHIFT_SLOT && swarmRiding(player)) mult += 0.5f;
   return mult;
 }
 
@@ -570,10 +779,49 @@ void onHitEnemy(AbilitySystem& sys, Player& player, Enemy& enemy, float damage,
 
   Enemy* still = sys.findEnemy(enemyId);
   if (!still) return;
+  if (damage > 0.0f && confusedBy(sys, *still, player.id) &&
+      has(player, Genus::Cerebrian, InfusionTree::Genealogy, EXALTED)) {
+    // Overmind: every enemy you confused shares the hit.
+    float share = damage * 0.3f;
+    float sx = still->x, sy = still->y;
+    uint32_t playerId = player.id;
+    int linked = 0;
+    sys.enemiesInCircle(sx, sy, 400.0f, [&](Enemy& other) {
+      if (other.id == enemyId || linked >= 8 ||
+          !confusedBy(sys, other, playerId)) {
+        return;
+      }
+      linked++;
+      sys.fxBeam(sx, sy, other.x, other.y, 6.0f, 160.0f, VfxTheme::Psychic);
+      sys.damageEnemy(playerId, other, share, DamageFlag::Proc);
+    });
+    still = sys.findEnemy(enemyId);
+    if (!still) return;
+  }
   // Core ability damage feeds Genealogy and never triggers Offense.
   if (flags & DamageFlag::Core) {
-    genealogyOnCoreHit(sys, player, *still);
+    genealogyOnCoreHit(sys, player, *still, damage);
     return;
+  }
+  int& momentum = player.gradeCounter[MOBILITY][FRIGIDARIANT];
+  if ((momentum & MOMENTUM_READY) &&
+      has(player, Genus::Frigidariant, InfusionTree::Mobility, EXALTED)) {
+    // Avalanche: the built-up momentum breaks over the target and a cone.
+    momentum &= ~MOMENTUM_READY;
+    player.gradeTimer[MOBILITY][FRIGIDARIANT] = 0.0f;
+    uint32_t playerId = player.id;
+    float dx = still->x - player.x, dy = still->y - player.y;
+    float d = std::max(1.0f, std::hypot(dx, dy));
+    sys.applyToEnemy(*still, EffectType::Stunned, 1, playerId, 1200.0f);
+    sys.fxCone(player.x, player.y, dx / d, dy / d, 170.0f, 90.0f,
+               VfxTheme::Ice);
+    sys.enemiesInCone(
+        player.x, player.y, dx / d, dy / d, 170.0f, 45.0f, [&](Enemy& other) {
+          sys.applyToEnemy(other, EffectType::Stunned, 1, playerId, 1000.0f);
+          sys.damageEnemy(playerId, other, 20.0f, DamageFlag::Proc);
+        });
+    still = sys.findEnemy(enemyId);
+    if (!still) return;
   }
   offenseOnHit(sys, player, *still);
 }
@@ -645,6 +893,21 @@ float onPlayerDamaged(AbilitySystem& sys, Player& player, float damage,
     // Slow Burn: part of the hit is deferred and dealt over time.
     float fraction = std::min(0.7f, 0.3f + 0.1f * molten);
     player.infusionTimer[DEFENSE][MAGNAROK] += damage * fraction;
+    if (has(player, Genus::Magnarok, InfusionTree::Defense, EXALTED)) {
+      // Heat Sink: held-back damage builds heat that vents as a nova.
+      float& heat = player.gradeTimer[DEFENSE][MAGNAROK];
+      heat += damage * fraction;
+      if (heat >= HEAT_SINK_HEAT) {
+        heat = 0.0f;
+        uint32_t playerId = player.id;
+        sys.fxBurst(player.x, player.y, 200.0f, VfxTheme::Fire);
+        sys.enemiesInCircle(player.x, player.y, 200.0f, [&](Enemy& enemy) {
+          sys.damageEnemy(playerId, enemy, 40.0f,
+                          DamageFlag::Proc | DamageFlag::Explosion);
+        });
+        sys.applyToPlayer(player, EffectType::Fortified, 3, playerId, 3000.0f);
+      }
+    }
     damage *= (1.0f - fraction);
   }
 
@@ -655,8 +918,10 @@ float onPlayerDamaged(AbilitySystem& sys, Player& player, float damage,
 
   // ---- talents: thresholds --------------------------------------------------
   float healthAfter = player.health - std::max(0.0f, damage - player.shield);
+  bool lastStood = false;
   if (player.hasTalent(Talent::LastStand) && healthAfter < 1.0f &&
       talentCounter(player, Talent::LastStand) == 0) {
+    lastStood = true;
     talentCounter(player, Talent::LastStand) = 1;
     damage = std::max(0.0f, player.shield + player.health - 1.0f);
     healthAfter = 1.0f;
@@ -670,6 +935,48 @@ float onPlayerDamaged(AbilitySystem& sys, Player& player, float damage,
     bubble.param2 = static_cast<uint8_t>(VfxTheme::Fire);
     sys.emit(bubble);
   }
+  float& cryo = player.gradeTimer[DEFENSE][FRIGIDARIANT];
+  if (has(player, Genus::Frigidariant, InfusionTree::Defense, EXALTED) &&
+      cryo <= 0.0f && healthAfter > 0.0f && !lastStood &&
+      healthAfter < player.maxHealth * 0.5f) {
+    // Cryo Sanctuary: an ice dome that roots enemies and shelters allies.
+    // Not on the blow Last Stand just caught: one big save per hit.
+    cryo = CRYO_COOLDOWN_MS;
+    uint32_t playerId = player.id;
+    AbilitySystem* s = &sys;
+    AbilitySystem::Zone dome;
+    dome.ownerId = playerId;
+    dome.x = player.x;
+    dome.y = player.y;
+    dome.radius = 160.0f;
+    dome.lifeMs = 5000.0f;
+    dome.tickMs = 250.0f;
+    dome.theme = VfxTheme::Ice;
+    dome.variant = 2;
+    dome.onEnemyTick = [s, playerId](AbilitySystem::Zone&, Enemy& enemy) {
+      s->applyToEnemy(enemy, EffectType::Snared, 1, playerId, 600.0f);
+    };
+    dome.onPlayerTick = [s, playerId](AbilitySystem::Zone&, Player& ally) {
+      if (ally.isDead()) return;
+      // Fortified is 10% a stack: two is the dome's 20%.
+      s->applyToPlayer(ally, EffectType::Fortified, 2, playerId, 400.0f);
+    };
+    sys.spawnZone(dome);
+    sys.fxRing(player.x, player.y, 160.0f, VfxTheme::Ice);
+  }
+
+  // Backlash: the barrier breaking stuns whatever broke it.
+  float& backlash = player.gradeTimer[DEFENSE][CEREBRIAN];
+  if (has(player, Genus::Cerebrian, InfusionTree::Defense, REFINED) &&
+      backlash <= 0.0f && player.shield > 0.0f && damage >= player.shield) {
+    backlash = 4000.0f;
+    uint32_t playerId = player.id;
+    sys.fxBurst(player.x, player.y, 150.0f, VfxTheme::Psychic);
+    sys.enemiesInCircle(player.x, player.y, 150.0f, [&](Enemy& enemy) {
+      sys.applyToEnemy(enemy, EffectType::Stunned, 1, playerId, 1000.0f);
+    });
+  }
+
   bool wasAbove35 = player.health >= player.maxHealth * 0.35f;
   bool wasAbove40 = player.health >= player.maxHealth * 0.40f;
   if (player.hasTalent(Talent::SecondWind) && wasAbove35 &&
@@ -689,7 +996,12 @@ float onPlayerDamaged(AbilitySystem& sys, Player& player, float damage,
 }
 
 void onHardCrowdControl(AbilitySystem& sys, Player& player, Enemy& enemy) {
-  (void)enemy;
+  if (has(player, Genus::Frigidariant, InfusionTree::Genealogy, REFINED) &&
+      !sys.effects().getEnemyEffects(enemy.id).hasEffect(
+          EffectType::Vulnerable)) {
+    // Brittle: what you lock down, the team hits harder.
+    sys.applyToEnemy(enemy, EffectType::Vulnerable, 1, player.id, 2000.0f);
+  }
   int frost = level(player, Genus::Frigidariant, InfusionTree::Genealogy);
   if (frost <= 0) return;
   // Unbreakable: at most one shield refresh per half second.
@@ -727,16 +1039,96 @@ void onKill(AbilitySystem& sys, Player& player, const Enemy& enemy) {
   }
 }
 
+void onEnemyDied(AbilitySystem& sys, const Enemy& enemy, uint32_t killerId) {
+  const ActiveEffects& fx = sys.effects().getEnemyEffects(enemy.id);
+  const EffectInstance* poison = fx.findEffect(EffectType::Poison);
+  bool burning = fx.hasEffect(EffectType::Wound);
+  uint32_t deadId = enemy.id;
+  float ex = enemy.x, ey = enemy.y;
+  int stacks = poison ? poison->stacks : 0;
+  uint32_t poisoner = poison ? poison->sourceId : 0;
+
+  for (auto& [id, player] : sys.allPlayers()) {
+    if (player.characterId == 0 || player.isDead()) continue;
+    uint32_t playerId = player.id;
+    if (stacks > 0 && poisoner == playerId &&
+        has(player, Genus::Venoxarid, InfusionTree::Offense, EXALTED)) {
+      // Plague Carrier: the poison jumps to the two nearest enemies.
+      for (int jump = 0; jump < 2; jump++) {
+        Enemy* next = nullptr;
+        float best = 250.0f;
+        sys.enemiesInCircle(ex, ey, 250.0f, [&](Enemy& other) {
+          if (other.id == deadId) return;
+          if (sys.effects().getEnemyEffects(other.id).getStacks(
+                  EffectType::Poison) >= stacks) {
+            return;  // already carries as much: try someone else
+          }
+          float d = std::hypot(other.x - ex, other.y - ey);
+          if (d < best) {
+            best = d;
+            next = &other;
+          }
+        });
+        if (!next) break;
+        sys.fxBeam(ex, ey, next->x, next->y, 8.0f, 220.0f, VfxTheme::Poison);
+        int held = sys.effects().getEnemyEffects(next->id).getStacks(
+            EffectType::Poison);
+        sys.applyToEnemy(*next, EffectType::Poison, stacks - held, playerId);
+      }
+    }
+    if (stacks > 0 &&
+        has(player, Genus::Venoxarid, InfusionTree::Defense, EXALTED) &&
+        std::hypot(player.x - ex, player.y - ey) <= 200.0f) {
+      // Symbiote: a poisoned death near you feeds you and your crew.
+      sys.healPlayer(playerId, player, player.maxHealth * 0.02f);
+      forAllies(sys, player, 200.0f, [&](Player& ally) {
+        sys.healPlayer(playerId, ally, ally.maxHealth * 0.02f);
+      });
+    }
+    if (burning && playerId == killerId &&
+        has(player, Genus::Magnarok, InfusionTree::Defense, REFINED)) {
+      // Cauterizing Wounds
+      player.infusionTimer[DEFENSE][MAGNAROK] *= 0.7f;
+    }
+  }
+}
+
+uint32_t puppeteerOf(AbilitySystem& sys, const Enemy& enemy) {
+  const EffectInstance* confused =
+      sys.effects().getEnemyEffects(enemy.id).findEffect(EffectType::Confused);
+  if (!confused) return 0;
+  Player* owner = sys.findPlayer(confused->sourceId);
+  if (!owner || owner->isDead() ||
+      !has(*owner, Genus::Cerebrian, InfusionTree::Offense, EXALTED)) {
+    return 0;
+  }
+  return owner->id;
+}
+
 void onDash(AbilitySystem& sys, Player& player, float x0, float y0, float x1,
             float y1) {
-  int psychic = level(player, Genus::Cerebrian, InfusionTree::Mobility);
-  if (psychic <= 0) return;
-  // Phase Shift: everything along the path takes psychic damage.
   uint32_t playerId = player.id;
-  sys.fxBeam(x0, y0, x1, y1, 26.0f, 260.0f, VfxTheme::Psychic);
-  sys.enemiesInLine(x0, y0, x1, y1, 30.0f, [&](Enemy& enemy) {
-    sys.damageEnemy(playerId, enemy, 18.0f * psychic, DamageFlag::Proc);
-  });
+  int psychic = level(player, Genus::Cerebrian, InfusionTree::Mobility);
+  if (psychic > 0) {
+    // Phase Shift: everything along the path takes psychic damage.
+    sys.fxBeam(x0, y0, x1, y1, 26.0f, 260.0f, VfxTheme::Psychic);
+    sys.enemiesInLine(x0, y0, x1, y1, 30.0f, [&](Enemy& enemy) {
+      sys.damageEnemy(playerId, enemy, 18.0f * psychic, DamageFlag::Proc);
+    });
+  }
+  if (has(player, Genus::Cerebrian, InfusionTree::Mobility, REFINED)) {
+    // Ghost Step: enemies lose you for a moment.
+    player.hiddenMs = std::max(player.hiddenMs, 1500.0f);
+  }
+  if (has(player, Genus::Magnarok, InfusionTree::Mobility, REFINED)) {
+    // Eruption Dash: land in a molten burst.
+    sys.fxBurst(x1, y1, 90.0f, VfxTheme::Fire);
+    sys.enemiesInCircle(x1, y1, 90.0f, [&](Enemy& enemy) {
+      sys.damageEnemy(playerId, enemy, 20.0f,
+                      DamageFlag::Proc | DamageFlag::Explosion);
+    });
+    spawnMoltenPatch(sys, playerId, x1, y1, 70.0f, 2500.0f, 5.0f);
+  }
 }
 
 void onAbilityUsed(AbilitySystem& sys, Player& player, int slot) {
@@ -766,6 +1158,12 @@ void tick(AbilitySystem& sys, Player& player, float dtMs) {
   }
   countDown(player.infusionTimer[GENEALOGY][MAGNAROK]);
   countDown(player.infusionTimer[GENEALOGY][FRIGIDARIANT]);
+  // Refined/Exalted cooldowns and pulses (Heat and Glacier/Avalanche
+  // timers are not countdowns).
+  countDown(player.gradeTimer[OFFENSE][VENOXARID]);
+  countDown(player.gradeTimer[OFFENSE][MAGNAROK]);
+  countDown(player.gradeTimer[DEFENSE][CEREBRIAN]);
+  countDown(player.gradeTimer[DEFENSE][FRIGIDARIANT]);
 
   // ---- talents --------------------------------------------------------------
   for (Talent cooldown : {Talent::SecondWind, Talent::EscapeArtist,
@@ -808,6 +1206,41 @@ void tick(AbilitySystem& sys, Player& player, float dtMs) {
     if (sinceHit >= 6000.0f && player.shield < barrier) {
       sys.grantShield(player, barrier, 600000.0f);
       sinceHit = 0.0f;
+      if (has(player, Genus::Cerebrian, InfusionTree::Defense, EXALTED)) {
+        // Psychic Link: the crew nearby gets half a barrier.
+        forAllies(sys, player, 250.0f, [&](Player& ally) {
+          if (ally.shield >= barrier * 0.5f) return;
+          sys.fxBeam(player.x, player.y, ally.x, ally.y, 6.0f, 200.0f,
+                     VfxTheme::Psychic);
+          sys.grantShield(ally, barrier * 0.5f, 600000.0f);
+        });
+      }
+    }
+  }
+  if (has(player, Genus::Venoxarid, InfusionTree::Defense, REFINED)) {
+    // Corrosion: poisoned enemies near you are Weakened.
+    float& pulse = player.gradeTimer[DEFENSE][VENOXARID];
+    pulse -= dtMs;
+    if (pulse <= 0.0f) {
+      pulse = 500.0f;
+      sys.enemiesInCircle(player.x, player.y, 200.0f, [&](Enemy& enemy) {
+        if (sys.effects().getEnemyEffects(enemy.id).hasEffect(
+                EffectType::Poison)) {
+          sys.applyToEnemy(enemy, EffectType::Weakened, 1, playerId, 1000.0f);
+        }
+      });
+    }
+  }
+  if (has(player, Genus::Frigidariant, InfusionTree::Defense, REFINED)) {
+    // Permafrost: a standing chill around you. (Its pulse uses the unused
+    // genus-None column; Cryo Sanctuary owns the Frigidariant one.)
+    float& pulse = player.gradeTimer[DEFENSE][0];
+    pulse -= dtMs;
+    if (pulse <= 0.0f) {
+      pulse = 400.0f;
+      sys.enemiesInCircle(player.x, player.y, 120.0f, [&](Enemy& enemy) {
+        sys.applyToEnemy(enemy, EffectType::Slow, 1, playerId, 700.0f);
+      });
     }
   }
   if (level(player, Genus::Magnarok, InfusionTree::Defense) > 0) {
@@ -822,6 +1255,111 @@ void tick(AbilitySystem& sys, Player& player, float dtMs) {
 
   // ---- Mobility -----------------------------------------------------------
   bool moving = std::abs(player.vx) + std::abs(player.vy) > 1.0f;
+
+  if (has(player, Genus::Frigidariant, InfusionTree::Offense, EXALTED)) {
+    // Glacier: time standing still; planted, you are Fortified.
+    float& still = player.gradeTimer[OFFENSE][FRIGIDARIANT];
+    bool wasPlanted = still >= GLACIER_STILL_MS;
+    still = moving ? 0.0f : still + dtMs;
+    if (still >= GLACIER_STILL_MS) {
+      if (!wasPlanted) sys.fxRing(player.x, player.y, 50.0f, VfxTheme::Ice);
+      // Fortified is 10% a stack: four is Glacier's 40%.
+      sys.applyToPlayer(player, EffectType::Fortified, 4, playerId, 300.0f);
+    }
+  }
+  if (has(player, Genus::Venoxarid, InfusionTree::Mobility, REFINED)) {
+    // Toxic Wake: running past enemies poisons them, once a second.
+    float& pulse = player.gradeTimer[MOBILITY][VENOXARID];
+    pulse -= dtMs;
+    if (moving && pulse <= 0.0f) {
+      int touched = 0;
+      sys.enemiesInCircle(player.x, player.y, 60.0f, [&](Enemy& enemy) {
+        sys.applyToEnemy(enemy, EffectType::Poison, 1, playerId);
+        touched++;
+      });
+      if (touched > 0) pulse = 1000.0f;
+    }
+  }
+  if (swarmRiding(player)) {
+    sys.applyToPlayer(player, EffectType::Unbounded, 1, playerId, 300.0f);
+  }
+  if (has(player, Genus::Cerebrian, InfusionTree::Mobility, EXALTED)) {
+    // Phantom: touching enemies hurts them.
+    float& pulse = player.gradeTimer[MOBILITY][CEREBRIAN];
+    pulse -= dtMs;
+    if (pulse <= 0.0f) {
+      pulse = 500.0f;
+      sys.enemiesInCircle(
+          player.x, player.y, Arena::Tuning::PLAYER_RADIUS + 12.0f,
+          [&](Enemy& enemy) {
+            sys.fxRing(enemy.x, enemy.y, 28.0f, VfxTheme::Psychic);
+            sys.damageEnemy(playerId, enemy, 12.0f, DamageFlag::Proc);
+          });
+    }
+  }
+  if (has(player, Genus::Frigidariant, InfusionTree::Mobility, REFINED)) {
+    int& flags = player.gradeCounter[MOBILITY][FRIGIDARIANT];
+    // Ice Skate: on your own ice you are fast and cannot be slowed.
+    bool onIce = inOwnZone(sys, player, VfxTheme::Ice, 1);
+    flags = onIce ? (flags | ON_ICE) : (flags & ~ON_ICE);
+    if (onIce) {
+      sys.applyToPlayer(player, EffectType::Unbounded, 1, playerId, 300.0f);
+    }
+    if (has(player, Genus::Frigidariant, InfusionTree::Mobility, EXALTED) &&
+        !(flags & MOMENTUM_READY)) {
+      // Avalanche: two seconds on the move builds momentum.
+      float& moved = player.gradeTimer[MOBILITY][FRIGIDARIANT];
+      moved = moving ? moved + dtMs : 0.0f;
+      if (moved >= AVALANCHE_MOVE_MS) {
+        flags |= MOMENTUM_READY;
+        sys.fxRing(player.x, player.y, 60.0f, VfxTheme::Ice);
+      }
+    }
+  }
+  if (has(player, Genus::Frigidariant, InfusionTree::Genealogy, EXALTED) &&
+      player.shield > 0.0f && player.shieldMs > 0.0f) {
+    // Diamond Heart: shields hold while something frozen is near.
+    int frozen =
+        sys.countEnemies(player.x, player.y, 300.0f, [&](const Enemy& enemy) {
+          return sys.effects().getEnemyEffects(enemy.id).hasEffect(
+              EffectType::Stunned);
+        });
+    if (frozen > 0) player.shieldMs = std::max(player.shieldMs, 250.0f);
+  }
+  if (has(player, Genus::Magnarok, InfusionTree::Offense, EXALTED) &&
+      inOwnZone(sys, player, VfxTheme::Fire, 1)) {
+    // Inferno Heart: standing on your molten ground Empowers you.
+    sys.applyToPlayer(player, EffectType::Empowered, 1, playerId, 300.0f);
+  }
+  if (has(player, Genus::Venoxarid, InfusionTree::Genealogy, EXALTED)) {
+    // Miasma Heart: a small cloud that never leaves you.
+    float& pulse = player.gradeTimer[GENEALOGY][VENOXARID];
+    pulse -= dtMs;
+    if (pulse <= 0.0f) {
+      pulse = 1000.0f;
+      sys.fxRing(player.x, player.y, 90.0f, VfxTheme::Poison);
+      sys.enemiesInCircle(player.x, player.y, 90.0f, [&](Enemy& enemy) {
+        sys.applyToEnemy(enemy, EffectType::Poison, 1, playerId);
+      });
+    }
+  }
+  if (has(player, Genus::Magnarok, InfusionTree::Mobility, EXALTED)) {
+    // Firewalker: among burning enemies, always in Burning Rush.
+    float& recount = player.gradeTimer[MOBILITY][MAGNAROK];
+    recount -= dtMs;
+    if (recount <= 0.0f) {
+      recount = 250.0f;
+      int burning =
+          sys.countEnemies(player.x, player.y, 300.0f, [&](const Enemy& enemy) {
+            return sys.effects().getEnemyEffects(enemy.id).hasEffect(
+                EffectType::Wound);
+          });
+      if (burning >= 3) {
+        float& rushLeft = player.infusionTimer[MOBILITY][MAGNAROK];
+        rushLeft = std::max(rushLeft, 400.0f);
+      }
+    }
+  }
 
   if (level(player, Genus::Venoxarid, InfusionTree::Mobility) > 0) {
     // Speed Siphon: recount poisoned enemies a few times per second.
@@ -889,6 +1427,9 @@ float speedMultiplier(const Player& player) {
   if (level(player, Genus::Magnarok, InfusionTree::Mobility) > 0 &&
       player.infusionTimer[MOBILITY][MAGNAROK] > 0.0f) {
     mult *= 1.4f;
+  }
+  if (player.gradeCounter[MOBILITY][FRIGIDARIANT] & ON_ICE) {
+    mult *= 1.2f;  // Ice Skate
   }
   return mult;
 }

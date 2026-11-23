@@ -3,9 +3,10 @@
 **ACCEPTED** (issue #44; spec approved by a human on 2026-11-23, with the
 defaults for the four open questions at the end). **Step 1 built**: grades,
 combining, depth requirements, attunement, Ascension and the suit screen.
-**Step 2 not built**: the 32 Refined and Exalted effects exist as text
-only; the suit screen marks them "not in the game yet". Extends
-`specs/genera-and-infusion-system.md`.
+**Step 2 built**: all 32 Refined and Exalted effects
+(`src/Infusions.cpp`, one test each in `tests/test_infusions.cpp`); see
+"Built as" under section 3 for where the build differs from the tables.
+Extends `specs/genera-and-infusion-system.md`.
 
 # Infusion grades: combine, go deep, become something
 
@@ -114,7 +115,7 @@ Numbers are first guesses, like the rest of the infusion numbers.
 
 | Tree | Raw (today) | Refined | Exalted |
 | --- | --- | --- | --- |
-| Offense | **Toxic Blade**: attacks poison and splash venom. | **Rupture**: hitting an enemy at its poison cap pops all its stacks for 6 damage each, and puts half of them on enemies within 90. | **Plague Carrier**: a poisoned enemy that dies passes its full poison stacks to the 2 nearest enemies within 250. Kills chain through a pack. |
+| Offense | **Toxic Blade**: attacks poison and splash venom. | **Rupture**: hitting an enemy with 10 or more poison stacks pops them all for 6 damage each, and puts half of them on enemies within 90. (Was "at its poison cap"; the cap is 30, too high to reach.) | **Plague Carrier**: a poisoned enemy that dies passes its full poison stacks to the 2 nearest enemies within 250. Kills chain through a pack. |
 | Defense | **Acidic Shell**: melee attackers are poisoned; poisoned enemies hit you softer. | **Corrosion**: poisoned enemies within 200 of you are Weakened (deal less damage to **everyone**, not just you). | **Symbiote**: a poisoned enemy that dies within 200 of you heals you and allies within 200 for 2% of max health. |
 | Mobility | **Speed Siphon**: move faster per poisoned enemy nearby. | **Toxic Wake**: passing within 60 of an enemy poisons it (once per enemy per second). You poison by running past. | **Swarm Rider**: with 5+ poisoned enemies within 300 you are Unbounded (cannot be slowed or rooted) and your SHIFT recharges 50% faster. |
 | Genealogy | **Venom Infusion**: core damage poisons; raises the poison cap. | **Toxic Catalyst**: core damage is doubled on enemies with 3+ poison stacks. | **Miasma Heart**: you always exude a small poison cloud (radius 90, 1 stack a second). You are the plague. |
@@ -141,10 +142,31 @@ Numbers are first guesses, like the rest of the infusion numbers.
 
 | Tree | Raw (today) | Refined | Exalted |
 | --- | --- | --- | --- |
-| Offense | **Eruptive Strikes**: hits ignite; burns add up. | **Flashpoint**: a burn that reaches 10 s left detonates: the rest of the burn is dealt at once to enemies within 70. | **Inferno Heart**: your hits leave molten ground under the target (one patch per 0.5 s), and you are Empowered while you stand on molten ground. A walking volcano. |
+| Offense | **Eruptive Strikes**: hits ignite; burns add up. | **Flashpoint**: a burn that reaches 5 stacks detonates: the rest of the burn is dealt at once to enemies within 70. (Was "10 s left"; burns refresh rather than add up, so stacks are what builds.) | **Inferno Heart**: your hits leave molten ground under the target (one patch per 0.5 s), and you are Empowered while you stand on molten ground. A walking volcano. |
 | Defense | **Slow Burn**: part of each hit is dealt to you over time instead. | **Cauterizing Wounds**: killing a burning enemy clears 30% of your deferred damage. | **Heat Sink**: damage you defer builds Heat; at 100 Heat you release a fire nova (40 damage, radius 200) and are Fortified for 3 s. |
 | Mobility | **Burning Rush**: every 12 kills, a burst of speed and a molten trail. | **Eruption Dash**: your dash or blink ends in a molten burst (radius 90) where you land. | **Firewalker**: while 3+ burning enemies are within 300, you are always in Burning Rush. |
 | Genealogy | **Cataclysm**: core damage leaves molten ground. | **Fuel**: your core ability ignites everything it damages (4 s burn). | **Supernova**: every third core cast has double radius and leaves a molten field (radius 200, 6 s). |
+
+### Built as (where the game differs from the tables above)
+
+- **Rupture** pops at 10 poison stacks, not "the poison cap" (the cap is
+  30, which play never reaches).
+- **Flashpoint** goes off at 5 burn stacks, not "10 s left": a new burn
+  refreshes the old one's time instead of adding to it, so stacks are
+  what builds up.
+- **Puppeteer**: confused enemies already hit other enemies for double;
+  Puppeteer doubles that again and gives you the kill.
+- **Ghost Step** hides you (enemies cannot target you) rather than using
+  the Stealth effect.
+- **Phantom**: players and enemies never body-block, so "walk through
+  enemies" is already true; Phantom is the contact damage (12 every 0.5 s
+  to what you touch).
+- **Supernova**: every third cast also blasts 40 damage in radius 300
+  around you and leaves the molten field, on top of whatever the core
+  does (cores differ too much for a uniform "double radius").
+- **Glacier, Heat Sink, Cryo Sanctuary** use Fortified, which is 10% a
+  stack: 4, 3 and 2 stacks.
+- **Cryo Sanctuary** does not fire on the hit Last Stand catches.
 
 ### Checks on the table
 

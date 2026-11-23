@@ -674,7 +674,7 @@ const AbilityInfo& coreAbility(Genus g) {
 
 // Refined and Exalted effects (specs/infusion-grades.md, section 3). Raw
 // builds something, Refined pays it off in a new way, Exalted changes how
-// you play. Designed, not built yet: `built` is false until each one is.
+// you play. Behaviour in src/Infusions.cpp.
 static const InfusionText GRADED_TEXT[GENUS_COUNT + 1][TREE_COUNT][2] = {
     {{{"", ""}, {"", ""}},
      {{"", ""}, {"", ""}},
@@ -683,129 +683,102 @@ static const InfusionText GRADED_TEXT[GENUS_COUNT + 1][TREE_COUNT][2] = {
     // Venoxarid
     {
         {{"Rupture",
-          "Hitting an enemy at its poison cap pops every stack for burst "
-          "damage and spreads half of them to enemies nearby.",
-          false},
+          "Hitting an enemy carrying 10 or more poison stacks pops them for "
+          "burst damage and spreads half of them to enemies nearby."},
          {"Plague Carrier",
           "A poisoned enemy that dies passes its full poison to the two "
-          "nearest enemies. Kills chain through a pack.",
-          false}},
+          "nearest enemies. Kills chain through a pack."}},
         {{"Corrosion",
           "Poisoned enemies near you are Weakened: they deal less damage to "
-          "everyone.",
-          false},
+          "everyone."},
          {"Symbiote",
           "A poisoned enemy that dies near you heals you and allies nearby "
-          "for 2% of max health.",
-          false}},
+          "for 2% of max health."}},
         {{"Toxic Wake",
-          "Running past an enemy poisons it. You poison by moving.", false},
+          "Running past an enemy poisons it. You poison by moving."},
          {"Swarm Rider",
           "With 5 or more poisoned enemies nearby you cannot be slowed or "
-          "rooted, and your SHIFT recharges 50% faster.",
-          false}},
+          "rooted, and your SHIFT recharges 50% faster."}},
         {{"Toxic Catalyst",
           "Your core ability deals double damage to enemies with 3 or more "
-          "poison stacks.",
-          false},
+          "poison stacks."},
          {"Miasma Heart",
-          "You always exude a small poison cloud. You are the plague.", false}},
+          "You always exude a small poison cloud. You are the plague."}},
     },
     // Cerebrian
     {
-        {{"Dominate", "Every 6th hit on the same enemy Confuses it for 2 s.",
-          false},
+        {{"Dominate", "Every 6th hit on the same enemy Confuses it for 2 s."},
          {"Puppeteer",
           "Enemies you Confused deal double damage to other enemies, and "
-          "their kills count as yours for loot.",
-          false}},
+          "their kills count as yours for loot."}},
         {{"Backlash",
           "When your barrier breaks, enemies close to you are Stunned for "
-          "1 s.",
-          false},
+          "1 s."},
          {"Psychic Link",
           "When your barrier recharges, allies nearby get a barrier of half "
-          "its strength.",
-          false}},
-        {{"Ghost Step", "After a dash you are Stealthed for 1.5 s.", false},
+          "its strength."}},
+        {{"Ghost Step", "After a dash, enemies lose track of you for 1.5 s."},
          {"Phantom",
-          "You are always ghosted: you walk through enemies, and touching "
-          "one deals psychic damage.",
-          false}},
+          "You walk through enemies like a ghost, and touching one deals "
+          "psychic damage."}},
         {{"Mind Echo",
           "1.5 s after your core ability damages enemies, a psychic echo "
-          "hits them again for 40%.",
-          false},
+          "hits them again for 40%."},
          {"Overmind",
           "30% of damage dealt to an enemy you Confused is also dealt to "
-          "every other enemy you Confused nearby.",
-          false}},
+          "every other enemy you Confused nearby."}},
     },
     // Frigidariant
     {
         {{"Splinter",
           "Hitting a frozen enemy ends the freeze and bursts for part of "
-          "its max health to enemies around it.",
-          false},
+          "its max health to enemies around it."},
          {"Glacier",
           "Stand still for half a second: you take 40% less damage and your "
-          "hits freeze at once, until you move.",
-          false}},
+          "hits freeze at once, until you move."}},
         {{"Permafrost",
           "Enemies close to you are always Slowed, so a melee attacker's "
-          "first hit roots it.",
-          false},
+          "first hit roots it."},
          {"Cryo Sanctuary",
           "Hit below half health, an ice dome forms around you: enemies "
           "entering are rooted, allies inside take 20% less damage. Once "
-          "every 25 s.",
-          false}},
+          "every 25 s."}},
         {{"Ice Skate",
           "On your own ice you cannot be slowed or rooted and move 20% "
-          "faster.",
-          false},
+          "faster."},
          {"Avalanche",
           "Moving for 2 s builds momentum: your next hit freezes the target "
-          "and hits every enemy in a cone.",
-          false}},
+          "and hits every enemy in a cone."}},
         {{"Brittle",
           "Enemies you stun or root are Vulnerable while it lasts: the "
-          "whole team hits them harder.",
-          false},
+          "whole team hits them harder."},
          {"Diamond Heart",
           "Your core ability freezes what it damages, and your shields do "
-          "not expire while a frozen enemy is near.",
-          false}},
+          "not expire while a frozen enemy is near."}},
     },
     // Magnarok
     {
         {{"Flashpoint",
-          "A burn that reaches 10 s detonates: the rest of it is dealt at "
-          "once to enemies around the target.",
-          false},
+          "A burn that reaches 5 stacks detonates: the rest of it is dealt "
+          "at once to enemies around the target."},
          {"Inferno Heart",
           "Your hits leave molten ground under the target, and you are "
-          "Empowered while you stand on molten ground.",
-          false}},
+          "Empowered while you stand on molten ground."}},
         {{"Cauterizing Wounds",
           "Killing a burning enemy clears 30% of the damage Slow Burn is "
-          "holding back.",
-          false},
+          "holding back."},
          {"Heat Sink",
           "Damage you hold back builds Heat; at 100 you release a fire nova "
-          "and take less damage for 3 s.",
-          false}},
+          "and take less damage for 3 s."}},
         {{"Eruption Dash",
-          "Your dash or blink ends in a molten burst where you land.", false},
+          "Your dash or blink ends in a molten burst where you land."},
          {"Firewalker",
           "While 3 or more burning enemies are near, you are always in "
-          "Burning Rush.",
-          false}},
-        {{"Fuel", "Your core ability ignites everything it damages.", false},
+          "Burning Rush."}},
+        {{"Fuel", "Your core ability ignites everything it damages."},
          {"Supernova",
-          "Every third core cast has double radius and leaves a molten "
-          "field.",
-          false}},
+          "Every third core cast also erupts around you and leaves a "
+          "molten field."}},
     },
 };
 
