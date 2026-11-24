@@ -21,6 +21,25 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-24: Crash intro shows the planet's pink-cracked side
+- **Decision** (requested by a human, issue #46, playtest 2026-11-22): the
+  intro planet is turned so the side with the glowing pink cracks faces the
+  camera, just left of the disc's centre on the day side (rotation
+  X -5°, Z 353°, was X 15°, Z 200°). The light, rim, framing and the ship's
+  impact point (lower right, night side) are unchanged.
+- **Pillars:** Clarity / tone: the first frame of a match reads as an alien
+  world, not an Earth clone. No other pillar is affected.
+- **Why:** The cracks are one small patch of the Meshy texture; the old
+  rotation put them on the far side. They were placed on the lit side
+  rather than near the impact point, because the impact is on the night
+  side where they would be lost in shadow. The patch is small, roughly 60 to 100 px
+  across on a 1440 x 810 screen, so it reads but is subtle. If it should
+  read more strongly, a follow-up could boost the pink in the bake or add a
+  glow; that was left alone here because the issue asked for orientation
+  only.
+- **Status:** Accepted (requested by a human)
+- **Where:** `tools/cutscene/render_intro.py`, `assets/cutscene/planet.png`
+
 ## 2026-11-23: Infusion grades step 2: the 32 Refined and Exalted effects
 - **Decision** (requested by a human: "move to step 2" of issue #44): every
   genus now has a Refined and an Exalted effect in every tree, as tabled in
