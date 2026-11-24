@@ -318,16 +318,33 @@ The engine supports headless testing for automated verification of game logic wi
 ./build/HeadlessClient --frames 60 --log-events
 ```
 
-**Run integration tests** (requires server):
+**Opt in to HeadlessMovement** (requires an externally managed server on
+localhost:1234). From the repository root, configure a separate build so the
+regular `build/` keeps its default server-test exclusion:
 ```bash
-# Terminal 1: Start server
-./build/Server
-
-# Terminal 2: Run integration test
-ctest -R HeadlessMovement --output-on-failure
+cmake -S . -B build-integration \
+  -DGAMBIT_ENABLE_SERVER_INTEGRATION_TESTS=ON
+cmake --build build-integration --target Server test_headless_movement -j8
+# Terminal 1, from repository root:
+./build-integration/Server
+# Terminal 2, from repository root:
+(cd build-integration && ctest -L integration --output-on-failure)
 ```
 
-**Note:** Integration tests are excluded from `make test` by default (they require a running server). Run them explicitly when needed.
+These commands use system dependencies. If your setup needs a toolchain, add
+`-DCMAKE_TOOLCHAIN_FILE=/absolute/path/to/toolchain.cmake` when configuring.
+The option defaults to OFF: HeadlessMovement is not registered unless enabled.
+`ctest -L integration` selects registered tests; it cannot enable a disabled
+or unregistered test. CTest sets the test's working directory to the repository
+root for assets. The server is not started/stopped by CTest. With the option ON,
+unfiltered CTest runs in that build also include HeadlessMovement. To turn it
+back off, run
+`cmake -S . -B build-integration -DGAMBIT_ENABLE_SERVER_INTEGRATION_TESTS=OFF`.
+
+Configuration regression only (no game dependencies or running server):
+`python3 tests/test_server_integration_config.py -v`. Its CMake/CTest fixture
+uses a stub executable, not the real multiplayer test; missing tools are
+reported as skips.
 
 ### Headless Testing Features
 

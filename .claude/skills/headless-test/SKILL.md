@@ -25,30 +25,43 @@ Headless testing allows you to verify game logic changes by running the client w
 
 ### Running Integration Tests
 
-The headless integration test is **disabled by default** (excluded from `make test`) because it requires a running server.
-
-Run the headless movement integration test explicitly:
+HeadlessMovement requires an externally managed server on localhost:1234.
+It is **not registered by default** (`GAMBIT_ENABLE_SERVER_INTEGRATION_TESTS=OFF`).
+Opt in at configure time, using a separate build to keep ordinary `make test`
+server-free. From repository root (with the usual build dependencies available):
 
 ```bash
-# Terminal 1: Start server
-./build/Server
-
-# Terminal 2: Enable and run the test
-cd build
-ctest -R HeadlessMovement --output-on-failure
+cmake -S . -B build-integration \
+  -DGAMBIT_ENABLE_SERVER_INTEGRATION_TESTS=ON
+cmake --build build-integration --target Server test_headless_movement -j8
+# Terminal 1, from repository root:
+./build-integration/Server
+# Terminal 2, from repository root:
+(cd build-integration && ctest -L integration --output-on-failure)
 ```
 
-**Note:** The test is marked with `DISABLED TRUE` in CMakeLists.txt to prevent it from running during regular `make test`. This avoids failures when no server is available.
+The example uses system dependencies. If needed, add
+`-DCMAKE_TOOLCHAIN_FILE=/absolute/path/to/toolchain.cmake` when configuring.
+Labels only select registered tests; `ctest -L integration` does not enable
+anything. The enabled test retains `integration;manual` labels and runs from
+repository root for assets. CTest does not manage the server. Unfiltered CTest
+in this opted-in build also runs it. Disable again with
+`cmake -S . -B build-integration -DGAMBIT_ENABLE_SERVER_INTEGRATION_TESTS=OFF`.
+
+Validate registration without game dependencies/server using
+`python3 tests/test_server_integration_config.py -v`. This includes a stub
+execution fixture, not a real server integration test; absent CMake/CTest is
+reported as a skip.
 
 Or run the test executable directly from project root:
 
 ```bash
 # Start server in background
-./build/Server > /dev/null 2>&1 &
+./build-integration/Server > /dev/null 2>&1 &
 SERVER_PID=$!
 
 # Run test
-./build/test_headless_movement
+./build-integration/test_headless_movement
 
 # Cleanup
 kill $SERVER_PID
@@ -209,7 +222,8 @@ When making changes to game logic, Claude can:
 Example workflow:
 ```
 Claude modifies: src/ServerGameState.cpp (damage formula)
-Claude runs: ctest -R HeadlessMovement
+Claude opts in as above, starts Server, then runs from repository root:
+(cd build-integration && ctest -R '^HeadlessMovement$' --output-on-failure)
 Output: PASSED - damage was 25, expected 25 ✓
 Result: Change verified automatically
 ```

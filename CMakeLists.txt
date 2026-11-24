@@ -886,15 +886,8 @@ add_test(NAME ArenaMatchBots COMMAND ArenaSim --quiet)
 set_tests_properties(ArenaMatchBots PROPERTIES
     WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
-# Headless integration test (requires running server on localhost:1234)
-# Note: This test will fail if no server is available
-# Excluded from default `make test` - run explicitly with: ctest -L integration
-add_test(NAME HeadlessMovement COMMAND test_headless_movement)
-set_tests_properties(HeadlessMovement PROPERTIES
-    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
-    LABELS "integration;manual"
-    DISABLED TRUE  # Disabled by default, enable with: ctest -L integration
-)
+# Explicit configure-time opt-in for externally managed server tests.
+include(cmake/ServerIntegrationTests.cmake)
 
 # Enable code coverage for test targets
 if(ENABLE_COVERAGE)
