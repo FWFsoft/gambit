@@ -138,6 +138,10 @@ void MusicSystem::followMatch(float dtSeconds) {
     // The title screen plays its own music (UISystem).
     currentPlaylist.clear();
     pendingPlaylist.clear();
+    currentTrack.clear();
+    channels.clear();
+    radioClock = 0.0;
+    director.reset();
     return;
   }
   // Our track finished (each plays once; the playlist moves on).
@@ -148,6 +152,20 @@ void MusicSystem::followMatch(float dtSeconds) {
   in.characterSelect = state == GameState::CharacterSelect;
   in.trackEnded = ended;
   std::string want = director.update(in, dtSeconds);
+  if (in.runEnded()) {
+    // Cancel even a queued transition. Clear ownership immediately so later
+    // frames cannot restart a finished track or repeatedly extend the fade.
+    if ((!currentPlaylist.empty() || !pendingPlaylist.empty()) &&
+        Mix_PlayingMusic() && Mix_FadingMusic() != MIX_FADING_OUT) {
+      Mix_FadeOutMusic(PLAYLIST_FADE_MS);
+    }
+    currentPlaylist.clear();
+    pendingPlaylist.clear();
+    currentTrack.clear();
+    channels.clear();
+    radioClock = 0.0;
+    return;
+  }
   // The radio's clock runs through the match; a new match starts it again.
   if (in.characterSelect ||
       (in.hasMatch && in.phase == Arena::MatchPhase::Lobby)) {

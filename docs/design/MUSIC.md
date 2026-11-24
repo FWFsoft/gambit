@@ -13,7 +13,7 @@ Which music plays when. The rules are the designer's; the code is
 | At the crash site (the ash ground around the ship: in at 1,300 px, out past 1,700 px) | the landing zone's songs: one for Confident, one for Weakened and Alone |
 | Anywhere else | the biome's songs for the crew's mood |
 | The boss fight | the boss music of the biome the ship landed in; any biome's boss music if it has none |
-| Victory, defeat | whatever was playing carries on |
+| Victory, defeat | fade out over 1.5 s, then stay silent until the next run or character select |
 
 **Mood** follows the party, as the designer set it:
 
@@ -29,7 +29,9 @@ last one standing, Weakened between.
 
 Within a playlist the tracks shuffle, never the same one twice in a row.
 Between playlists the old track fades out and the new one fades in over
-1.5 s.
+1.5 s. A completed run cancels pending music and forgets its radio channels;
+the next run starts First Contact from the beginning, not its old position.
+Individual knockdowns still follow the party mood rules while the run continues.
 
 ## Steady, not twitchy
 
