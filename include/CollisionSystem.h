@@ -65,8 +65,9 @@ class CollisionSystem {
   bool blocksEnemies(const CollisionShape& shape) const {
     return isTerrain(shape) || isActiveHull(shape);
   }
-  // The terrain piece or current-tier hull box whose edge is nearest (x, y),
-  // if within maxDist: what Isaac's Lifeline can anchor to.
+  // The solid rectangular prop or active hull whose edge is nearest (x, y),
+  // if within maxDist: what Isaac's Lifeline can anchor to. This includes
+  // trees and other player-blocking props, not just enemy-blocking terrain.
   const CollisionShape* terrainNear(float x, float y, float maxDist) const;
   // The point of `box` nearest (x, y) (the point itself when inside).
   static void closestPoint(const AABB& box, float x, float y, float& outX,

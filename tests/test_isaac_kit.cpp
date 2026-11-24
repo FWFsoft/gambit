@@ -2,7 +2,7 @@
 // slows and heals but deals no damage (Wingers have no base damage), and
 // Lifeline bonds to an ally, a rock, the ship's hull or one of Kade's
 // mirrors near the cursor, heals, and pulls him there on release. With nothing
-// in reach it does nothing and most of the cooldown comes back. Enemies slide
+// in reach it refuses to charge without spending cooldown. Enemies slide
 // off terrain.
 
 #include <cassert>
@@ -225,16 +225,23 @@ void test_Lifeline_BondsToAnAllyAndHealsThemToo() {
   assert(w.isaac().y > 200.0f);  // pulled to his side
 }
 
-void test_Lifeline_NothingInReach_StaysAndRefunds() {
+void test_Lifeline_NothingInReach_RefusesToCharge() {
   World w;
   w.isaac().health = 50.0f;
   w.aimX = 0.0f;  // open ground
   w.aimY = 400.0f;
   w.run(1000.0f, RMB);
   assert(w.isaac().health == 50.0f);
+  assert(w.isaac().chargeSlot == -1);
+  assert(w.isaac().kitMode == 0);  // invalid preview at the cursor
+  assert(w.isaac().kitX == w.aimX && w.isaac().kitY == w.aimY);
+  for (const auto& event : w.events) {
+    assert(event.kind != GameEventKind::AbilityCast);
+    assert(event.kind != GameEventKind::Tether);
+  }
   w.run(700.0f, 0);
   assert(std::abs(w.isaac().x) < 1.0f && std::abs(w.isaac().y) < 1.0f);
-  assert(w.isaac().cooldownMs[1] <= 1500.0f);
+  assert(w.isaac().cooldownMs[1] <= 0.0f);
 }
 
 void test_Lifeline_RockOutOfReach() {
@@ -263,6 +270,34 @@ void test_TerrainQueries() {
   assert(x == 400.0f && y == 10.0f);
 }
 
+void test_Lifeline_SolidPropsAreAnchors() {
+  for (const char* type : {"tree", "prop", ""}) {
+    World w;
+    w.shapes.push_back(rock(-440.0f, -40.0f, 80.0f, 80.0f, type));
+    w.aimX = -400.0f;
+    w.run(TICK_MS, 0);
+    assert(w.isaac().kitMode == 2);  // valid preview before pressing
+    assert(w.isaac().kitX == -360.0f && w.isaac().kitY == 0.0f);
+    w.run(500.0f, RMB);
+    assert(w.isaac().chargeSlot == 1);
+    w.run(700.0f, 0);
+    assert(w.isaac().x < -250.0f);
+    assert(w.solid.isPositionValid(w.isaac().x, w.isaac().y,
+                                   Arena::Tuning::PLAYER_RADIUS));
+  }
+}
+
+void test_Lifeline_InactiveHullSiteIsNotAnAnchor() {
+  World w;
+  w.shapes.push_back(rock(-440.0f, -40.0f, 80.0f, 80.0f, "hull@1"));
+  w.solid.setHullSite(0);
+  w.aimX = -400.0f;
+  w.run(500.0f, RMB);
+  assert(w.isaac().kitMode == 0);
+  assert(w.isaac().chargeSlot == -1);
+  assert(w.isaac().cooldownMs[1] <= 0.0f);
+}
+
 }  // namespace
 
 int main() {
@@ -276,7 +311,9 @@ int main() {
   test_Lifeline_BondsToAKadeMirror();
   test_Lifeline_BreaksWhenTheMirrorGoes();
   test_Lifeline_BondsToAnAllyAndHealsThemToo();
-  test_Lifeline_NothingInReach_StaysAndRefunds();
+  test_Lifeline_NothingInReach_RefusesToCharge();
+  test_Lifeline_SolidPropsAreAnchors();
+  test_Lifeline_InactiveHullSiteIsNotAnAnchor();
   test_Lifeline_RockOutOfReach();
   test_Enemies_SlideOffTerrain();
   std::cout << "Isaac kit passed\n";

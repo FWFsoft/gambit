@@ -756,6 +756,8 @@ class GravonKit : public Kit {
 //   kitTarget      Lifeline ally id, or the mirror's zone id
 //   kitTimer[1,2]  Lifeline terrain or mirror anchor point (on its face)
 //   kitTimer[3]    Lifeline heal/tether pulse accumulator
+//   kitMode        Replicated preview kind (same Anchor enum; 0 invalid)
+//   kitX/kitY      Replicated preview point (cursor when invalid)
 // ===========================================================================
 class IsaacKit : public Kit {
  public:
@@ -854,14 +856,15 @@ class IsaacKit : public Kit {
     }
   }
 
-  void chargeTick(AbilityContext& ctx, int slot, float dtMs) override {
-    if (slot != 1) return;
+  // Shared by the idle preview, cast gate, and first held tick. No VFX or
+  // healing: querying a target must not perform the ability.
+  static void selectAnchor(AbilityContext& ctx) {
     AbilitySystem& sys = ctx.sys;
     Player& self = ctx.self;
 
-    if (self.chargeMs <= dtMs + 0.01f) {
+    {
       // First tick: pick the anchor. An ally near the cursor first, then
-      // whichever terrain is nearest the cursor: a rock, the ship's hull or
+      // whichever solid prop is nearest the cursor, the active ship hull or
       // one of Kade's mirrors (anyone's); all within reach of Isaac.
       self.kitTarget = 0;
       self.kitCounter[1] = None;
@@ -910,11 +913,22 @@ class IsaacKit : public Kit {
           self.kitCounter[1] = found;
         }
       }
-      if (self.kitCounter[1] == None) {
-        // Nothing in reach: a spark at the cursor says so.
-        sys.fxRing(ctx.aimX, ctx.aimY, 26.0f, VfxTheme::Holy);
-      }
     }
+  }
+
+  bool canCast(AbilitySystem& sys, const Player& self, int slot) override {
+    if (slot != 1) return true;
+    Player query = self;
+    AbilityContext ctx{sys, query, self.aimX, self.aimY, 0.0f, 0.0f, 0.0f};
+    selectAnchor(ctx);
+    return query.kitCounter[1] != None;
+  }
+
+  void chargeTick(AbilityContext& ctx, int slot, float dtMs) override {
+    if (slot != 1) return;
+    AbilitySystem& sys = ctx.sys;
+    Player& self = ctx.self;
+    if (self.chargeMs <= dtMs + 0.01f) selectAnchor(ctx);
     if (self.kitCounter[1] == None) return;
 
     self.kitTimer[3] += dtMs;
@@ -959,8 +973,21 @@ class IsaacKit : public Kit {
     return static_cast<uint32_t>(self.kitCounter[0]) == self.id ? 1.2f : 1.0f;
   }
 
-  void tick(AbilitySystem&, Player& self, float) override {
+  void tick(AbilitySystem& sys, Player& self, float) override {
     self.resource = self.kitCounter[0] != 0 ? 255 : 0;
+    if (self.chargeSlot != 1) {
+      AbilityContext ctx{sys, self, self.aimX, self.aimY, 0.0f, 0.0f, 0.0f};
+      selectAnchor(ctx);
+    }
+    // Replicate the authoritative selection for the local target highlight.
+    self.kitMode = static_cast<uint8_t>(self.kitCounter[1]);
+    Player* ally = self.kitMode == Ally ? sys.findPlayer(self.kitTarget) : nullptr;
+    self.kitX = ally ? ally->x : self.aimX;
+    self.kitY = ally ? ally->y : self.aimY;
+    if (!ally && self.kitMode != None) {
+      self.kitX = self.kitTimer[1];
+      self.kitY = self.kitTimer[2];
+    }
   }
 };
 

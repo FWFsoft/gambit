@@ -21,6 +21,35 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-24: Lifeline target preview, refusal and solid-prop anchors
+- **Decision:** Share Lifeline selection between its idle preview, cast gate
+  and initial bond. Show the local Isaac a valid ring or invalid crossed ring
+  with a label, using the server's replicated target. An empty/out-of-range
+  selection cannot begin charging or spend cooldown. Extend anchor queries
+  to all currently solid rectangular collision props, retaining active hull
+  tier/site filtering. Do not change pull speed, arc, release or healing.
+- **Pillars:** Clarity serves: the same selection drives the preview and cast
+  eligibility; shape and text supplement colour. Creative Builds & Dynamic
+  Play serves: existing solid props join mirrors/allies as mobility anchors.
+  Strategic Crunch neutral: no mobility range/cooldown tuning. Comradery in
+  Competition neutral: no ally healing or damage rules change.
+- **Why:** Issue #54. Previously an empty hold animated and spent a partially
+  refunded cooldown. The query only accepted enemy-blocking rocks/hulls,
+  overlooking other player-solid rectangles. Scope is explicit: decorative
+  trees in the generated map's visual-only Props layer are NOT collision
+  shapes and remain unsupported, as do TerrainGrid-only cells and polygons.
+  Do not silently make scenery solid to claim full tree support. This is a
+  partial implementation, not closure of #54. Snapshot latency and marker
+  clutter need visual review; no rendered fluid-feel claim is made.
+- **Open human design question:** Isaac has no ally to support when solo.
+  Should mobility alone be his solo loop, or should another solo interaction
+  be added while keeping the Winger's no-base-damage identity? Defer this and
+  flight-feel tuning to a human playtest rather than invent combat buffs.
+- **Status:** Built, needs review
+- **Where:** `src/CharacterKits.cpp`, `src/ArenaView.cpp`,
+  `include/CollisionSystem.h`, `src/CollisionSystem.cpp`,
+  `tests/test_isaac_kit.cpp`, `tests/test_lifeline_anchors.cpp`
+
 ## 2026-11-24: Minimap follows exploration by zooming out; mirrors are targets
 - **Decision:** Keep the ship-centered minimap and existing minimum/zone
   range, expanding it to include the local hero and every active Kade mirror

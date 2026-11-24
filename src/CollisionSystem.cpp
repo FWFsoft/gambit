@@ -151,7 +151,11 @@ const CollisionShape* CollisionSystem::terrainNear(float x, float y,
   const CollisionShape* best = nullptr;
   float bestDist = maxDist;
   for (const auto& shape : collisionShapes) {
-    if (!blocksEnemies(shape)) continue;  // rocks and the current hull
+    // Every prop that blocks players is an anchor, not only the rocks that
+    // also block enemies. Ignore inactive hulls and unsupported polygons.
+    if (!isSolid(shape) || shape.type != CollisionShape::Type::Rectangle) {
+      continue;
+    }
     float cx, cy;
     closestPoint(shape.aabb, x, y, cx, cy);
     float d = std::hypot(cx - x, cy - y);
