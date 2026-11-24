@@ -67,6 +67,12 @@ class FogOfWar {
   std::vector<Source> current;
   std::vector<float> seen;      // per cell, highest visibility ever
   std::vector<uint8_t> pixels;  // RGBA8
+  // A cell's texel only changes where a source sees it now or saw it last
+  // frame, so update() rebuilds those rectangles, not the whole grid, unless
+  // reset() or reveal() changed `seen` elsewhere.
+  bool allDirty = true;
 
   static float sight(const Source& source, float x, float y, float reach);
+  void refreshCells(int column0, int row0, int column1, int row1);
+  void refreshAround(const Source& source);
 };

@@ -67,6 +67,13 @@ GLuint createShaderProgram(const char* vertexSource,
 }
 
 void checkGLError(const char* operation) {
+#if defined(__EMSCRIPTEN__) && !defined(GAMBIT_WEBGL_ERROR_CHECKS)
+  // In WebGL glGetError() is a synchronous round trip to the GPU process
+  // (measured ~0.3 ms each, ~1.3 ms a frame). Build with
+  // -DGAMBIT_WEBGL_ERROR_CHECKS to turn the checks back on when debugging.
+  (void)operation;
+  return;
+#endif
   GLenum error = glGetError();
   if (error != GL_NO_ERROR) {
     Logger::error("OpenGL error after " + std::string(operation) + ": " +
