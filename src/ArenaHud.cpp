@@ -18,6 +18,7 @@
 #include "ClientPrediction.h"
 #include "Effect.h"
 #include "EffectTracker.h"
+#include "MatchReadiness.h"
 #include "config/ScreenConfig.h"
 
 using namespace ArenaDraw;
@@ -1353,6 +1354,9 @@ void ArenaView::drawSuitScreen(bool intermission) {
       prediction->sendToServer(serialize(packet));
     }
     ImGui::PopStyleColor();
+    const auto crew = matchReadiness(match);
+    ImGui::Text("%d/%d ready - Everyone ready starts now; timer is the hard limit.",
+                crew.ready, crew.participants);
   } else {
     ImGui::TextDisabled("Only works beside the ship.  [B] closes");
   }
@@ -2327,7 +2331,10 @@ void ArenaView::drawCampPanel() {
                        "The finale is at the ship: you will be called home.");
   }
   ImGui::Spacing();
-  ImGui::Text("Dawn in %s", formatTime(match.timeRemaining).c_str());
+  const auto crew = matchReadiness(match);
+  ImGui::Text("%d/%d ready - Everyone ready starts now.", crew.ready,
+              crew.participants);
+  ImGui::Text("Dawn in %s (hard limit)", formatTime(match.timeRemaining).c_str());
   ImGui::SameLine(400.0f);
   bool ready = me->ready != 0;
   if (ImGui::Button(ready ? "READY  [R]" : "READY UP  [R]", ImVec2(140.0f, 28.0f))) {
