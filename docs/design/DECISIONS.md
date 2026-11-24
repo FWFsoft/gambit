@@ -21,6 +21,27 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-23: Mirror Step requires a live mirror and preserves its destination
+- **Decision:** Keep Mirror Step gated on an existing live mirror. A refused
+  attempt now shows "CAN'T CAST" above Kade without spending cooldown or
+  creating a mirror. At the three-mirror cap, keep the destination and replace
+  the oldest other mirror with the one dropped at his departure point.
+- **Pillars:** Strategic Crunch serves: placing a mirror remains a prerequisite
+  for mobility. Comradery in Competition neutral: no teammate rules change.
+  Creative Builds & Dynamic Play serves: teleporting uses the existing mirror
+  network consistently. Clarity serves: refusal is visible and the chosen
+  destination remains in the world. No pillar is weakened.
+- **Why:** Issue #47's requested rules are already implemented at the base
+  revision, but refusal was silent. Preserve those rules rather than rewrite
+  them; add explicit feedback and regressions for dead mirrors and each target
+  position at the cap (including eviction order and departure placement).
+  No art, tuning, or balance values change. Runtime/visual validation is
+  blocked locally by missing CMake and SDL2 headers; no claim of visual review
+  or ArenaSim results is made.
+- **Status:** Built, needs review
+- **Where:** `src/CharacterKits.cpp`, `include/NetworkProtocol.h`,
+  `src/ArenaClient.cpp`, `tests/test_kade_kit.cpp`
+
 ## 2026-11-24: Read before readying; a longer but bounded night
 - **Decision:** Raise the intermission hard cap from 40 s to 90 s. Keep the
   existing immediate next-tick start when every selected player is ready,
