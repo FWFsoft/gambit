@@ -284,6 +284,36 @@ void test_MirrorStep_NeedsAMirror() {
   w.tap(SHIFT);
   assert(std::abs(w.kade().x) < 1.0f);
   assert(w.kade().cooldownMs[3] <= 0.0f);  // refused, not spent
+  assert(w.kade().actionLockMs <= 0.0f);
+  assert(w.mirrorCount() == 0);
+  int denied = 0;
+  for (const GameEventPacket& e : w.events) {
+    assert(e.kind != GameEventKind::AbilityCast);
+    if (e.kind == GameEventKind::CannotCast) {
+      assert(e.sourceId == KADE_ID && e.param == 3);
+      assert(std::abs(e.x) < 1.0f && std::abs(e.y) < 1.0f);
+      denied++;
+    }
+  }
+  assert(denied == 1);
+}
+
+void test_MirrorStep_EndedMirrorDoesNotAllowCast() {
+  World w;
+  w.mirror(300.0f, 0.0f);
+  uint32_t stale = static_cast<uint32_t>(w.kade().kitCounter[0]);
+  w.combat.endZone(stale);
+  w.events.clear();
+  w.tap(SHIFT);
+  assert(std::abs(w.kade().x) < 1.0f);
+  assert(w.kade().cooldownMs[3] <= 0.0f);
+  assert(w.mirrorCount() == 0);
+  bool denied = false;
+  for (const GameEventPacket& e : w.events) {
+    assert(e.kind != GameEventKind::AbilityCast);
+    denied |= e.kind == GameEventKind::CannotCast;
+  }
+  assert(denied);
 }
 
 void test_MirrorStep_LeavesAMirrorAndComesOutOfTheTarget() {
@@ -303,18 +333,41 @@ void test_MirrorStep_LeavesAMirrorAndComesOutOfTheTarget() {
 }
 
 void test_MirrorStep_AtTheLimit_KeepsTheTarget() {
-  World w;
-  w.mirror(300.0f, 0.0f);  // the oldest, and the target
-  w.mirror(0.0f, 300.0f);
-  w.mirror(-300.0f, 0.0f);
-  uint32_t target = static_cast<uint32_t>(w.kade().kitCounter[0]);
-  w.aimX = 300.0f;
-  w.aimY = 0.0f;
-  w.tap(SHIFT);
-  w.run(100.0f, 0);
-  assert(w.combat.findZone(target));
-  assert(w.kade().x > 300.0f);
-  assert(w.mirrorCount() == 3);
+  for (int targetIndex = 0; targetIndex < Arena::KadeMode::MAX_MIRRORS;
+       targetIndex++) {
+    World w;
+    w.mirror(300.0f, 0.0f);  // oldest
+    w.mirror(0.0f, 300.0f);
+    w.mirror(-300.0f, 0.0f);
+    uint32_t ids[3];
+    for (int i = 0; i < 3; i++) {
+      ids[i] = static_cast<uint32_t>(w.kade().kitCounter[i]);
+    }
+    uint32_t target = ids[targetIndex];
+    const AbilitySystem::Zone* destination = w.combat.findZone(target);
+    assert(destination);
+    w.aimX = destination->x;
+    w.aimY = destination->y;
+    w.tap(SHIFT);
+    w.run(100.0f, 0);
+    assert(w.combat.findZone(target));
+    assert(std::hypot(w.kade().x - w.aimX, w.kade().y - w.aimY) < 60.0f);
+    assert(w.kade().cooldownMs[3] > 0.0f);
+    assert(w.mirrorCount() == 3);
+    const int evicted = targetIndex == 0 ? 1 : 0;
+    for (int i = 0; i < 3; i++) {
+      assert((w.combat.findZone(ids[i]) != nullptr) == (i != evicted));
+    }
+    assert(static_cast<uint32_t>(w.kade().kitCounter[0]) ==
+           ids[evicted == 0 ? 1 : 0]);
+    assert(static_cast<uint32_t>(w.kade().kitCounter[1]) == ids[2]);
+    const AbilitySystem::Zone* left =
+        w.combat.findZone(static_cast<uint32_t>(w.kade().kitCounter[2]));
+    assert(left && std::abs(left->x) < 1.0f && std::abs(left->y) < 1.0f);
+    for (const GameEventPacket& e : w.events) {
+      assert(e.kind != GameEventKind::CannotCast);
+    }
+  }
 }
 
 }  // namespace
@@ -331,6 +384,7 @@ int main() {
   test_FullRelease_LeavesEachMirrorOutOfItsGlass();
   test_Mirror_TurnsAPlayersShotOutOfItsGlass();
   test_MirrorStep_NeedsAMirror();
+  test_MirrorStep_EndedMirrorDoesNotAllowCast();
   test_MirrorStep_LeavesAMirrorAndComesOutOfTheTarget();
   test_MirrorStep_AtTheLimit_KeepsTheTarget();
   std::cout << "Kade kit passed\n";

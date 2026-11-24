@@ -382,6 +382,18 @@ void ArenaClient::onGameEvent(const GameEventPacket& p) {
       break;
     }
 
+    case GameEventKind::CannotCast: {
+      FloatText text;
+      text.x = p.x;
+      text.y = p.y - 78.0f;
+      text.text = "CAN'T CAST";
+      text.color = COLOR_DEBUFF;
+      text.size = 15.0f;
+      text.lifeMs = 1000.0f;
+      texts.push_back(text);
+      break;
+    }
+
     case GameEventKind::EffectText: {
       EffectType type = static_cast<EffectType>(p.param);
       FloatText text;

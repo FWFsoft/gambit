@@ -1152,6 +1152,13 @@ class KadeKit : public Kit {
         uint32_t id = static_cast<uint32_t>(self.kitCounter[i]);
         if (id && sys.findZone(id)) return true;
       }
+      GameEventPacket denied;
+      denied.kind = GameEventKind::CannotCast;
+      denied.sourceId = self.id;
+      denied.x = self.x;
+      denied.y = self.y;
+      denied.param = static_cast<uint8_t>(slot);
+      sys.emit(denied);
       return false;
     }
     return slot >= 0 && slot <= 3;

@@ -366,6 +366,8 @@ enum class GameEventKind : uint8_t {
   // A recovered probe scans: the land within value px of x,y is mapped
   // (explored in every client's fog), objectives there included.
   Reveal = 25,
+  // Refused ability: sourceId = caster, param = slot, x,y = caster position.
+  CannotCast = 26,
   // Client-only (never sent): impact flash where a hit landed.
   HitSpark = 200
 };
