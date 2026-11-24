@@ -405,13 +405,27 @@ void ServerGameState::onNetworkPacketReceived(
       break;
 
     case PacketType::InfusionSlot: {
-      if (e.size < 4) break;
+      if (e.size < 5) break;
       InfusionSlotPacket packet = deserializeInfusionSlot(e.data, e.size);
       auto playerIt = players.find(e.clientId);
       if (playerIt != players.end()) {
-        director->onSlotInfusion(
+        director->onSlotInfusion(playerIt->second,
+                                 static_cast<Arena::Genus>(packet.genus),
+                                 static_cast<Arena::InfusionPart>(packet.part),
+                                 packet.grade, packet.node);
+      }
+      break;
+    }
+
+    case PacketType::InfusionCombine: {
+      if (e.size < 5) break;
+      InfusionCombinePacket packet = deserializeInfusionCombine(e.data, e.size);
+      auto playerIt = players.find(e.clientId);
+      if (playerIt != players.end()) {
+        director->onCombineInfusion(
             playerIt->second, static_cast<Arena::Genus>(packet.genus),
-            static_cast<Arena::InfusionPart>(packet.part), packet.node);
+            packet.grade, static_cast<Arena::InfusionPart>(packet.targetPart),
+            static_cast<Arena::InfusionPart>(packet.otherPart));
       }
       break;
     }

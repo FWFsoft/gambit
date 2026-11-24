@@ -1096,22 +1096,46 @@ void MatchDirector::onReady(Player& player, bool ready) {
   }
 }
 
-void MatchDirector::onSlotInfusion(Player& player, Genus genus,
-                                   Arena::InfusionPart part, int node) {
+bool MatchDirector::canWorkOnSuit(const Player& player) const {
   // The suit can only be opened up back at the ship, night or day.
   if (currentPhase == MatchPhase::Round ||
       currentPhase == MatchPhase::BossFight ||
       currentPhase == MatchPhase::Intermission) {
-    if (!atShip(player)) return;
+    return atShip(player);
   }
-  if (Infusions::slotInfusion(player, genus, part, node,
+  return true;
+}
+
+void MatchDirector::onSlotInfusion(Player& player, Genus genus,
+                                   Arena::InfusionPart part, int grade,
+                                   int node) {
+  if (!canWorkOnSuit(player)) return;
+  Genus ascendedBefore = player.ascendedGenus;
+  if (Infusions::slotInfusion(player, genus, part, grade, node,
                               Arena::suitTierCap(currentRound))) {
     std::string where = node == Arena::CORE_NODE
                             ? std::string("the core")
                             : std::string(Arena::suitNode(node).name);
     Logger::info("Match: player " + std::to_string(player.id) + " slotted " +
-                 Arena::genusName(genus) + " " + Arena::partInfo(part).name +
-                 " into " + where);
+                 Arena::gradeName(grade) + " " + Arena::genusName(genus) + " " +
+                 Arena::partInfo(part).name + " into " + where);
+    if (ascendedBefore == Genus::None && player.ascendedGenus != Genus::None) {
+      Logger::info("Match: player " + std::to_string(player.id) +
+                   " ascended as " + Arena::genusName(player.ascendedGenus));
+    }
+  }
+}
+
+void MatchDirector::onCombineInfusion(Player& player, Genus genus, int grade,
+                                      Arena::InfusionPart targetPart,
+                                      Arena::InfusionPart otherPart) {
+  if (!canWorkOnSuit(player)) return;
+  if (Infusions::combineInfusions(player, genus, grade, targetPart,
+                                  otherPart)) {
+    Logger::info("Match: player " + std::to_string(player.id) + " combined " +
+                 Arena::gradeName(grade) + " " + Arena::genusName(genus) +
+                 " into " + Arena::gradeName(grade + 1) + " " +
+                 Arena::partInfo(targetPart).name);
   }
 }
 
@@ -1364,11 +1388,15 @@ void MatchDirector::onDebugCommand(Player& player, DebugCommandKind command,
       }
       break;
     case DebugCommandKind::GiveInfusions:
-      // One of every item.
+      // One of every item, at every grade.
       for (int g = 1; g <= Arena::GENUS_COUNT; g++) {
         for (int p = 0; p < Arena::PART_COUNT; p++) {
-          Infusions::addToInventory(player, static_cast<Genus>(g),
-                                    static_cast<Arena::InfusionPart>(p));
+          for (int grade = Arena::GRADE_RAW; grade <= Arena::GRADE_EXALTED;
+               grade++) {
+            Infusions::addToInventory(player, static_cast<Genus>(g),
+                                      static_cast<Arena::InfusionPart>(p),
+                                      grade);
+          }
         }
       }
       break;
@@ -1502,13 +1530,18 @@ MatchStatePacket MatchDirector::buildState() const {
     p.ready = player.ready ? 1 : 0;
     p.coreGenus = static_cast<uint8_t>(player.coreGenus);
     p.corePart = static_cast<uint8_t>(player.corePart);
+    p.coreGrade = player.coreGrade;
     for (int i = 0; i < Arena::suitNodeCount(); i++) {
       p.nodeGenus[i] = static_cast<uint8_t>(player.nodeGenus[i]);
       p.nodePart[i] = static_cast<uint8_t>(player.nodePart[i]);
+      p.nodeGrade[i] = player.nodeGrade[i];
     }
     for (int g = 0; g < Arena::GENUS_COUNT; g++) {
       for (int part = 0; part < Arena::PART_COUNT; part++) {
-        p.inventory[g][part] = player.infusionInventory[g][part];
+        for (int grade = 0; grade < Arena::GRADE_COUNT; grade++) {
+          p.inventory[g][part][grade] =
+              player.infusionInventory[g][part][grade];
+        }
       }
     }
     assert(player.scrapCarried >= 0 &&

@@ -21,6 +21,140 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-23: Infusion grades step 2: the 32 Refined and Exalted effects
+- **Decision** (requested by a human: "move to step 2" of issue #44): every
+  genus now has a Refined and an Exalted effect in every tree, as tabled in
+  `specs/infusion-grades.md` section 3. Raw builds something, Refined pays
+  it off, Exalted changes how you play. Numbers are first guesses.
+  Differences from the tables (listed in the spec under "Built as"):
+  - **Rupture** pops at 10 poison stacks (the poison cap is 30, which play
+    never reaches) and **Flashpoint** at 5 burn stacks (burns refresh
+    their time instead of adding to it, so a 10 s burn never happens).
+  - **Puppeteer** doubles the confused enemy's already-doubled hits on its
+    friends and gives you the kill. **Ghost Step** hides you from
+    targeting. **Phantom** is contact damage only: nothing body-blocks
+    players already. **Supernova** is a 300-radius blast plus the molten
+    field on every third cast, since the four cores differ too much for
+    "double radius".
+  - Cryo Sanctuary does not fire on the blow Last Stand catches (the
+    overlap the spec flagged).
+- **Pillars:**
+  - **Creative Builds:** serves; this is what step 1 was waiting for. Deep
+    builds now play differently (Glacier plants you, Phantom wants you in
+    the crowd, Avalanche wants you moving), and several cross genera:
+    Brittle and Corrosion help any teammate, Splinter and Diamond Heart
+    feed on any freeze, Fuel feeds a Magnarok core's Cauterize. Risk: some
+    effects may dominate; nothing is balance-tested yet.
+  - **Strategic Crunch:** serves. Combining now buys a real new effect, so
+    wide vs deep is a real choice instead of "deep is a trap".
+  - **Comradery:** serves. Corrosion, Symbiote, Psychic Link, Brittle and
+    Cryo Sanctuary help the crew; none hurts or blocks an ally. Puppeteer
+    gives you kills your confused enemies make, which were nobody's before;
+    it takes nothing from a teammate.
+  - **Clarity:** weakens slightly. Each effect shows with existing effect
+    visuals (rings, bursts, beams, zones, status icons), but Miasma Heart
+    pulses a ring every second and several Exalted auras stack around one
+    player; that may be busy with four ascended players. Not checked on
+    screen in this step.
+- **Why:** Alternatives rejected: changing burns to add duration (would
+  change the Raw effect and the Cauterize core, out of scope);
+  per-core "double radius" Supernovas (four special cases for one
+  effect).
+- **Verified:** one test per effect plus the Last Stand overlap in
+  `test_infusions` (Debug, asserts on); full suite passes. `ArenaSim
+  --suits` (new: bots start with every item at every grade) ran two full
+  matches in a Debug build with each bot ascending a different genus, no
+  crashes. Balance is not measured: the sim's bots do not play well
+  enough to judge it.
+- **Status:** Accepted (requested by a human); numbers Built, needs review
+- **Where:** `src/Infusions.cpp` (effects), `include/Player.h`
+  (`gradeTimer`, `gradeCounter`, `dominateTarget`), `include/Infusions.h`
+  (`onEnemyDied`, `puppeteerOf`), `src/AbilitySystem.cpp`,
+  `src/EnemySystem.cpp` (Puppeteer), `src/ArenaData.cpp` (text),
+  `tests/test_infusions.cpp`, `tests/arena_sim.cpp` (`--suits`),
+  `specs/infusion-grades.md`
+
+## 2026-11-23: Infusion grades: combine to go deep; deeper effects differ and lock you in
+- **Decision** (issue #44; full text in
+  `specs/infusion-grades.md`):
+  - **Grades.** Drops are Raw (I). Two infusions of the same genus and
+    grade combine into one of the next grade at the ship: Raw → Refined
+    (II) → Exalted (III). The target item's part survives; part stats
+    scale with the Raw inside (×1, ×2, ×4), so combining moves stats but
+    never loses them. Nothing splits back.
+  - **Depth needs grade.** Tree tiers 1 and 2 take any grade, tier 3
+    needs Refined, tier 4 needs Exalted. A full tree costs 8 Raw (was 4).
+  - **Different effects per grade.** Each genus × tree gets a Refined and
+    an Exalted effect (32 new effects) on top of today's Raw effect.
+    Raw builds something (stacks, a status), Refined pays it off in a new
+    way (a burst, a team effect), Exalted changes how you play (Plague
+    Carrier, Phantom, Glacier, Inferno Heart...).
+  - **Lock-outs.** Combining is permanent. The first Refined in a tree
+    attunes it to that genus (only that genus after). The first Exalted
+    slotted makes you that genus's Ascendant: one capstone genus per
+    match.
+  - The round depth cap (2 / 3 / 4) stays for the first build, to be
+    removed if sims show it never binds.
+- **Pillars:**
+  - **Creative Builds** decided it (main pillar of the issue): builds now
+    form over the match instead of all being open the whole time, and
+    Exalted effects make a deep build play differently, not just hit
+    harder. It trades a little of the 2026-11-17 freedom to mix genera:
+    a tree's deep half is now one genus. The shallow suit stays mixed, so
+    Purebred vs Hybrid Vigor is still a real fork.
+  - **Strategic Crunch:** serves. Every pair of infusions is wide (two
+    slots, two talents) vs deep (one slot, a tier-3 node, a new effect),
+    and Ascension is a one-way door with a confirm step.
+  - **Comradery:** serves. Five of the new effects help the team
+    (Corrosion, Symbiote, Psychic Link, Brittle, Cryo Sanctuary); none can
+    hurt or block an ally. The Ascendant title shows off a player's build.
+  - **Clarity:** weakens slightly. Grades and attunement are two more
+    rules on the suit screen; the spec answers with one pip language
+    everywhere, a "why is this blocked" tooltip and a confirm before
+    Ascension. 32 new effects need hit feedback of their own when built.
+- **Why:** Playtest 2026-11-22: upgrades came too fast; with one slot per
+  drop a player fills 13 to 17 of 17 slots in a match (estimate from the
+  drop code; the sim could not be built here). Rejected: 3 → 1 recipe
+  (an Exalted would cost 9 Raw, so almost nobody would reach a capstone);
+  locking the whole suit to one genus at the first Refined (kills mixed
+  builds); starving drops instead (makes exploring less rewarding, against
+  the camping decision of 2026-11-19). **Against the Genera and Infusion
+  doc:** the doc's scaling is "more infusions of the genus, a stronger
+  effect" and the doc never mentions grades or lock-outs; this keeps that
+  rule for Raw effects and adds grades on top. Pacing numbers are
+  estimates and must be measured with ArenaSim once built. Four open
+  questions are listed at the end of the spec.
+- **Built (step 1, 2026-11-23):** grades, combining (drag an item onto a
+  twin in the pack, or press C), the depth requirements, attunement,
+  Ascension with a confirm step, grade dots on every item and slot, the
+  "why is this blocked" tooltips, an Ascension flash plus a banner the
+  whole crew sees, and the Ascendant title on the scoreboard and suit
+  summary. F6 now gives one of every item at every grade. Checked in the
+  running client (slot, block reasons, combine by key and by drag,
+  Ascension, banner, scoreboard) and in `test_infusions`.
+  - **Step 2** (the 32 Refined and Exalted effects) is built: see the
+    entry above.
+  - **Differs from the spec:** the Ascendant title is not drawn over the
+    health bar at night (scoreboard, suit and banner only). An Exalted or
+    Refined item in a shallow slot also attunes that tree (the rule is
+    "the first Refined-or-better in a tree"); the slot tooltip warns.
+  - **Pacing still unmeasured.** ArenaSim bots now combine when nothing
+    else fits, but they only collect 1 to 9 infusions a match (they do not
+    chase loot or objectives), so the sim cannot judge pacing. One bot
+    reached tier 3 in a seed-11 run; none ascended. Needs a human
+    playtest.
+- **Status:** Accepted (spec approved by a human, 2026-11-23); step 1
+  Built, needs review
+- **Where:** `specs/infusion-grades.md`; `include/ArenaData.h`,
+  `src/ArenaData.cpp` (grades, `slotBlock`, attunement, Ascension, graded
+  text), `include/Player.h`, `src/Infusions.cpp` (`combineInfusions`,
+  grade-aware `slotInfusion`), `include/NetworkProtocol.h`,
+  `src/NetworkProtocol.cpp` (`InfusionCombinePacket`, grades on the
+  wire), `src/MatchDirector.cpp`, `src/ServerGameState.cpp`,
+  `src/ArenaHud.cpp` (suit screen, scoreboard, banner),
+  `tests/test_infusions.cpp`, `tests/test_network_protocol.cpp`,
+  `tests/arena_sim.cpp`
+
 ## 2026-11-22: Scrap is a counted currency; turret repairs cost scrap
 - **Decision:** Scrap is a count, not one heavy piece.
   - Every kill can drop a little: swarmers 35% for 1, casters 50% for 2,

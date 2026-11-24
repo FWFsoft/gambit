@@ -36,8 +36,14 @@ built to be cheap to change.
    ability (E). The rest go into the Offense / Defense / Mobility /
    Genealogy trees, four tiers deep: each slot gives its talent plus the
    infusion's genus effect for that tree (same-genus infusions in a tree
-   level it up), and each tier past the first is a choice of one. Press
-   **R** to ready up.
+   level it up), and each tier past the first is a choice of one. Drops
+   are **Raw** (one dot); drag an infusion onto another of the same genus
+   and grade (or press **C**) to combine two into one **Refined** (two
+   dots), and two Refined into one **Exalted** (three dots). Tier 3 needs
+   Refined, tier 4 Exalted. The first Refined in a tree attunes it to that
+   genus; your first Exalted makes you that genus's **Ascendant** for the
+   match, and no other genus can be Exalted after that
+   (`specs/infusion-grades.md`). Press **R** to ready up.
 4. **Final stand.** After round 3 the ship is lost and **The Matriarch**
    arrives. Kill her to win. If the whole crew is down at once, or the ship
    is destroyed during a round, you lose.
@@ -74,9 +80,9 @@ the ship slowly heals you.
 **Playtest cheats** (for poking at things, not for real tests):
 F2 stand up both roof turrets, set the ship burning (60% hull damage)
 and bank 80 scrap (enough for both ship tiers),
-F5 skip phase, F6 one of every infusion item, F7 spawn a pack near you,
-F8 god mode, F9 kill everything, F10 spawn the boss, F11 spawn a swarm
-of Toxliths where you are aiming.
+F5 skip phase, F6 one of every infusion item at every grade, F7 spawn a
+pack near you, F8 god mode, F9 kill everything, F10 spawn the boss, F11
+spawn a swarm of Toxliths where you are aiming.
 F12 opens the effect lab: training allies plus number keys that
 poison, amplify, spread, detonate, empower, corrupt and purify (see
 `docs/design/EFFECT_VISUALS.md`).
@@ -209,7 +215,9 @@ human review, are in `docs/design/DECISIONS.md`.
 - **Comradery in competition:** do people help each other (revives,
   Isaac / Suds buffs) while still caring about the scoreboard?
 - **Creative builds:** do infusion choices feel different? Does anyone
-  build around Suds' Guard / Wound loop or Gravon's crits?
+  build around Suds' Guard / Wound loop or Gravon's crits? With grades:
+  does upgrading still feel too fast? Does anyone combine, and is wide vs
+  deep a real choice? Does anyone ascend by the boss?
 - **Clarity:** can you read enemy attacks (red telegraphs) and dodge them?
   Is it obvious which hits are yours?
 

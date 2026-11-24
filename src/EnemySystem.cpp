@@ -7,6 +7,7 @@
 #include "AbilitySystem.h"
 #include "CollisionSystem.h"
 #include "EffectManager.h"
+#include "Infusions.h"
 #include "Logger.h"
 
 using Arena::EnemyKind;
@@ -615,9 +616,13 @@ void EnemySystem::resolveAttack(Enemy& enemy,
         victims.push_back(id);
       }
     }
+    // Puppeteer: the player who confused it owns the hit (double damage,
+    // and kills count as theirs).
+    uint32_t owner = Infusions::puppeteerOf(*combat, enemy);
+    float mult = owner != 0 ? 4.0f : 2.0f;
     for (uint32_t id : victims) {
       if (Enemy* other = find(id)) {
-        combat->damageEnemy(0, *other, damage * 2.0f, DamageFlag::Proc);
+        combat->damageEnemy(owner, *other, damage * mult, DamageFlag::Proc);
       }
     }
     return;
