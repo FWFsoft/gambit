@@ -19,6 +19,17 @@ Builds the project (if needed) and runs all tests using CTest.
    make test-coverage
    ```
 
+Build and coverage use the same toolchain selection documented in
+`../build/SKILL.md`: explicit `CMAKE_TOOLCHAIN_FILE`, otherwise `VCPKG_ROOT`,
+otherwise retain an existing cached toolchain or use fresh system dependencies.
+For example, `make test-coverage CMAKE_TOOLCHAIN_FILE="/path with spaces/custom.cmake"`.
+Use `make clean` before switching providers; it deletes all of `build/`.
+
+For Make recipe regressions only (Python 3 + GNU Make, no CMake/dependencies):
+```bash
+python3 -m unittest discover -s tests -p test_portable_build.py -v
+```
+
 ## Test Structure
 
 Tests are organized into modular suites:

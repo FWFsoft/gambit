@@ -19,6 +19,8 @@ Removes the build directory and all compiled artifacts to enable a fresh rebuild
 Use this skill when:
 - You encounter strange build errors
 - Dependencies have changed
+- Switching `CMAKE_TOOLCHAIN_FILE` or between toolchain/system dependencies;
+  build and coverage refuse to silently change the existing cached provider
 - You want to ensure a completely fresh build
 - Before running the `build` skill if you suspect stale artifacts
 

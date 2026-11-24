@@ -14,6 +14,23 @@ Builds both the Server and Client executables for the Gambit game engine.
    make build
    ```
 
+## Dependency toolchain
+
+The same selection applies to `make build`, `make test` and
+`make test-coverage`: explicit `CMAKE_TOOLCHAIN_FILE` (environment or Make
+argument), otherwise `VCPKG_ROOT`'s standard toolchain, otherwise retain the
+existing cached toolchain, or use system dependencies for a fresh build.
+
+```bash
+VCPKG_ROOT="/path/to/vcpkg" make build
+make build CMAKE_TOOLCHAIN_FILE="/path with spaces/custom.cmake"
+make build CMAKE_TOOLCHAIN_FILE=  # explicit system packages, overrides VCPKG_ROOT
+```
+
+Missing selected toolchains fail; no install or developer-specific fallback.
+Switching a configured build's toolchain/provider requires `make clean`
+first (deletes all `build/` artifacts). See README for complete setup notes.
+
 ## Expected Output
 
 On success, you should see:

@@ -28,10 +28,47 @@ sudo apt-get install cmake libsdl2-dev libenet-dev libspdlog-dev
 /dev        # Run full dev environment (1 server + 4 clients)
 ```
 
-**Manual Build**:
+**Portable Make build** (requires CMake and a native build tool on PATH):
 ```bash
-mkdir -p build && cd build
-cmake .. && make
+make build                         # fresh build: system-installed dependencies
+VCPKG_ROOT="/path/to/vcpkg" make build
+make build CMAKE_TOOLCHAIN_FILE="/path with spaces/custom.cmake"
+make build CMAKE_TOOLCHAIN_FILE=   # explicitly use system deps, even with VCPKG_ROOT
+```
+
+`make build`, `make test` and `make test-coverage` use the same toolchain
+selection: explicitly set `CMAKE_TOOLCHAIN_FILE` (environment or Make command
+line), otherwise `$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake`, otherwise the
+existing build's cached toolchain, or system dependencies for a fresh build.
+Relative toolchain paths resolve from the repository root; quote paths with
+spaces. A configured but missing toolchain is an error, not a fallback.
+No developer-specific vcpkg location is assumed and nothing is auto-installed.
+System dependencies must satisfy **all** native `find_package`/library checks
+in `CMakeLists.txt` (the prerequisite examples above are not an exhaustive
+package list); vcpkg dependencies are listed in `vcpkg.json`.
+
+Changing between toolchains, or between toolchain and system dependencies,
+requires `make clean` first. This removes **all of `build/`**, including its
+cache and reports; review/save artifacts before cleaning. With neither
+variable set, incremental builds retain the existing cached toolchain rather
+than silently switching dependency providers.
+
+```bash
+make clean
+make test-coverage CMAKE_TOOLCHAIN_FILE="/path/to/custom.cmake"
+# Coverage additionally requires CTest, lcov and genhtml.
+```
+
+**Direct CMake build** (manual toolchain/cache management):
+```bash
+cmake -S . -B build
+cmake --build build --parallel 8
+```
+
+The Make recipe regression tests require only Python 3 and GNU Make, not
+CMake or C++ dependencies:
+```bash
+python3 -m unittest discover -s tests -p test_portable_build.py -v
 ```
 
 **Manual Run**:

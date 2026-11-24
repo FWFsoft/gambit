@@ -3,16 +3,19 @@
 
 NUM_CLIENTS?=2
 
+# Preserve unset versus explicitly empty (system dependencies) for the helper.
+ifneq ($(origin CMAKE_TOOLCHAIN_FILE),undefined)
+export CMAKE_TOOLCHAIN_FILE
+endif
+export VCPKG_ROOT
+
 .PHONY: help build test clean run-server run-client dev test-coverage test-coverage-open pre-commit
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
 
 build:  ## Builds the project as is
-	@mkdir -p build
-	@cd build && \
-	cmake .. -DCMAKE_TOOLCHAIN_FILE=$$HOME/dev/vcpkg/scripts/buildsystems/vcpkg.cmake && \
-	make -j8
+	@sh scripts/build.sh
 
 clean:  ## Remove build artifacts for a fresh rebuild
 	@if [ -d "build" ]; then \
@@ -27,10 +30,7 @@ test: build  ## Builds and runs tests
 
 test-coverage:  ## Run tests with code coverage and generate HTML report
 	@echo "Building with coverage enabled..."
-	@mkdir -p build
-	@cd build && \
-	cmake -DENABLE_COVERAGE=ON -DCMAKE_TOOLCHAIN_FILE=$$HOME/dev/vcpkg/scripts/buildsystems/vcpkg.cmake .. && \
-	make -j8
+	@sh scripts/build.sh -DENABLE_COVERAGE=ON
 	@echo "Running tests..."
 	@cd build && ctest --output-on-failure
 	@echo "Generating coverage report..."
