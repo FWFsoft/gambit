@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "ArenaDraw.h"
+#include "ArenaMinimap.h"
 #include "ArenaView.h"
 #include "CharacterRegistry.h"
 #include "ClientPrediction.h"
@@ -819,15 +820,14 @@ void ArenaView::drawBanners() {
 void ArenaView::drawMinimap() {
   ImDrawList* dl = ImGui::GetBackgroundDrawList();
   const MatchStatePacket& match = arena->match();
-  const float radius = 86.0f;
-  ImVec2 centre(SCREEN_W - radius - 14.0f, SCREEN_H - radius - 14.0f);
-
-  // Fit the current zone with a little margin.
-  float worldRange = std::max(700.0f, match.zoneRadius * 1.15f);
-  float scale = radius / worldRange;
+  const Player& local = prediction->getLocalPlayer();
+  const auto map = arenaMinimap(match, local.x, local.y, arena->zones());
+  const float radius = ArenaMinimap::RADIUS;
+  ImVec2 centre(ArenaMinimap::X, ArenaMinimap::Y);
+  float scale = map.scale();
   auto toMap = [&](float wx, float wy, bool clampToEdge) {
-    float dx = (wx - match.shipX) * scale;
-    float dy = (wy - match.shipY) * scale;
+    float dx = map.mapX(wx) - centre.x;
+    float dy = map.mapY(wy) - centre.y;
     float d = std::sqrt(dx * dx + dy * dy);
     if (clampToEdge && d > radius - 4.0f) {
       dx *= (radius - 4.0f) / d;
@@ -855,8 +855,8 @@ void ArenaView::drawMinimap() {
         ImVec2 p(centre.x - radius + (i + 0.5f) * step,
                  centre.y - radius + (j + 0.5f) * step);
         if (!inside(p)) continue;
-        float wx = match.shipX + (p.x - centre.x) / scale;
-        float wy = match.shipY + (p.y - centre.y) / scale;
+        float wx = map.worldX(p.x);
+        float wy = map.worldY(p.y);
         if (!wasSeen(wx, wy)) continue;
         if (grid->regionAt(wx, wy) == 0) continue;  // sea
         Arena::Genus genus = regionGenusAt(wx, wy);
@@ -931,6 +931,15 @@ void ArenaView::drawMinimap() {
                                        : IM_COL32(240, 70, 70, 255)));
   }
 
+  // Mirrors are persistent team navigation targets, including outside sight.
+  // Hollow cyan panes distinguish them from solid pickup/objective markers.
+  for (const auto& zone : arena->zones()) {
+    if (zone.variant != Arena::KadeMode::MirrorZone) continue;
+    ImVec2 p = toMap(zone.x, zone.y, false);
+    dl->AddRect(ImVec2(p.x - 3, p.y - 5), ImVec2(p.x + 3, p.y + 5),
+                IM_COL32(100, 225, 255, 255), 0.0f, 0, 2.0f);
+  }
+
   // Ship
   dl->AddRectFilled(ImVec2(centre.x - 4, centre.y - 3),
                     ImVec2(centre.x + 4, centre.y + 3),
@@ -938,7 +947,6 @@ void ArenaView::drawMinimap() {
 
   // Players
   uint32_t me = localId();
-  const Player& local = prediction->getLocalPlayer();
   for (const auto& [id, view] : arena->players()) {
     if (view.state.characterId == 0) continue;
     float x = id == me ? local.x : view.x;

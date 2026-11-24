@@ -2,6 +2,8 @@
 
 #include <cmath>
 
+#include "ArenaClient.h"
+#include "ArenaMinimap.h"
 #include "Camera.h"
 #include "CharacterRegistry.h"
 #include "CharacterSelectionState.h"
@@ -86,6 +88,17 @@ void ClientPrediction::onLocalInput(const LocalInputEvent& e) {
   float groundY = flatY;
   for (int i = 0; i < 3; i++) groundY = flatY + lift(aimX, groundY);
   aimY = groundY + AIM_HEIGHT;
+  // Shift targets a mirror globally. Minimap coordinates are already ground
+  // coordinates: neither camera zoom nor terrain lift / AIM_HEIGHT applies.
+  if (arena && arena->hasMatch() &&
+      localPlayer.characterId == Arena::CharacterId::Kade &&
+      (e.buttons & InputButtons::Mobility) != 0 &&
+      ArenaMinimap::contains(e.mouseX, e.mouseY)) {
+    const auto map = arenaMinimap(arena->match(), localPlayer.x, localPlayer.y,
+                                  arena->zones());
+    aimX = map.worldX(e.mouseX);
+    aimY = map.worldY(e.mouseY);
+  }
   localPlayer.aimX = aimX;
   localPlayer.aimY = aimY;
 
