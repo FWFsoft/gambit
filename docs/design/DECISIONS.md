@@ -21,6 +21,22 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-23: Infusion ground labels one step larger
+- **Decision:** Increase dropped infusion part-name text from 13 to 14 px;
+  keep its position, colour, outline, bob and all other pickup labels unchanged.
+- **Pillars:** Clarity serves: slightly larger text targets the playtest
+  readability feedback (#42). Strategic Crunch is neutral: no timing or loot
+  rules change. Comradery in Competition is neutral: access to loot is
+  unchanged. Creative Builds & Dynamic Play is neutral: no infusion effects
+  or drop variety change.
+- **Why:** A one-pixel local increase is the smallest size step; changing the
+  shared text helper would enlarge unrelated UI. No pillar conflict identified;
+  larger labels could overlap in dense loot, so rendered review is still needed.
+  `make build` and `make test` are blocked by missing CMake. Visual testing
+  is blocked by no native client or WASM build; no visual result is claimed.
+- **Status:** Built, needs review
+- **Where:** `src/ArenaView.cpp` (`ArenaView::drawPickup`)
+
 ## 2026-11-24: Crash intro shows the planet's pink-cracked side
 - **Decision** (requested by a human, issue #46, playtest 2026-11-22): the
   intro planet is turned so the side with the glowing pink cracks faces the

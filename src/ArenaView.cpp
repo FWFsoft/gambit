@@ -1890,7 +1890,7 @@ void ArenaView::drawPickup(ImDrawList* dl, uint32_t itemId, float worldX,
                    IM_COL32(14, 10, 18, 255));
     const Arena::InfusionPartInfo& part =
         Arena::partInfo(Arena::PickupId::infusionPart(itemId));
-    text(dl, ImVec2(centre.x, centre.y - 32), themeHot(theme, 1.0f), 13.0f,
+    text(dl, ImVec2(centre.x, centre.y - 32), themeHot(theme, 1.0f), 14.0f,
          part.name);
   } else if (Arena::PickupId::isScrap(itemId) && scrapSprite(&sheet, &idle)) {
     // The salvage pile (art/models/Scrap.glb): a bigger pile for more, its
