@@ -277,6 +277,7 @@ int directionFrame(float dirX, float dirY) {
 ArenaView::ArenaView(ArenaClient* arena, ClientPrediction* prediction,
                      EffectTracker* effects, Camera* camera)
     : arena(arena), prediction(prediction), effects(effects), camera(camera) {
+  prediction->setArena(arena);
   // Picking up an infusion says what it is and what to do with it.
   EventBus::instance().subscribe<ItemPickedUpEvent>(
       [this](const ItemPickedUpEvent& e) { onLocalPickup(e.itemId); });

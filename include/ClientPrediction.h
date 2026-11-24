@@ -24,6 +24,7 @@ struct ClientObjective {
   float depositX, depositY;
 };
 
+class ArenaClient;
 class NetworkClient;
 class CollisionSystem;
 struct Camera;
@@ -70,6 +71,7 @@ class ClientPrediction {
   // The view the cursor is aimed through. Without one (tests, headless) the
   // view is assumed to be centred on the local player.
   void setCamera(const Camera* camera) { this->camera = camera; }
+  void setArena(const ArenaClient* arena) { this->arena = arena; }
   // Send any packet to the server (HUD actions: ready, infusions, debug).
   void sendToServer(const std::vector<uint8_t>& data);
 
@@ -99,6 +101,7 @@ class ClientPrediction {
   float shipY = 0.0f;
   bool hasShip = false;
 
+  const ArenaClient* arena = nullptr;  // not owned; may be null
   const Camera* camera = nullptr;  // not owned; may be null
   float aimX = 0.0f;
   float aimY = 0.0f;

@@ -21,6 +21,28 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-24: Minimap follows exploration by zooming out; mirrors are targets
+- **Decision:** Keep the ship-centered minimap and existing minimum/zone
+  range, expanding it to include the local hero and every active Kade mirror
+  with 15% margin. Draw mirrors as hollow cyan panes, distinct from filled
+  objectives and pickups. Kade's Shift over the map uses the inverse of the
+  same transform, without world-camera zoom, terrain lift or aim-height bias.
+- **Pillars:** Clarity serves: the hero and mirrors no longer disappear beyond
+  the fixed ship circle, and map aiming agrees with marker positions.
+  Strategic Crunch is neutral: no travel costs or cooldowns change.
+  Comradery in Competition is neutral: team markers grant no denial mechanic.
+  Creative Builds & Dynamic Play is neutral: mirror rules and kits are unchanged.
+- **Why:** Zooming preserves the ship/zone/quadrant anchor and global mirror
+  targeting without duplicating coordinate math. Enemy/terrain discovery rules
+  remain unchanged. Trade-off within Clarity: distant targets compress nearby
+  detail; dense-marker readability still needs rendered review. Focused C++
+  transform tests pass; full build/tests are blocked by missing CMake, and no
+  rendered verification was possible without a native/WASM client build.
+- **Status:** Built, needs review
+- **Where:** `include/ArenaMinimap.h`, `src/ArenaHud.cpp`,
+  `src/ClientPrediction.cpp`, `include/ClientPrediction.h`, `src/ArenaView.cpp`,
+  `tests/test_arena_minimap.cpp`
+
 ## 2026-11-23: End the run's music at game over
 - **Decision:** Victory and defeat fade the current music out over the existing
   1.5 s playlist fade. Cancel queued transitions and forget the old run's
