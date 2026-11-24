@@ -205,6 +205,35 @@ The search tool:
 /build
 ```
 
+## Server-dependent integration test (opt-in)
+
+`HeadlessMovement` is not registered in default test builds. To enable it,
+configure a separate native build (using the same dependency/toolchain settings
+as your regular build):
+
+```bash
+cmake -S . -B build-integration \
+  -DGAMBIT_ENABLE_SERVER_INTEGRATION_TESTS=ON
+cmake --build build-integration --target Server test_headless_movement -j8
+# Terminal 1, from repository root (server on localhost:1234):
+./build-integration/Server
+# Terminal 2, from repository root:
+(cd build-integration && ctest -L integration --output-on-failure)
+```
+
+The example uses system dependencies; if needed, add
+`-DCMAKE_TOOLCHAIN_FILE=/absolute/path/to/toolchain.cmake` when configuring.
+The option defaults to OFF. Label selection alone does not enable tests.
+CTest preserves the `integration;manual` labels and repository-root working
+directory, but does not start the server. Opted-in builds also include this test
+in unfiltered CTest runs. To remove it again, configure with
+`-DGAMBIT_ENABLE_SERVER_INTEGRATION_TESTS=OFF`.
+
+Registration regression (no game dependencies/server):
+`python3 tests/test_server_integration_config.py -v`. CMake/CTest checks use a
+stub and explicitly skip when tools are missing; this does not validate real
+multiplayer movement.
+
 ## Project Structure
 
 ```

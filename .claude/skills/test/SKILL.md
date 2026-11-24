@@ -41,6 +41,14 @@ On failure, CTest will show which test suites failed with error details.
 ## Notes
 
 - Tests use CTest for better isolation and parallel execution
+- `HeadlessMovement` is unregistered by default. To run it, follow the
+  configure-time `GAMBIT_ENABLE_SERVER_INTEGRATION_TESTS=ON` instructions in
+  `../headless-test/SKILL.md`, preferably in a separate `build-integration/`.
+  It requires a running server on localhost:1234. Label selection alone does
+  not opt in; unfiltered CTest in an opted-in build includes this test.
+- Validate this registration separately with
+  `python3 tests/test_server_integration_config.py -v` (stub fixture only;
+  skips CMake/CTest execution if tools are missing).
 - Each test suite is a separate executable in `build/test_*`
 - Run specific tests with: `cd build && ctest -R <TestName>`
 - Run tests in parallel with: `cd build && ctest -j8`
