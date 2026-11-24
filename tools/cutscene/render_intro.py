@@ -129,7 +129,11 @@ def bake_planet(tmp):
     sc.cycles.samples = 64
     sc.cycles.samples = 16
     root = import_model(os.path.join(REPO, "art/models/Planet.glb"))
-    root.rotation_euler = Euler((math.radians(15), 0.0, math.radians(200)))
+    # Turn the side with the pink glowing cracks (the one thing that says
+    # "alien" on this model; on import they face -Y, toward the camera) to
+    # just left of the disc's centre, in the daylight. Facing away, the
+    # planet reads as an Earth clone (playtest, issue #46).
+    root.rotation_euler = Euler((math.radians(-5), 0.0, math.radians(353)))
     # Flat colour only (texture as emission): the light is added below from
     # the sphere's normals, where the day side and terminator can be placed
     # exactly.
