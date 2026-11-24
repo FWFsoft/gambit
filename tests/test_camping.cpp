@@ -173,6 +173,38 @@ void dawnAmbushesWildCampsOnly() {
   std::cout << "  dawn: an ambush at the wild camp, none at the ship\n";
 }
 
+void readinessSkipsWaitButAfkCannotStall() {
+  World w;
+  w.nightfall();
+  for (uint32_t id : {A, B, C}) assert(!w.p(id).ready);
+  // The old 40 s cap must no longer interrupt reading.
+  w.run(41000.0f);
+  assert(w.director.phase() == Arena::MatchPhase::Intermission);
+  w.director.onReady(w.p(A), true);
+  w.director.onReady(w.p(B), true);
+  w.run(TICK_MS);
+  assert(w.director.phase() == Arena::MatchPhase::Intermission);
+  w.director.onReady(w.p(B), false);  // players may change their mind
+  w.director.onReady(w.p(C), true);
+  w.run(TICK_MS);
+  assert(w.director.phase() == Arena::MatchPhase::Intermission);
+  w.director.onReady(w.p(B), true);
+  w.director.update(TICK_MS);  // no countdown after the final ready
+  assert(w.director.phase() == Arena::MatchPhase::Round);
+  assert(w.director.round() == 2);
+
+  World afk;
+  afk.nightfall();
+  afk.director.onReady(afk.p(A), true);
+  afk.director.onReady(afk.p(B), true);
+  afk.run((T::INTERMISSION_SECONDS - 1.0f) * 1000.0f);
+  assert(afk.director.phase() == Arena::MatchPhase::Intermission);
+  afk.run(1100.0f);
+  assert(afk.director.phase() == Arena::MatchPhase::Round);
+  assert(afk.director.round() == 2);
+  std::cout << "  night: longer reading cap, all-ready skips, AFK cannot stall\n";
+}
+
 }  // namespace
 
 int main() {
@@ -184,6 +216,7 @@ int main() {
   downedAreCarriedInOrWakeAtShip();
   suitAndUpgradesOnlyAtTheShip();
   dawnAmbushesWildCampsOnly();
+  readinessSkipsWaitButAfkCannotStall();
   std::cout << "All camping tests passed\n";
   return 0;
 }

@@ -591,7 +591,8 @@ constexpr float ZONE_START_RADIUS[ROUND_COUNT] = {2000.0f, 2500.0f, 2900.0f};
 // The finale only: the boss arena's shield, deadly outside.
 constexpr float ZONE_DAMAGE_PER_SECOND = 0.05f;  // fraction of max health
 constexpr float BOSS_ZONE_RADIUS = 950.0f;
-constexpr float INTERMISSION_SECONDS = 40.0f;  // the night
+// Time to read and choose; all-ready skips the wait, AFK cannot extend it.
+constexpr float INTERMISSION_SECONDS = 90.0f;  // the night's hard limit
 
 // Camping. Night falls where you are: nobody is teleported home. At the
 // ship (inside its safe radius) the crew heals fully, banks scrap, opens

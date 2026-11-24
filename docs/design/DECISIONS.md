@@ -21,6 +21,32 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-24: Read before readying; a longer but bounded night
+- **Decision:** Raise the intermission hard cap from 40 s to 90 s. Keep the
+  existing immediate next-tick start when every selected player is ready,
+  and start at the cap even if someone never readies. Both the ship's suit
+  screen and the wild camp panel show `2/4 ready` beside the existing
+  READY UP / READY [R] button and explain the all-ready shortcut.
+- **Pillars:** Strategic Crunch weakens slightly: 50 s more potential night
+  time reduces reading pressure and can lengthen an AFK wait. This explicit,
+  reversible trade buys informed decisions, not extra combat time; the hard
+  cap and all-ready shortcut bound dead time. Comradery in Competition
+  serves: one AFK cannot hold the crew forever, and a ready crew need not
+  wait out the cap. Creative Builds & Dynamic Play serves: players have
+  time to understand unfamiliar infusions. Clarity serves: readiness count,
+  button, shortcut and deadline are visible in both night screens.
+- **Why:** Issue #43 asks for decision pressure rather than a reading test.
+  90 s is a first tuning pass, not a required wait. All-ready, R toggling,
+  clickable buttons and timeout already existed; preserve that server flow
+  rather than adding another ready protocol. Spectators with no selected
+  character are excluded from the displayed quorum, as on the server.
+  No claim of runtime visual or pacing verification: CMake and SDL headers
+  are absent, no client/WASM build is available. Human playtest needed.
+- **Status:** Built, needs review
+- **Where:** `include/ArenaData.h`, `include/MatchReadiness.h`,
+  `src/ArenaHud.cpp`, `tests/test_match_readiness.cpp`,
+  `tests/test_camping.cpp`, `CMakeLists.txt`
+
 ## 2026-11-23: Infusion ground labels one step larger
 - **Decision:** Increase dropped infusion part-name text from 13 to 14 px;
   keep its position, colour, outline, bob and all other pickup labels unchanged.
