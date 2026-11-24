@@ -238,7 +238,45 @@ void testBoss() {
   in.shipBiome = "tidal";  // no boss track of its own yet
   assert(d.update(in, 0.016f) == "boss");
   in.phase = MatchPhase::Victory;
-  assert(d.update(in, 0.016f).empty());  // let it play out
+  assert(in.runEnded());
+  assert(d.update(in, 0.016f).empty());  // fade to silence
+}
+
+void testRunEndAndRestart() {
+  for (MatchPhase end : {MatchPhase::Defeat, MatchPhase::Victory}) {
+    for (bool firstContactFinished : {false, true}) {
+      auto d = director();
+      auto in = round1(4, 4, 3000.0f, "city");
+      assert(!in.runEnded());
+      assert(d.update(in, 0.016f) == "first_contact");
+      if (firstContactFinished) {
+        in.trackEnded = true;
+        assert(d.update(in, 0.016f) == "city.confident");
+      }
+      in.phase = end;
+      assert(in.runEnded());
+      // A natural track end during the game-over fade must not advance it.
+      in.trackEnded = true;
+      assert(run(d, in, 10.0f).empty());
+      assert(d.place().empty());
+      // Even a direct restart, without a lobby snapshot, gets First Contact.
+      in = round1();
+      in.phase = MatchPhase::Intro;
+      assert(d.update(in, 0.016f) == "first_contact");
+      in.phase = MatchPhase::Round;
+      assert(d.update(in, 0.016f) == "first_contact");
+      in.trackEnded = true;
+      assert(d.update(in, 0.016f) == "landing.confident");
+      d.reset();
+      in.trackEnded = false;
+      assert(d.update(in, 0.016f) == "first_contact");
+      // Returning to selection must win over the previous run's packet.
+      in.phase = end;
+      in.characterSelect = true;
+      assert(!in.runEnded());
+      assert(d.update(in, 0.016f) == "lobby");
+    }
+  }
 }
 
 }  // namespace
@@ -253,6 +291,7 @@ int main() {
   testDeaths();
   testSolo();
   testBoss();
+  testRunEndAndRestart();
   std::cout << "MusicDirector: all rules hold\n";
   return 0;
 }

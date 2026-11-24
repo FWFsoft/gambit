@@ -21,6 +21,28 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-23: End the run's music at game over
+- **Decision:** Victory and defeat fade the current music out over the existing
+  1.5 s playlist fade. Cancel queued transitions and forget the old run's
+  playlist, radio clock/channels and First Contact state. A new run starts
+  First Contact from the beginning, even if it follows game over directly.
+  Individual knockdowns during an ongoing co-op run retain party mood music.
+- **Pillars:** Clarity serves: the soundtrack marks the end of a run instead
+  of sounding like play continued. Strategic Crunch neutral: no extra wait
+  is imposed before restarting. Comradery in Competition neutral: a teammate
+  going down does not silence the survivors' soundtrack. Creative Builds &
+  Dynamic Play neutral: no builds or music-selection variety are changed.
+- **Why:** Playtest issue #53 requests a fade and fresh tracks on a new run.
+  This intentionally replaces MUSIC.md's old victory/defeat carry-on rule.
+  Use authoritative match end rather than local death so revives and co-op
+  mood changes keep working. No pillar is weakened. Audio-only review:
+  focused director tests pass; full client/listening and visual verification
+  are blocked by missing CMake/dependencies and no WASM build.
+- **Status:** Built, needs review
+- **Where:** `src/MusicSystem.cpp`, `src/MusicDirector.cpp`,
+  `include/MusicDirector.h`, `tests/test_music_director.cpp`,
+  `docs/design/MUSIC.md`
+
 ## 2026-11-23: Mirror Step requires a live mirror and preserves its destination
 - **Decision:** Keep Mirror Step gated on an existing live mirror. A refused
   attempt now shows "CAN'T CAST" above Kade without spending cooldown or

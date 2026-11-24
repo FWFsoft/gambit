@@ -74,12 +74,23 @@ class MusicDirector {
     std::string biome;        // biome key under the local hero ("" = none)
     std::string shipBiome;    // biome key the ship landed in
     bool trackEnded = false;  // the playing track just finished
+
+    bool runEnded() const {
+      // Character select can precede the server's next lobby snapshot.
+      return !characterSelect && hasMatch &&
+             (phase == Arena::MatchPhase::Victory ||
+              phase == Arena::MatchPhase::Defeat);
+    }
   };
 
   // `hasPlaylist(key)` says whether a playlist exists (music.txt).
   explicit MusicDirector(std::function<bool(const std::string&)> hasPlaylist);
 
+  // Forget a completed run, including First Contact and mood hysteresis.
+  void reset();
+
   // The playlist that should play now, or "" to keep whatever plays.
+  // runEnded() instead means silence: the audio owner must fade out.
   std::string update(const Inputs& in, float dtSeconds);
 
   MusicMood mood() const { return settledMood; }

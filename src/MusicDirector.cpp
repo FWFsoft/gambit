@@ -108,10 +108,24 @@ void MusicDirector::track(const Inputs& in, float dt) {
   }
 }
 
+void MusicDirector::reset() {
+  firstContactPlaying = firstContactDone = settled = false;
+  settledPlace.clear();
+  pendingPlace.clear();
+  placeTimer = moodTimer = 0.0f;
+  settledMood = pendingMood = MusicMood::Confident;
+  current.clear();
+}
+
 std::string MusicDirector::update(const Inputs& in, float dt) {
   assert(dt >= 0.0f);
   using Arena::MatchPhase;
   std::string want;
+
+  if (in.runEnded()) {
+    reset();
+    return "";
+  }
 
   if (in.characterSelect || (in.hasMatch && in.phase == MatchPhase::Lobby)) {
     // Before a match: the next landing starts with First Contact again.
@@ -158,7 +172,7 @@ std::string MusicDirector::update(const Inputs& in, float dt) {
       want = has("boss") ? "boss" : "";
     }
   } else {
-    want = "";  // Victory, Defeat: let it play out
+    want = "";
   }
 
   if (!want.empty()) current = want;
