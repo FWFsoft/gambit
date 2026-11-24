@@ -99,13 +99,22 @@ class ArenaView {
     int cellW = 0, cellH = 0, pivotX = 0, pivotY = 0, columns = 1;
     float scale = 1.0f;  // drawn this much larger (chunkier art pixels)
     std::unordered_map<std::string, ActorAnim> anims;
+    // Hero sheets load on first use (loadHeroSheets): most of the ~1 GB of
+    // actor art belongs to heroes, and a match uses at most four of them.
+    std::string path;
+    bool smooth = false;
+    std::string hero;     // owning hero for lazy sheets, "" if loaded eagerly
+    bool failed = false;  // texture would not load; don't retry every frame
     const ActorAnim* find(const std::string& name) const {
       auto it = anims.find(name);
       return it == anims.end() ? nullptr : &it->second;
     }
   };
-  std::unordered_map<std::string, ActorSheet> actorSheets;
+  // Mutable: actorFor() loads a hero's sheets the first time one is asked for.
+  mutable std::unordered_map<std::string, ActorSheet> actorSheets;
   const ActorSheet* actorFor(const std::string& name) const;
+  void loadHeroSheets(const std::string& hero) const;
+  static bool loadSheetTexture(ActorSheet& sheet);
   // Nyx: when each Nyx last changed form (to time her drop and lift), which
   // way she faced when she set the CRT down, and where her swarm is drawn
   // (eased toward the server's position between state updates).
