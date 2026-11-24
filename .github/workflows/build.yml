@@ -11,9 +11,12 @@ permissions:
   pages: write
   id-token: write
 
+# One run per branch or PR; a newer push to a PR replaces its older run.
+# Only the Pages deploy is serialized (see deploy-pages), so PR builds
+# never wait behind main's deploy or cancel each other.
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   native-build:
@@ -113,6 +116,9 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     needs: [native-build, wasm-build]
     runs-on: ubuntu-latest
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
