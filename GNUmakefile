@@ -69,3 +69,8 @@ dev: build  ## Full dev environment: 1 server + N clients
 .PHONY: pre-commit
 pre-commit: ## Runs pre-commit hooks like format and lint
 	uv run pre-commit run -a
+
+# Standalone subset only; deliberately has no dependency on `build`.
+.PHONY: test-lightweight
+test-lightweight: ## Runs dependency-free logic tests (not a full game build)
+	python3 scripts/run_lightweight_tests.py
