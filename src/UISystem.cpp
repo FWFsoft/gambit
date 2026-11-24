@@ -194,7 +194,11 @@ void UISystem::render() {
       }
       break;
     case GameState::Inventory:
-      renderInventory();
+      if (arenaView) {
+        renderArenaInventory();
+      } else {
+        renderInventory();
+      }
       break;
   }
 
@@ -882,6 +886,28 @@ void UISystem::renderDeathScreen() {
   }
 
   ImGui::End();
+}
+
+// In the arena the only items are infusions (issue #41), so I is a quick
+// look at the pack over the live HUD, and B (or its button) opens the suit
+// to install them. The legacy screen below is for the non-arena client.
+void UISystem::renderArenaInventory() {
+  // Opening I swaps the B suit screen for the quick view.
+  if (lastRenderedState != GameState::Inventory) {
+    arenaView->closeSuitScreen();
+  }
+  arenaView->render();
+  // The suit is showing (B pressed, or intermission at the ship, where the
+  // suit is the phase itself and already holds the pack): let it own the
+  // screen instead of drawing the quick view on top of it.
+  if (arenaView->suitScreenShowing()) {
+    GameStateManager::instance().transitionTo(GameState::Playing);
+    return;
+  }
+  if (arenaView->drawPackScreen()) {
+    arenaView->openSuitScreen();
+    GameStateManager::instance().transitionTo(GameState::Playing);
+  }
 }
 
 void UISystem::renderInventory() {

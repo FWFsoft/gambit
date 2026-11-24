@@ -21,6 +21,47 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-24: The I screen is a quick look at the infusion pack
+- **Decision:** In the arena, I no longer opens the legacy 20-slot
+  consumable/weapon/armor inventory. It opens a small "PACK" window over
+  the live HUD: one 44px square per infusion (genus colour, part initial,
+  grade pips, count), then an "IN YOUR SUIT" row of what is installed.
+  Hovering a pack square shows the same tooltip as the suit's pack.
+  "OPEN SUIT TO INSTALL [B]" (or B) swaps to the suit. Away from the ship,
+  the window says installing and combining only work beside the ship.
+  Opening I closes a B suit screen. In intermission at the ship, the suit
+  already holds the pack, so I does nothing there. The legacy screen
+  stays only for the non-arena client.
+- **Pillars:** Creative Builds serves: infusions are the one item and
+  build system, and there is no second build system with no effect.
+  Clarity serves: a quick check reads the whole build at a glance, with
+  details on hover and no talent-tree screen. Strategic Crunch serves:
+  checking the pack is fast and leaves the world visible. Comradery is
+  neutral.
+- **Why:** Issue #41. A playtester did not know what the I screen was
+  for. In the arena it showed demo items seeded at spawn
+  (`ServerGameState.cpp` "test items ... for demonstration"). Weapon and
+  armor stats are never read by combat, and nothing in the arena adds to
+  that inventory: infusion pickups go to the pack and medkits heal on
+  pickup. The human direction was to keep a quick inventory view, behind
+  the single item system, as small squares with hover text and a button
+  to open the suit. The suit stays the talent-tree view. Rejected:
+  relabelling the old screen ("Items & Equipment"), which kept items that
+  look meaningful but do nothing, and removing I entirely. Not done here:
+  the server still seeds the legacy demo items and the legacy
+  UseItem/EquipItem packets remain. Retiring them is a separate engine
+  cleanup.
+- **Status:** Built, needs review. Type-checked only: a full build and
+  visual check were not possible in this environment. Check in a match
+  that the window fits and the tooltips read well, and that I, Esc and B
+  each switch screens.
+- **Where:** `src/ArenaHud.cpp` (`drawPackScreen`, shared
+  `packItemTooltip`), `include/ArenaView.h`, `src/ArenaView.cpp`,
+  `src/UISystem.cpp` (`renderArenaInventory`), `include/UISystem.h`,
+  `PLAYTEST.md` (controls). This matches the infusion spec
+  (`specs/genera-and-infusion-system.md`: hovering infusions in your
+  inventory explains what slotting them gives).
+
 ## 2026-11-24: Lifeline target preview, refusal and solid-prop anchors
 - **Decision:** Share Lifeline selection between its idle preview, cast gate
   and initial bond. Show the local Isaac a valid ring or invalid crossed ring
