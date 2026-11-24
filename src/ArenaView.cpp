@@ -2012,6 +2012,23 @@ void ArenaView::drawPlayer(ImDrawList* dl, const ArenaClient::PlayerView& view,
     aimX = prediction->getAimX();
     aimY = prediction->getAimY();
   }
+  if (isLocal && !dead && state.characterId == Arena::CharacterId::Isaac) {
+    // The server uses the same selection for this preview and the cast gate.
+    // Shape as well as colour distinguishes an empty target from an anchor.
+    ImVec2 target = toScreen(state.kitX, state.kitY);
+    const bool valid = state.kitMode != 0;
+    ImU32 color = valid ? IM_COL32(100, 255, 170, 230)
+                        : IM_COL32(255, 100, 100, 230);
+    dl->AddCircle(target, 12.0f, color, 20, 2.0f);
+    if (!valid) {
+      dl->AddLine(ImVec2(target.x - 5, target.y - 5),
+                  ImVec2(target.x + 5, target.y + 5), color, 2.0f);
+      dl->AddLine(ImVec2(target.x - 5, target.y + 5),
+                  ImVec2(target.x + 5, target.y - 5), color, 2.0f);
+    }
+    dl->AddText(ImVec2(target.x + 16, target.y - 7), color,
+                valid ? "LIFELINE" : "NO ANCHOR");
+  }
   float speed = std::sqrt(vx * vx + vy * vy);
   bool moving = speed > 12.0f && !dead;
 

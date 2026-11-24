@@ -456,6 +456,12 @@ target_link_libraries(test_client_prediction PRIVATE
     SDL2::SDL2
 )
 
+add_executable(test_lifeline_anchors
+    tests/test_lifeline_anchors.cpp
+    src/CollisionSystem.cpp
+)
+target_include_directories(test_lifeline_anchors PRIVATE include)
+
 add_executable(test_collision
     tests/test_collision.cpp
     src/Logger.cpp
@@ -841,6 +847,7 @@ add_executable(test_arena_minimap tests/test_arena_minimap.cpp)
 target_include_directories(test_arena_minimap PRIVATE include)
 add_test(NAME ArenaMinimap COMMAND test_arena_minimap)
 
+add_test(NAME LifelineAnchors COMMAND test_lifeline_anchors)
 add_test(NAME CameraAndFogOfWar COMMAND test_camera_fog)
 add_test(NAME MusicZone COMMAND test_music_zone)
 add_test(NAME MusicSystem COMMAND test_music_system)
