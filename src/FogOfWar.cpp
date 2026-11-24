@@ -33,6 +33,7 @@ FogOfWar::FogOfWar(float worldWidth, float worldHeight) : cell(Tune::FOG_CELL) {
 
 void FogOfWar::reset() {
   std::fill(seen.begin(), seen.end(), 0.0f);
+  allDirty = true;
   update({});
 }
 
@@ -76,15 +77,47 @@ void FogOfWar::reveal(float x, float y, float radius) {
       seen[static_cast<size_t>(row) * columns + column] = 1.0f;
     }
   }
+  // Rare (a probe's scan): rebuild every texel on the next update().
+  allDirty = true;
 }
 
 void FogOfWar::update(const std::vector<Source>& sources) {
-  current = sources;
   assert(seen.size() == static_cast<size_t>(columns) * rows);
+  if (allDirty) {
+    current = sources;
+    refreshCells(0, 0, columns, rows);
+    allDirty = false;
+    return;
+  }
+  // Cells last frame's sources lit go dark again; cells this frame's light
+  // up. Everywhere else neither `seen` nor the sight changed, so the texel
+  // is already right. Overlaps are refreshed twice, which is harmless.
+  std::vector<Source> previous;
+  previous.swap(current);
+  current = sources;
+  for (const Source& source : previous) refreshAround(source);
+  for (const Source& source : current) refreshAround(source);
+}
 
-  for (int row = 0; row < rows; row++) {
+void FogOfWar::refreshAround(const Source& source) {
+  // sight() is exactly 0 at or beyond `radius` from the source.
+  if (source.radius <= 0.0f) return;
+  const int column0 =
+      static_cast<int>(std::floor((source.x - source.radius - left) / cell));
+  const int column1 =
+      static_cast<int>(std::ceil((source.x + source.radius - left) / cell)) + 1;
+  const int row0 =
+      static_cast<int>(std::floor((source.y - source.radius - top) / cell));
+  const int row1 =
+      static_cast<int>(std::ceil((source.y + source.radius - top) / cell)) + 1;
+  refreshCells(std::max(0, column0), std::max(0, row0),
+               std::min(columns, column1), std::min(rows, row1));
+}
+
+void FogOfWar::refreshCells(int column0, int row0, int column1, int row1) {
+  for (int row = row0; row < row1; row++) {
     const float y = top + (row + 0.5f) * cell;
-    for (int column = 0; column < columns; column++) {
+    for (int column = column0; column < column1; column++) {
       const float x = left + (column + 0.5f) * cell;
       const size_t index = static_cast<size_t>(row) * columns + column;
       const float now = visibility(x, y);
