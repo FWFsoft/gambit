@@ -40,6 +40,12 @@ cmake .. && make
 ./build/Client  # Start client
 ```
 
+## Lightweight Logic Tests
+
+Run `make test-lightweight` with Python 3 and a C++17 compiler, without graphics
+or network build dependencies. This is a limited subset, **not a full game
+build**; see [exact scope and runner checks](docs/LIGHTWEIGHT_TESTS.md).
+
 ## Using Claude Code Skills
 
 This project includes Claude Code skills that streamline development workflows. These skills work in both **Claude Code** (CLI) and **Cursor** (IDE).
