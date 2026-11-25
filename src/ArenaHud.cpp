@@ -158,7 +158,7 @@ void ArenaView::handleHotkeys() {
   }
 
   // N: tour the planet. Frees the camera and jumps it to the next
-  // landmark, the city and the far places, so the map can be looked at
+  // landmark, the city, the far places and the four coasts, so the map can be looked at
   // without walking it (for reviewing the scenery; Y takes the camera back).
   if (ImGui::IsKeyPressed(ImGuiKey_N, false) && props) {
     std::vector<std::pair<float, float>> stops;
@@ -176,6 +176,34 @@ void ArenaView::handleHotkeys() {
       }
     }
     if (city > 0) stops.insert(stops.begin(), {cityX / city, cityY / city});
+    // And the coast nearest each edge of the map's grid, to check the land
+    // ends in sea and the grid's edge stays out of sight (issue #50).
+    if (const TerrainGrid* grid = terrain()) {
+      const int w = grid->width(), h = grid->height();
+      for (int side = 0; side < 4; side++) {
+        int bestInner = w + h, bestX = -1, bestY = -1;
+        for (int ty = 0; ty < h; ty += 2) {
+          for (int tx = 0; tx < w; tx += 2) {
+            if (grid->biomeOf(tx, ty) == 0 || grid->blockedTile(tx, ty)) {
+              continue;
+            }
+            int inner = side == 0   ? tx
+                        : side == 1 ? ty
+                        : side == 2 ? w - 1 - tx
+                                    : h - 1 - ty;
+            if (inner < bestInner) {
+              bestInner = inner;
+              bestX = tx;
+              bestY = ty;
+            }
+          }
+        }
+        if (bestX < 0) continue;
+        float wx, wy;
+        grid->cornerToWorld(bestX + 0.5f, bestY + 0.5f, wx, wy);
+        stops.push_back({wx, wy});
+      }
+    }
     if (!stops.empty()) {
       tourStop = (tourStop + 1) % static_cast<int>(stops.size());
       if (camera->isLocked()) camera->toggleMode();

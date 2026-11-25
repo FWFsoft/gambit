@@ -37,7 +37,7 @@ output is a normal Tiled map (big layers are zlib-compressed). Hand edits
 in Tiled are fine, but re-running the generator overwrites them.
 
 Usage:
-  python3 tools/maps/generate_planet.py [--seed 3] [--size 720] [--site 0]
+  python3 tools/maps/generate_planet.py [--seed 3] [--size 800] [--site 0]
       [--preview docs/prototype/planet_overview.png]
 """
 
@@ -91,6 +91,14 @@ CRASH_SITE_RADIUS = 1300.0
 SHIP_CLEAR = 420.0
 COAST = 0.86               # land where the shape metric is below this
 SEA_KEEP = 2600.0          # sea tiles drawn this far out; past it, empty
+# The continent is laid out for a 720-tile grid. The map's grid is bigger
+# (--size, 800 by default) so the continent sits in open sea and never runs
+# into the grid's edge, which read as a hard line (issue #50). BORDER_SEA:
+# whatever happens, no land within this many world px (square to the edge)
+# of the grid's edge, with BORDER_WOBBLE of noise on it.
+CONTINENT_TILES = 720
+BORDER_SEA = 900.0
+BORDER_WOBBLE = 250.0
 
 # ---------------------------------------------------------------------------
 # Biomes. Ids are the Biome layer's values (0 = sea / none). Earth-like
@@ -229,6 +237,14 @@ POI_KINDS = {
             (0, 0), 190.0),
     "littlejohn": ("little_john", "Open the gate its guardian is watching",
                    110.0, 1.0, (0, 1), 190.0),
+    # The city's own errands (issue #49): the same mechanics, dressed for
+    # streets, and with pads that fit a crossroads rather than open ground.
+    "depot": ("alien_scrapyard", "Strip the wrecked transit depot for scrap and haul it home",
+              70.0, 3.0, (2, 0), 150.0),
+    "clinic": ("salvage_medpacks", "Clear the squatters, then crack the clinic's supply cache",
+               120.0, 1.0, (3, 0), 160.0),
+    "plaza": ("capture_outpost", "Take back the plaza from the nest that holds it",
+              130.0, 1.0, (3, 1), 170.0),
 }
 
 # What each ring asks for. Near: quick stops in round 1. Mid: a real trip.
@@ -245,6 +261,24 @@ RINGS = [
                              "medpacks_big", "medpacks_big", "gas", "frogs"]),
 ]
 POI_SPACING = 850.0
+# Coverage (issue #49): after the rings, extra objectives go into the
+# biggest empty stretches until, for every landing site, no walkable spot is
+# more than COVER_GAP world px (straight line, ~12 s at hero speed) from an
+# objective in play. Fill objectives are in play for every landing site.
+COVER_GAP = 3000.0
+COVER_MAX = 40
+# What a fill objective is, by biome: the first that fits wins, so each
+# place keeps its own kind of errand.
+FILL_KINDS = {
+    CITY: ["plaza", "clinic", "depot"],
+    SWAMP: ["frogs", "gas", "outpost_big"],
+    JUNGLE: ["gas", "littlejohn", "outpost_big"],
+    TIDAL: ["frogs", "scrapyard", "outpost"],
+    DESERT: ["scrapyard", "probe", "outpost_big"],
+    ARCTIC: ["probe", "outpost_big", "medpacks"],
+    PNW: ["littlejohn", "outpost_big", "probe"],
+    PLAINS: ["outpost_big", "medpacks", "scrapyard"],
+}
 # Objectives are fixed places on the planet. One is in play for every
 # landing site within this reach (the far ring's edge), not just the site it
 # was placed around, so sites close together share the ground between them.
@@ -255,6 +289,7 @@ POI_BIOME = {
     "gas": {SWAMP: 3.0, JUNGLE: 2.0, DESERT: 1.0},
     "scrapyard": {CITY: 2.0, DESERT: 1.0, PLAINS: 0.5},
     "medpacks": {CITY: 2.5},
+    "depot": {CITY: 4.0}, "clinic": {CITY: 4.0}, "plaza": {CITY: 4.0},
     "outpost": {PNW: 1.0, ARCTIC: 1.0, DESERT: 1.0},
     "probe": {ARCTIC: 1.5, DESERT: 1.0},
     "littlejohn": {JUNGLE: 1.0, PNW: 1.0},
@@ -316,7 +351,9 @@ class Grid:
     def __init__(self, size):
         self.size = size
         self.cy = (size - 1) * QUARTER_H  # world y of the map centre
-        self.hx, self.hy = size * HALF_W, size * QUARTER_H  # half extents
+        # Half extents of the continent (not of the grid): the land's shape,
+        # biomes and sites are laid out in these.
+        self.hx, self.hy = CONTINENT_TILES * HALF_W, CONTINENT_TILES * QUARTER_H
         ty, tx = np.mgrid[0:size, 0:size]
         self.tx, self.ty = tx, ty
         self.wx = ((tx - ty) * HALF_W).astype(np.float32)
@@ -446,6 +483,20 @@ def fill_from_neighbours(labels, holes):
 # ---------------------------------------------------------------------------
 # The planet
 # ---------------------------------------------------------------------------
+def edge_depth(g):
+    """World px from each tile centre to the nearest edge of the grid's
+    diamond, measured square to that edge (a grid step is ~28.6 px)."""
+    step = 1.0 / math.hypot(1.0 / (2 * HALF_W), 1.0 / (2 * QUARTER_H))
+    inner = np.minimum.reduce([g.tx, g.ty, g.size - 1 - g.tx, g.size - 1 - g.ty])
+    return (inner + 0.5) * step
+
+
+def border_sea(g, noise):
+    """Tiles that must stay sea: a belt inside every edge of the grid."""
+    shore = BORDER_SEA + BORDER_WOBBLE * noise.fbm(g.wx, g.wy, 1700, 3)
+    return edge_depth(g) <= shore
+
+
 def make_land(g, noise):
     wx, wy = g.wx, g.wy
     nx_, ny_ = wx / g.hx, wy / g.hy
@@ -465,7 +516,7 @@ def make_land(g, noise):
     # room for the tidal coast to be a place, not a strip.
     d = np.hypot((nx_ + 0.50) / 0.20, (ny_ - 0.56) / 0.16)
     e = e - 0.30 * np.clip(1.0 - d, 0, 1) ** 0.7
-    return e < COAST, e
+    return (e < COAST) & ~border_sea(g, noise), e
 
 
 def spine_field(g, noise):
@@ -629,6 +680,7 @@ def build(seed: int, size: int, site_index: int):
     ship_dist = np.min([np.hypot(wx - x, wy - y) for x, y in site_xy], axis=0)
     for x, y in site_xy:
         land[g.disc(x, y, BASIN_RADIUS + 400)] = True
+    land &= ~border_sea(g, n1)  # a landing basin never reopens the edge
 
     # ---- 4. Height -----------------------------------------------------------
     params = np.zeros((5, size, size), dtype=np.float32)
@@ -1024,6 +1076,7 @@ def build(seed: int, size: int, site_index: int):
         for i in range(len(site_xy)):
             at_site(i)
             place_pois(world, ring)
+    fill_coverage(world)
     for i in range(len(site_xy)):
         at_site(i)
         cut_trails(world)
@@ -1186,6 +1239,99 @@ def place_pois(w, ring_spec):
             _s, x, y = best
             pois.append((kind, x, y, ring, site))
             flatten(w, x, y, pad, material=MAT["pad"])
+
+
+def poi_in_play(w, poi, site):
+    """Whether an objective is in play when the ship lands on `site`."""
+    kind, x, y, ring, home = poi
+    if ring == "fill":
+        return True
+    px, py = w["site_xy"][site]
+    return math.hypot(x - px, y - py) <= POI_REACH
+
+
+def coverage_gaps(w, stride=8):
+    """Sample walkable tiles; for each, the worst (over landing sites)
+    straight-line distance to an objective in play. Returns (xs, ys, gap)."""
+    g = w["g"]
+    ty, tx = np.mgrid[0:g.size:stride, 0:g.size:stride]
+    keep = w["land"][ty, tx] & ~w["blocked"][ty, tx]
+    xs, ys = g.wx[ty, tx][keep], g.wy[ty, tx][keep]
+    worst = np.zeros(xs.shape, dtype=np.float32)
+    for site in range(len(w["site_xy"])):
+        live = [(x, y) for (k, x, y, r, h) in w["pois"]
+                if poi_in_play(w, (k, x, y, r, h), site)]
+        if not live:
+            worst[:] = np.inf
+            continue
+        best = np.full(xs.shape, np.inf, dtype=np.float32)
+        for x, y in live:
+            best = np.minimum(best, np.hypot(xs - x, ys - y))
+        worst = np.maximum(worst, best)
+    return xs, ys, worst
+
+
+def fill_coverage(w):
+    """Objectives in the empty stretches the rings left (issue #49)."""
+    g, rng = w["g"], w["rng"]
+    tried = set()
+    placed = 0
+    while placed < COVER_MAX:
+        xs, ys, gap = coverage_gaps(w)
+        order = np.argsort(-gap)
+        target = None
+        for i in order[:400]:
+            if gap[i] <= COVER_GAP:
+                break
+            key = (int(xs[i]) // 600, int(ys[i]) // 600)
+            if key not in tried:
+                target = (float(xs[i]), float(ys[i]), key)
+                break
+        if target is None:
+            break
+        gx, gy, key = target
+        tried.add(key)
+        tx, ty = g.to_tile(gx, gy)
+        kinds = FILL_KINDS.get(int(w["biome"][ty, tx]), ["outpost", "medpacks"])
+        best = None
+        for _ in range(700):
+            a = rng.uniform(-math.pi, math.pi)
+            r = 900.0 * math.sqrt(rng.uniform(0, 1))
+            x, y = gx + math.cos(a) * r, gy + math.sin(a) * r * 0.75
+            ctx, cty = g.to_tile(x, y)
+            if not g.inside(ctx, cty):
+                continue
+            here = int(w["biome"][cty, ctx])
+            kind = next((k for k in FILL_KINDS.get(here, kinds)
+                         if not (w["city"][cty, ctx] and k in ("frogs", "gas", "probe"))),
+                        None)
+            if kind is None:
+                continue
+            pad = POI_KINDS[kind][5]
+            if not walkable_spot(w, x, y, pad + 40):
+                continue
+            if any(math.hypot(x - px, y - py) < POI_SPACING for _k, px, py, _r, _s in w["pois"]):
+                continue
+            if any(math.hypot(x - lx, y - ly) < 380 for _k, lx, ly in w["landmarks"]):
+                continue
+            if any(math.hypot(x - sx, y - sy) < 1150.0 for sx, sy in w["site_xy"]):
+                continue
+            # Closest to the middle of the gap wins; biome fit breaks ties.
+            score = -math.hypot(x - gx, y - gy) + 120.0 * POI_BIOME.get(
+                kind.split("_")[0], {}).get(here, 0.0)
+            if best is None or score > best[0]:
+                best = (score, kind, x, y)
+        if best is None:
+            continue
+        _score, kind, x, y = best
+        home = min(range(len(w["site_xy"])),
+                   key=lambda i: math.hypot(x - w["site_xy"][i][0], y - w["site_xy"][i][1]))
+        w["pois"].append((kind, x, y, "fill", home))
+        flatten(w, x, y, POI_KINDS[kind][5], material=MAT["pad"])
+        placed += 1
+    xs, ys, gap = coverage_gaps(w)
+    w["coverage"] = (placed, float(np.median(gap)), float(np.percentile(gap, 95)),
+                     float(gap.max()))
 
 
 def cut_trails(w):
@@ -1632,8 +1778,8 @@ def write_tmx(w, path, seed, size_arg):
         # Fixed on the planet: in play for every landing site in reach. The
         # camp's size was set by the site it was placed around (its ring).
         sx_, sy_ = w["site_xy"][site]
-        reach = [i for i, (px, py) in enumerate(w["site_xy"])
-                 if math.hypot(x - px, y - py) <= POI_REACH]
+        reach = [i for i in range(len(w["site_xy"]))
+                 if poi_in_play(w, (kind, x, y, ring, site), i)]
         assert site in reach
         tag = ("sites", "string", ",".join(str(i) for i in reach))
         otype, desc, radius, itime, (grunts, elites), _pad = POI_KINDS[kind]
@@ -1921,7 +2067,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawTextHelpFormatter)
     ap.add_argument("--seed", type=int, default=3)
-    ap.add_argument("--size", type=int, default=720)
+    ap.add_argument("--size", type=int, default=800)
     ap.add_argument("--site", type=int, default=0,
                     help="which candidate crash site the ship sits on")
     ap.add_argument("--out", default=str(MAPS / "planet.tmx"))
@@ -1941,8 +2087,12 @@ def main():
     print(f"{len(w['sites'])} landing sites (the server picks one per match); default ship "
           f"on site {w['site_index']} at ({sx:.0f}, {sy:.0f})")
     for i in range(len(w["sites"])):
-        n = sum(1 for p in w["pois"] if p[4] == i)
-        print(f"  site {i}: {n} objectives")
+        n = sum(1 for p in w["pois"] if poi_in_play(w, p, i))
+        print(f"  site {i}: {n} objectives in play")
+    placed, med, p95, worst = w["coverage"]
+    print(f"coverage: {placed} fill objectives; nearest objective in play from any "
+          f"walkable spot, worst site: median {med:.0f} px, 95% {p95:.0f} px, "
+          f"max {worst:.0f} px (target {COVER_GAP:.0f})")
     for i, (x, y, mix) in enumerate(w["sites"]):
         names = ", ".join(f"{BIOMES[b][1]} {mix[b] * 100:.0f}%" for b in BIOMES
                           if mix[b] >= 0.05)

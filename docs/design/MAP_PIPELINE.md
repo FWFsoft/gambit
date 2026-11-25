@@ -29,9 +29,14 @@ The split that makes this fast (the same one the character pipeline uses):
 default map (`assets/maps/arena.tmx`, the old prototype, still loads with
 `--map`). One seeded command makes the whole planet:
 
-- **Land:** a continent filling the map (720 x 720 tiles, about 840 m by
+- **Land:** a continent (laid out on 720 x 720 tiles, about 840 m by
   420 m), with an east bay, coves and a peninsula off the warm south-west
-  coast, in a dark sea. Sea far from land is left undrawn.
+  coast, in a dark sea. The map's grid is bigger (800 x 800,
+  `CONTINENT_TILES`, `--size`), so every side of the continent ends in a
+  coast with sea beyond it and nothing walkable comes within 800 px of the
+  grid's edge (`BORDER_SEA`, a guaranteed sea belt). The camera never sees
+  the end of the map from a shore (issue #50). Sea far from land is left
+  undrawn. In game, N tours the landmarks and then the four coasts.
 - **Biomes** (next section): earth-like places laid out like a compressed
   North America. The genera do not drive them; genus territories sit
   inside them.
@@ -71,8 +76,14 @@ default map (`assets/maps/arena.tmx`, the old prototype, still loads with
   (property `sites`, e.g. `0,2`). Each site still gets its three rings
   (near, mid, far), filled to their usual counts: objectives a neighbour
   already put in the band count toward them, and a site's near ring is only
-  its own. A match has 28 to 34 objectives in play, about as many as one
-  site had before. Placed by context and biome (frogs and gas by swamp and
+  its own. Then **coverage**: wherever the ship lands, no walkable spot
+  may be more than 3,000 px (about 12 s at hero speed) from an objective
+  in play (`COVER_GAP`). Fill objectives go into the biggest empty
+  stretches (up to 40, `COVER_MAX`), each the errand its biome is known
+  for (`FILL_KINDS`), and are in play every match. The city has its own:
+  a transit depot to strip for scrap, a clinic cache, and a plaza to take
+  back from a nest. A match has 63 to 70 objectives in play (it was 28 to
+  34, which left whole regions empty: issue #49). Placed by context and biome (frogs and gas by swamp and
   water, scrap and med pods in the city, outposts on high ground); rewards
   follow the distance from where the ship landed (far ones pay two
   infusions).

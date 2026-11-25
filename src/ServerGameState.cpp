@@ -715,9 +715,20 @@ void ServerGameState::broadcastStateUpdate() {
 
   server->broadcastPacket(serialize(packet));
 
-  // Enemy state
+  // Enemy state. Most of the planet's camps stand still most of the time:
+  // an enemy whose state has not changed since it was last sent goes out
+  // only on its turn, every ENEMY_RESEND_TICKS (staggered by id), well
+  // inside the client's 400 ms stale window. Any change goes out at once.
   {
+    constexpr uint32_t ENEMY_RESEND_TICKS = 12;  // 5 Hz at 60 ticks/s
     EnemyStateUpdatePacket enemyPacket;
+    for (auto it = lastSentEnemy.begin(); it != lastSentEnemy.end();) {
+      if (enemySystem->find(it->first) == nullptr) {
+        it = lastSentEnemy.erase(it);
+      } else {
+        ++it;
+      }
+    }
     for (const auto& [id, enemy] : enemySystem->getEnemies()) {
       NetworkEnemyState state;
       state.id = enemy.id;
@@ -736,6 +747,18 @@ void ServerGameState::broadcastStateUpdate() {
         state.windup = static_cast<uint8_t>(
             std::min(255.0f, std::max(0.0f, progress) * 255.0f));
       }
+      auto sent = lastSentEnemy.find(id);
+      bool unchanged =
+          sent != lastSentEnemy.end() && sent->second.state == state.state &&
+          sent->second.x == state.x && sent->second.y == state.y &&
+          sent->second.vx == state.vx && sent->second.vy == state.vy &&
+          sent->second.health == state.health &&
+          sent->second.maxHealth == state.maxHealth &&
+          sent->second.flags == state.flags &&
+          sent->second.windup == state.windup &&
+          sent->second.type == state.type;
+      if (unchanged && (serverTick + id) % ENEMY_RESEND_TICKS != 0) continue;
+      lastSentEnemy[id] = state;
       enemyPacket.enemies.push_back(state);
     }
     server->broadcastPacket(serialize(enemyPacket));

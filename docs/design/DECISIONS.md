@@ -21,6 +21,61 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-25: Objectives cover the whole map; the land ends in a coast
+- **Decision:** Two map-generator changes, regenerated into
+  `assets/maps/planet.tmx`:
+  1. **Coverage (#49).** After each landing site's near/mid/far rings, the
+     generator adds "fill" objectives in the biggest empty stretches until,
+     for every landing site, no walkable spot is more than 3,000 px (~12 s
+     at hero speed, straight line) from an objective in play. Fill
+     objectives are in play every match. 36 were needed (cap 40). In play
+     per match: 63 to 70 (was 28 to 34). The worst spot is now 2,987 px
+     from an objective; it was over 10,000 px (~40 s) for landing sites 1
+     and 3, which had no city objectives at all. Each fill objective is
+     the errand its biome is known for. The city gets three of its own,
+     on existing mechanics with smaller pads that fit a crossroads:
+     "transit depot" (scrap haul), "clinic cache" (clear camp, open the
+     med pod) and "plaza" (wipe the camp and its enforcer).
+  2. **Map edge (#50).** The continent keeps its shape and size in world
+     px, but the tile grid grows from 720 to 800 so the land that used to
+     run into the grid's edge now ends in a natural coast with drawn sea
+     beyond. A guaranteed sea belt keeps every walkable tile at least
+     800 px from the edge (it was 14 px). The default camera sees about
+     610 px past the hero square to the edge, so the edge stays out of
+     sight. Walkable area, biomes and the four landing sites are unchanged.
+  Also: enemies whose network state has not changed are re-sent at 5 Hz
+  instead of 60 Hz, so twice the camps cost less bandwidth than before
+  (ArenaSim, 4 bots: 142 KB/s before, 284 KB/s with the new camps and no
+  change, 51 KB/s now).
+- **Pillars:** Strategic Crunch serves: the playtest walked through whole
+  biomes and found nothing, and "dead time feels very bad". Creative
+  Builds & Dynamic Play serves: far places are worth going to, and the
+  city has its own errands. Clarity serves: the world has no visible
+  edge, only a coast. Comradery is neutral.
+  **Trade-off:** about twice the objectives and camps (peak enemies alive
+  in ArenaSim: 78 before, 158 now) mean more infusions on offer per match.
+  Time still limits how many a crew can reach, but this is an economy
+  change a human should check in play. `COVER_GAP` is the dial: 3,000 px
+  was chosen over 2,500 (48 fills, still not fully covered) because it
+  cost a quarter fewer camps for nearly the same 95th-percentile gap.
+- **Why:** Whole-map coverage needs about 70 objectives in play however
+  it is done: the rings cover only the half of the map near each site.
+  Rejected: activating every ring objective in every match (still leaves
+  gaps where no ring reaches, and makes ring sizes meaningless) and simply
+  raising the reach (no coverage guarantee, and does not fix the city's
+  street fit). For the edge, rejected: pushing land down near the edge
+  (cost 15 to 30% of the land and a landing site, and made the continent
+  a diamond) and an invisible wall. City blocks still reject the bigger
+  objective pads; the city kinds have smaller ones. Not done: brand new
+  objective mechanics per biome (these are new names and placements on
+  existing mechanics), and path-distance coverage (straight line only).
+- **Status:** Built, needs review
+- **Where:** `tools/maps/generate_planet.py` (`fill_coverage`,
+  `FILL_KINDS`, `COVER_GAP`, `CONTINENT_TILES`, `border_sea`),
+  `assets/maps/planet.tmx`, `src/ServerGameState.cpp` (enemy resend),
+  `src/ArenaHud.cpp` (N tour visits the coasts),
+  `tests/test_planet_map.cpp`, `docs/design/MAP_PIPELINE.md`
+
 ## 2026-11-25: Lifeline bonds to the map's trees, cacti and ruins
 - **Decision:** Isaac's Lifeline (RMB) can now bond to decorative props
   from the map's Props layer, not only to solid rocks and the hull. Each
