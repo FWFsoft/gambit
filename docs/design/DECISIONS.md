@@ -21,6 +21,25 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-25: Snow lies on the fir's ledges, not along its outline
+- **Decision:** Snowy conifers no longer have pale slivers down both
+  outer edges of each tier. Each tier now carries a band of snow across
+  its face on the ledge just under the tier above (36 to 62% of the tier's
+  height), with four small lumps draping over its lower edge and a thin
+  ink line under it; the top tier has a cap on its tip. Lit on the left
+  (0.62 of the snow colour), shaded on the right (0.44), like the
+  foliage. Snow colour unchanged (cool, dim).
+- **Pillars:** Clarity serves: snow reads as snow, not as a rim light or
+  a glowing outline that competes with heroes and effects (playtest
+  2026-11-22, #55). Others neutral.
+- **Why:** Snow settles on what faces up and toward the camera, so the
+  ledges carry it. A first try at full brightness bloomed through the
+  post-process and made every tree glow, which breaks "the world is dark,
+  heroes are the brightest things" (ART_DIRECTION.md); it was dimmed.
+  Checked in a rendered frame of the arctic coast (N tour).
+- **Status:** Built, needs review
+- **Where:** `src/ArenaWorld.cpp` (`snowOnTier`)
+
 ## 2026-11-25: Leaving to the main menu leaves the match; Rejoin or Abandon
 - **Decision:** The pause menu's "Main Menu" is now "Leave to Main Menu".
   It takes you out of the fight on the server (the existing
