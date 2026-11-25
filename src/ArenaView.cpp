@@ -307,6 +307,23 @@ void ArenaView::onLocalPickup(uint32_t itemId) {
 // Sprites
 // ---------------------------------------------------------------------------
 
+namespace {
+// The playable hero an actor sheet belongs to, by name: "Jeff" for Jeff and
+// JeffTreads, "Kade" for KadeMirror. The longest match wins. "" for enemies,
+// the ship and props, which are loaded up front.
+std::string heroOwning(const std::string& actor) {
+  std::string best;
+  for (const CharacterDefinition& hero :
+       CharacterRegistry::instance().getAllCharacters()) {
+    if (hero.name.size() > best.size() &&
+        actor.compare(0, hero.name.size(), hero.name) == 0) {
+      best = hero.name;
+    }
+  }
+  return best;
+}
+}  // namespace
+
 void ArenaView::loadManifest() {
   if (manifestLoaded) return;
   manifestLoaded = true;
@@ -355,11 +372,21 @@ void ArenaView::loadManifest() {
           sheet.columns;
       if (!(in >> sheet.scale)) sheet.scale = 1.0f;
       std::string filter;
-      bool smooth = (in >> filter) && filter == "smooth";
-      sheet.texture = TextureManager::instance().get(path);
-      // Toon-style sheets are smooth art: filter them linearly.
-      if (sheet.texture && smooth) sheet.texture->setSmooth(true);
-      if (sheet.texture) {
+      sheet.smooth = (in >> filter) && filter == "smooth";
+      sheet.path = path;
+      sheet.hero = heroOwning(name);
+      bool present;
+      if (sheet.hero.empty()) {
+        // Enemies, the ship and props: shared by every match and first seen
+        // mid-fight, so decode them now rather than as one spawns.
+        present = loadSheetTexture(sheet);
+      } else {
+        present = std::ifstream(path).good();
+        if (!present) {
+          Logger::error("ArenaView: actor sheet missing: " + path);
+        }
+      }
+      if (present) {
         auto anims = std::move(actorSheets[name].anims);
         actorSheets[name] = sheet;
         actorSheets[name].anims = std::move(anims);
@@ -393,7 +420,8 @@ void ArenaView::loadManifest() {
     }
   }
   for (auto it = actorSheets.begin(); it != actorSheets.end();) {
-    if (!it->second.texture) {
+    // Anim lines without a usable actor line, or an eager sheet that failed.
+    if (it->second.path.empty() || it->second.failed) {
       it = actorSheets.erase(it);
     } else {
       ++it;
@@ -420,7 +448,32 @@ const ArenaView::CharacterSprite* ArenaView::characterSprite(
 
 const ArenaView::ActorSheet* ArenaView::actorFor(const std::string& name) const {
   auto it = actorSheets.find(name);
-  return it == actorSheets.end() ? nullptr : &it->second;
+  if (it == actorSheets.end()) return nullptr;
+  if (!it->second.texture && !it->second.failed) {
+    loadHeroSheets(it->second.hero);
+  }
+  return it->second.texture ? &it->second : nullptr;
+}
+
+bool ArenaView::loadSheetTexture(ActorSheet& sheet) {
+  sheet.texture = TextureManager::instance().get(sheet.path);
+  // Toon-style sheets are smooth art: filter them linearly.
+  if (sheet.texture && sheet.smooth) sheet.texture->setSmooth(true);
+  sheet.failed = sheet.texture == nullptr;
+  return sheet.texture != nullptr;
+}
+
+void ArenaView::loadHeroSheets(const std::string& hero) const {
+  // All of a hero's sheets at once (Jeff's treads, Kade's mirror...), so
+  // a form or kit change mid-fight never stalls on decoding a sheet.
+  assert(!hero.empty() && "eager sheets are loaded by loadManifest");
+  int loaded = 0;
+  for (auto& [name, sheet] : actorSheets) {
+    if (sheet.hero != hero || sheet.texture || sheet.failed) continue;
+    if (loadSheetTexture(sheet)) loaded++;
+  }
+  Logger::info("ArenaView: loaded " + std::to_string(loaded) +
+               " actor sheets for " + hero);
 }
 
 int ArenaView::actorFrameIndex(const ActorAnim& anim, float elapsed, bool hold,

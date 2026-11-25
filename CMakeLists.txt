@@ -39,6 +39,17 @@ if(EMSCRIPTEN)
         "-sALLOW_MEMORY_GROWTH=1"
         "--preload-file" "${CMAKE_SOURCE_DIR}/assets@assets"
     )
+    # add_compile_options(-O2) above only reaches the compile step. emcc's
+    # own -O level is taken at link: without it the link is -O0, so the
+    # wasm skips wasm-opt and the JS glue keeps ASSERTIONS and
+    # stack-cookie checks. C/C++ asserts are unaffected (no NDEBUG).
+    if(NOT CMAKE_BUILD_TYPE AND NOT ENABLE_COVERAGE)
+        list(APPEND EM_LINK_FLAGS "-O2")
+    endif()
+    if(GAMBIT_WASM_PROFILE)
+        # Keep function names in the wasm for Chrome's Performance panel.
+        list(APPEND EM_LINK_FLAGS "--profiling-funcs")
+    endif()
 
     # spdlog needs special defines for single-threaded WASM
     add_compile_definitions(SPDLOG_NO_THREAD_ID SPDLOG_NO_TLS SPDLOG_HEADER_ONLY)
@@ -993,6 +1004,11 @@ add_library(imgui_wasm STATIC
 )
 target_include_directories(imgui_wasm PUBLIC ${imgui_SOURCE_DIR})
 target_compile_options(imgui_wasm PRIVATE ${EM_COMPILE_FLAGS})
+# WebGL2 has no glDrawElementsBaseVertex, so the GL3 backend cannot set
+# RendererHasVtxOffset and any draw list over 65535 vertices aborts with
+# 16-bit indices (the world view does, once the intro fades in). WebGL2
+# draws 32-bit indices natively. PUBLIC: every TU must agree on ImDrawIdx.
+target_compile_definitions(imgui_wasm PUBLIC "ImDrawIdx=unsigned int")
 
 # Shared source files for WASM client (same as Client but without ENet)
 set(WASM_CLIENT_SOURCES

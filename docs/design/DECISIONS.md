@@ -62,6 +62,25 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
   (`specs/genera-and-infusion-system.md`: hovering infusions in your
   inventory explains what slotting them gives).
 
+## 2026-11-24: Hero sprite sheets load when a hero first appears
+- **Decision:** Load each hero's actor sheets (with its extra parts, e.g.
+  JeffTreads, KadeMirror) the first time that hero is drawn, not all 20 at
+  startup. Enemies, the ship and props still load up front. Art is
+  unchanged: full resolution, no downscaling.
+- **Pillars:** Strategic Crunch and Clarity serve on the web: the browser
+  build holds ~300 MB of actor textures instead of ~1.06 GB, so weaker
+  machines stall less. Trades against both, slightly: the first time a hero
+  appears (your own at the intro fade-in, a teammate joining or swapping),
+  that frame pauses while the sheet decodes. Enemies stay preloaded so
+  that pause never lands mid-fight on a spawn.
+- **Why:** Requested by a human (web build was very slow). Rejected:
+  half-resolution web sheets (softer heroes, against the inked-hero look in
+  ART_DIRECTION.md); loading only the picked hero (a teammate's hero would
+  still have to load when they join, so first use covers both).
+- **Status:** Accepted (requested by a human); the first-appearance pause
+  needs a look on a slow machine.
+- **Where:** `src/ArenaView.cpp` (`actorFor`, `loadHeroSheets`), PR
+
 ## 2026-11-24: Lifeline target preview, refusal and solid-prop anchors
 - **Decision:** Share Lifeline selection between its idle preview, cast gate
   and initial bond. Show the local Isaac a valid ring or invalid crossed ring
