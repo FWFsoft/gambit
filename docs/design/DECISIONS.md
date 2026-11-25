@@ -21,6 +21,50 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-25: Infusion builds designed backward from 18 end states (proposal)
+- **Decision** (proposed in a design session with a human; nothing built):
+  `specs/infusion-builds.md` picks 18 end-state builds, each with a proven
+  Risk of Rain 2 ancestor, and works back to what each infusion layer must
+  supply. Main proposals:
+  - **Parts become kit buttons:** Talon = LMB hits, Eye = RMB charge, Sinew
+    = SHIFT, Hide = being struck, plus a new **Crown** part that fires when
+    a nearby enemy gets the genus status *from anyone*. Each genus delivers
+    one status, one escalation, one buff (Venoxarid Poison / Weakened /
+    Haste, Cerebrian Expose / Confused / Sharpened, Frigidariant Slow /
+    Snared / Fortified, Magnarok Wound / Vulnerable / Empowered).
+  - **Part grades:** one Refined rule (reaches allies or more enemies) and
+    one Exalted rule break per part, the same for every genus (Echo, Heavy
+    Hand, Reset, Backlash Aura, Throne).
+  - **Nine new talents** (five are team converters) and a Hybrid Vigor
+    rework; rework Avalanche, the one capstone no build uses.
+  - **Rules:** archetype multipliers on what infusions produce (question
+    for a human), proc depth 1 with echoes that never retrigger, cooldown
+    floors, a per-player visual budget.
+- **Pillars:**
+  - **Creative Builds** decided it: items gain triggers that combine with
+    kits, other items and other players, and a wide build (Chimera) is
+    designed to compete with Ascension so neither is the dominant one.
+  - **Comradery:** serves. Crowns listen to teammates' effects, Refined
+    rules hand buffs to allies, and the builds are designed as setup and
+    payoff pairs.
+  - **Crunch:** serves. Genus is steered by territory (costs time), part
+    is random, and choosing which part to combine onto is a real choice.
+    Courier is a build against dead time.
+  - **Clarity:** weakens. 20 items, part rules and archetype multipliers
+    add rules; answered with one rule per part, one buff colour per
+    genus, tooltips showing your own number, and a visual budget.
+- **Why:** the playtests show builds not forming. Parts are flat stats,
+  genus effects mostly use their own statuses instead of the shared
+  effect vocabulary, nothing touches RMB charge (why every RMB is
+  charged), damage items are near-dead on Playmakers and Wingers, and
+  nothing listens to teammates. **Against docs:** the effects spec's
+  Iceborn Crown gives Empowered on Slow (here Frigidariant's buff is
+  Fortified); several end states break the archetype maxima unless
+  multipliers are approved.
+- **Status:** Proposed (needs a human: five open questions at the end of
+  the spec)
+- **Where:** `specs/infusion-builds.md`
+
 ## 2026-11-25: Field stations: the suit opens at a wild camp for 8 scrap
 - **Decision:** At night, a player camped away from the ship can spend 8
   carried scrap to set up a **field station** at their camp. Until dawn,
