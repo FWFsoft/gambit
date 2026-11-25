@@ -42,7 +42,9 @@ these apart, this spec calls the item's level its **grade**:
 - **Recipe: 2 → 1.** Two infusions of the **same genus and same grade**
   combine into one of the next grade. Exalted is the top.
 - **Where:** in the suit screen, at the ship, during the night (the same
-  place and time as slotting). Not in the field.
+  place and time as slotting). Not in the field, except inside a field
+  station a crewmate paid for that night (8 carried scrap, 500 px, gone at
+  dawn; issue #45).
 - **Which part survives:** the result keeps the part of the item you
   dragged *onto* (the target); the other is used up. Two Talons make a
   Talon; a Talon dropped on a Hide makes a Hide.

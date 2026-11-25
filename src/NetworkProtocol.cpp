@@ -989,6 +989,13 @@ std::vector<uint8_t> serialize(const MatchStatePacket& packet) {
     writeUint8(buffer, p.scrapCarried);
     writeFloat(buffer, p.reviveProgress);
   }
+  assert(packet.stations.size() <= 255);
+  writeUint8(buffer, static_cast<uint8_t>(packet.stations.size()));
+  for (const FieldStationState& s : packet.stations) {
+    writeFloat(buffer, s.x);
+    writeFloat(buffer, s.y);
+    writeUint32(buffer, s.builderId);
+  }
   return buffer;
 }
 
@@ -1060,6 +1067,17 @@ MatchStatePacket deserializeMatchState(const uint8_t* data, size_t size) {
     p.reviveProgress = readFloat(data + offset);
     offset += 4;
     packet.players.push_back(p);
+  }
+  assert(size >= offset + 1);
+  uint8_t stations = readUint8(data + offset++);
+  assert(size >= offset + stations * 12u);
+  for (uint8_t i = 0; i < stations; i++) {
+    FieldStationState s;
+    s.x = readFloat(data + offset);
+    s.y = readFloat(data + offset + 4);
+    s.builderId = readUint32(data + offset + 8);
+    offset += 12;
+    packet.stations.push_back(s);
   }
   return packet;
 }
@@ -1147,6 +1165,20 @@ AbandonMatchPacket deserializeAbandonMatch(const uint8_t* data, size_t size) {
   assert(data[0] == static_cast<uint8_t>(PacketType::AbandonMatch));
   (void)size;
   return AbandonMatchPacket();
+}
+
+std::vector<uint8_t> serialize(const BuildFieldStationPacket& packet) {
+  std::vector<uint8_t> buffer;
+  writeUint8(buffer, static_cast<uint8_t>(packet.type));
+  return buffer;
+}
+
+BuildFieldStationPacket deserializeBuildFieldStation(const uint8_t* data,
+                                                     size_t size) {
+  assert(size >= 1);
+  assert(data[0] == static_cast<uint8_t>(PacketType::BuildFieldStation));
+  (void)size;
+  return BuildFieldStationPacket();
 }
 
 std::vector<uint8_t> serialize(const DebugCommandPacket& packet) {

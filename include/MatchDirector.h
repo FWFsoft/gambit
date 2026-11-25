@@ -96,6 +96,12 @@ class MatchDirector {
   // false if it is not intermission, the ship is at its top tier, or the
   // crew has not banked enough.
   bool onShipUpgrade(Player& player);
+  // Set up a field station at the player's camp for carried scrap (issue
+  // #45). Intermission only, away from the ship, not already inside a
+  // station, one per player per night. Returns whether one was built.
+  bool onBuildFieldStation(Player& player);
+  // Inside a field station's radius tonight.
+  bool atFieldStation(const Player& player) const;
   void damageShip(float amount);
   void onDebugCommand(Player& player, DebugCommandKind command, uint8_t arg);
 
@@ -173,6 +179,13 @@ class MatchDirector {
   };
   std::unordered_map<uint32_t, MenuLeave> leftForMenu;
   std::unordered_set<uint32_t> away;  // at the menu, may Rejoin
+  // Tonight's field stations, and who has built one tonight.
+  std::vector<FieldStationState> stations;
+  std::unordered_set<uint32_t> builtStationTonight;
+  void clearFieldStations() {
+    stations.clear();
+    builtStationTonight.clear();
+  }
 
   void leaveToMenu(Player& player);
  public:

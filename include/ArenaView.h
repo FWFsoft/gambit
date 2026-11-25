@@ -350,6 +350,8 @@ class ArenaView {
   // walls, a foam line on water, so a blocked edge never looks walkable.
   void drawBlockedEdges(ImDrawList* dl);
   bool localAtShip() const;
+  // Inside a field station's radius tonight (issue #45): the suit opens.
+  bool localAtFieldStation() const;
   void drawLobby();
   void drawEndScreen();
   void drawDownedOverlay();

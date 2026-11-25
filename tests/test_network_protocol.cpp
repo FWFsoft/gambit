@@ -208,6 +208,28 @@ TEST(ArenaPacketsRoundTrip) {
         deserializeShipUpgrade(upgradeBytes.data(), upgradeBytes.size()).type ==
         PacketType::ShipUpgrade);
 
+    BuildFieldStationPacket build;
+    auto buildBytes = serialize(build);
+    assert(buildBytes.size() == 1);
+    assert(deserializeBuildFieldStation(buildBytes.data(), buildBytes.size())
+               .type == PacketType::BuildFieldStation);
+
+    MatchStatePacket withStations;
+    withStations.players.push_back(MatchPlayerState{});
+    FieldStationState station;
+    station.x = -1234.5f;
+    station.y = 678.0f;
+    station.builderId = 7;
+    withStations.stations.push_back(station);
+    auto stationBytes = serialize(withStations);
+    MatchStatePacket stationsOut =
+        deserializeMatchState(stationBytes.data(), stationBytes.size());
+    assert(stationsOut.stations.size() == 1);
+    assert(stationsOut.stations[0].x == -1234.5f &&
+           stationsOut.stations[0].y == 678.0f &&
+           stationsOut.stations[0].builderId == 7);
+    assert(stationsOut.players.size() == 1);
+
     AbandonMatchPacket abandon;
     auto abandonBytes = serialize(abandon);
     assert(abandonBytes.size() == 1);

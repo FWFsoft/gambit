@@ -254,6 +254,7 @@ void MatchDirector::dawnAmbush() {
 // ---------------------------------------------------------------------------
 
 void MatchDirector::startRound(int round) {
+  clearFieldStations();  // they last one night
   currentRound = round;
   currentPhase = MatchPhase::Round;
   phaseTimeLeft = Tuning::ROUND_SECONDS[round - 1];
@@ -317,6 +318,7 @@ void MatchDirector::endRound() {
 }
 
 void MatchDirector::startIntermission() {
+  clearFieldStations();  // they last one night
   currentPhase = MatchPhase::Intermission;
   phaseTimeLeft = Tuning::INTERMISSION_SECONDS;
   phaseElapsed = 0.0f;
@@ -341,6 +343,7 @@ void MatchDirector::startIntermission() {
 }
 
 void MatchDirector::startBossFight() {
+  clearFieldStations();  // they last one night
   currentPhase = MatchPhase::BossFight;
   currentRound = Tuning::ROUND_COUNT + 1;
   phaseTimeLeft = 0.0f;
@@ -369,6 +372,7 @@ void MatchDirector::startBossFight() {
 }
 
 void MatchDirector::finishMatch(bool victory) {
+  clearFieldStations();  // they last one night
   currentPhase = victory ? MatchPhase::Victory : MatchPhase::Defeat;
   phaseTimeLeft = END_SCREEN_SECONDS;
   phaseElapsed = 0.0f;
@@ -390,6 +394,7 @@ void MatchDirector::finishMatch(bool victory) {
 }
 
 void MatchDirector::resetMatch() {
+  clearFieldStations();  // they last one night
   currentPhase = MatchPhase::Lobby;
   away.clear();  // a new match: nobody is away from it
   leftForMenu.clear();
@@ -1116,12 +1121,51 @@ void MatchDirector::onReady(Player& player, bool ready) {
 }
 
 bool MatchDirector::canWorkOnSuit(const Player& player) const {
-  // The suit can only be opened up back at the ship, night or day.
+  // The suit opens at the ship, night or day, or at night at a field
+  // station (issue #45). Checked on every install and combine.
+  if (currentPhase == MatchPhase::Intermission) {
+    return atShip(player) || atFieldStation(player);
+  }
   if (currentPhase == MatchPhase::Round ||
-      currentPhase == MatchPhase::BossFight ||
-      currentPhase == MatchPhase::Intermission) {
+      currentPhase == MatchPhase::BossFight) {
     return atShip(player);
   }
+  return true;
+}
+
+bool MatchDirector::atFieldStation(const Player& player) const {
+  if (currentPhase != MatchPhase::Intermission) return false;
+  if (!isParticipant(player) || player.isDead()) return false;
+  for (const FieldStationState& s : stations) {
+    if (dist(player.x, player.y, s.x, s.y) <= Tuning::FIELD_STATION_RADIUS) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool MatchDirector::onBuildFieldStation(Player& player) {
+  if (currentPhase != MatchPhase::Intermission) return false;
+  if (!isParticipant(player) || player.isDead()) return false;
+  if (!std::isfinite(player.x) || !std::isfinite(player.y)) return false;
+  if (atShip(player) || atFieldStation(player)) return false;  // no need
+  if (builtStationTonight.count(player.id) != 0) return false;
+  if (static_cast<int>(stations.size()) >= Tuning::FIELD_STATION_MAX) {
+    return false;
+  }
+  if (player.scrapCarried < Tuning::FIELD_STATION_SCRAP) return false;
+  spendScrap(player, Tuning::FIELD_STATION_SCRAP);
+  FieldStationState station;
+  station.x = player.x;
+  station.y = player.y;
+  station.builderId = player.id;
+  stations.push_back(station);
+  builtStationTonight.insert(player.id);
+  abilities->fxBurst(player.x, player.y - 20.0f, 120.0f, VfxTheme::Heal);
+  abilities->fxRing(player.x, player.y, Tuning::FIELD_STATION_RADIUS,
+                    VfxTheme::Heal);
+  Logger::info("Match: player " + std::to_string(player.id) +
+               " set up a field station");
   return true;
 }
 
@@ -1528,6 +1572,7 @@ MatchStatePacket MatchDirector::buildState() const {
   packet.scrapBanked = static_cast<uint16_t>(scrapBanked);
   packet.shipTier = static_cast<uint8_t>(tier);
   packet.bossId = bossId;
+  packet.stations = stations;
   for (int i = 0; i < Tuning::ROOF_TURRET_COUNT; i++) {
     const RoofTurret& turret = roofTurrets[i];
     if (!turret.online) continue;

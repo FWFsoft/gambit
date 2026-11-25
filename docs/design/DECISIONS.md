@@ -21,6 +21,42 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-25: Field stations: the suit opens at a wild camp for 8 scrap
+- **Decision:** At night, a player camped away from the ship can spend 8
+  carried scrap to set up a **field station** at their camp. Until dawn,
+  every living crewmate within 500 px of it (the camp-sharing radius) can
+  install and combine infusions exactly as at the ship. One station per
+  player per night; it can't be built at the ship or inside another
+  station, and the price is taken from the builder's own carried scrap
+  (never the bank or a teammate). It stays if the builder leaves. It is
+  gone at dawn, at the finale and at the end of the match. Ship upgrades,
+  the full heal and banking stay at the ship. The camp panel says why the
+  suit is locked and offers "SET UP FIELD STATION - 8 scrap (you carry N)
+  [V]", or says how to fix it next time when you carry too little. The
+  station draws a faint green ring of its reach and a small marker.
+  New client-to-server packet `BuildFieldStation` (id 32); match state
+  carries the night's stations.
+- **Pillars:** Strategic Crunch serves: no more sitting through a long
+  night with nothing to do while the crew upgrades, and "carry scrap out
+  or bank it at home" becomes a real choice. **Trade-off:** it weakens
+  the pull back to the ship and competes with turret repairs and ship
+  tiers for scrap; the price is the brake. Comradery serves: one player
+  pays, the whole camp benefits. Creative Builds serves: wild campers can
+  act on infusions they just found. Clarity serves: the panel names the
+  rule ("the ship or a field station") and the fix.
+- **Why:** Issue #45. Numbers (8 scrap, 500 px, until dawn) approved by
+  a human on 2026-11-25. 8 matches a turret repair and is under the
+  10-scrap heavy load. Rejected: free field access (removes the ship's
+  pull) and a client-only unlock (the server gates every install and
+  combine, and now also checks the station on each request).
+- **Status:** Accepted (requested by a human)
+- **Where:** `include/ArenaData.h` (`FIELD_STATION_*`),
+  `src/MatchDirector.cpp` (`onBuildFieldStation`, `atFieldStation`,
+  `canWorkOnSuit`), `NetworkProtocol`, `src/ArenaHud.cpp`
+  (`drawCampPanel`, `localAtFieldStation`), `src/ArenaView.cpp`,
+  `tests/test_camping.cpp`, `tests/test_network_protocol.cpp`,
+  `specs/infusion-grades.md`
+
 ## 2026-11-25: Snow lies on the fir's ledges, not along its outline
 - **Decision:** Snowy conifers no longer have pale slivers down both
   outer edges of each tier. Each tier now carries a band of snow across

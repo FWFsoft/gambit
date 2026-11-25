@@ -107,7 +107,7 @@ void ArenaView::renderHud() {
   }
   trackAscensions();
   if (phase == MatchPhase::Intermission) {
-    if (!localAtShip()) {
+    if (!localAtShip() && !localAtFieldStation()) {
       drawCampPanel();
     } else if (timeSeconds >= shipRevealUntil) {
       drawSuitScreen(true);
@@ -1417,7 +1417,12 @@ void ArenaView::drawSuitScreen(bool intermission) {
   ImGui::SetWindowFontScale(1.5f);
   ImGui::Text("SUIT INFUSIONS");
   ImGui::SetWindowFontScale(1.0f);
-  if (intermission) {
+  if (intermission && !localAtShip()) {
+    // At a field station: the suit, but the ship is far away.
+    ImGui::SameLine(520.0f);
+    ImGui::TextColored(ImVec4(0.6f, 1.0f, 0.75f, 1.0f),
+                       "FIELD STATION  (until dawn)");
+  } else if (intermission) {
     // The crew's scrap builds the ship's next tier: anyone can spend it.
     int tier =
         std::min<int>(match.shipTier, Arena::Tuning::SHIP_TIER_COUNT - 1);
@@ -2155,7 +2160,9 @@ bool ArenaView::drawPackScreen() {
     openSuit = true;
   }
   if (!localAtShip()) {
-    ImGui::TextDisabled("Installing and combining only work beside the ship.");
+    ImGui::TextDisabled(
+        "Installing and combining only work beside the ship, or at night at "
+        "a field station.");
   }
   ImGui::PopTextWrapPos();
   ImGui::End();
@@ -2450,6 +2457,21 @@ void ArenaView::drawPrompts() {
   if (prompt) text(dl, ImVec2(SCREEN_W * 0.5f, y), colour, 16.0f, prompt);
 }
 
+bool ArenaView::localAtFieldStation() const {
+  if (!arena->hasMatch()) return false;
+  const MatchStatePacket& match = arena->match();
+  if (match.phase != static_cast<uint8_t>(Arena::MatchPhase::Intermission)) {
+    return false;
+  }
+  const Player& local = prediction->getLocalPlayer();
+  const float r = Arena::Tuning::FIELD_STATION_RADIUS;  // same as the server
+  for (const FieldStationState& s : match.stations) {
+    float dx = local.x - s.x, dy = local.y - s.y;
+    if (dx * dx + dy * dy <= r * r) return true;
+  }
+  return false;
+}
+
 bool ArenaView::localAtShip() const {
   if (!arena->hasMatch()) return true;
   const MatchStatePacket& match = arena->match();
@@ -2501,7 +2523,31 @@ void ArenaView::drawCampPanel() {
                     100.0f * std::min(1.0f, Arena::Tuning::CAMP_HEAL_FRACTION +
                                                 Arena::Tuning::CAMP_HEAL_PER_ALLY *
                                                     static_cast<float>(allies)));
-  ImGui::BulletText("Your suit opens only at the ship.");
+  // The suit: the ship, or a field station set up here (issue #45).
+  ImGui::BulletText("Your suit opens only at the ship or at a field station.");
+  {
+    const int cost = Arena::Tuning::FIELD_STATION_SCRAP;
+    const bool canAfford = me->scrapCarried >= cost;
+    char label[96];
+    std::snprintf(label, sizeof(label),
+                  "SET UP FIELD STATION  -  %d scrap (you carry %d)  [V]", cost,
+                  me->scrapCarried);
+    ImGui::BeginDisabled(!canAfford);
+    bool build = ImGui::Button(label, ImVec2(-1.0f, 30.0f));
+    ImGui::EndDisabled();
+    if (canAfford && ImGui::IsKeyPressed(ImGuiKey_V, false)) build = true;
+    if (build) prediction->sendToServer(serialize(BuildFieldStationPacket()));
+    if (canAfford) {
+      ImGui::TextDisabled(
+          "Opens the suit for everyone within %.0f m of you until dawn.",
+          Arena::Tuning::FIELD_STATION_RADIUS / 55.0f);
+    } else {
+      ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.5f, 1.0f),
+                         "Not enough scrap in hand. Next time: carry %d out, or "
+                         "head home before nightfall.",
+                         cost);
+    }
+  }
   if (me->scrapCarried > 0) {
     ImGui::BulletText("Your %d scrap stays in your hands until you bank it.",
                       me->scrapCarried);

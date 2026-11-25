@@ -453,6 +453,14 @@ void ServerGameState::onNetworkPacketReceived(
       break;
     }
 
+    case PacketType::BuildFieldStation: {
+      auto playerIt = players.find(e.clientId);
+      if (playerIt != players.end()) {
+        director->onBuildFieldStation(playerIt->second);
+      }
+      break;
+    }
+
     case PacketType::AbandonMatch: {
       auto playerIt = players.find(e.clientId);
       if (playerIt != players.end()) director->onAbandon(playerIt->second);
