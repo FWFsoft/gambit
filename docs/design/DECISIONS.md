@@ -197,6 +197,25 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
   (`setAnchors`, `anchorForProp`, `terrainNear`), `src/ServerGameState.cpp`,
   `tests/test_lifeline_anchors.cpp`, `tests/test_isaac_kit.cpp`
 
+## 2026-11-24: Browser build fills the window, has fullscreen, and no Quit
+- **Decision:** The web page scales the game (still drawn at 1280x720) to
+  fit the browser window at 16:9, letterboxed in near-black, with a small
+  Fullscreen button in the top-left corner and a plain loading bar; logs
+  go only to the browser console. Quit is gone from the title screen, the
+  main menu and the pause menu in the browser build; the pause menu's
+  Main Menu is the way out of a match. Native builds are unchanged.
+- **Pillars:** Clarity (a bigger picture, no dead button). Neutral on the
+  others.
+- **Why:** A tab cannot close itself, so Quit only stopped the game loop
+  and left a frozen frame, which read as a crash. The button sits top-left
+  because the scoreboard owns the top-right. Upscaling 1280x720 is a
+  little soft on large screens; rendering at the real screen size would
+  need the engine to handle a resizable window, which it does not yet.
+  In fullscreen, Esc still pauses in Chrome and Edge (hold Esc to leave
+  fullscreen); in Firefox and Safari the first Esc leaves fullscreen.
+- **Status:** Accepted (requested by a human)
+- **Where:** `web/shell.html`, `CMakeLists.txt`, `src/UISystem.cpp`
+
 ## 2026-11-24: The I screen is a quick look at the infusion pack
 - **Decision:** In the arena, I no longer opens the legacy 20-slot
   consumable/weapon/armor inventory. It opens a small "PACK" window over

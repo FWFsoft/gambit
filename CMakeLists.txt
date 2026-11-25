@@ -38,6 +38,9 @@ if(EMSCRIPTEN)
         "-sFULL_ES3=1"
         "-sALLOW_MEMORY_GROWTH=1"
         "--preload-file" "${CMAKE_SOURCE_DIR}/assets@assets"
+        # The page around the game: fit-to-window canvas, fullscreen
+        # button, loading bar. Logs go to the browser console only.
+        "--shell-file" "${CMAKE_SOURCE_DIR}/web/shell.html"
     )
     # add_compile_options(-O2) above only reaches the compile step. emcc's
     # own -O level is taken at link: without it the link is -O0, so the
@@ -1091,6 +1094,9 @@ target_link_libraries(WasmClient PRIVATE tmxlite spdlog_wasm imgui_wasm glm_wasm
 # Apply Emscripten flags (split compile vs link)
 target_compile_options(WasmClient PRIVATE ${EM_COMPILE_FLAGS})
 target_link_options(WasmClient PRIVATE ${EM_LINK_FLAGS})
+# Relink when the page shell changes.
+set_property(TARGET WasmClient APPEND PROPERTY LINK_DEPENDS
+             "${CMAKE_SOURCE_DIR}/web/shell.html")
 
 message(STATUS "WasmClient target configured for Emscripten")
 message(STATUS "  Output: WasmClient.html, WasmClient.js, WasmClient.wasm, WasmClient.data")

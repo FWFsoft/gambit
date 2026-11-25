@@ -299,11 +299,15 @@ void UISystem::renderTitleScreen() {
     showSettings = true;
   }
 
+#ifndef __EMSCRIPTEN__
+  // A browser tab cannot close itself: Quit there would only stop the
+  // main loop and leave a frozen frame. The page has its own controls.
   ImGui::SameLine();
 
   if (ImGui::Button("Quit", ImVec2(100, 30))) {
     window->close();
   }
+#endif
 
   ImGui::End();
   ImGui::PopStyleVar();
@@ -683,12 +687,14 @@ void UISystem::renderMainMenu() {
     showSettings = true;
   }
 
+#ifndef __EMSCRIPTEN__
   ImGui::Spacing();
 
-  // Quit button
+  // Quit button (not in the browser: see renderTitleScreen)
   if (ImGui::Button("Quit", ImVec2(-1, 40))) {
     window->close();
   }
+#endif
 
   ImGui::End();
 }
@@ -840,7 +846,11 @@ void UISystem::renderPauseMenu() {
   // Centered pause menu
   ImVec2 center = ImGui::GetMainViewport()->GetCenter();
   ImGui::SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+#ifdef __EMSCRIPTEN__
+  ImGui::SetNextWindowSize(ImVec2(300, 200), ImGuiCond_Always);  // no Quit
+#else
   ImGui::SetNextWindowSize(ImVec2(300, 250), ImGuiCond_Always);
+#endif
 
   ImGui::Begin("Paused", nullptr,
                ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
@@ -874,12 +884,14 @@ void UISystem::renderPauseMenu() {
         awayCharacterId != 0 ? GameState::MainMenu : GameState::CharacterSelect);
   }
 
+#ifndef __EMSCRIPTEN__
   ImGui::Spacing();
 
-  // Quit button
+  // Quit button (not in the browser: see renderTitleScreen)
   if (ImGui::Button("Quit", ImVec2(-1, 40))) {
     window->close();
   }
+#endif
 
   ImGui::End();
 }
