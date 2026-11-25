@@ -4,6 +4,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstdlib>
+#include <utility>
 
 CollisionSystem::CollisionSystem(
     const std::vector<CollisionShape>& collisionShapes,
@@ -164,7 +165,56 @@ const CollisionShape* CollisionSystem::terrainNear(float x, float y,
       best = &shape;
     }
   }
+  for (const auto& shape : anchors) {
+    float cx, cy;
+    closestPoint(shape.aabb, x, y, cx, cy);
+    float d = std::hypot(cx - x, cy - y);
+    if (d < bestDist) {  // a solid shape wins a tie
+      bestDist = d;
+      best = &shape;
+    }
+  }
   return best;
+}
+
+void CollisionSystem::setAnchors(std::vector<CollisionShape> anchorShapes) {
+  for (const CollisionShape& shape : anchorShapes) {
+    assert(shape.type == CollisionShape::Type::Rectangle);
+    assert(shape.objectType == "anchor");
+    assert(shape.aabb.width > 0.0f && shape.aabb.height > 0.0f);
+  }
+  anchors = std::move(anchorShapes);
+}
+
+bool CollisionSystem::anchorForProp(const std::string& kind, float x, float y,
+                                    float scale, CollisionShape& out) {
+  // Half the width of what a tether can wrap round, in world px at scale 1:
+  // the trunk, not the canopy. Ground cover (grass, reeds, flora, debris,
+  // bones, craters) holds nothing. City blocks are not here: they block as
+  // terrain cells, not as boxes.
+  struct Trunk {
+    const char* kind;
+    float half;
+  };
+  static const Trunk TRUNKS[] = {
+      {"conifer", 18.0f},  {"snow_conifer", 18.0f}, {"cypress", 18.0f},
+      {"jungle_tree", 20.0f}, {"palm", 14.0f},   {"cactus", 14.0f},
+      {"boulder", 30.0f},  {"sea_stack", 45.0f},    {"ruin", 34.0f},
+      {"monolith", 30.0f}, {"spire", 30.0f},        {"ribcage", 40.0f},
+      {"freighter", 90.0f}, {"lamp", 10.0f},        {"sign", 10.0f},
+  };
+  assert(scale > 0.0f);
+  for (const Trunk& trunk : TRUNKS) {
+    if (kind != trunk.kind) continue;
+    float half = trunk.half * scale;
+    out.type = CollisionShape::Type::Rectangle;
+    // Flattened like the ground plane (isometric: half as deep as wide).
+    out.aabb = {x - half, y - half * 0.5f, half * 2.0f, half};
+    out.name = kind;
+    out.objectType = "anchor";
+    return true;
+  }
+  return false;
 }
 
 void CollisionSystem::closestPoint(const AABB& box, float x, float y,

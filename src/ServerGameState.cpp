@@ -4,6 +4,7 @@
 #include <cassert>
 #include <cmath>
 #include <limits>
+#include <utility>
 
 #include "AbilitySystem.h"
 #include "CollisionSystem.h"
@@ -51,6 +52,22 @@ ServerGameState::ServerGameState(NetworkServer* server,
     hasShip = true;
     Logger::info("Ship position loaded: (" + std::to_string(shipX) + ", " +
                  std::to_string(shipY) + ")");
+  }
+
+  // Isaac's Lifeline bonds to the map's trees, cacti and ruins too, though
+  // they never block anyone (the Props layer is set dressing).
+  if (world.tiledMap != nullptr && collisionSystem != nullptr) {
+    std::vector<CollisionShape> anchors;
+    for (const MapProp& prop : world.tiledMap->getProps()) {
+      CollisionShape anchor;
+      if (CollisionSystem::anchorForProp(prop.kind, prop.x, prop.y, prop.scale,
+                                         anchor)) {
+        anchors.push_back(anchor);
+      }
+    }
+    Logger::info("Lifeline anchors: " + std::to_string(anchors.size()) +
+                 " props");
+    collisionSystem->setAnchors(std::move(anchors));
   }
 
   // Combat + match flow

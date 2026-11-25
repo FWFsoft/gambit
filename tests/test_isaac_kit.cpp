@@ -287,6 +287,22 @@ void test_Lifeline_SolidPropsAreAnchors() {
   }
 }
 
+void test_Lifeline_DecorativeTreesAreAnchors() {
+  // A tree from the map's Props layer: an anchor, not an obstacle.
+  World w;
+  CollisionShape tree;
+  assert(CollisionSystem::anchorForProp("snow_conifer", -400.0f, 0.0f, 1.0f,
+                                        tree));
+  w.solid.setAnchors({tree});
+  w.aimX = -400.0f;
+  w.run(TICK_MS, 0);
+  assert(w.isaac().kitMode == 2);  // valid preview on the trunk
+  w.run(500.0f, RMB);
+  assert(w.isaac().chargeSlot == 1);
+  w.run(700.0f, 0);
+  assert(w.isaac().x < -250.0f);  // flew to the tree
+}
+
 void test_Lifeline_InactiveHullSiteIsNotAnAnchor() {
   World w;
   w.shapes.push_back(rock(-440.0f, -40.0f, 80.0f, 80.0f, "hull@1"));
@@ -314,6 +330,7 @@ int main() {
   test_Lifeline_NothingInReach_RefusesToCharge();
   test_Lifeline_SolidPropsAreAnchors();
   test_Lifeline_InactiveHullSiteIsNotAnAnchor();
+  test_Lifeline_DecorativeTreesAreAnchors();
   test_Lifeline_RockOutOfReach();
   test_Enemies_SlideOffTerrain();
   std::cout << "Isaac kit passed\n";

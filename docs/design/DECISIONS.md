@@ -21,6 +21,37 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-25: Lifeline bonds to the map's trees, cacti and ruins
+- **Decision:** Isaac's Lifeline (RMB) can now bond to decorative props
+  from the map's Props layer, not only to solid rocks and the hull. Each
+  tree, cactus, boulder, sea stack, ruin, monolith, spire, ribcage,
+  freighter wreck, lamp and sign gets a trunk-sized anchor box (for
+  example 36 x 18 px for a conifer at scale 1, bigger for bigger props).
+  The boxes block nothing: players and enemies still walk through
+  scenery as before. Ground cover (grass, reeds, flora, debris, bones,
+  craters) holds nothing. A solid shape wins a tie with a prop. On the
+  planet map that is 1,960 new anchors. Pull speed, range, arc, release
+  and cooldown are unchanged.
+- **Pillars:** Creative Builds & Dynamic Play serves: forests become
+  Isaac's travel network, which was the intent of #54 ("feel like flying
+  around the map"). Clarity serves: what looks like something to grab
+  can be grabbed, and the existing valid/invalid preview ring shows it
+  before the press. Strategic Crunch serves: less dead walking for a solo
+  Isaac. Comradery is neutral.
+- **Why:** The earlier #54 patch made all solid props anchors, but the
+  generated planet's trees are visual only, so in play almost nothing
+  outside rocks worked. Making the trees solid would have blocked
+  movement across every forest. A separate anchor list keeps collision
+  as it was. City blocks are not anchors yet: they block as terrain
+  cells (an isometric footprint, not a box) and need their own query.
+  Still open for a human playtest: whether the pull feels fluid (speed,
+  arc, keeping momentum on release), and what a solo Isaac does besides
+  move (raised in the 2026-11-24 Lifeline entry).
+- **Status:** Built, needs review
+- **Where:** `include/CollisionSystem.h`, `src/CollisionSystem.cpp`
+  (`setAnchors`, `anchorForProp`, `terrainNear`), `src/ServerGameState.cpp`,
+  `tests/test_lifeline_anchors.cpp`, `tests/test_isaac_kit.cpp`
+
 ## 2026-11-24: The I screen is a quick look at the infusion pack
 - **Decision:** In the arena, I no longer opens the legacy 20-slot
   consumable/weapon/armor inventory. It opens a small "PACK" window over
