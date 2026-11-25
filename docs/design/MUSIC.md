@@ -86,3 +86,11 @@ minutes a category should hold: Tidal (every category, and no boss track),
 PNW Alone, City Boss. First Contact (4.4 min) is longer than round 1
 (2.5 min): it fades out as the intermission starts, which the designer is
 happy with (2026-11-18), and does not come back in later rounds.
+
+## Needs new music
+
+- **Pacific Northwest (`pnw.*`) does not fit the game's tone**
+  (playtest 2026-11-22, issue #56). The current tracks stay until
+  replacements exist; nothing in code needs to change. To replace them,
+  import the new folder with `import_music.py` and point the `pnw.*`
+  lines in `music.txt` at the new files.
