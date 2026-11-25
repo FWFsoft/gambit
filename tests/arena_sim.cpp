@@ -590,12 +590,61 @@ int main(int argc, char** argv) {
   std::vector<int> landedOn;
   bool countedEnd = false;
   bool repeatedSite = false;
+  // Issue #51: the ship never moves within a match, and the finale gathers
+  // the crew where it actually landed, and the Matriarch arrives there.
+  float matchShipX = 0.0f, matchShipY = 0.0f;
+  bool haveMatchShip = false;
+  bool checkedBossArrival = false;
+  bool finaleMoved = false;
 
   while (sim.ticks() < maxTicks) {
     sim.step();
     Arena::MatchPhase phase = director.phase();
     peakEnemies =
         std::max(peakEnemies, sim.game().getEnemySystem()->livingCount());
+
+    {
+      const MatchStatePacket st = director.buildState();
+      if (phase == Arena::MatchPhase::Lobby ||
+          phase == Arena::MatchPhase::Victory ||
+          phase == Arena::MatchPhase::Defeat) {
+        haveMatchShip = false;  // the next match may land somewhere new
+        checkedBossArrival = false;
+      } else if (!haveMatchShip) {
+        matchShipX = st.shipX;
+        matchShipY = st.shipY;
+        haveMatchShip = true;
+      } else if (st.shipX != matchShipX || st.shipY != matchShipY) {
+        std::printf("ERROR: the ship moved mid-match (%s): (%.0f, %.0f) -> "
+                    "(%.0f, %.0f)\n",
+                    phaseName(phase), matchShipX, matchShipY, st.shipX,
+                    st.shipY);
+        finaleMoved = true;
+        matchShipX = st.shipX;
+        matchShipY = st.shipY;
+      }
+      if (phase == Arena::MatchPhase::BossFight && lastPhase != phase) {
+        for (const auto& [id, player] : sim.game().getPlayers()) {
+          if (player.characterId == 0) continue;
+          if (std::hypot(player.x - st.shipX, player.y - st.shipY) > 400.0f) {
+            std::printf("ERROR: p%u starts the finale %.0f px from the ship\n",
+                        id, std::hypot(player.x - st.shipX,
+                                       player.y - st.shipY));
+            finaleMoved = true;
+          }
+        }
+      }
+      if (phase == Arena::MatchPhase::BossFight && !checkedBossArrival &&
+          st.bossId != 0) {
+        checkedBossArrival = true;
+        Enemy* boss = sim.game().getEnemySystem()->find(st.bossId);
+        if (boss && std::hypot(boss->x - st.shipX, boss->y - st.shipY) >
+                        Arena::Tuning::BOSS_ZONE_RADIUS) {
+          std::printf("ERROR: the Matriarch arrives outside the ship's shield\n");
+          finaleMoved = true;
+        }
+      }
+    }
 
     if (phase != lastPhase || director.round() != lastRound) {
       if (!quiet) {
@@ -656,6 +705,7 @@ int main(int argc, char** argv) {
     std::printf("ERROR: two matches in a row landed on the same site\n");
     return 1;
   }
+  if (finaleMoved) return 1;
   if (static_cast<int>(landedOn.size()) < matches) {
     std::printf("ERROR: only %zu of %d matches finished\n", landedOn.size(),
                 matches);
