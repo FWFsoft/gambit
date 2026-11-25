@@ -607,7 +607,9 @@ void UISystem::renderMainMenu() {
   // Center the menu window
   ImVec2 center = ImGui::GetMainViewport()->GetCenter();
   ImGui::SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-  ImGui::SetNextWindowSize(ImVec2(300, 200), ImGuiCond_Always);
+  const bool away = awayCharacterId != 0;
+  ImGui::SetNextWindowSize(ImVec2(away ? 380.0f : 300.0f, away ? 300.0f : 200.0f),
+                           ImGuiCond_Always);
 
   ImGui::Begin("Blue Zone", nullptr,
                ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
@@ -617,9 +619,61 @@ void UISystem::renderMainMenu() {
   ImGui::Separator();
   ImGui::Spacing();
 
-  // Start Game button
-  if (ImGui::Button("Start Game", ImVec2(-1, 40))) {
-    GameStateManager::instance().transitionTo(GameState::Playing);
+  if (away) {
+    // Issue #52: say plainly that the match is still going without you.
+    const ArenaClient* arena = arenaView ? arenaView->arenaClient() : nullptr;
+    bool running = true;
+    std::string where = "Your crew's match is still running.";
+    if (arena && arena->hasMatch()) {
+      const MatchStatePacket& match = arena->match();
+      switch (arena->phase()) {
+        case Arena::MatchPhase::Lobby:
+          running = false;
+          where = "The match you left has ended.";
+          break;
+        case Arena::MatchPhase::Intro:
+          where = "Your crew is landing without you.";
+          break;
+        case Arena::MatchPhase::Round:
+          where = "Your crew is out in round " + std::to_string(match.round) +
+                  " without you.";
+          break;
+        case Arena::MatchPhase::Intermission:
+          where = "Your crew is camped for the night " +
+                  std::to_string(match.round) + " without you.";
+          break;
+        case Arena::MatchPhase::BossFight:
+          where = "Your crew is fighting the Matriarch without you.";
+          break;
+        case Arena::MatchPhase::Victory:
+        case Arena::MatchPhase::Defeat:
+          where = "Your crew's match is over.";
+          break;
+      }
+    }
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.82f, 0.35f, 1.0f));
+    ImGui::TextWrapped("%s", where.c_str());
+    ImGui::PopStyleColor();
+    if (running) {
+      ImGui::TextWrapped(
+          "Rejoin drops you back in at the ship. Abandon gives up your place.");
+    }
+    ImGui::Spacing();
+    if (ImGui::Button(running ? "Rejoin" : "Play again", ImVec2(-1, 40))) {
+      // The same character again: the server's return-from-menu rules apply
+      // (back at the ship; mid-round, abilities start on cooldown).
+      CharacterSelectionState::instance().setSelectedCharacter(awayCharacterId);
+      awayCharacterId = 0;
+      GameStateManager::instance().transitionTo(GameState::Playing);
+    }
+    ImGui::Spacing();
+    if (ImGui::Button("Abandon", ImVec2(-1, 40))) {
+      clientPrediction->sendToServer(serialize(AbandonMatchPacket()));
+      awayCharacterId = 0;
+      GameStateManager::instance().transitionTo(GameState::CharacterSelect);
+    }
+  } else if (ImGui::Button("Start Game", ImVec2(-1, 40))) {
+    GameStateManager::instance().transitionTo(GameState::CharacterSelect);
   }
 
   ImGui::Spacing();
@@ -810,14 +864,14 @@ void UISystem::renderPauseMenu() {
 
   ImGui::Spacing();
 
-  // Main Menu button (returns to character selection)
-  if (ImGui::Button("Main Menu", ImVec2(-1, 40))) {
-    // Reset character selection state
+  // Leave to the main menu. The match keeps running for the crew; this
+  // client stops showing and playing it, and can Rejoin or Abandon there.
+  if (ImGui::Button("Leave to Main Menu", ImVec2(-1, 40))) {
+    awayCharacterId = CharacterSelectionState::instance().getSelectedCharacterId();
     CharacterSelectionState::instance().reset();
-    clientPrediction->resetCharacterSelection();
-
-    // Return to character selection screen
-    GameStateManager::instance().transitionTo(GameState::CharacterSelect);
+    clientPrediction->resetCharacterSelection();  // out of the fight
+    GameStateManager::instance().transitionTo(
+        awayCharacterId != 0 ? GameState::MainMenu : GameState::CharacterSelect);
   }
 
   ImGui::Spacing();

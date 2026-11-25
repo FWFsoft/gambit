@@ -391,6 +391,8 @@ void MatchDirector::finishMatch(bool victory) {
 
 void MatchDirector::resetMatch() {
   currentPhase = MatchPhase::Lobby;
+  away.clear();  // a new match: nobody is away from it
+  leftForMenu.clear();
   currentRound = 0;
   phaseTimeLeft = 0.0f;
   shipHp = Tuning::SHIP_START_HEALTH;
@@ -1009,6 +1011,21 @@ void MatchDirector::onPlayerLeft(uint32_t playerId) {
   wasDead.erase(playerId);
   roundStartScore.erase(playerId);
   leftForMenu.erase(playerId);
+  away.erase(playerId);
+}
+
+void MatchDirector::onAbandon(Player& player) {
+  leaveToMenu(player);  // no-op if already left
+  leftForMenu.erase(player.id);
+  away.erase(player.id);
+  Logger::info("Match: player " + std::to_string(player.id) +
+               " abandoned the match");
+  if (currentPhase != MatchPhase::Lobby && participantCount() == 0 &&
+      away.empty()) {
+    // Nobody is playing this match and nobody can come back to it.
+    Logger::info("Match: abandoned by everyone, back to the lobby");
+    resetMatch();
+  }
 }
 
 void MatchDirector::leaveToMenu(Player& player) {
@@ -1016,6 +1033,7 @@ void MatchDirector::leaveToMenu(Player& player) {
   if (inCombat()) {
     leftForMenu[player.id] = MenuLeave{currentRound, player.isDead()};
   }
+  if (currentPhase != MatchPhase::Lobby) away.insert(player.id);
   dropCarriedScrap(player);
   abilities->effects().clearEntity(player.id, false);
   player.characterId = 0;
@@ -1042,6 +1060,7 @@ void MatchDirector::onCharacterSelected(Player& player, uint32_t characterId) {
   if (!swappable) return;
 
   bool joiningLate = player.characterId == 0 && currentPhase != MatchPhase::Lobby;
+  away.erase(player.id);
   float leftX = player.x;
   float leftY = player.y;
   player.characterId = characterId;

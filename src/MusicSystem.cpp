@@ -135,7 +135,12 @@ MusicDirector::Inputs MusicSystem::readMatch() const {
 void MusicSystem::followMatch(float dtSeconds) {
   GameState state = GameStateManager::instance().getCurrentState();
   if (state == GameState::TitleScreen || state == GameState::MainMenu) {
-    // The title screen plays its own music (UISystem).
+    // The title screen plays its own music (UISystem). Leaving a match for
+    // the main menu: the match's music goes with it.
+    if (!currentPlaylist.empty() && Mix_PlayingMusic() &&
+        Mix_FadingMusic() != MIX_FADING_OUT) {
+      Mix_FadeOutMusic(PLAYLIST_FADE_MS);
+    }
     currentPlaylist.clear();
     pendingPlaylist.clear();
     currentTrack.clear();

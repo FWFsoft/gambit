@@ -4,6 +4,7 @@
 #include <functional>
 #include <random>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "TerrainGrid.h"
 
@@ -171,9 +172,18 @@ class MatchDirector {
     bool down;
   };
   std::unordered_map<uint32_t, MenuLeave> leftForMenu;
+  std::unordered_set<uint32_t> away;  // at the menu, may Rejoin
 
   void leaveToMenu(Player& player);
+ public:
+  // A player at the main menu gives up their place in the running match:
+  // no Rejoin penalties to remember. If that leaves nobody playing it and
+  // nobody away who might come back, the match resets to the lobby.
+  void onAbandon(Player& player);
+  // Away at the menu, able to Rejoin (left with characterId 0, not abandoned).
+  bool isAway(uint32_t playerId) const { return away.count(playerId) != 0; }
 
+ private:
   std::mt19937 rng{4242};
 
   // Phase transitions

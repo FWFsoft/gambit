@@ -1136,6 +1136,19 @@ ShipUpgradePacket deserializeShipUpgrade(const uint8_t* data, size_t size) {
   return ShipUpgradePacket();
 }
 
+std::vector<uint8_t> serialize(const AbandonMatchPacket& packet) {
+  std::vector<uint8_t> buffer;
+  writeUint8(buffer, static_cast<uint8_t>(packet.type));
+  return buffer;
+}
+
+AbandonMatchPacket deserializeAbandonMatch(const uint8_t* data, size_t size) {
+  assert(size >= 1);
+  assert(data[0] == static_cast<uint8_t>(PacketType::AbandonMatch));
+  (void)size;
+  return AbandonMatchPacket();
+}
+
 std::vector<uint8_t> serialize(const DebugCommandPacket& packet) {
   std::vector<uint8_t> buffer;
   writeUint8(buffer, static_cast<uint8_t>(packet.type));

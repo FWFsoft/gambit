@@ -453,6 +453,12 @@ void ServerGameState::onNetworkPacketReceived(
       break;
     }
 
+    case PacketType::AbandonMatch: {
+      auto playerIt = players.find(e.clientId);
+      if (playerIt != players.end()) director->onAbandon(playerIt->second);
+      break;
+    }
+
     case PacketType::PlayerReady: {
       if (e.size < 2) break;
       PlayerReadyPacket packet = deserializePlayerReady(e.data, e.size);

@@ -208,6 +208,12 @@ TEST(ArenaPacketsRoundTrip) {
         deserializeShipUpgrade(upgradeBytes.data(), upgradeBytes.size()).type ==
         PacketType::ShipUpgrade);
 
+    AbandonMatchPacket abandon;
+    auto abandonBytes = serialize(abandon);
+    assert(abandonBytes.size() == 1);
+    assert(deserializeAbandonMatch(abandonBytes.data(), abandonBytes.size())
+               .type == PacketType::AbandonMatch);
+
     DebugCommandPacket debug;
     debug.command = static_cast<uint8_t>(DebugCommandKind::SpawnWave);
     debug.arg = 9;

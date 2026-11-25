@@ -7,6 +7,7 @@
 
 #include "ClientPrediction.h"
 #include "EventBus.h"
+#include "GameStateManager.h"
 #include "Logger.h"
 #include "NetworkProtocol.h"
 
@@ -54,6 +55,15 @@ SfxSystem::SfxSystem(const ClientPrediction* prediction)
   // The player's audio settings (UISystem): master x sound effects, and mute.
   EventBus::instance().subscribe<AudioSettingsChangedEvent>(
       [this](const AudioSettingsChangedEvent& e) { settingsGain = e.sfxGain; });
+  // Leaving the match for a menu silences it at once (issue #52): every
+  // sound still ringing, and the crash intro's soundtrack.
+  EventBus::instance().subscribe<GameStateChangedEvent>(
+      [this](const GameStateChangedEvent& e) {
+        if (showsMatchWorld(e.previousState) && !showsMatchWorld(e.newState)) {
+          Mix_FadeOutChannel(-1, 120);
+          introElapsed = -1.0f;
+        }
+      });
   Logger::info("SfxSystem initialized");
 }
 
@@ -92,6 +102,8 @@ void SfxSystem::onPacket(const NetworkPacketReceivedEvent& e) {
   // In embedded mode the server shares this EventBus; packets travelling
   // client -> server carry a non-zero client id and are not for us.
   if (!ready || e.size == 0 || e.clientId != 0) return;
+  // At a menu the match keeps running on the server, but is not heard.
+  if (!showsMatchWorld(GameStateManager::instance().getCurrentState())) return;
   PacketType type = static_cast<PacketType>(e.data[0]);
   if (type == PacketType::MatchState) {
     onMatchState(deserializeMatchState(e.data, e.size));
@@ -147,6 +159,7 @@ void SfxSystem::onGameEvent(const GameEventPacket& event) {
 void SfxSystem::onUpdate(const UpdateEvent& e) {
   timeMs += e.deltaTime;
   if (!ready) return;
+  if (!showsMatchWorld(GameStateManager::instance().getCurrentState())) return;
   const Player& local = clientPrediction->getLocalPlayer();
   for (const AbilitySounds::Cue& cue : grouper.onTick(
            timeMs, clientPrediction->getLocalPlayerId(), local.x, local.y)) {

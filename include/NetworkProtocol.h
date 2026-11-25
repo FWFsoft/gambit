@@ -36,7 +36,8 @@ enum class PacketType : uint8_t {
   PlayerReady = 27,        // Client → Server (ready up in lobby/intermission)
   DebugCommand = 28,       // Client → Server (playtest shortcuts)
   ShipUpgrade = 29,        // Client → Server (spend banked scrap on a tier)
-  InfusionCombine = 30     // Client → Server (two infusions → next grade)
+  InfusionCombine = 30,    // Client → Server (two infusions → next grade)
+  AbandonMatch = 31        // Client → Server (left to the menu for good)
 };
 
 // Ability buttons carried in ClientInputPacket::buttons (held state).
@@ -522,6 +523,12 @@ struct ShipUpgradePacket {
   PacketType type = PacketType::ShipUpgrade;
 };
 
+// A player who left to the main menu gives up their place in the running
+// match (no Rejoin). When nobody is playing it any more, it resets.
+struct AbandonMatchPacket {
+  PacketType type = PacketType::AbandonMatch;
+};
+
 struct PlayerReadyPacket {
   PacketType type = PacketType::PlayerReady;
   uint8_t ready = 1;
@@ -574,6 +581,8 @@ InfusionSlotPacket deserializeInfusionSlot(const uint8_t* data, size_t size);
 PlayerReadyPacket deserializePlayerReady(const uint8_t* data, size_t size);
 std::vector<uint8_t> serialize(const ShipUpgradePacket& packet);
 ShipUpgradePacket deserializeShipUpgrade(const uint8_t* data, size_t size);
+std::vector<uint8_t> serialize(const AbandonMatchPacket& packet);
+AbandonMatchPacket deserializeAbandonMatch(const uint8_t* data, size_t size);
 std::vector<uint8_t> serialize(const InfusionCombinePacket& packet);
 InfusionCombinePacket deserializeInfusionCombine(const uint8_t* data,
                                                  size_t size);

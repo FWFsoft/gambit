@@ -21,6 +21,41 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-25: Leaving to the main menu leaves the match; Rejoin or Abandon
+- **Decision:** The pause menu's "Main Menu" is now "Leave to Main Menu".
+  It takes you out of the fight on the server (the existing
+  return-from-menu rules: carried scrap dropped, and if you come back the
+  same round, abilities start on cooldown and a downed hero comes back
+  down), and on your client the match stops: the world is no longer
+  drawn, every sound still ringing fades out in 0.12 s, new match sounds
+  are ignored, and the match music fades out. The main menu then says
+  what your crew is doing ("Your crew is out in round 2 without you") and
+  offers **Rejoin** (pick the same character again: back at the ship) and
+  **Abandon** (give up your place; back to character select). The match
+  keeps running for everyone else. When the last player abandons and
+  nobody else is playing or away, the match resets to the lobby, so a
+  solo player who abandons starts fresh. New client-to-server packet
+  `AbandonMatch` (id 31).
+- **Pillars:** Comradery serves: one player leaving never ends or pauses
+  the crew's match, and Rejoin keeps the door open. Clarity serves: the
+  menu says plainly that the match is still running and what each button
+  does, and the game is no longer heard behind a menu. Strategic Crunch
+  is protected: the menu is no free cooldown reset or escape from being
+  downed (rules unchanged). Creative Builds is neutral.
+- **Why:** Issue #52: the old button sent you to character select while
+  the match kept playing audibly, with no way back except picking again.
+  Rejected: keeping the avatar in the world while away (it would be a
+  free target or a free body-blocker, and needs new server state), and
+  pausing the server (shared by the crew). Rejoin works while this client
+  stays connected; rejoining after a disconnect would need a resume token
+  and is not built. Rejoining in round 1 may restart First Contact music
+  (the music director resets at the menu).
+- **Status:** Built, needs review
+- **Where:** `src/UISystem.cpp` (pause and main menus), `src/SfxSystem.cpp`,
+  `src/MusicSystem.cpp`, `src/RenderSystem.cpp`, `include/GameState.h`,
+  `src/MatchDirector.cpp` (`onAbandon`, `away`), `NetworkProtocol`,
+  `tests/test_character_swap.cpp`, `tests/test_network_protocol.cpp`
+
 ## 2026-11-25: Objectives cover the whole map; the land ends in a coast
 - **Decision:** Two map-generator changes, regenerated into
   `assets/maps/planet.tmx`:
