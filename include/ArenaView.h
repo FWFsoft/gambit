@@ -42,6 +42,14 @@ class ArenaView {
   // Closes the suit screen opened with B; false if it wasn't showing. The
   // intermission suit screen is the phase itself and isn't closed by this.
   bool closeSuitScreen();
+  void openSuitScreen() { suitScreenOpen = true; }
+  // Whether render() drew the suit screen this frame (B, or intermission at
+  // the ship).
+  bool suitScreenShowing() const { return suitShownThisFrame; }
+  // The quick inventory view behind I: the infusion pack and what is
+  // installed, as small squares with hover text. Call after render(). True
+  // when the player asked to open the suit to install.
+  bool drawPackScreen();
 
   // The look (docs/design/ART_DIRECTION.md): with a presentation layer the
   // world is drawn into its scene target, actors cast shadows, effects
@@ -244,6 +252,7 @@ class ArenaView {
   Arena::Genus ascendFlashGenus = Arena::Genus::None;
   void trackAscensions();
   bool suitScreenOpen = false;  // toggled with B outside intermission
+  bool suitShownThisFrame = false;
   // The ship's tier last frame, and until when the suit screen stands aside
   // to show a freshly upgraded ship.
   int lastShipTier = 0;

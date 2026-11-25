@@ -65,6 +65,7 @@ class UISystem {
   void renderHUD();
   void renderPauseMenu();
   void renderInventory();
+  void renderArenaInventory();
   void renderDeathScreen();
 
   // UI interaction handlers

@@ -960,6 +960,7 @@ void ArenaView::render() {
   float now = arena->nowMs() / 1000.0f;
   float dt = std::clamp(now - timeSeconds, 0.0f, 0.1f);
   timeSeconds = now;
+  suitShownThisFrame = false;
 
   if (renderIntro(dt)) return;
   updateFog();

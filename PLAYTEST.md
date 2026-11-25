@@ -68,6 +68,7 @@ win, we win".
 | E | Core ability (needs a core infusion) |
 | F | Interact with objectives (scrapyards, turrets) |
 | B | Suit screen (only works beside the ship mid-round) |
+| I | Pack: a quick look at your infusions and what is installed; hover to read, B opens the suit |
 | R | Ready up (night / end screen) |
 | U | Upgrade the ship with banked scrap (night only: 30 to dig it out, 50 more to fortify it) |
 | Tab (hold) | Full scoreboard |

@@ -111,9 +111,11 @@ void ArenaView::renderHud() {
       drawCampPanel();
     } else if (timeSeconds >= shipRevealUntil) {
       drawSuitScreen(true);
+      suitShownThisFrame = true;
     }
   } else if (suitScreenOpen) {
     drawSuitScreen(false);
+    suitShownThisFrame = true;
   }
   if (phase == MatchPhase::Round || phase == MatchPhase::BossFight) {
     drawDownedOverlay();
@@ -1196,6 +1198,62 @@ std::string blockReason(Arena::SlotBlock block, const SuitView& suit, int node,
   return "";
 }
 
+// The tooltip for one pack item (the suit's pack and the I quick view): the
+// item's own effect, then what its genus does in each place it could go.
+void packItemTooltip(const SuitView& suit, Genus genus, InfusionPart part,
+                     int grade, bool deadWeight) {
+  ImGui::BeginTooltip();
+  ImGui::PushTextWrapPos(380.0f);
+  ImGui::TextColored(genusColorV(genus, 1.0f), "%s",
+                     itemName(genus, part, grade).c_str());
+  if (grade > Arena::GRADE_RAW) {
+    ImGui::Text("Always: %s  (x%d: made of %d Raw)",
+                Arena::partInfo(part).description, Arena::gradeRawCount(grade),
+                Arena::gradeRawCount(grade));
+  } else {
+    ImGui::Text("Always: %s", Arena::partInfo(part).description);
+  }
+  ImGui::Separator();
+  if (suit.core == Genus::None) {
+    const Arena::AbilityInfo& ability = Arena::coreAbility(genus);
+    ImGui::TextColored(genusColorV(genus, 1.0f), "In the core: %s [E]",
+                       ability.name);
+    ImGui::TextUnformatted(ability.description);
+  } else {
+    ImGui::TextDisabled("In a tree, plus that slot's talent:");
+    for (int t = 0; t < Arena::TREE_COUNT; t++) {
+      InfusionTree tree = static_cast<InfusionTree>(t);
+      Genus attuned = suit.attuned[t];
+      if (attuned != Genus::None && attuned != genus) {
+        ImGui::TextDisabled("%s: attuned to %s", Arena::treeName(tree),
+                            Arena::genusName(attuned));
+        continue;
+      }
+      genusEffectLines(genus, tree, suit.level(genus, tree, 1),
+                       std::max(grade, suit.grade(genus, tree)));
+    }
+  }
+  if (deadWeight) {
+    ImGui::Separator();
+    ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f),
+                       "You are a %s Ascendant: this can never be "
+                       "slotted.",
+                       Arena::genusName(suit.ascended));
+  }
+  if (grade < Arena::GRADE_EXALTED) {
+    ImGui::Separator();
+    if (Arena::canCombine(suit.ascended, genus, grade)) {
+      ImGui::TextDisabled("Two of these (any parts) combine into a %s %s.",
+                          Arena::gradeName(grade + 1), Arena::genusName(genus));
+    } else {
+      ImGui::TextDisabled("Cannot become Exalted: you are a %s Ascendant.",
+                          Arena::genusName(suit.ascended));
+    }
+  }
+  ImGui::PopTextWrapPos();
+  ImGui::EndTooltip();
+}
+
 // A pack item being dragged onto another to combine them.
 struct PackPayload {
   int genus, part, grade;
@@ -1454,61 +1512,7 @@ void ArenaView::drawSuitScreen(bool intermission) {
         }
 
         if (ImGui::IsItemHovered() && !held) {
-          // The tooltip from the doc: the item's own effect, then what its
-          // genus does in each place it could go.
-          ImGui::BeginTooltip();
-          ImGui::PushTextWrapPos(380.0f);
-          ImGui::TextColored(genusColorV(genus, 1.0f), "%s",
-                             itemName(genus, part, grade).c_str());
-          if (grade > Arena::GRADE_RAW) {
-            ImGui::Text("Always: %s  (x%d: made of %d Raw)",
-                        Arena::partInfo(part).description,
-                        Arena::gradeRawCount(grade),
-                        Arena::gradeRawCount(grade));
-          } else {
-            ImGui::Text("Always: %s", Arena::partInfo(part).description);
-          }
-          ImGui::Separator();
-          if (suit.core == Genus::None) {
-            const Arena::AbilityInfo& ability = Arena::coreAbility(genus);
-            ImGui::TextColored(genusColorV(genus, 1.0f), "In the core: %s [E]",
-                               ability.name);
-            ImGui::TextUnformatted(ability.description);
-          } else {
-            ImGui::TextDisabled("In a tree, plus that slot's talent:");
-            for (int t = 0; t < Arena::TREE_COUNT; t++) {
-              InfusionTree tree = static_cast<InfusionTree>(t);
-              Genus attuned = suit.attuned[t];
-              if (attuned != Genus::None && attuned != genus) {
-                ImGui::TextDisabled("%s: attuned to %s", Arena::treeName(tree),
-                                    Arena::genusName(attuned));
-                continue;
-              }
-              genusEffectLines(genus, tree, suit.level(genus, tree, 1),
-                               std::max(grade, suit.grade(genus, tree)));
-            }
-          }
-          if (deadWeight) {
-            ImGui::Separator();
-            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f),
-                               "You are a %s Ascendant: this can never be "
-                               "slotted.",
-                               Arena::genusName(suit.ascended));
-          }
-          if (grade < Arena::GRADE_EXALTED) {
-            ImGui::Separator();
-            if (Arena::canCombine(suit.ascended, genus, grade)) {
-              ImGui::TextDisabled(
-                  "Two of these (any parts) combine into a %s %s.",
-                  Arena::gradeName(grade + 1), Arena::genusName(genus));
-            } else {
-              ImGui::TextDisabled(
-                  "Cannot become Exalted: you are a %s Ascendant.",
-                  Arena::genusName(suit.ascended));
-            }
-          }
-          ImGui::PopTextWrapPos();
-          ImGui::EndTooltip();
+          packItemTooltip(suit, genus, part, grade, deadWeight);
         }
         ImGui::PopID();
       }
@@ -1984,6 +1988,151 @@ void ArenaView::drawSuitScreen(bool intermission) {
 // ---------------------------------------------------------------------------
 // Lobby / end / downed / prompts
 // ---------------------------------------------------------------------------
+
+// The quick view behind I (issue #41): the same infusions the suit uses, as
+// small squares to glance at between fights. Hover a square to read it; the
+// suit (B) is where they are installed. There is no second item system.
+bool ArenaView::drawPackScreen() {
+  const MatchPlayerState* me =
+      arena->hasMatch() ? arena->matchPlayer(localId()) : nullptr;
+  constexpr float CELL = 44.0f, GAP = 6.0f;
+  constexpr int COLUMNS = 8;
+  const float gridWidth = COLUMNS * CELL + (COLUMNS - 1) * GAP;
+
+  ImGui::SetNextWindowPos(ImVec2(SCREEN_W * 0.5f, SCREEN_H * 0.5f),
+                          ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+  ImGui::SetNextWindowBgAlpha(0.94f);
+  ImGui::Begin("Pack##quick", nullptr,
+               ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+                   ImGuiWindowFlags_AlwaysAutoResize |
+                   ImGuiWindowFlags_NoSavedSettings);
+  ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + gridWidth);
+  ImGui::Dummy(ImVec2(gridWidth, 0.0f));  // fixes the window width
+
+  ImGui::SetWindowFontScale(1.3f);
+  ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "PACK");
+  ImGui::SetWindowFontScale(1.0f);
+  ImGui::SameLine();
+  ImGui::TextDisabled("Infusions you carry.  [I] closes");
+  ImGui::Separator();
+
+  bool openSuit = false;
+  if (!me) {
+    ImGui::TextDisabled("No match running.");
+    ImGui::PopTextWrapPos();
+    ImGui::End();
+    return false;
+  }
+  const SuitView suit(*me, arena->match().round);
+  ImDrawList* dl = ImGui::GetWindowDrawList();
+
+  // One square per item: genus colour, part initial, grade pips, count.
+  auto square = [&](int slot, Genus genus, InfusionPart part, int grade,
+                    int count, bool dim) {
+    if (slot % COLUMNS != 0) ImGui::SameLine(0.0f, GAP);
+    ImGui::PushID(slot);
+    ImGui::InvisibleButton("item", ImVec2(CELL, CELL));
+    bool hovered = ImGui::IsItemHovered();
+    ImVec2 a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
+    float fill = dim ? 0.12f : hovered ? 0.75f : 0.4f;
+    dl->AddRectFilled(a, b, ImGui::GetColorU32(genusColorV(genus, fill)), 4.0f);
+    dl->AddRect(a, b,
+                hovered ? genusColor(genus, 1.0f) : IM_COL32(255, 255, 255, 50),
+                4.0f, 0, hovered ? 2.0f : 1.0f);
+    char initial[2] = {Arena::partInfo(part).name[0], '\0'};
+    ImVec2 size = ImGui::CalcTextSize(initial);
+    dl->AddText(
+        ImVec2((a.x + b.x - size.x) * 0.5f, (a.y + b.y - size.y) * 0.5f - 3.0f),
+        IM_COL32(255, 255, 255, dim ? 120 : 240), initial);
+    gradePips(dl, ImVec2((a.x + b.x) * 0.5f, b.y - 7.0f), grade,
+              IM_COL32(255, 255, 255, 235), false, 2.2f);
+    if (count > 1) {
+      char badge[8];
+      std::snprintf(badge, sizeof(badge), "x%d", count);
+      ImVec2 badgeSize = ImGui::CalcTextSize(badge);
+      dl->AddText(ImVec2(b.x - badgeSize.x - 3.0f, a.y + 1.0f),
+                  IM_COL32(255, 255, 255, 230), badge);
+    }
+    ImGui::PopID();
+    return hovered;
+  };
+
+  // --- pack: same order as the suit screen's pack list.
+  int index = 0;
+  for (int g = 0; g < Arena::GENUS_COUNT; g++) {
+    Genus genus = static_cast<Genus>(g + 1);
+    for (int grade = Arena::GRADE_RAW; grade <= Arena::GRADE_EXALTED; grade++) {
+      for (int p = 0; p < Arena::PART_COUNT; p++) {
+        int n = me->inventory[g][p][grade - 1];
+        if (n == 0) continue;
+        InfusionPart part = static_cast<InfusionPart>(p);
+        bool deadWeight = grade >= Arena::GRADE_EXALTED &&
+                          suit.ascended != Genus::None &&
+                          suit.ascended != genus;
+        if (square(index++, genus, part, grade, n, deadWeight)) {
+          packItemTooltip(suit, genus, part, grade, deadWeight);
+        }
+      }
+    }
+  }
+  if (index == 0) {
+    ImGui::TextDisabled(
+        "Empty. Kill aliens and finish objectives to find infusions; each "
+        "territory drops its own genus.");
+  }
+
+  // --- what is already installed, so the quick look shows the whole build.
+  ImGui::Spacing();
+  ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "IN YOUR SUIT");
+  ImGui::Separator();
+  ImGui::PushID("suit");
+  int installed = 0;
+  auto installedTooltip = [&](Genus genus, InfusionPart part, int grade,
+                              const std::string& where) {
+    ImGui::BeginTooltip();
+    ImGui::PushTextWrapPos(380.0f);
+    ImGui::TextColored(genusColorV(genus, 1.0f), "%s",
+                       itemName(genus, part, grade).c_str());
+    ImGui::TextDisabled("%s", where.c_str());
+    ImGui::Text("Always: %s", Arena::partInfo(part).description);
+    ImGui::PopTextWrapPos();
+    ImGui::EndTooltip();
+  };
+  if (suit.core != Genus::None) {
+    if (square(installed++, suit.core, suit.corePart, suit.coreGrade, 1,
+               false)) {
+      installedTooltip(
+          suit.core, suit.corePart, suit.coreGrade,
+          std::string("Core: ") + Arena::coreAbility(suit.core).name + " [E]");
+    }
+  }
+  for (int i = 0; i < Arena::suitNodeCount(); i++) {
+    if (suit.nodes[i] == Genus::None) continue;
+    const Arena::SuitNode& node = Arena::suitNode(i);
+    int grade = Arena::validGrade(suit.grades[i]) ? suit.grades[i] : 1;
+    if (square(installed++, suit.nodes[i], suit.parts[i], grade, 1, false)) {
+      installedTooltip(suit.nodes[i], suit.parts[i], grade,
+                       std::string(Arena::treeName(node.tree)) + " tier " +
+                           std::to_string(node.tier) + ": " + node.name);
+    }
+  }
+  ImGui::PopID();
+  if (installed == 0) {
+    ImGui::TextDisabled("Nothing installed yet.");
+  }
+
+  ImGui::Spacing();
+  ImGui::Separator();
+  if (ImGui::Button("OPEN SUIT TO INSTALL  [B]", ImVec2(gridWidth, 30.0f))) {
+    openSuit = true;
+  }
+  if (!localAtShip()) {
+    ImGui::TextDisabled("Installing and combining only work beside the ship.");
+  }
+  ImGui::PopTextWrapPos();
+  ImGui::End();
+  return openSuit;
+}
 
 void ArenaView::drawLobby() {
   ImDrawList* dl = ImGui::GetBackgroundDrawList();
