@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alien Arena</title>
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: #07070b;
+    color: #c9c9d6;
+    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+    overflow: hidden;
+  }
+  /* The stage fills the browser window (or the screen, in fullscreen) and
+     the game is scaled to fit inside it at 16:9. The drawing buffer stays
+     1280x720; SDL maps mouse positions through the CSS size. */
+  #stage {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #07070b;
+  }
+  #canvas {
+    display: block;
+    width: min(100vw, calc(100vh * 16 / 9));
+    height: min(100vh, calc(100vw * 9 / 16));
+    background: #000;
+    outline: none;
+    border: 0;
+  }
+  /* Top-left: the scoreboard owns the top-right of the HUD. */
+  #fullscreen {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    padding: 4px 8px;
+    font-size: 12px;
+    border: 1px solid #ffffff33;
+    border-radius: 4px;
+    background: #00000099;
+    color: #e6e6f0;
+    font-family: inherit;
+    cursor: pointer;
+    opacity: 0.45;
+    transition: opacity 0.2s;
+  }
+  #fullscreen:hover { opacity: 1; }
+  #overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    pointer-events: none;
+  }
+  #overlay.hidden { display: none; }
+  #status { letter-spacing: 0.05em; }
+  #bar {
+    width: 260px;
+    height: 4px;
+    background: #ffffff1a;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  #bar > div {
+    width: 0;
+    height: 100%;
+    background: #8fd3ff;
+    transition: width 0.15s;
+  }
+  #overlay.error #bar { display: none; }
+  #overlay.error #status { color: #ff8f8f; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="canvas" width="1280" height="720" tabindex="-1"></canvas>
+  <button id="fullscreen" type="button" tabindex="-1">Fullscreen</button>
+  <div id="overlay">
+    <div id="status">Loading…</div>
+    <div id="bar"><div></div></div>
+  </div>
+</div>
+<script>
+  (function () {
+    var stage = document.getElementById('stage');
+    var canvas = document.getElementById('canvas');
+    var button = document.getElementById('fullscreen');
+    var overlay = document.getElementById('overlay');
+    var statusEl = document.getElementById('status');
+    var barEl = document.querySelector('#bar > div');
+
+    function showError(text) {
+      overlay.classList.remove('hidden');
+      overlay.classList.add('error');
+      statusEl.textContent = text;
+    }
+
+    // Right-click belongs to the game, not the browser menu.
+    canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    canvas.addEventListener('webglcontextlost', function (e) {
+      e.preventDefault();
+      showError('The graphics context was lost. Reload the page to continue.');
+    });
+
+    // Fullscreen the stage, not the canvas, so the letterbox stays dark and
+    // the canvas keeps its fit-to-screen sizing.
+    var canFullscreen = !!(stage.requestFullscreen || stage.webkitRequestFullscreen);
+    if (!canFullscreen) button.style.display = 'none';
+    function isFullscreen() {
+      return !!(document.fullscreenElement || document.webkitFullscreenElement);
+    }
+    function updateButton() {
+      button.textContent = isFullscreen() ? 'Exit fullscreen' : 'Fullscreen';
+    }
+    // Keep focus off the button: otherwise Space or Enter in the game
+    // would press it again.
+    button.addEventListener('mousedown', function (e) { e.preventDefault(); });
+    button.addEventListener('click', function () {
+      if (isFullscreen()) {
+        (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      } else {
+        (stage.requestFullscreen || stage.webkitRequestFullscreen).call(stage);
+      }
+      canvas.focus();
+    });
+    // Esc pauses the game. In fullscreen the browser takes Esc to leave
+    // fullscreen; where the Keyboard Lock API exists (Chrome, Edge) the
+    // game keeps Esc and the player holds Esc to leave instead. Elsewhere
+    // the first Esc only leaves fullscreen.
+    function onFullscreenChange() {
+      updateButton();
+      var kb = navigator.keyboard;
+      if (!kb || !kb.lock) return;
+      if (isFullscreen()) kb.lock(['Escape']).catch(function () {});
+      else kb.unlock();
+    }
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+
+    window.Module = {
+      canvas: canvas,
+      print: function (text) { console.log(text); },
+      printErr: function (text) { console.error(text); },
+      setStatus: function (text) {
+        if (!text) {
+          overlay.classList.add('hidden');
+          return;
+        }
+        var m = text.match(/\((\d+(?:\.\d+)?)\/(\d+)\)/);
+        if (m) {
+          barEl.style.width = (100 * parseFloat(m[1]) / parseFloat(m[2])) + '%';
+          statusEl.textContent = 'Loading…';
+        } else {
+          statusEl.textContent = text;
+        }
+      },
+      onAbort: function () {
+        showError('The game stopped unexpectedly. Reload the page to try again.');
+      },
+      totalDependencies: 0,
+      monitorRunDependencies: function (left) {
+        this.totalDependencies = Math.max(this.totalDependencies, left);
+        if (left === 0) this.setStatus('Starting…');
+      }
+    };
+  })();
+</script>
+{{{ SCRIPT }}}
+</body>
+</html>
