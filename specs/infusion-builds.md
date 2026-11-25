@@ -1,627 +1,619 @@
 # STATUS
 
-**PROPOSED** (2026-11-25, design session; nothing here is built). Works
-backward from 18 end-state builds to what each layer of the infusion
-system has to provide. Extends `specs/genera-and-infusion-system.md` and
-`specs/infusion-grades.md`. Prior art: the Risk of Rain 2 items-and-builds
-research (34 community builds, design takeaways), shared in the session.
-Open questions for a human are at the end.
+**PROPOSED, revision 2** (2026-11-25, design session with a human). The
+four verb cores (Part 0) and leaning into archetype identity were
+**approved by the human in the session**; everything else is a proposal.
+Nothing here is built. Extends `specs/genera-and-infusion-system.md` and
+`specs/infusion-grades.md`. Prior art: the Risk of Rain 2
+items-and-builds research shared in the session. Characters come from the
+team's Character Concepts doc (Drive); concept-only characters are marked
+with \*. The review copy, with comments, is the Claude doc "Infusion
+Builds Spec".
 
 # Infusion builds: start from the end state
 
-## Why this doc
+We design the infusion system backward from 18 end-state builds, each
+built on a proven Risk of Rain 2 engine. Every core ability is now its
+genus's effect verb, and every archetype gets its own identity in the suit.
 
-The suit works mechanically (grades, combining, attunement, Ascension, 48
-genus effects, 28 talents), but the builds have not taken off. The aim
-is **Risk of Rain 2's explosive roguelike builds in a game that plays like
-a MOBA**: four players, four archetypes, a fixed five-button kit.
+## This revision
 
-RoR2's builds that people still talk about are almost never one item. They
-are 2 to 4 pieces that multiply each other ("Gesture + Fuel Cell",
-"Transcendence + Shaped Glass", "Bungus Engineer"). So this doc starts from
-the **end states** (what a player should be able to *become* by the boss)
-and works back to what each layer has to supply.
+- **The cores are now verbs.** Venoxarid Outbreak (Contaminate),
+  Cerebrian Inversion (Corrupt and Purify), Frigidariant Stasis (Anchor
+  and Doom), Magnarok Cauterize (Detonate, kept). Toxic Miasma, Mind Flay
+  and Diamond Fortress are retired. **This goes against the Genera and
+  Infusion doc**; the human approved it in the session.
+- **Every build was rebuilt from its core.** In revision 1 only 7 of the
+  17 builds with a core used the core in their engine; now all 17 do.
+- **Answers from the human:** lean into archetypes (trait multipliers plus
+  16 archetype signature talents); add the Crown part, and the trees were
+  too shallow (signature talents add a third option at tier 3); use the
+  full concept roster.
+- **Recommended defaults** for the two open answers: Frigidariant's buff is
+  Fortified, and Raw part effects stack per copy, up to 3 stacks per hit.
+- **Roster mismatch:** Nolan is a Playmaker in the Character Concepts doc
+  and a Striker in `src/CharacterKits.cpp`. This spec follows the code.
 
-## Diagnosis: why the current suit doesn't make builds
+## Diagnosis
 
-From the code (`src/ArenaData.cpp` PARTS and SUIT_NODES,
-`src/Infusions.cpp`):
+The suit works (grades, combining, attunement, Ascension, 48 genus
+effects, 28 talents), but builds don't form. From the code:
 
 1. **Items are stat sticks.** A part is +6% damage, +12 health, 6% recharge
-   or 4% speed. No item has a trigger, so items never combine with
-   anything. In RoR2 these would all be white items: the stat backbone,
-   never what a build is named after.
-2. **Infusions don't talk to the kits.** Kits speak the effects system
-   (Suds: Guard and Wound; Nolan: Expose; Nyx: Silenced and Focused;
-   Presidente: Grappled; Volgore: Snared and Doomed). The genus effects
-   mostly speak their own language (poison stacks, freeze chains, molten
-   ground). Only Affliction and a few Refined effects (Brittle, Corrosion)
-   read the shared vocabulary.
-3. **Nothing touches the kit buttons.** Every RMB is charged *so that items
-   can interact with charge time and charge amount*, and nothing does.
-   Relentless touches LMB; a few Mobility talents touch SHIFT; nothing
-   touches RMB or Q.
-4. **Half the cast gets half the items.** Playmakers and Wingers have no
-   base damage, so Talons, Opening Strike, Executioner, Overcharge and
-   most Offense effects barely work for them. RoR2 has the same problem
-   ("Fungus is ONLY good on Engineer"), but there it is the exception. Here
-   it affects two of the four archetypes.
-5. **Nothing listens to your teammates.** No item fires when an *ally's*
-   effect lands. RoR2's co-op synergy sits at the edges of the game;
-   Comradery needs it at the centre.
-6. **A third of the talents are flat numbers** (as the 2026-11-17 entry
-   already says). RoR2's lesson: keystones rewrite a rule; they don't add
-   a number.
+   or 4% speed, with no trigger to combine with anything.
+2. **Infusions don't speak the kits' language.** Kits use the effects
+   system (Guard, Wound, Expose, Silenced, Grappled). Most genus effects
+   use their own poison, freeze and molten ground.
+3. **Nothing touches RMB charge**, which every RMB has so items could.
+4. **Damage items barely work on Playmakers and Wingers**, two of the four
+   archetypes.
+5. **Nothing reacts to teammates.** Comradery needs that at the centre.
+6. **A third of the talents are flat numbers.**
+7. **Most cores were a ticket to their genus, not part of a build.** Only
+   Cauterize read the game state; the other three each did one fixed
+   thing.
 
-## The four layers (names used below)
+## The layers
 
-Every slotted infusion gives all four at once:
+Every slotted infusion gives four things at once, and your archetype
+shapes all of them:
 
-| Layer | What it is | Today | Where it comes from |
-| --- | --- | --- | --- |
-| **Talent** | the node's own effect | 28 talents, 1 or 2 per tier | the node you slot into |
-| **Part effect** | the item's own effect, wherever slotted | flat stat | the item's part (Talon, Eye...) |
-| **Part grade** | what the part effect becomes at Refined / Exalted | nothing | the grade of that item |
-| **Genus effect** | the genus × tree effect, by grade | 48 effects | the item's genus + the tree |
+| Layer | What it is | From |
+| --- | --- | --- |
+| Talent | the node's own effect | the node you slot into |
+| Part effect | the item's effect through one kit button | the item's part |
+| Part grade | what the part effect becomes at Refined and Exalted | the item's grade |
+| Genus effect | the genus × tree effect, by grade | the item's genus and the tree |
+| **Archetype** | trait multipliers on all of the above, plus a signature talent at every tier 3 | your character |
 
-The key consequence: **your Exalted item is two capstones in one**. An
-Exalted Magnarok Eye in Offense tier 4 gives Inferno Heart (genus), Focus
-Fire or Bloodlust (talent) *and* the Exalted Eye rule (part). Which part
-you combine onto is a build decision. Combining keeps the target's part, so
-a Talon you don't want can still go into the grade of the Eye you do want:
-that is our version of a RoR2 scrapper and printer.
+The core (E) is the first infusion, and it is now the genus's verb.
 
----
+Your Exalted item is two capstones in one: an Exalted Magnarok Eye in
+Offense tier 4 gives Inferno Heart (genus), a talent, *and* the Exalted
+Eye rule (part). Combining keeps the target's part, so an unwanted Talon
+can still become the grade of the Eye you want. That is our scrapper and
+printer.
 
-# Part 1: the 18 end states
+## Part 0: the cores are genus verbs
 
-Chosen to cover every archetype, every genus, every tree, every kit button,
-the wide (non-Ascended) path, and at least one build per archetype that
-*converts* the archetype's strong trait into team value. Each one names its
-RoR2 ancestor, so the engine is a proven one.
+All four share one shape so the Genealogy tree can modify any of them:
+**E targets an area (radius 200, range 500, at the cursor) and does the
+verb to everything in it.** Three of the four deal no damage of their own,
+so every archetype can use every core; each reads what anyone has applied,
+so the crew's effects make your core stronger.
 
-How to read the pieces: **Core** is the first infusion. **Deep** is the
-tree taken to tier 4 (8 Raw: 1 + 1 + 2 + 4), which carries the capstone.
-**Talents** are the node picks that matter. **Parts** says which part the
-key items should be. **Shallow** is the rest of a ~15-Raw match.
-**Half-built** is the build at about 6 Raw (round 1 to 2). No end state
-may be a trap before it is finished: the Benthic Bloom lesson.
+| Genus | Core (E) | Verb | What it does | So it works alone | Cooldown (guess) |
+| --- | --- | --- | --- | --- | --- |
+| Venoxarid | **Outbreak** | Contaminate | The enemy with the most debuff stacks in the area is the source; every other enemy there gets a copy of its debuffs (half stacks, at least 1) | enemies in the area gain 2 Poison first | 12 s |
+| Cerebrian | **Inversion** | Corrupt, Purify | Enemies' buffs become their opposite debuffs (Berserk → Stunned, Focused → Confused, Fortified → Vulnerable); allies' debuffs become their opposite buffs (Slow → Haste, Weakened → Empowered, Poison → Mend) | enemies in the area gain 2 Expose | 14 s |
+| Frigidariant | **Stasis** | Anchor, Doom | For 4 s, effects in the area stop running down: enemies are Doomed (debuffs can't be cleansed) and their debuff timers freeze; allies are Anchored and their buff timers freeze | enemies in the area gain 2 Slow | 14 s |
+| Magnarok | **Cauterize** (kept) | Detonate | Every over-time effect in the area resolves at once: enemies' Wound and Poison as a blast scaled by the time left; allies' Mend as an instant heal (new) | none needed: the kits apply Wound and Mend | 12 s |
 
-New pieces this doc proposes are marked **(new)**; the part rules are in
-Part 2.
+The cores chain across the crew: Stasis keeps time on the Wound that
+Cauterize scales with; Inversion turns enemy buffs into debuffs that
+Outbreak then spreads; Outbreak gives Cauterize more targets.
 
-## Overview
+**Retired:** Toxic Miasma (its cloud lives on in the Venoxarid Exalted
+Miasma Heart), Mind Flay and Diamond Fortress. All three are built today
+(`src/Infusions.cpp`), so this is replacement work.
 
-| # | Build | Archetype (best characters) | Capstone (genus · tree) | RoR2 ancestor |
-| --- | --- | --- | --- | --- |
-| 1 | Permafrost Lockdown | Playmaker (Zephyr, Presidente, Kade) | Frigidariant · Genealogy (Diamond Heart) | Stun Grenade lock + Death Mark |
-| 2 | Puppet Master | Playmaker (Nyx, Kade) | Cerebrian · Offense (Puppeteer) | Captain's drone army |
-| 3 | Gravity Well | Playmaker (Zephyr, Kade) | Venoxarid · Genealogy (Miasma Heart) | Primordial Cube + Royal Capacitor |
-| 4 | Hot Potato | Playmaker (El Presidente; Nolan) | Magnarok · Genealogy (Supernova) | Bungus Engineer (kit-specific value) |
-| 5 | Battery | Winger (Isaac) | Cerebrian · Defense (Psychic Link) | N'kuhana's Opinion, routed to an ally |
-| 6 | Purifier | Winger (Isaac; Suds) | Venoxarid · Defense (Symbiote) | Void corruption, inverted |
-| 7 | Courier | Winger / Playmaker (Isaac, Zephyr) | Venoxarid · Mobility (Swarm Rider) | Perma-Tonic + War Horn |
-| 8 | Thornwall | Defender (Volgore, Suds) | Frigidariant · Defense (Cryo Sanctuary) | Razorwire + Hellfire Tincture |
-| 9 | Pressure Keg | Defender (Suds) | Magnarok · Defense (Heat Sink) | Transcendence (health becomes a regenerating pool) |
-| 10 | Glacier Turret | Striker / Defender (Mina; Suds) | Frigidariant · Offense (Glacier) | Bungus Engineer (stand still) |
-| 11 | Haymaker | Striker (Wade, Gravon) | Magnarok · Offense (Inferno Heart) | Kjaro's + Runald's Bands |
-| 12 | Glass Comet | Striker (Nolan, Gravon) | Magnarok · Mobility (Firewalker) | Shaped Glass on an i-frame survivor |
-| 13 | Momentum | Striker (Wade, Nolan) | Venoxarid · Mobility (Swarm Rider) | Speed Loader |
-| 14 | Plague Chain | Striker (Jeff, Mina) | Venoxarid · Offense (Plague Carrier) | AtG + Ukulele, Voidsent Flame |
-| 15 | Cauterizer | Striker (Mina, Jeff) | Magnarok · Genealogy (Supernova) | Poison executioner Acrid |
-| 16 | Overkill | Striker (Gravon, Nolan) | Cerebrian · Mobility (Phantom) | Crit Flurry Huntress, Railgunner |
-| 17 | Core Loop | any (Kade, Nyx, Mina) | any · Genealogy (Overmind shown) | Gesture + Fuel Cells |
-| 18 | Chimera | any, never Ascends | none (wide) | Growth Nectar + Wake of Vultures |
+**Unchanged:** your first infusion still becomes your core (see open
+questions).
 
-The 17 Ascended builds use 15 of the 16 capstones, and two pairs share
-one: Courier and Momentum (Swarm Rider), Hot Potato and Cauterizer
-(Supernova). **That is the point**: the same capstone with different
-talents and parts should play differently. Courier (Tailwind, Sinews) is
-selfless; Momentum (Hit and Run, Talons, the Momentum talent) is selfish.
-The one capstone no end state wants is **Avalanche** (Frigidariant ·
-Mobility), so it is the first candidate to rework (Part 2, C).
+## Archetype identity
 
----
+### Trait multipliers
 
-## Playmakers: crowd control that turns into team damage
+What an infusion produces is scaled by your archetype's maximum for that
+trait (`ARCHETYPES.md`). The same item means different things on different
+characters, as in RoR2, and the maxima hold ("no Playmaker out-heals a
+Winger").
+
+| Archetype | DMG | Healing | CC | Resilience | Mobility |
+| --- | --- | --- | --- | --- | --- |
+| Playmaker | ×0.25 | ×0.75 | ×1.25 | ×0.75 | ×1.25 |
+| Defender | ×0.5 | ×0.75 | ×0.75 | ×1.25 | ×0.25 |
+| Striker | ×1.25 | ×0.5 | ×0.25 | ×0.75 | ×0.75 |
+| Winger | ×0.25 | ×1.25 | ×0.75 | ×0.75 | ×1.0 |
+
+Multipliers are first guesses (Very High ×1.25, High ×1.0, Mid ×0.75, Low
+×0.5, Very Low ×0.25). Each infusion output carries one trait tag:
+
+- **DMG:** damage, Empowered, Sharpened, and Vulnerable or Expose put on
+  enemies.
+- **Healing:** heals, Mend.
+- **CC:** Slow, Snared, Stunned, Confused, Silenced, Grappled and Marked
+  put on enemies.
+- **Resilience:** shields, Guard, Fortified, damage reduction, and
+  Weakened put on enemies.
+- **Mobility:** Haste, move speed, SHIFT recharge.
+
+Multipliers scale durations and amounts, never stack counts, so
+thresholds like "10 Poison" read the same for everyone. Tooltips always
+show your own numbers.
+
+Example: the same Glacier build roots for 1.25 s on Valthor\* (Defender,
+CC Mid) and 0.4 s on Mina (Striker, CC Very Low), but Mina's Splinter hits
+2.5 times as hard. Same items, two different jobs.
+
+### Signature talents
+
+Every tree's tier 3 gets a third option that only your archetype sees: 16
+signature talents. They live at tier 3 because most players should reach
+tier 3 somewhere by the boss (the grades spec's target). They also make
+the trees wider, answering "the trees are too shallow". The talents are
+listed under "Talents" below.
+
+## The 18 end states at a glance
+
+Each build's **core is part of its engine**. Pieces: **Core**, then **Deep**
+(the tree taken to tier 4, 8 Raw, carrying the capstone), then the
+talents and parts that matter, then **Shallow** (the rest of a ~15-Raw
+match). **Half-built** is the build at about 6 Raw. No end state may be a
+trap before it is finished (the Benthic Bloom lesson).
+
+| # | Build | Archetype (best characters) | Core | Capstone (genus · tree) | RoR2 ancestor |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Permafrost Lockdown | Playmaker (Zephyr, Kade, Mason\*) | Stasis | Frigidariant · Genealogy (Diamond Heart) | Stun Grenade lock + Death Mark |
+| 2 | Puppet Master | Playmaker (Nyx, Kade) | Inversion | Cerebrian · Offense (Puppeteer) | Captain's drone army |
+| 3 | Gravity Well | Playmaker (Zephyr, Mason\*, Kade) | Outbreak | Venoxarid · Genealogy (Miasma Heart) | Primordial Cube + Royal Capacitor |
+| 4 | Hot Potato | Playmaker (El Presidente; Zephyr) | Outbreak | Magnarok · Genealogy (Supernova) | Bungus Engineer (kit-specific value) |
+| 5 | Battery | Winger (Miles\*, Isaac, Lilith\*) | Inversion | Cerebrian · Defense (Psychic Link) | N'kuhana's Opinion, routed to an ally |
+| 6 | Plague Doctor | Winger (Eliana\*, Stitches\*) | Outbreak | Venoxarid · Defense (Symbiote) | Void corruption, inverted |
+| 7 | Courier | Winger or Playmaker (Miles\*, Eliana\*, Isaac, Zephyr) | Stasis | Venoxarid · Mobility (Swarm Rider) | Perma-Spinel Tonic + War Horn |
+| 8 | Thornwall | Defender (Volgore, Valthor\*) | Outbreak | Frigidariant · Defense (Cryo Sanctuary) | Razorwire + Hellfire Tincture |
+| 9 | Pressure Keg | Defender (Suds, Nemora\*) | Cauterize | Magnarok · Defense (Heat Sink) | Transcendence |
+| 10 | Glacier Turret | Defender or Striker (Valthor\*, Mina) | Stasis | Frigidariant · Offense (Glacier) | Bungus Engineer (stand still) |
+| 11 | Haymaker | Striker (Wade, Gravon, Mordryn\*) | Cauterize | Magnarok · Offense (Inferno Heart) | Kjaro's + Runald's Bands |
+| 12 | Glass Comet | Striker (Gravon, Mordryn\*) | Inversion | Magnarok · Mobility (Firewalker) | Shaped Glass on an i-frame survivor |
+| 13 | Momentum | Striker (Wade, Jeff, Mordryn\*) | Stasis | Venoxarid · Mobility (Swarm Rider) | Speed Loader |
+| 14 | Plague Chain | Striker (Jeff, Mina) | Outbreak | Venoxarid · Offense (Plague Carrier) | AtG + Ukulele, Voidsent Flame |
+| 15 | Cauterizer | Striker (Mina, Jeff) | Cauterize | Magnarok · Genealogy (Supernova) | Poison-executioner Acrid |
+| 16 | Overkill | Striker (Gravon, Nolan) | Stasis | Cerebrian · Mobility (Phantom) | Crit Huntress, Railgunner |
+| 17 | Core Loop | any (Kade, Nyx, Eliana\*) | any | any · Genealogy (Overmind shown) | Gesture + Fuel Cells |
+| 18 | Chimera | any, never Ascends | Inversion | none (wide) | Growth Nectar + Wake of Vultures |
+
+Cores are spread evenly: Stasis 5, Outbreak 5, Inversion 4, Cauterize 3,
+plus Core Loop. The 17 Ascended builds use 15 of the 16 capstones; two
+pairs share one (Courier and Momentum; Hot Potato and Cauterizer) and
+play differently through their talents and parts. Avalanche (Frigidariant
+· Mobility) is the only capstone no build wants.
+
+## Playmaker builds
 
 ### 1. Permafrost Lockdown: "Nothing moves while I'm here."
 
-- **Ancestor:** stun-locking Golems with Stun Grenade + attack speed;
-  Death Mark turning debuffs into team damage.
-- **Engine:** Slow → Snare → freeze (Icy Strikes), on every LMB. Brittle
-  makes everything you stun or root Vulnerable *for the whole team*.
-  Diamond Heart freezes everything the core hits. Feedback Loop brings
-  the core back sooner.
-- **Core:** Frigidariant (Diamond Fortress).
-- **Deep:** Genealogy, Frigidariant: Unbreakable → Brittle → Diamond Heart.
-  Talents Bloodline, Purebred, Overcharge, **Feedback Loop**.
-- **Parts:** Frigidariant **Talons** (Raw: LMB Slows; Refined: Escalate to
-  Snare). The Exalted is a **Crown** (Throne: the Fortified it gathers
-  radiates to allies).
-- **Shallow:** Mobility 1 to 2 (Light Frame, Slipstream).
-- **Half-built:** core + 2 Frigidariant Talons + Glacial Path: packs crawl.
-- **Team:** Vulnerable on every controlled enemy; frozen targets for a
-  Splinter Striker.
-- **Weak to:** Berserk and Unbounded elites, the Matriarch. Deals almost
-  no damage alone, which is intended: it needs a Striker.
+- **Ancestor:** stun-locking with Stun Grenade; Death Mark turning
+  debuffs into team damage.
+- **Engine:** Talons stack Slow, escalating to Snare → **Stasis** freezes
+  the timers and Dooms them, so the lock holds and can't be cleansed →
+  Diamond Heart makes the core Stun everything it touches → Brittle makes
+  everything you control Vulnerable to the whole team.
+- **Deep:** Genealogy, Frigidariant: Unbreakable → Brittle → Diamond
+  Heart. Talents Bloodline, Purebred, **Lockdown** (signature), Feedback
+  Loop.
+- **Parts:** Frigidariant Talons; the Exalted is a Crown (Throne radiates
+  its Fortified to allies).
+- **Shallow:** Mobility 1 to 2.
+- **Half-built:** Stasis on Zephyr's vortex: a stunned cluster that stays
+  stunned.
+- **Team:** Vulnerable on every controlled enemy. Deals almost nothing
+  alone, by design.
+- **Weak to:** Berserk and Unbounded elites (unless a crewmate's
+  Inversion corrupts Berserk into Stunned).
 
 ### 2. Puppet Master: "Their army is my army."
 
-- **Ancestor:** Captain and Engineer drone armies; Empathy Cores scaling
-  with allies.
-- **Engine:** Confuse (Mind Flay, Mass Confusion, Dominate) → confused
-  enemies hit their friends, and Puppeteer doubles that and gives you
-  their kills.
-- **Core:** Cerebrian (Mind Flay).
+- **Ancestor:** Captain's and Engineer's drone armies.
+- **Engine:** **Inversion** corrupts Focused (immunity) into Confused and
+  Berserk into Stunned, so the toughest enemies become yours first →
+  Dominate confuses more → Puppeteer doubles confused enemies' damage to
+  their friends and gives you their kills.
 - **Deep:** Offense, Cerebrian: Psychic Shockwave → Dominate → Puppeteer.
-  Talents Killer Instinct (filler), Relentless, **Affliction**, **Focus
-  Fire** (your hits make enemies Vulnerable to the team).
-- **Parts:** Cerebrian **Eyes**: charged RMB stacks Expose; Exalted Eye
+  Talents Killer Instinct, Relentless, **Setup** (signature), Focus Fire.
+- **Parts:** Cerebrian Eyes (charged RMB stacks Expose); the Exalted Eye
   (Heavy Hand) makes one full charge count as three Dominate hits.
-- **Shallow:** Genealogy 1 to 2 with Raw Cerebrian (Mass Confusion).
-- **Half-built:** Mind Flay + Mass Confusion: packs brawl each other.
-- **Team:** confused enemies don't attack the crew. Kills by puppets give
-  you loot only, never score taken from a teammate.
-- **Weak to:** few enemies (the boss), Focused enemies. **Clarity risk:**
-  which enemies are yours needs one look everywhere.
+- **Half-built:** Inversion + Raw Cerebrian Talons.
+- **Team:** confused enemies don't attack the crew; puppet kills give you
+  loot, never score taken from a teammate.
+- **Weak to:** few enemies (the boss). **Clarity:** which enemies are
+  yours needs one look everywhere.
 
 ### 3. Gravity Well: "I set the table."
 
-- **Ancestor:** MUL-T's Primordial Cube + Royal Capacitor: gather the
-  pack, then hit all of it.
-- **Engine:** the kit clusters (Zephyr's vortex, Kade's mirrors). You load
-  one enemy with debuffs; **Contagion** copies them to the whole cluster;
-  a teammate's AoE lands on a pre-debuffed pack (Affliction, Rupture,
-  Flashpoint all light up).
-- **Core:** Venoxarid (Toxic Miasma, a cloud on the cluster).
-- **Deep:** Genealogy, Venoxarid: Venom Infusion → Toxic Catalyst →
-  Miasma Heart (you are the cloud: drag the cluster through yourself).
-  Talents Bloodline, Hybrid Vigor, **Contagion (new)**, Feedback Loop.
-- **Parts:** Venoxarid **Eyes** (charged RMB pours poison by charge).
-- **Shallow:** Raw Frigidariant and Magnarok Talons, so the load you
-  spread holds Slow and Wound as well as Poison.
-- **Half-built:** Toxic Miasma on a vortex.
-- **Team:** this build exists to multiply someone else's AoE.
-- **Weak to:** single targets; spread fractions need tuning.
+- **Ancestor:** Primordial Cube + Royal Capacitor: gather, then hit all.
+- **Engine:** the kit clusters (Zephyr's vortex, Mason's\* walls, Kade's
+  mirrors) → you load one enemy with debuffs → **Outbreak** copies them to
+  the whole cluster → a teammate's AoE lands on a pre-debuffed pack.
+- **Deep:** Genealogy, Venoxarid: Venom Infusion → Carrier → Miasma Heart
+  (a cloud follows you; drag the cluster through it). Talents Bloodline,
+  Hybrid Vigor, **Crowd Shield** (signature), Feedback Loop.
+- **Parts:** Venoxarid Eyes (charged RMB pours Poison by charge).
+- **Shallow:** Raw Frigidariant and Magnarok Talons, so the load holds
+  Slow and Wound too.
+- **Team:** exists to multiply someone else's AoE.
+- **Weak to:** single targets.
 
 ### 4. Hot Potato: "Catch."
 
 - **Ancestor:** Bungus Engineer: one character makes an item great.
-- **Engine:** whoever you Grapple, Snare or knock back carries your
-  statuses; when it lands or hits another enemy it **detonates** its
-  Wound and Poison on the pack. El Presidente carries, slams and throws,
-  so this is his build; Zephyr's shield and Nolan's kicks get a weaker
-  version.
-- **Core:** Magnarok (Cauterize).
-- **Deep:** Genealogy, Magnarok: Cataclysm → Fuel → Supernova. Talents
-  Bloodline, Purebred, **Hot Potato (new)**, Apex Mutation.
-- **Parts:** Magnarok **Talons** (LMB burns the held foe; Refined
-  Escalates to Vulnerable).
-- **Half-built:** Cauterize on a slammed pack.
-- **Team:** burst into packs; Wound feeds Suds (build 9) and Cauterizer
-  (15).
+- **Engine:** El Presidente grabs the most-debuffed enemy → **Hot Potato**
+  makes it the centre of his next core → he throws it into a pack and
+  presses E: **Outbreak** goes off where it lands → every third cast is a
+  Supernova.
+- **Deep:** Genealogy, Magnarok: Cataclysm → Stoke → Supernova. Talents
+  Bloodline, Purebred, Overcharge, Apex Mutation.
+- **Shallow:** Mobility 1 to 3 for **Hot Potato** (signature).
+- **Parts:** Magnarok Talons (LMB burns the held foe).
+- **Team:** Wound across a pack feeds every Cauterize in the crew.
 - **Weak to:** nothing to grab (ranged packs, the boss).
 
-## Wingers: healing that becomes everyone else's power
+## Winger builds
 
 ### 5. Battery: "When I heal you, you hit harder."
 
-- **Ancestor:** N'kuhana's Opinion (healing becomes damage), routed to an
-  ally, because a Winger's DMG must stay Very Low.
-- **Engine:** Crowns gather buffs from what *anyone* does to nearby enemies
-  (Slow → Fortified, Wound → Empowered, Expose → Sharpened). **Conduit**
-  hands every buff you carry to whoever you heal. Psychic Link hands them
-  your barrier too.
-- **Core:** Cerebrian.
+- **Ancestor:** N'kuhana's Opinion, routed to an ally because a Winger's
+  DMG stays Very Low.
+- **Engine:** Crowns gather buffs from what anyone does to nearby enemies
+  → **Inversion** turns the crew's debuffs into buffs → **Conduit** hands
+  every buff you carry to whoever you heal → Psychic Link hands over your
+  barrier too. Miles\* already Radiates and Doubles Mend and Haste.
 - **Deep:** Defense, Cerebrian: Mind Barrier → Backlash → Psychic Link.
-  Talents Plating, Regrowth, **Conduit (new)**, Share the Load.
-- **Parts:** **Crowns** of several genera (each a different buff). Refined
+  Talents Plating, Regrowth, Guardian, Share the Load.
+- **Shallow:** Offense 1 to 3 for **Conduit** (signature).
+- **Parts:** Crowns of several genera (each a different buff); Refined
   Crowns also give the buff back to the ally who applied the status.
-- **Half-built:** two Raw Crowns + Mind Barrier.
-- **Team:** the whole build. "When I win, we win", literally.
-- **Weak to:** a split crew. **Clarity risk:** buff icons on allies must
-  say who gave them.
+- **Team:** the whole build.
+- **Weak to:** a split crew. **Clarity:** ally buff icons must say who
+  gave them.
 
-### 6. Purifier: "Your curse is my gift."
+### 6. Plague Doctor: "Their sickness is our medicine."
 
-- **Ancestor:** Void items transforming stacks, used here on effects:
-  turn debuffs into their opposites.
-- **Engine:** heals **Purify** an ally's debuff (Slow → Haste, Weakened →
-  Empowered, Wound → Mend). Corrosion keeps nearby enemies Weakened.
-  Symbiote heals the crew when poisoned enemies die near you.
-- **Core:** Venoxarid.
+- **Ancestor:** Void items transforming stacks, used here on effects.
+- **Engine:** Eliana's\* Hex Weakens enemies, and her passive heals her
+  from damage Weakened enemies take, overflowing to allies → **Outbreak**
+  copies Weakened to the whole pack → Corrosion keeps enemies near you
+  Weakened → Symbiote heals the crew when poisoned enemies die near you.
+  Stitches\* plays it with Wound instead.
 - **Deep:** Defense, Venoxarid: Acidic Shell → Corrosion → Symbiote.
-  Talents Plating, Second Wind, Guardian, **Purifier (new)**.
-- **Parts:** Venoxarid **Hides** (Refined: Bodyguard, they fire when a
-  nearby ally is struck).
-- **Team:** elites and raids that debuff the crew now feed it.
-- **Weak to:** calm rounds. **Depends on enemy content:** enemies must apply
-  debuffs for Purify to matter (most do not yet).
+  Talents Plating, Second Wind, **Purifier** (signature), Last Stand.
+- **Parts:** Venoxarid Hides (Refined: Bodyguard, they fire when a nearby
+  ally is struck).
+- **Team:** a pack that hits the crew softer and heals it as it dies.
+- **Weak to:** enemies that cleanse.
 
 ### 7. Courier: "Everyone's fast when I'm here."
 
 - **Ancestor:** perma-Spinel Tonic + War Horn: 100% uptime on a timed buff.
-- **Engine:** SHIFT Hastes you and nearby allies (Slipstream, Tailwind,
-  Refined Sinews). Haste also makes abilities recharge faster, so team
-  Haste is team cooldown. Swarm Rider makes you Unbounded and SHIFT
-  recharge 50% faster while 5+ poisoned enemies are near.
-- **Core:** Venoxarid.
+- **Engine:** SHIFT and kits hand out Haste (Slipstream, Tailwind,
+  Refined Sinews, Eliana's\* totem, Miles's\* Exploit) → **Stasis**
+  Anchors the crew and freezes their buff timers, so the Haste stays →
+  Haste also makes abilities recharge faster, so team Haste is team
+  cooldown → Swarm Rider keeps your SHIFT up.
 - **Deep:** Mobility, Venoxarid: Speed Siphon → Toxic Wake → Swarm Rider.
-  Talents Light Frame, Slipstream, **Tailwind**, Escape Artist.
-- **Parts:** Venoxarid **Sinews**; the Exalted one (Reset) gives back SHIFT
+  Talents Light Frame, Slipstream, **Arrival** (signature), Escape Artist.
+- **Parts:** Venoxarid Sinews; the Exalted one (Reset) gives back SHIFT
   time per enemy its trail touches.
-- **Team:** the crew crosses the map faster. **This is the build against
-  dead time** (Crunch's key insight), and it helps whoever carries scrap.
+- **Team:** the crew crosses the map faster: **the build against dead
+  time** (Crunch's key insight).
 - **Weak to:** low kill power; Haste caps.
 
-## Defenders: soak that becomes team safety and team damage
+## Defender builds
 
 ### 8. Thornwall: "Hit me. Please."
 
-- **Ancestor:** Razorwire + Hellfire Tincture + Harvester's Scythe: the
-  thorns tank.
-- **Engine:** draw hits (**Lightning Rod** taunts; Share the Load takes a
-  quarter of allies' damage) → every hit fires every Hide (one Slows, one
-  Poisons, one Burns the attacker) and Thorns → Cryo Sanctuary and Last
-  Stand keep you up.
-- **Core:** Frigidariant (Diamond Fortress).
+- **Ancestor:** Razorwire + Hellfire Tincture: the thorns tank.
+- **Engine:** draw hits (**Lightning Rod** taunts; Valthor's\* domain makes
+  attackers Vulnerable) → every hit fires every Hide on the attacker
+  (Slow, Poison, Wound) → **Outbreak** copies the loaded attacker's pile
+  to the whole pack → Cryo Sanctuary and Last Stand keep you up.
 - **Deep:** Defense, Frigidariant: Arctic Aura → Permafrost → Cryo
-  Sanctuary. Talents Plating, Second Wind, **Lightning Rod (new)** or
-  Thorns, **Share the Load**.
-- **Parts:** **Hides** of every genus. Exalted Hide (Backlash Aura): Hide
-  effects hit every enemy within 150, not only the attacker.
-- **Team:** aggro off the squishy players; Share the Load's damage also
-  fires your Hides.
-- **Weak to:** ranged packs (fewer melee attackers), big burst.
+  Sanctuary. Talents Plating, Second Wind, **Lightning Rod** (signature),
+  Share the Load.
+- **Parts:** Hides of every genus; the Exalted Hide (Backlash Aura) fires
+  on every enemy within 150.
+- **Team:** aggro off the squishy players; Share the Load's damage fires
+  your Hides too.
+- **Weak to:** ranged packs, big burst.
 
 ### 9. Pressure Keg: "Everyone's armour is my bomb."
 
-- **Ancestor:** Transcendence: health becomes a regenerating pool, and
-  the penalty moves somewhere you can manage.
-- **Engine:** Suds hands out Guard; Frothy turns lost Guard into Wound
-  on enemies; Slow Burn spreads your own damage over time; Heat Sink turns
-  the damage you defer into a fire nova and Fortified. **Bastion** makes
-  your Guard regenerate and lets extra health raise your Guard cap.
-- **Core:** Magnarok (Cauterize explodes all that Wound).
+- **Ancestor:** Transcendence: health becomes a regenerating pool.
+- **Engine:** Suds hands out Guard; Frothy turns lost Guard into Wound on
+  enemies; his SHIFT doubles Guard and Wound → **Cauterize** detonates it
+  all → Heat Sink turns the damage you defer into a fire nova and
+  Fortified → **Bastion** regenerates your Guard.
 - **Deep:** Defense, Magnarok: Slow Burn → Cauterizing Wounds → Heat Sink.
-  Talents Plating, Regrowth, Guardian, **Bastion (new)**.
-- **Parts:** Cerebrian **Hides** in the shallow slots (Guard when struck).
-- **Team:** less damage taken by everyone; enemies hitting an ally's Guard
-  feed your Cauterize.
+  Talents Plating, Regrowth, Guardian, Last Stand.
+- **Shallow:** Genealogy 1 to 3 for **Bastion** (signature).
+- **Parts:** Cerebrian Hides in shallow slots (Guard when struck).
+  Nemora\* plays it with her Guard stances.
+- **Team:** less damage for everyone; enemies hitting an ally's Guard feed
+  your Cauterize.
 - **Weak to:** burst through Guard; enemies that cleanse.
 
 ### 10. Glacier Turret: "Hold here."
 
 - **Ancestor:** Bungus Engineer: standing still is the build.
-- **Engine:** stand still for half a second: Glacier (Fortified, hits
-  freeze at once) → Splinter bursts frozen targets → Permafrost slows
-  anything close.
-- **Core:** Frigidariant.
+- **Engine:** stand still → Glacier (Fortified; hits freeze at once) →
+  Splinter bursts frozen targets → **Stasis** freezes the timers on your
+  Fortified and on enemies' Slows and Stuns. Valthor's\* Sovereign Domain
+  is a place to stand.
 - **Deep:** Offense, Frigidariant: Icy Strikes → Splinter → Glacier.
   Talents Killer Instinct, Opening Strike, Executioner, Focus Fire.
-- **Parts:** Frigidariant **Eyes**: Mina charges while planted anyway.
-- **Team:** anchors the ship against raids, next to the roof turrets.
-- **Crunch:** the clock makes you move; "hold the ship or go out" is the
-  trade-off, by design.
-- **Archetype conflict:** on a Striker, freezing is crowd control, and
-  Strikers' CC must stay Very Low. See "Archetype maxima" in Part 2.
+- **Shallow:** Mobility 1 to 3 for **Anchor** (Defender signature: allies
+  near you are Fortified while you hold still).
+- **Parts:** Frigidariant Eyes.
+- **Archetype:** the multiplier example. On Valthor\* it is a CC wall; on
+  Mina it is a damage turret with short freezes.
+- **Team:** anchors the ship against raids. **Crunch:** the clock makes
+  you choose between holding and going out.
 
-## Strikers: damage that comes online off a teammate's setup
+## Striker builds
 
 ### 11. Haymaker: "One punch, whole pack."
 
-- **Ancestor:** Kjaro's + Runald's Bands: hits over 400% trigger huge
-  effects, so slow, heavy survivors (Loader) live on them.
-- **Engine:** **Exalted Eye (Heavy Hand)**: a full-charge RMB counts as
-  three LMB hits for every on-hit effect. Three Magnarok Talon burns in one
-  punch reach Flashpoint at once; the pack detonates.
-- **Core:** Magnarok.
+- **Ancestor:** Kjaro's + Runald's Bands: huge hits trigger huge effects.
+- **Engine:** the **Exalted Eye (Heavy Hand)**: a full-charge RMB counts as
+  three LMB hits → three Magnarok Talon burns in one punch reach
+  Flashpoint → **Cauterize** detonates whatever Wound is left.
 - **Deep:** Offense, Magnarok: Eruptive Strikes → Flashpoint → Inferno
-  Heart. Talents Killer Instinct, **Opening Strike**, Executioner,
-  Bloodlust.
-- **Parts:** Magnarok **Talons** in tiers 1 to 2; the **Exalted is an
-  Eye**.
-- **Half-built:** Talons + Eruptive Strikes: Wade's three-punch combination
-  already reaches Flashpoint.
+  Heart. Talents Killer Instinct, Opening Strike, **Overkill** or
+  Executioner, Bloodlust.
+- **Parts:** Magnarok Talons in tiers 1 and 2; the Exalted is an Eye.
+- **Half-built:** Wade's three-punch combination already reaches
+  Flashpoint.
 - **Weak to:** whiffs. A missed charge is nothing: skill shows.
 
 ### 12. Glass Comet: "Don't get hit."
 
-- **Ancestor:** Shaped Glass: best on characters with dodges and
-  i-frames ("it doesn't matter if your hp is 1 if you don't get hit").
-- **Engine:** **Overclock**: always Vulnerable, but Empowered caps higher
-  and you start each fight Empowered. Magnarok Crowns Empower you whenever
-  enemies near you burn (from anyone). Firewalker keeps you in Burning Rush
-  with 3+ burning enemies around.
-- **Core:** Magnarok.
+- **Ancestor:** Shaped Glass on characters with i-frames.
+- **Engine:** **Overclock**: always Vulnerable, but Empowered caps higher →
+  Magnarok Crowns Empower you whenever enemies near you burn (from anyone)
+  → Firewalker keeps you in Burning Rush → **Inversion** cast on yourself
+  turns your Vulnerable into Fortified for its duration: timing the core
+  is how you play around the downside.
 - **Deep:** Mobility, Magnarok: Burning Rush → Eruption Dash → Firewalker.
   Talents Light Frame, Quick Recovery, Hit and Run, Blitz.
-- **Shallow:** Offense 1 to 2 with **Overclock (new, tier 2)**: a risk you
-  can take early, like a Lunar.
-- **Parts:** Magnarok **Crowns** and **Sinews**.
-- **Team:** depends on a Winger (Battery or Purifier), which is the
-  Comradery hook: the glass cannon needs a friend.
-- **Weak to:** one-shots. The downside is visible and you can play around
-  it, which is what made Shaped Glass loved and Brittle Crown hated.
+- **Shallow:** Defense 1 to 3 for **Overclock** (signature).
+- **Parts:** Magnarok Crowns and Sinews.
+- **Team:** needs a Winger, which is the Comradery hook. Gravon's
+  Soulblade and Mordryn's\* Stealth are its i-frames.
+- **Weak to:** one-shots, with a visible downside you can play around.
 
 ### 13. Momentum: "Speed is damage."
 
-- **Ancestor:** Speed Loader: movement speed becomes punch damage.
-- **Engine:** Wade's third punch Hastes him; Speed Siphon adds speed per
-  poisoned enemy; **Momentum** turns speed above base into damage.
-- **Core:** Venoxarid.
+- **Ancestor:** Speed Loader.
+- **Engine:** kits Haste you (Wade's third punch, Jeff's treads,
+  Mordryn's\* Frenzy) → Speed Siphon adds speed per poisoned enemy →
+  **Stasis** on yourself freezes your Haste timers so the stacks build →
+  **Momentum** turns speed above base into damage.
 - **Deep:** Mobility, Venoxarid (Courier's tree): Speed Siphon → Toxic
-  Wake → Swarm Rider. Talents Light Frame, Slipstream, Hit and Run,
-  **Momentum (new, tier 4 option)**.
-- **Parts:** Venoxarid **Talons** (Poison on LMB feeds Speed Siphon).
+  Wake → Swarm Rider. Talents Light Frame, Slipstream, **Momentum**
+  (signature), Blitz.
+- **Parts:** Venoxarid Talons (Poison feeds Speed Siphon).
 - **Pair:** the same capstone as Courier. Courier hands out speed;
   Momentum spends it.
 
 ### 14. Plague Chain: "It spreads."
 
-- **Ancestor:** AtG + Ukulele proc chains; Voidsent Flame chains through
-  full-health packs.
-- **Engine:** **Exalted Talon (Echo)** splashes every LMB's Poison to
-  enemies around the target → Rupture pops at 10 stacks onto neighbours →
-  Plague Carrier hands a dead enemy's stacks to the two nearest. Jeff's
-  beam hits often; his biomass vacuum turns the crew's kills into fuel.
-- **Core:** Venoxarid.
+- **Ancestor:** AtG + Ukulele chains; Voidsent Flame.
+- **Engine:** the **Exalted Talon (Echo)** splashes each LMB's Poison →
+  Rupture pops at 10 stacks onto neighbours → Plague Carrier hands a dead
+  enemy's stacks on → **Outbreak** copies the most-loaded enemy's pile to
+  the pack in one press. Jeff's beam hits often and his biomass turns the
+  crew's kills into fuel.
 - **Deep:** Offense, Venoxarid: Toxic Blade → Rupture → Plague Carrier.
-  Talents Killer Instinct, Relentless, **Affliction**, Bloodlust.
-- **Parts:** Venoxarid **Talons**; the Exalted is a Talon.
-- **Weak to:** bosses (no pack to chain through).
-- **Needs:** the proc rule (Part 2). This is the build that lags RoR2 and
-  needs the visual budget.
+  Talents Killer Instinct, Relentless, Affliction, Bloodlust.
+- **Parts:** Venoxarid Talons; the Exalted is a Talon.
+- **Needs:** the proc rule and the visual budget (Rules).
+- **Weak to:** bosses.
 
 ### 15. Cauterizer: "Let it all go off at once."
 
-- **Ancestor:** the poison-executioner Acrid: damage over time takes
-  elites under the execute line, and on-kill effects chain.
-- **Engine:** mixed genera load every kind of damage over time (Poison
-  from Venoxarid, Wound from Magnarok, Suds's Frothy) → the Magnarok core,
-  Cauterize, explodes all of it, scaled by the time left → Executioner
-  finishes. Every third cast is a Supernova; Feedback Loop brings the core
-  back.
-- **Core:** Magnarok.
-- **Deep:** Genealogy, Magnarok: Cataclysm → Fuel → Supernova. Talents
-  Bloodline, **Hybrid Vigor**, Overcharge, Feedback Loop.
-- **Shallow:** Offense 1 to 3 with Venoxarid (Refined Rupture in tier 3,
-  Executioner).
-- **Parts:** **Eyes** (the part stat recharges abilities).
-- **Proves:** a mixed build can carry a capstone; the purebred route is not
-  the only one.
+- **Ancestor:** poison-executioner Acrid.
+- **Engine:** mixed genera load every over-time effect (Poison, Wound,
+  Suds's Frothy) → Stoke doubles them → **Cauterize** explodes all of it,
+  scaled by the time left → every third cast is a Supernova →
+  **Opportunist** brings the core back when you kill something a crewmate
+  debuffed.
+- **Deep:** Genealogy, Magnarok: Cataclysm → Stoke → Supernova. Talents
+  Bloodline, Hybrid Vigor, **Opportunist** (signature), Feedback Loop.
+- **Shallow:** Offense 1 to 3 with Venoxarid (Refined Rupture, Executioner).
+- **Parts:** Eyes.
+- **Team:** best beside a crewmate's Stasis, which keeps the time on the
+  pile.
 
 ### 16. Overkill: "Every hit is a crit, then more."
 
-- **Ancestor:** Crit Huntress (9 Lens-Maker's + Scythe) and Railgunner
-  (crit chance converted to crit damage).
-- **Engine:** Cerebrian Crowns give you Sharpened whenever enemies near you
-  are Exposed (Nolan stacks Expose himself). Nyx's Focused gives an ally
-  Sharpened every second. At 100% crit, **Overkill** turns the extra into
-  crit damage, so hitting the cap is a fork, not a wall. Phantom deals
-  contact damage while you weave through the pack.
-- **Core:** Cerebrian.
+- **Ancestor:** crit Huntress; Railgunner's crit conversion.
+- **Engine:** Cerebrian Crowns give Sharpened whenever enemies near you
+  are Exposed (Nolan stacks Expose himself); Nyx's Focused gives Sharpened
+  every second; Gravon's full charge adds one → **Stasis** on yourself
+  freezes Sharpened timers so stacks pile up → at 100% crit, **Overkill**
+  turns the rest into crit damage.
 - **Deep:** Mobility, Cerebrian: Phase Shift → Ghost Step → Phantom.
   Talents Light Frame, Quick Recovery, Hit and Run, Blitz.
-- **Shallow:** Offense 1 to 2 with Killer Instinct and **Overkill (new,
-  tier 2 option)**.
-- **Parts:** Cerebrian **Crowns**; Gravon's charged RMB already crits, so
-  an Exalted Eye suits him.
+- **Shallow:** Offense 1 to 3 for **Overkill** (signature).
+- **Parts:** Cerebrian Crowns; Gravon wants an Exalted Eye.
 - **Team:** Nyx and Overkill are a pair: her Focused is his crit chance.
 
-## Any archetype
+## Any-archetype builds
 
 ### 17. Core Loop: "It's always up."
 
-- **Ancestor:** Gesture of the Drowned + Fuel Cells: equipment fires
-  itself on a short cooldown. Our equipment is the core ability (E).
-- **Engine:** Bloodline, Feedback Loop, Eye parts (recharge) and Haste
-  shorten the core's cooldown; an Exalted Genealogy effect makes every cast
-  huge (Overmind, Diamond Heart, Supernova, Miasma Heart).
-- **Core / Deep:** whatever genus you're dealt, Genealogy. Shown with
-  Cerebrian: Mass Confusion → Mind Echo → Overmind.
-- **Parts:** **Eyes** everywhere.
-- **Guard rail:** the core's cooldown has a floor (first guess 3 s), so
-  kills → cooldown → kills can't run away (the Soulbound + Forgive Me
-  loop).
+- **Ancestor:** Gesture of the Drowned + Fuel Cells.
+- **Engine:** Bloodline, Feedback Loop, Eyes and Haste shorten the core →
+  Mind Echo makes every cast happen twice → Overmind links everything the
+  core touched. With Outbreak, debuffs spread twice; with Inversion, the
+  flip happens twice; with Stasis, the freeze is renewed.
+- **Deep:** Genealogy, Cerebrian: Mass Confusion → Mind Echo → Overmind.
+  Talents Bloodline, Purebred, Overcharge (or **Lifeblood** on a Winger),
+  Feedback Loop.
+- **Parts:** Eyes everywhere.
+- **Guard rail:** the core's cooldown never goes below 3 s.
 
 ### 18. Chimera: "A bit of everything, all of it working."
 
-- **Ancestor:** Growth Nectar + Wake of Vultures (power per distinct buff),
-  and the general RoR2 truth that a wide pile of whites wins runs.
+- **Ancestor:** Growth Nectar + Wake of Vultures: power per distinct buff.
 - **Engine:** never Ascend. All four trees to tier 2, all Raw, all four
-  genera. **Hybrid Vigor (reworked)** counts distinct buffs on you as well as
-  distinct genera. Crowns of all four genera gather four different buffs
-  from whatever the crew is doing.
+  genera → Crowns of all four genera gather four different buffs →
+  **Inversion** turns the crew's debuffs into more buffs → **Hybrid Vigor
+  (reworked)** counts distinct buffs as well as genera.
 - **Why it must exist:** if deep always beats wide, Ascension is the one
-  dominant build (Creative Builds). It is also the build that makes a late
-  lucky drop of any genus worth picking up.
+  dominant build. It also makes a late drop of any genus worth having.
 - **Weak to:** no capstone moment. Reliable, with a lower ceiling.
 
 ## The builds as a team
 
-Most of these are halves. The pillar is "when I win, we win", so the
-strongest moments should need two players:
+The strongest moments should need two players ("when I win, we win"):
 
 | Setup | Payoff | What links them |
 | --- | --- | --- |
-| Permafrost Lockdown | Glass Comet, Haymaker | Brittle's Vulnerable; frozen targets |
+| Stasis (any Frigidariant core) | Cauterize (any Magnarok core) | the preserved time makes the blast bigger |
+| Inversion on enemies | Outbreak | corrupted buffs become debuffs that spread |
+| Permafrost Lockdown | Glass Comet, Haymaker | Brittle's Vulnerable; locked targets |
 | Gravity Well | Plague Chain, Cauterizer | a clustered, pre-debuffed pack |
 | Puppet Master | Thornwall | puppets and the taunt split the horde |
-| Battery | Overkill, Haymaker | buffs handed over on each heal |
-| Purifier | Glass Comet | a Vulnerable cannon kept alive |
+| Battery | Overkill, Haymaker | buffs handed over on every heal |
+| Plague Doctor | Glass Comet | a Weakened pack and a healed cannon |
 | Courier | everyone | Haste is speed and cooldown |
 | Pressure Keg | Cauterizer, Hot Potato | Wound piles that someone detonates |
 | Nyx (any build) | Overkill | Focused is crit chance |
 
----
+## Parts and part grades
 
-# Part 2: working back, what each layer must supply
+### Each part is a kit button
 
-## A. Parts: each part is a kit button
-
-The builds need items that hook into the five-button kit. Proposal: each
-part **is** a button, and its effect is the genus delivered through it.
-
-| Part | Hooks into | Raw effect (genus delivers) | Stat line (kept, small) |
+| Part | Hooks into | Raw effect (the genus delivers) | Stat line (kept, small) |
 | --- | --- | --- | --- |
-| **Talon** | LMB hits | each hit applies 1 genus status | +damage |
-| **Eye** | RMB charge | release applies the status, stacks = charge level; +10% charge speed | +recharge |
-| **Sinew** | SHIFT | SHIFT applies the status in a burst where you leave | +speed |
-| **Hide** | being struck | the attacker gets the status | +health |
-| **Crown (new part)** | anyone's effects | when an enemy within 300 gets the status **from anyone**, you gain the genus buff (1 stack, max 5) | none |
+| Talon | LMB hits | each hit applies 1 genus status | +damage |
+| Eye | RMB charge | release applies the status, stacks = charge level; +10% charge speed | +recharge |
+| Sinew | SHIFT | SHIFT applies the status in a burst where you leave | +speed |
+| Hide | being struck | the attacker gets the status | +health |
+| **Crown** (new) | anyone's effects | when an enemy within 300 gets the status **from anyone**, you gain the genus buff (1 stack, up to 5) | none |
 
-Q stays the kit's own: it is "iconic, wide variations", and the talents and
-genus effects already reach it through the statuses it applies. Defenders'
-SHIFT is a second unique, and Sinew still fires on it: the hook is "SHIFT
-was used", not "dashed".
+Q stays the kit's own. Defenders' SHIFT is a second unique; Sinew still
+fires on it ("SHIFT was used", not "dashed"). Raw part effects stack per
+copy, up to 3 stacks per hit (recommended default).
 
-**The genus palette** (what each genus delivers):
+**Genus palette:**
 
-| Genus | Status (Raw parts) | Escalates to (Refined Talon) | Buff (Crown) | Meta verb |
+| Genus | Status (Raw parts) | Escalates to (Refined Talon) | Buff (Crown) | Core verb |
 | --- | --- | --- | --- | --- |
-| Venoxarid | Poison | Weakened | Haste | Contaminate (copy debuffs) |
-| Cerebrian | Expose | Confused (0.75 s) | Sharpened | Radiate (copy buffs), Corrupt / Purify |
-| Frigidariant | Slow | Snared (0.5 s) | Fortified | Doomed / Anchored (locks effects in) |
-| Magnarok | Wound (burn) | Vulnerable | Empowered | Double, Detonate |
+| Venoxarid | Poison | Weakened | Haste | Contaminate |
+| Cerebrian | Expose | Confused (0.75 s) | Sharpened | Corrupt, Purify |
+| Frigidariant | Slow | Snared (0.5 s) | Fortified | Anchor, Doom |
+| Magnarok | Wound (burn) | Vulnerable | Empowered | Detonate |
 
-All of these are already in `EffectType` and the effect verbs
-(`amplifyEffect`, `spreadEffect`, `detonateEffect`, `corruptBuffs`,
-`purifyDebuffs`). Magnarok burns are already Wound, which is why Suds's
-Frothy and Magnarok already combine.
+All of these already exist in `EffectType` and the effect verbs
+(`spreadEffect`, `corruptBuffs`, `purifyDebuffs`, `detonateEffect`,
+`amplifyEffect`). Fortified for Frigidariant (recommended): the effects
+spec's Iceborn Crown gave Empowered, but one buff per genus lets a Crown's
+colour say what it gives.
 
-**Differs from the effects spec example:** its "Iceborn Crown" gives
-Empowered when enemies are Slowed. Here the Frigidariant buff is Fortified
-and Empowered is Magnarok's, so each genus owns one buff and a Crown's
-colour tells you what it gives (Clarity).
+20 items (4 genera × 5 parts). Genus follows the territory, so you steer it
+by where you go (which costs time); the part is the random roll; combining
+turns an unwanted part into the grade of a wanted one.
 
-20 items (4 genera × 5 parts) instead of 16. The genus follows the
-territory, so the player steers genus by where they go (that costs time:
-Crunch). The part is the random roll (1 in 5), and combining turns an
-unwanted part into the grade of a wanted one. Steering with real
-randomness: the Artifact of Command lesson.
+### One rule per part grade, the same for every genus
 
-## B. Part grades: one rule per part, the same for every genus
-
-To keep this learnable, each part has **one** Refined and **one** Exalted
-rule, and the genus only changes the status. Refined **reaches**: allies,
-or more enemies. Exalted **breaks a rule**.
+Refined **reaches** allies or more enemies. Exalted **breaks a rule**.
 
 | Part | Refined | Exalted (rule break) |
 | --- | --- | --- |
-| Talon | **Escalate**: every 4th hit on the same target applies the genus's escalation status | **Echo**: LMB status applications also land on every enemy within 90 of the target (Ukulele) |
-| Eye | **Overcharge**: hold up to 1 s past full charge; an overcharged release applies double | **Heavy Hand**: a full-charge RMB counts as 3 LMB hits for every on-hit effect (the Bands) |
+| Talon | **Escalate**: every 4th hit on the same target applies the escalation status | **Echo**: LMB statuses also land on every enemy within 90 of the target |
+| Eye | **Overcharge**: hold up to 1 s past full; an overcharged release applies double | **Heavy Hand**: a full-charge RMB counts as 3 LMB hits for every on-hit effect |
 | Sinew | **Wake**: allies you pass during or just after SHIFT gain the genus buff | **Reset**: SHIFT recharges 1 s per enemy its effect touches (up to half its cooldown) |
 | Hide | **Bodyguard**: also fires when an ally within 250 is struck | **Backlash Aura**: fires on every enemy within 150, not just the attacker |
-| Crown | **Share**: the ally who applied the status also gets the buff | **Throne**: cap 10, and your buff radiates to allies within 250 every 2 s |
+| Crown | **Share**: the ally who applied the status also gets the buff | **Throne**: up to 10 stacks, and your buff radiates to allies within 250 every 2 s |
 
-Raw part effects stack per copy, like today's stat lines. Refined and
-Exalted part rules don't stack; you have them or you don't, like the genus
-grades. The Refined rules are where Playmakers and Wingers stop
-getting dead items: an Empowered Crown is useless on Kade, but a Refined
-one hands Empowered to the Striker who applied the Wound.
+Refined and Exalted part rules don't stack: you have them or you don't.
+The Refined rules are where Playmakers and Wingers stop getting dead
+items: an Empowered Crown does little for Kade, but a Refined one hands
+Empowered to the Striker who applied the Wound.
 
-## C. Genus effects: keep, re-speak, rework one
+## Genus effects
 
-- **Keep** the 48 effects. Every genus × tree except Frigidariant ·
-  Mobility anchors an end state.
-- **Re-speak them in the shared vocabulary** wherever there's a choice:
-  a "freeze" should be Stunned (so Berserk counters it and Brittle reads
-  it), "poisoned enemies deal less" should be Weakened, and so on. Then
-  kits, talents and other players' items can read them.
-- **Rework Avalanche** (Frigidariant · Mobility), which no end state wants:
-  a moving freeze is a Playmaker tool with nobody to deliver it.
-  Candidate: "SHIFT through enemies Snares them; Snared enemies you pass
-  are Stunned". That gives Zephyr a second Frigidariant end state.
+- **Keep** the 48 effects, but **re-speak them in the shared vocabulary**:
+  a freeze is Stunned (so Berserk counters it and Brittle reads it),
+  "poisoned enemies deal less" is Weakened, and so on.
+- **Rewrite the Genealogy column.** Genealogy modifies your core, and the
+  old effects assumed damaging cores ("core damage poisons"). The new
+  effects work on any core, through the shared "act on an area" shape:
 
-## D. Talents: converters and keystones, not numbers
-
-The tier-1 legs (Killer Instinct, Plating, Light Frame, Bloodline) can stay
-flat: they are the white items, cheap filler. Every other tier should hold
-rule-changers. New talents the end states need (numbers are first
-guesses; "option" means a new choice at that tier, which the layout
-already supports):
-
-| Talent | Tree · tier | Effect | Builds |
+| Genus | Raw | Refined | Exalted |
 | --- | --- | --- | --- |
-| **Overclock** | Offense · 2 option | You are always Vulnerable ×3. Empowered caps 3 higher, and you start each fight Empowered ×2 | 12 |
-| **Overkill** | Offense · 2 option | Crit chance over 100% becomes crit damage (1:1); each Sharpened stack over the cap adds 10% crit damage | 16 |
-| **Contagion** | Genealogy · 3 option | When an enemy you debuffed dies, its debuffs copy to enemies within 150 (half stacks) | 3 |
-| **Hot Potato** | Genealogy · 3 option | An enemy you Grapple, Snare or knock back detonates its Wound and Poison when it lands or hits another enemy | 4 |
-| **Conduit** | Defense · 3 option | Your heals also give the healed ally 1 stack of every buff you carry | 5 |
-| **Lightning Rod** | Defense · 3 option | SHIFT Marks you for 3 s: enemies within 300 attack you; Fortified ×2 while Marked | 8 |
-| **Purifier** | Defense · 4 option | Your heals Purify one debuff on the ally (into its opposite buff) | 6 |
-| **Bastion** | Defense · 4 option | Your Guard regenerates (1 stack per 2 s, up to 3); every 25 max health above base raises your Guard cap by 1 | 9 |
-| **Momentum** | Mobility · 4 option | +1% damage per 1% move speed above base (up to +40%) | 13 |
-| **Hybrid Vigor** (rework) | Genealogy · 2 | Also counts each distinct buff on you (up to 6) | 18 |
+| Venoxarid | **Venom Infusion**: your core applies 2 Poison to enemies it affects (+1 per level) | **Carrier**: each enemy your core affects passes one of its debuffs to the nearest enemy outside the area | **Miasma Heart** (kept): a small poison cloud always follows you |
+| Cerebrian | **Mass Confusion**: your core Confuses enemies it affects for 0.5 s (+0.25 s per level) | **Mind Echo**: 1.5 s later, your core happens again on the same targets at 40% | **Overmind**: enemies your core affected are linked for 4 s; 30% of the damage and every debuff one gets is shared with the others |
+| Frigidariant | **Unbreakable**: your core shields you for 5 per enemy it affects | **Brittle**: enemies your core affects, and any you stun or root, are Vulnerable for 3 s | **Diamond Heart**: your core Stuns everything it affects for 1.2 s; your shields don't expire while a stunned enemy is within 300 |
+| Magnarok | **Cataclysm**: your core leaves molten ground (Wound) in its area | **Stoke** (replaces Fuel): before your core acts, it doubles every over-time effect in its area | **Supernova**: every third core cast covers double the area and leaves a molten field |
 
-Five of the nine are team converters (Contagion, Conduit, Lightning Rod,
-Purifier, Bastion). Two are deliberate risk items (Overclock, Lightning
-Rod), whose downside you can see and play around.
+- **Rework Avalanche** (Frigidariant · Mobility), the one capstone no build
+  wants. Candidate: "SHIFT through enemies Snares them; Snared enemies you
+  pass are Stunned", a second Frigidariant end state for Zephyr.
 
-## E. Rules the builds need
+## Talents
 
-1. **Archetype maxima apply to infusions, too.** `ARCHETYPES.md` compares
-   each trait across "base kit plus synergy with infusions". The builds
-   above break that in places: Glacier freezes on a Striker, Momentum or
-   Talons give a Playmaker damage, Symbiote heals on a Defender. The
-   effects spec already says intensity "varies per character". Proposal:
-   **scale what an infusion produces by the archetype's maximum for that
-   trait**:
+### General talents
 
-   | Archetype max | Very High | High | Mid | Low | Very Low |
-   | --- | --- | --- | --- | --- | --- |
-   | Multiplier (guess) | ×1.25 | ×1.0 | ×0.75 | ×0.5 | ×0.25 |
+The tier-1 legs (Killer Instinct, Plating, Light Frame, Bloodline) stay
+flat: they are the cheap filler. **Hybrid Vigor** (Genealogy · 2) is
+reworked to also count each distinct buff on you (up to 6). Contagion
+from revision 1 is dropped: Outbreak does it.
 
-   It applies per trait: damage, healing, CC duration, damage reduction,
-   mobility. A Frigidariant Talon then roots for 0.6 s on Zephyr and
-   0.12 s on Wade. This does automatically what RoR2 does by hand ("the
-   same item means different things on different survivors"), and it
-   keeps the "no Playmaker out-heals a Winger" promise. The tooltip
-   always shows *your* number. **A big trade-off: see question 1.**
+### Signature talents (tier 3, one per tree per archetype)
+
+| Archetype | Offense | Defense | Mobility | Genealogy |
+| --- | --- | --- | --- | --- |
+| Playmaker | **Setup**: enemies you crowd-control take 25% more damage from allies (not you) for 2 s after it ends | **Crowd Shield**: +1 Fortified for each enemy you have crowd-controlled within 300 (up to 5) | **Hot Potato**: an enemy you Grapple, pull or knock back becomes the centre of your next core cast within 4 s, wherever it is | **Lockdown**: crowd control on enemies your core affects lasts 50% longer and is Doomed |
+| Winger | **Conduit**: your heals also give the ally 1 stack of every buff you carry | **Purifier**: your heals Purify one debuff on the ally | **Arrival**: ending your SHIFT within 150 of an ally Hastes them ×2 and heals 5% of their max health | **Lifeblood**: your core heals each ally it affects for 3% of max health per effect it changes on them |
+| Defender | **Retribution**: damage your Guard, shields and Fortified prevent builds up to 60; your next hit deals it | **Lightning Rod**: SHIFT Marks you for 3 s (enemies within 300 attack you); Fortified ×2 while Marked | **Anchor**: after 1 s without moving, allies within 250 are Fortified ×1 and Unbounded | **Bastion**: your Guard regenerates 1 stack every 2 s (up to 3); every 25 max health above base raises your Guard cap by 1 |
+| Striker | **Overkill**: crit chance over 100% becomes crit damage; Sharpened stacks past the cap add 10% crit damage each | **Overclock**: always Vulnerable ×3; Empowered caps 3 higher, and you start each fight Empowered ×2 | **Momentum**: +1% damage per 1% move speed above base (up to +40%) | **Opportunist**: killing an enemy carrying a debuff a crewmate applied takes 1 s off your core's cooldown |
+
+Each archetype's four signatures turn its strongest trait into team value
+or into its own fantasy. Defenders have no mobility, so their Mobility
+signature is about holding ground.
+
+## Rules the builds need
+
+1. **Archetype multipliers** on everything infusions produce (above).
 2. **Proc depth is 1, and the tooltip says so.** An effect caused by an
-   infusion reaction (Echo splashes, Crown buffs, Contagion copies, Plague
-   Carrier hand-offs, detonations) is an **echo**: echoes never trigger
-   Talons, Hides, Echo or Contagion again. Crowns listen to everything but
-   only grant buffs, so they cannot loop. RoR2 was still patching an
-   infinite Runic Lens + AtG chain in 2026; the code already skips procs
-   and damage over time for on-hit (`AbilitySystem.h`), so this extends a
-   rule that exists.
-3. **Cooldown floors.** The core and SHIFT never go below a floor (first
-   guess: core 3 s, SHIFT 1 s), whatever Feedback Loop, Reset, Haste and
-   Eyes add up to.
-4. **A visual budget per player.** Each player's echoes merge into one
-   visible pulse per 0.25 s (Clarity; "AtG lags the game hard").
-5. **Pacing.** Each end state fits ~15 Raw (core 1 + deep tree 8 +
-   shallow 6) and is already doing its thing at ~6 Raw. Measure with
-   `ArenaSim` once the bots can be given a build to aim for.
+   infusion reaction (Echo splashes, Crown buffs, Carrier and Plague
+   Carrier hand-offs, detonations, Mind Echo) is an **echo**: echoes never
+   trigger Talons, Hides, Echo or Carrier again. Crowns listen to
+   everything but only grant buffs, so they can't loop. The code already
+   skips procs and damage over time for on-hit (`AbilitySystem.h`).
+3. **Cooldown floors:** the core never below 3 s, SHIFT never below 1 s.
+4. **Visual budget:** each player's echoes merge into one visible pulse per
+   0.25 s (Clarity; "AtG lags the game hard").
+5. **Pacing:** each end state fits about 15 Raw (core 1 + deep tree 8 +
+   shallow 6) and is already doing its thing at about 6 Raw. Measure with
+   `ArenaSim` once bots can aim for a build.
 
-## F. Suggested order of work
+## Order of work
 
-1. **Parts become buttons (Raw only)** for Talon, Eye, Sinew and Hide, plus
-   the proc-depth rule. This makes every item do something with every kit.
-   It is the biggest change to how infusions feel and needs no new UI.
-2. **Archetype multipliers** (if approved), shown in the tooltips.
-3. **Crown** and the ten part-grade rules (Refined Share is the Comradery
-   payoff).
-4. **The nine talents**, converters first (Conduit, Contagion, Purifier).
-5. **Build presets for testing**: a debug key that gives a player one end
+1. **The four verb cores** and the rewritten Genealogy column (approved;
+   replaces three built cores).
+2. **Parts as kit buttons** (Raw) for Talon, Eye, Sinew and Hide, with the
+   proc-depth rule.
+3. **Archetype multipliers**, shown in tooltips.
+4. **Crown** and the ten part-grade rules.
+5. **The 16 signature talents** and the Hybrid Vigor rework.
+6. **Build presets for testing:** a debug key that gives a player one end
    state's exact pieces, so each of the 18 can be played in minutes and
-   the sims can measure them. That is how we find the dominant one before
-   players do.
+   measured in the sims.
 
-## Open questions for a human
+## Open questions
 
-1. **Archetype multipliers on infusion output** (E.1): yes or no? It
-   changes every infusion number per character, and it is the main answer
-   to "damage items are dead on Playmakers and Wingers". Without it,
-   several end states break the archetype maxima.
-2. **A fifth part, Crown** (20 items instead of 16): worth the extra pool
-   dilution for the "listens to your teammates" layer?
-3. Is **this list of 18** right? Which would you cut or add? Specifically:
-   all three Winger builds ride on Isaac, the only Winger with a kit.
-4. **Frigidariant's buff:** Fortified (this doc) or Empowered (the effects
-   spec's Iceborn Crown)?
-5. Should **Raw part effects stack** per copy (three Frigidariant Talons =
-   3 Slow per hit), or should only the highest copy count?
+1. **Should your first drop still decide your core?** "Play the hand
+   you're dealt" says yes; picking your core from your first two drops
+   would let players aim for a build from round 1.
+2. **Nolan's archetype:** Playmaker (Character Concepts doc) or Striker
+   (the code)?
+3. **Multiplier numbers:** are ×1.25 to ×0.25 the right spread, and should
+   anything besides durations and amounts scale?
+4. **Signature talents at tier 3:** the right depth, or should some sit at
+   tier 2 so every player sees theirs?
+5. **Recommended defaults to confirm:** Frigidariant's buff is Fortified;
+   Raw part effects stack per copy, up to 3 stacks per hit.

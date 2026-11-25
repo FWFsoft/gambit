@@ -21,6 +21,39 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-25: Cores become genus verbs; archetypes get multipliers and signature talents
+- **Decision** (requested by a human in the design session, revising the
+  infusion-builds proposal below; nothing built):
+  - **Cores are the genus's effect verb.** Venoxarid Outbreak (copy the
+    most-debuffed enemy's debuffs to the area), Cerebrian Inversion
+    (corrupt enemy buffs, purify ally debuffs), Frigidariant Stasis (freeze
+    effect timers; Doomed/Anchored), Magnarok Cauterize (kept; allies' Mend
+    now resolves as a heal). Toxic Miasma, Mind Flay and Diamond Fortress
+    are retired. The Genealogy column is rewritten to modify any core.
+  - **Archetype identity:** infusion output is scaled per trait by the
+    archetype's maximum (x1.25 Very High to x0.25 Very Low), and every
+    tree's tier 3 gets a third, archetype-only signature talent (16).
+  - **Crown part accepted.** The 18 builds were rebuilt so every core is
+    part of its build's engine (was 7 of 17), using the full Character
+    Concepts roster.
+- **Pillars:**
+  - **Creative Builds** decided it: the cores now read and combine with
+    everyone's effects instead of being a ticket to a genus.
+  - **Comradery:** serves. Cores and signature talents read what
+    crewmates applied; cores chain across players (Stasis keeps time on
+    the Wound Cauterize detonates).
+  - **Crunch:** neutral.
+  - **Clarity:** weakens. Multipliers hide numbers unless tooltips show
+    your own; more verbs on screen.
+- **Why:** three of the four old cores did one fixed thing and were mostly
+  chosen for their genus. **Against the Genera and Infusion doc** (Drive):
+  replaces three of its four cores; approved by the human. Also: Nolan is
+  a Playmaker in the Character Concepts doc but a Striker in the code.
+- **Status:** Accepted (requested by a human) for the cores and archetype
+  direction; the rest Proposed. Review copy: the Claude doc "Infusion
+  Builds Spec".
+- **Where:** `specs/infusion-builds.md`
+
 ## 2026-11-25: Infusion builds designed backward from 18 end states (proposal)
 - **Decision** (proposed in a design session with a human; nothing built):
   `specs/infusion-builds.md` picks 18 end-state builds, each with a proven
