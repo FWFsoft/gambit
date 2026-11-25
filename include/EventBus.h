@@ -41,6 +41,22 @@ struct MouseButtonEvent {
   int x, y;
 };
 
+// Game controller input, already filtered to the one controller this client
+// is bound to (Window::bindController).
+struct ControllerButtonEvent {
+  uint8_t button;  // SDL_GameControllerButton
+  bool down;
+};
+
+struct ControllerAxisEvent {
+  uint8_t axis;  // SDL_GameControllerAxis
+  float value;   // sticks: -1..1 (down / right positive), triggers: 0..1
+};
+
+// The bound controller went away (unplugged, battery, rebound): everything
+// on it counts as released.
+struct ControllerDisconnectedEvent {};
+
 struct LocalInputEvent {
   bool moveLeft;
   bool moveRight;
@@ -50,6 +66,11 @@ struct LocalInputEvent {
   uint8_t buttons = 0;  // InputButtons bitmask (LMB, RMB, Q, SHIFT, E)
   int mouseX = 0;       // cursor in window pixels
   int mouseY = 0;
+  // Controller aiming: the aim point is an offset from the hero (world
+  // pixels) instead of the cursor position.
+  bool padAim = false;
+  float padAimX = 0.0f;
+  float padAimY = 0.0f;
 };
 
 struct AttackInputEvent {};

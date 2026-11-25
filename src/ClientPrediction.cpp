@@ -12,6 +12,8 @@
 #include "ItemRegistry.h"
 #include "Logger.h"
 #include "NetworkClient.h"
+#include "PadAim.h"
+#include "PadState.h"
 #include "config/PlayerConfig.h"
 #include "config/ScreenConfig.h"
 
@@ -80,24 +82,39 @@ void ClientPrediction::onLocalInput(const LocalInputEvent& e) {
       viewY = camera->y;
     }
   }
-  aimX = viewX + (e.mouseX - Config::Screen::WIDTH / 2.0f) / zoom;
-  // The ground under the cursor is drawn lifted by its height: find the
-  // spot whose lifted image is under the cursor (converges in a few steps
-  // on slopes this gentle).
-  const float flatY = viewY + (e.mouseY - Config::Screen::HEIGHT / 2.0f) / zoom;
-  float groundY = flatY;
-  for (int i = 0; i < 3; i++) groundY = flatY + lift(aimX, groundY);
-  aimY = groundY + AIM_HEIGHT;
-  // Shift targets a mirror globally. Minimap coordinates are already ground
-  // coordinates: neither camera zoom nor terrain lift / AIM_HEIGHT applies.
-  if (arena && arena->hasMatch() &&
-      localPlayer.characterId == Arena::CharacterId::Kade &&
-      (e.buttons & InputButtons::Mobility) != 0 &&
-      ArenaMinimap::contains(e.mouseX, e.mouseY)) {
-    const auto map = arenaMinimap(arena->match(), localPlayer.x, localPlayer.y,
-                                  arena->zones());
-    aimX = map.worldX(e.mouseX);
-    aimY = map.worldY(e.mouseY);
+  if (e.padAim) {
+    // Controller: the stick points away from the hero, wherever the camera is.
+    aimX = localPlayer.x + e.padAimX;
+    aimY = localPlayer.y + e.padAimY;
+    PadState::aimDirX = e.padAimX;
+    PadState::aimDirY = e.padAimY;
+    // An ability that picks an ally goes to the one the stick points at,
+    // not the one nearest the reticle (the HUD chose and marked them).
+    if (PadState::allyAimed && (e.buttons & PadState::allyButtons) != 0) {
+      aimX = PadState::allyX;
+      aimY = PadState::allyY;
+    }
+  } else {
+    aimX = viewX + (e.mouseX - Config::Screen::WIDTH / 2.0f) / zoom;
+    // The ground under the cursor is drawn lifted by its height: find the
+    // spot whose lifted image is under the cursor (converges in a few steps
+    // on slopes this gentle).
+    const float flatY = viewY + (e.mouseY - Config::Screen::HEIGHT / 2.0f) / zoom;
+    float groundY = flatY;
+    for (int i = 0; i < 3; i++) groundY = flatY + lift(aimX, groundY);
+    aimY = groundY + AIM_HEIGHT;
+    // Shift targets a mirror globally. Minimap coordinates are already ground
+    // coordinates: neither camera zoom nor terrain lift / AIM_HEIGHT applies.
+    // Mouse only: a controller's stick never points at the minimap.
+    if (arena && arena->hasMatch() &&
+        localPlayer.characterId == Arena::CharacterId::Kade &&
+        (e.buttons & InputButtons::Mobility) != 0 &&
+        ArenaMinimap::contains(e.mouseX, e.mouseY)) {
+      const auto map = arenaMinimap(arena->match(), localPlayer.x, localPlayer.y,
+                                    arena->zones());
+      aimX = map.worldX(e.mouseX);
+      aimY = map.worldY(e.mouseY);
+    }
   }
   localPlayer.aimX = aimX;
   localPlayer.aimY = aimY;
@@ -313,6 +330,7 @@ void ClientPrediction::reconcile(const StateUpdatePacket& stateUpdate) {
     localPlayer.cooldownMs[slot] = serverState->cooldowns[slot] * 10.0f;
   }
   localPlayer.characterId = serverState->characterId;
+  PadState::aimReach = PadAim::reach(localPlayer.characterId);
   const Arena::KitInfo* kit = Arena::kitInfo(localPlayer.characterId);
   localPlayer.moveSpeed = kit ? kit->moveSpeed : Config::Player::SPEED;
 

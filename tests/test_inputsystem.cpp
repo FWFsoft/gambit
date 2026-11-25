@@ -1,9 +1,14 @@
+#include <cmath>
 #include <SDL2/SDL.h>
+
+#include <vector>
 
 #include "Camera.h"
 #include "GameStateManager.h"
 #include "InputSystem.h"
 #include "Logger.h"
+#include "PadAim.h"
+#include "PadState.h"
 #include "test_utils.h"
 
 TEST(InputSystem_KeyBindings) {
@@ -161,6 +166,308 @@ TEST(InputSystem_EscapeClosesTopOverlay) {
   gsm.transitionTo(GameState::Playing);
 }
 
+// --- Game controller ---------------------------------------------------
+
+namespace {
+
+// The last input the system published. File scope, so the one handler
+// padReset subscribes never outlives what it writes to.
+LocalInputEvent padLastInput{};
+bool padGotInput = false;
+
+// One update tick; returns the input it published (padAim / buttons / moves).
+LocalInputEvent padTick() {
+  padGotInput = false;
+  EventBus::instance().publish(UpdateEvent{16.67f, 1});
+  assert(padGotInput);
+  return padLastInput;
+}
+
+void padReset() {
+  resetEventBus();
+  EventBus::instance().subscribe<LocalInputEvent>(
+      [](const LocalInputEvent& e) {
+        padLastInput = e;
+        padGotInput = true;
+      });
+  PadState::holding = false;
+  PadState::aimReach = PadAim::DEFAULT_REACH;
+  PadState::scoreboardHeld = false;
+  PadState::bound = true;
+  PadState::active = false;
+  PadState::overlayOpen = false;
+  PadState::toggleSuitRequested = false;
+  GameStateManager::instance().transitionTo(GameState::Playing);
+}
+
+void padButton(uint8_t button, bool down) {
+  EventBus::instance().publish(ControllerButtonEvent{button, down});
+}
+
+void padAxis(uint8_t axis, float value) {
+  EventBus::instance().publish(ControllerAxisEvent{axis, value});
+}
+
+}  // namespace
+
+// Every ability has a button, and releasing it lets go.
+TEST(InputSystem_PadAbilityButtons) {
+  padReset();
+  InputSystem inputSystem(nullptr);
+
+  padAxis(SDL_CONTROLLER_AXIS_TRIGGERRIGHT, 1.0f);
+  assert(padTick().buttons == InputButtons::Primary);
+  padAxis(SDL_CONTROLLER_AXIS_TRIGGERRIGHT, 0.0f);
+  assert(padTick().buttons == 0);
+
+  padAxis(SDL_CONTROLLER_AXIS_TRIGGERLEFT, 0.9f);
+  assert(padTick().buttons == InputButtons::Secondary);
+  padAxis(SDL_CONTROLLER_AXIS_TRIGGERLEFT, 0.1f);
+  assert(padTick().buttons == 0);
+
+  padButton(SDL_CONTROLLER_BUTTON_RIGHTSHOULDER, true);
+  assert(padTick().buttons == InputButtons::Special);
+  padButton(SDL_CONTROLLER_BUTTON_RIGHTSHOULDER, false);
+
+  padButton(SDL_CONTROLLER_BUTTON_LEFTSHOULDER, true);
+  assert(padTick().buttons == InputButtons::Core);
+  padButton(SDL_CONTROLLER_BUTTON_LEFTSHOULDER, false);
+
+  padButton(SDL_CONTROLLER_BUTTON_A, true);
+  assert(padTick().buttons == InputButtons::Mobility);
+  padButton(SDL_CONTROLLER_BUTTON_A, false);
+  assert(padTick().buttons == 0);
+
+  // X is interact.
+  int interacts = 0;
+  EventBus::instance().subscribe<InteractInputEvent>(
+      [&](const InteractInputEvent&) { interacts++; });
+  padButton(SDL_CONTROLLER_BUTTON_X, true);
+  assert(interacts == 1);
+}
+
+// The left stick and the D-pad both walk, snapped to eight directions.
+TEST(InputSystem_PadMovement) {
+  padReset();
+  InputSystem inputSystem(nullptr);
+
+  // Inside the deadzone: standing still.
+  padAxis(SDL_CONTROLLER_AXIS_LEFTX, 0.2f);
+  LocalInputEvent e = padTick();
+  assert(!e.moveLeft && !e.moveRight && !e.moveUp && !e.moveDown);
+
+  // Mostly right with a little drift down is still just "right".
+  padAxis(SDL_CONTROLLER_AXIS_LEFTX, 0.95f);
+  padAxis(SDL_CONTROLLER_AXIS_LEFTY, 0.15f);
+  e = padTick();
+  assert(e.moveRight && !e.moveLeft && !e.moveUp && !e.moveDown);
+
+  // Up and left together is the diagonal.
+  padAxis(SDL_CONTROLLER_AXIS_LEFTX, -0.7f);
+  padAxis(SDL_CONTROLLER_AXIS_LEFTY, -0.7f);
+  e = padTick();
+  assert(e.moveLeft && e.moveUp && !e.moveRight && !e.moveDown);
+
+  padAxis(SDL_CONTROLLER_AXIS_LEFTX, 0.0f);
+  padAxis(SDL_CONTROLLER_AXIS_LEFTY, 0.0f);
+  padButton(SDL_CONTROLLER_BUTTON_DPAD_DOWN, true);
+  e = padTick();
+  assert(e.moveDown && !e.moveUp && !e.moveLeft && !e.moveRight);
+  padButton(SDL_CONTROLLER_BUTTON_DPAD_DOWN, false);
+  e = padTick();
+  assert(!e.moveDown);
+}
+
+// Aim: right stick first, else the walking direction, else the last aim.
+// The mouse takes the aim back when it is clicked.
+TEST(InputSystem_PadAim) {
+  padReset();
+  InputSystem inputSystem(nullptr);
+
+  // Nothing touched yet: mouse aim.
+  assert(!padTick().padAim);
+
+  // Walking right aims right.
+  padAxis(SDL_CONTROLLER_AXIS_LEFTX, 1.0f);
+  LocalInputEvent e = padTick();
+  assert(e.padAim && e.padAimX > 100.0f && e.padAimY == 0.0f);
+
+  // The right stick overrides it: aim up while walking right.
+  padAxis(SDL_CONTROLLER_AXIS_RIGHTY, -1.0f);
+  e = padTick();
+  assert(e.padAim && e.padAimY < -100.0f && e.padAimX == 0.0f);
+  const float fullTilt = -e.padAimY;
+
+  // Less tilt reaches less far.
+  padAxis(SDL_CONTROLLER_AXIS_RIGHTY, -0.5f);
+  e = padTick();
+  assert(e.padAimY < 0.0f && -e.padAimY < fullTilt);
+
+  // Sticks at rest: the last aim stays.
+  padAxis(SDL_CONTROLLER_AXIS_RIGHTY, 0.0f);
+  padAxis(SDL_CONTROLLER_AXIS_LEFTX, 0.0f);
+  const float lastY = e.padAimY;
+  e = padTick();
+  assert(e.padAim && e.padAimY == lastY);
+
+  // Full tilt reaches as far as the hero's longest placed ability.
+  padAxis(SDL_CONTROLLER_AXIS_RIGHTY, -1.0f);
+  PadState::aimReach = PadAim::reach(Arena::CharacterId::Mina);
+  e = padTick();
+  assert(std::fabs(-e.padAimY - 580.0f) < 0.5f);
+  PadState::aimReach = PadAim::reach(Arena::CharacterId::Wade);
+  e = padTick();
+  assert(std::fabs(-e.padAimY - PadAim::DEFAULT_REACH) < 0.5f);
+  padAxis(SDL_CONTROLLER_AXIS_RIGHTY, 0.0f);
+
+  // A mouse click hands the aim back to the cursor.
+  EventBus::instance().publish(
+      MouseButtonEvent{SDL_BUTTON_LEFT, true, 100, 100});
+  e = padTick();
+  assert(!e.padAim);
+  EventBus::instance().publish(
+      MouseButtonEvent{SDL_BUTTON_LEFT, false, 100, 100});
+
+  // So does playing on the keyboard, after the stick took it again.
+  padAxis(SDL_CONTROLLER_AXIS_LEFTX, 1.0f);
+  assert(padTick().padAim);
+  padAxis(SDL_CONTROLLER_AXIS_LEFTX, 0.0f);
+  EventBus::instance().publish(KeyDownEvent{SDLK_w});
+  assert(!padTick().padAim);
+}
+
+// A trigger held through the pause menu does not fire on resume, and an
+// unplugged controller lets go of everything.
+TEST(InputSystem_PadHeldThroughPauseAndDisconnect) {
+  padReset();
+  GameStateManager& gsm = GameStateManager::instance();
+  InputSystem inputSystem(nullptr);
+
+  padAxis(SDL_CONTROLLER_AXIS_TRIGGERRIGHT, 1.0f);
+  assert(padTick().buttons == InputButtons::Primary);
+  assert(PadState::holding);
+
+  padButton(SDL_CONTROLLER_BUTTON_START, true);
+  padButton(SDL_CONTROLLER_BUTTON_START, false);
+  assert(gsm.getCurrentState() == GameState::Paused);
+  EventBus::instance().publish(UpdateEvent{16.67f, 1});  // paused tick
+  padButton(SDL_CONTROLLER_BUTTON_START, true);
+  padButton(SDL_CONTROLLER_BUTTON_START, false);
+  assert(gsm.getCurrentState() == GameState::Playing);
+  assert(padTick().buttons == 0);  // still held, but stale
+  padAxis(SDL_CONTROLLER_AXIS_TRIGGERRIGHT, 0.0f);
+  padAxis(SDL_CONTROLLER_AXIS_TRIGGERRIGHT, 1.0f);
+  assert(padTick().buttons == InputButtons::Primary);
+
+  // Walking and firing when the controller dies.
+  padAxis(SDL_CONTROLLER_AXIS_LEFTX, 1.0f);
+  padButton(SDL_CONTROLLER_BUTTON_Y, true);
+  LocalInputEvent e = padTick();
+  assert(e.moveRight && e.buttons == InputButtons::Primary);
+  assert(PadState::scoreboardHeld);
+  EventBus::instance().publish(ControllerDisconnectedEvent{});
+  e = padTick();
+  assert(!e.moveRight && e.buttons == 0);
+  assert(!PadState::holding && !PadState::scoreboardHeld);
+}
+
+// In menus the controller is the menu's: it presses keys, never abilities,
+// and a button held through a menu does nothing until it is pressed again.
+// Ally-targeted abilities go to the ally the stick points at.
+TEST(InputSystem_PadAllyPick) {
+  const PadAim::Point allies[] = {
+      {300.0f, 20.0f},   // right, slightly off the line
+      {0.0f, -200.0f},   // straight up
+      {900.0f, 0.0f},    // dead right, but out of range
+      {150.0f, 150.0f},  // down-right diagonal
+  };
+  // Aiming right: the near ally on the right, not the far one.
+  assert(PadAim::pickAlly(0, 0, 1, 0, allies, 4, 520.0f) == 0);
+  // With the range to reach them, the one dead on the line wins.
+  assert(PadAim::pickAlly(0, 0, 1, 0, allies, 4, 1000.0f) == 2);
+  // Aiming up.
+  assert(PadAim::pickAlly(0, 0, 0, -200, allies, 4, 520.0f) == 1);
+  // Aiming left: nobody is there, so nobody is picked.
+  assert(PadAim::pickAlly(0, 0, -1, 0, allies, 4, 520.0f) == -1);
+  // No aim, no allies.
+  assert(PadAim::pickAlly(0, 0, 0, 0, allies, 4, 520.0f) == -1);
+  assert(PadAim::pickAlly(0, 0, 1, 0, allies, 0, 520.0f) == -1);
+
+  // Only Isaac and Zephyr have such abilities.
+  assert(PadAim::allyTargeting(Arena::CharacterId::Isaac).buttons ==
+         (InputButtons::Secondary | InputButtons::Special));
+  assert(PadAim::allyTargeting(Arena::CharacterId::Zephyr).buttons ==
+         InputButtons::Special);
+  assert(PadAim::allyTargeting(Arena::CharacterId::Mina).buttons == 0);
+}
+
+TEST(InputSystem_PadMenus) {
+  padReset();
+  GameStateManager& gsm = GameStateManager::instance();
+  InputSystem inputSystem(nullptr);
+
+  std::vector<SDL_Keycode> keys;
+  EventBus::instance().subscribe<KeyDownEvent>(
+      [&](const KeyDownEvent& e) { keys.push_back(e.key); });
+
+  // Title: any button starts.
+  gsm.transitionTo(GameState::TitleScreen);
+  padButton(SDL_CONTROLLER_BUTTON_X, true);
+  padButton(SDL_CONTROLLER_BUTTON_X, false);
+  assert(gsm.getCurrentState() == GameState::CharacterSelect);
+
+  // Character select: D-pad and stick flicks move, A confirms.
+  keys.clear();
+  padButton(SDL_CONTROLLER_BUTTON_DPAD_RIGHT, true);
+  padButton(SDL_CONTROLLER_BUTTON_DPAD_RIGHT, false);
+  padAxis(SDL_CONTROLLER_AXIS_LEFTY, 0.9f);
+  padAxis(SDL_CONTROLLER_AXIS_LEFTY, 0.95f);  // still held: no repeat
+  padAxis(SDL_CONTROLLER_AXIS_LEFTY, 0.0f);
+  padButton(SDL_CONTROLLER_BUTTON_A, true);
+  assert((keys == std::vector<SDL_Keycode>{SDLK_RIGHT, SDLK_DOWN,
+                                           SDLK_RETURN}));
+
+  // A is still held as the game starts: it must not dash.
+  gsm.transitionTo(GameState::Playing);
+  assert(padTick().buttons == 0);
+  padButton(SDL_CONTROLLER_BUTTON_A, false);
+  padButton(SDL_CONTROLLER_BUTTON_A, true);
+  assert(padTick().buttons == InputButtons::Mobility);
+  padButton(SDL_CONTROLLER_BUTTON_A, false);
+
+  // Start pauses and resumes.
+  padButton(SDL_CONTROLLER_BUTTON_START, true);
+  padButton(SDL_CONTROLLER_BUTTON_START, false);
+  assert(gsm.getCurrentState() == GameState::Paused);
+  padButton(SDL_CONTROLLER_BUTTON_START, true);
+  padButton(SDL_CONTROLLER_BUTTON_START, false);
+  assert(gsm.getCurrentState() == GameState::Playing);
+
+  // Clicking the right stick opens the inventory, and closes it again.
+  padButton(SDL_CONTROLLER_BUTTON_RIGHTSTICK, true);
+  padButton(SDL_CONTROLLER_BUTTON_RIGHTSTICK, false);
+  assert(gsm.getCurrentState() == GameState::Inventory);
+  padButton(SDL_CONTROLLER_BUTTON_RIGHTSTICK, true);
+  padButton(SDL_CONTROLLER_BUTTON_RIGHTSTICK, false);
+  assert(gsm.getCurrentState() == GameState::Playing);
+
+  // Back opens the suit screen; while it is open the hero stands still.
+  padButton(SDL_CONTROLLER_BUTTON_BACK, true);
+  padButton(SDL_CONTROLLER_BUTTON_BACK, false);
+  assert(PadState::toggleSuitRequested);
+  PadState::toggleSuitRequested = false;
+  PadState::overlayOpen = true;
+  padButton(SDL_CONTROLLER_BUTTON_A, true);
+  padAxis(SDL_CONTROLLER_AXIS_LEFTX, 1.0f);
+  LocalInputEvent e = padTick();
+  assert(e.buttons == 0 && !e.moveRight);
+  padButton(SDL_CONTROLLER_BUTTON_B, true);  // B closes it
+  assert(PadState::toggleSuitRequested);
+
+  PadState::overlayOpen = false;
+  PadState::toggleSuitRequested = false;
+}
+
 int main() {
   Logger::init();
 
@@ -169,6 +476,12 @@ int main() {
   test_InputSystem_SequenceIncrement();
   test_InputSystem_SpaceFollowsCameraMode();
   test_InputSystem_EscapeClosesTopOverlay();
+  test_InputSystem_PadAbilityButtons();
+  test_InputSystem_PadMovement();
+  test_InputSystem_PadAim();
+  test_InputSystem_PadAllyPick();
+  test_InputSystem_PadMenus();
+  test_InputSystem_PadHeldThroughPauseAndDisconnect();
 
   return 0;
 }

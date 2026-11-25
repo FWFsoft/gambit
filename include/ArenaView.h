@@ -350,6 +350,7 @@ class ArenaView {
   void drawLobby();
   void drawEndScreen();
   void drawDownedOverlay();
+  void drawPadAllyTarget();
   void drawPrompts();
   void drawCameraHud();
   void handleHotkeys();
