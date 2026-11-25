@@ -39,6 +39,9 @@ class ArenaView {
 
   // World layer + HUD for the Playing state.
   void render();
+  // The match as the server last described it (the main menu reads it to
+  // say whether the match you left is still running).
+  const ArenaClient* arenaClient() const { return arena; }
   // Closes the suit screen opened with B; false if it wasn't showing. The
   // intermission suit screen is the phase itself and isn't closed by this.
   bool closeSuitScreen();
@@ -347,6 +350,8 @@ class ArenaView {
   // walls, a foam line on water, so a blocked edge never looks walkable.
   void drawBlockedEdges(ImDrawList* dl);
   bool localAtShip() const;
+  // Inside a field station's radius tonight (issue #45): the suit opens.
+  bool localAtFieldStation() const;
   void drawLobby();
   void drawEndScreen();
   void drawDownedOverlay();

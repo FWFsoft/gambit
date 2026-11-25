@@ -21,6 +21,182 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-25: Field stations: the suit opens at a wild camp for 8 scrap
+- **Decision:** At night, a player camped away from the ship can spend 8
+  carried scrap to set up a **field station** at their camp. Until dawn,
+  every living crewmate within 500 px of it (the camp-sharing radius) can
+  install and combine infusions exactly as at the ship. One station per
+  player per night; it can't be built at the ship or inside another
+  station, and the price is taken from the builder's own carried scrap
+  (never the bank or a teammate). It stays if the builder leaves. It is
+  gone at dawn, at the finale and at the end of the match. Ship upgrades,
+  the full heal and banking stay at the ship. The camp panel says why the
+  suit is locked and offers "SET UP FIELD STATION - 8 scrap (you carry N)
+  [V]", or says how to fix it next time when you carry too little. The
+  station draws a faint green ring of its reach and a small marker.
+  New client-to-server packet `BuildFieldStation` (id 32); match state
+  carries the night's stations.
+- **Pillars:** Strategic Crunch serves: no more sitting through a long
+  night with nothing to do while the crew upgrades, and "carry scrap out
+  or bank it at home" becomes a real choice. **Trade-off:** it weakens
+  the pull back to the ship and competes with turret repairs and ship
+  tiers for scrap; the price is the brake. Comradery serves: one player
+  pays, the whole camp benefits. Creative Builds serves: wild campers can
+  act on infusions they just found. Clarity serves: the panel names the
+  rule ("the ship or a field station") and the fix.
+- **Why:** Issue #45. Numbers (8 scrap, 500 px, until dawn) approved by
+  a human on 2026-11-25. 8 matches a turret repair and is under the
+  10-scrap heavy load. Rejected: free field access (removes the ship's
+  pull) and a client-only unlock (the server gates every install and
+  combine, and now also checks the station on each request).
+- **Status:** Accepted (requested by a human)
+- **Where:** `include/ArenaData.h` (`FIELD_STATION_*`),
+  `src/MatchDirector.cpp` (`onBuildFieldStation`, `atFieldStation`,
+  `canWorkOnSuit`), `NetworkProtocol`, `src/ArenaHud.cpp`
+  (`drawCampPanel`, `localAtFieldStation`), `src/ArenaView.cpp`,
+  `tests/test_camping.cpp`, `tests/test_network_protocol.cpp`,
+  `specs/infusion-grades.md`
+
+## 2026-11-25: Snow lies on the fir's ledges, not along its outline
+- **Decision:** Snowy conifers no longer have pale slivers down both
+  outer edges of each tier. Each tier now carries a band of snow across
+  its face on the ledge just under the tier above (36 to 62% of the tier's
+  height), with four small lumps draping over its lower edge and a thin
+  ink line under it; the top tier has a cap on its tip. Lit on the left
+  (0.62 of the snow colour), shaded on the right (0.44), like the
+  foliage. Snow colour unchanged (cool, dim).
+- **Pillars:** Clarity serves: snow reads as snow, not as a rim light or
+  a glowing outline that competes with heroes and effects (playtest
+  2026-11-22, #55). Others neutral.
+- **Why:** Snow settles on what faces up and toward the camera, so the
+  ledges carry it. A first try at full brightness bloomed through the
+  post-process and made every tree glow, which breaks "the world is dark,
+  heroes are the brightest things" (ART_DIRECTION.md); it was dimmed.
+  Checked in a rendered frame of the arctic coast (N tour).
+- **Status:** Built, needs review
+- **Where:** `src/ArenaWorld.cpp` (`snowOnTier`)
+
+## 2026-11-25: Leaving to the main menu leaves the match; Rejoin or Abandon
+- **Decision:** The pause menu's "Main Menu" is now "Leave to Main Menu".
+  It takes you out of the fight on the server (the existing
+  return-from-menu rules: carried scrap dropped, and if you come back the
+  same round, abilities start on cooldown and a downed hero comes back
+  down), and on your client the match stops: the world is no longer
+  drawn, every sound still ringing fades out in 0.12 s, new match sounds
+  are ignored, and the match music fades out. The main menu then says
+  what your crew is doing ("Your crew is out in round 2 without you") and
+  offers **Rejoin** (pick the same character again: back at the ship) and
+  **Abandon** (give up your place; back to character select). The match
+  keeps running for everyone else. When the last player abandons and
+  nobody else is playing or away, the match resets to the lobby, so a
+  solo player who abandons starts fresh. New client-to-server packet
+  `AbandonMatch` (id 31).
+- **Pillars:** Comradery serves: one player leaving never ends or pauses
+  the crew's match, and Rejoin keeps the door open. Clarity serves: the
+  menu says plainly that the match is still running and what each button
+  does, and the game is no longer heard behind a menu. Strategic Crunch
+  is protected: the menu is no free cooldown reset or escape from being
+  downed (rules unchanged). Creative Builds is neutral.
+- **Why:** Issue #52: the old button sent you to character select while
+  the match kept playing audibly, with no way back except picking again.
+  Rejected: keeping the avatar in the world while away (it would be a
+  free target or a free body-blocker, and needs new server state), and
+  pausing the server (shared by the crew). Rejoin works while this client
+  stays connected; rejoining after a disconnect would need a resume token
+  and is not built. Rejoining in round 1 may restart First Contact music
+  (the music director resets at the menu).
+- **Status:** Built, needs review
+- **Where:** `src/UISystem.cpp` (pause and main menus), `src/SfxSystem.cpp`,
+  `src/MusicSystem.cpp`, `src/RenderSystem.cpp`, `include/GameState.h`,
+  `src/MatchDirector.cpp` (`onAbandon`, `away`), `NetworkProtocol`,
+  `tests/test_character_swap.cpp`, `tests/test_network_protocol.cpp`
+
+## 2026-11-25: Objectives cover the whole map; the land ends in a coast
+- **Decision:** Two map-generator changes, regenerated into
+  `assets/maps/planet.tmx`:
+  1. **Coverage (#49).** After each landing site's near/mid/far rings, the
+     generator adds "fill" objectives in the biggest empty stretches until,
+     for every landing site, no walkable spot is more than 3,000 px (~12 s
+     at hero speed, straight line) from an objective in play. Fill
+     objectives are in play every match. 36 were needed (cap 40). In play
+     per match: 63 to 70 (was 28 to 34). The worst spot is now 2,987 px
+     from an objective; it was over 10,000 px (~40 s) for landing sites 1
+     and 3, which had no city objectives at all. Each fill objective is
+     the errand its biome is known for. The city gets three of its own,
+     on existing mechanics with smaller pads that fit a crossroads:
+     "transit depot" (scrap haul), "clinic cache" (clear camp, open the
+     med pod) and "plaza" (wipe the camp and its enforcer).
+  2. **Map edge (#50).** The continent keeps its shape and size in world
+     px, but the tile grid grows from 720 to 800 so the land that used to
+     run into the grid's edge now ends in a natural coast with drawn sea
+     beyond. A guaranteed sea belt keeps every walkable tile at least
+     800 px from the edge (it was 14 px). The default camera sees about
+     610 px past the hero square to the edge, so the edge stays out of
+     sight. Walkable area, biomes and the four landing sites are unchanged.
+  Also: enemies whose network state has not changed are re-sent at 5 Hz
+  instead of 60 Hz, so twice the camps cost less bandwidth than before
+  (ArenaSim, 4 bots: 142 KB/s before, 284 KB/s with the new camps and no
+  change, 51 KB/s now).
+- **Pillars:** Strategic Crunch serves: the playtest walked through whole
+  biomes and found nothing, and "dead time feels very bad". Creative
+  Builds & Dynamic Play serves: far places are worth going to, and the
+  city has its own errands. Clarity serves: the world has no visible
+  edge, only a coast. Comradery is neutral.
+  **Trade-off:** about twice the objectives and camps (peak enemies alive
+  in ArenaSim: 78 before, 158 now) mean more infusions on offer per match.
+  Time still limits how many a crew can reach, but this is an economy
+  change a human should check in play. `COVER_GAP` is the dial: 3,000 px
+  was chosen over 2,500 (48 fills, still not fully covered) because it
+  cost a quarter fewer camps for nearly the same 95th-percentile gap.
+- **Why:** Whole-map coverage needs about 70 objectives in play however
+  it is done: the rings cover only the half of the map near each site.
+  Rejected: activating every ring objective in every match (still leaves
+  gaps where no ring reaches, and makes ring sizes meaningless) and simply
+  raising the reach (no coverage guarantee, and does not fix the city's
+  street fit). For the edge, rejected: pushing land down near the edge
+  (cost 15 to 30% of the land and a landing site, and made the continent
+  a diamond) and an invisible wall. City blocks still reject the bigger
+  objective pads; the city kinds have smaller ones. Not done: brand new
+  objective mechanics per biome (these are new names and placements on
+  existing mechanics), and path-distance coverage (straight line only).
+- **Status:** Built, needs review
+- **Where:** `tools/maps/generate_planet.py` (`fill_coverage`,
+  `FILL_KINDS`, `COVER_GAP`, `CONTINENT_TILES`, `border_sea`),
+  `assets/maps/planet.tmx`, `src/ServerGameState.cpp` (enemy resend),
+  `src/ArenaHud.cpp` (N tour visits the coasts),
+  `tests/test_planet_map.cpp`, `docs/design/MAP_PIPELINE.md`
+
+## 2026-11-25: Lifeline bonds to the map's trees, cacti and ruins
+- **Decision:** Isaac's Lifeline (RMB) can now bond to decorative props
+  from the map's Props layer, not only to solid rocks and the hull. Each
+  tree, cactus, boulder, sea stack, ruin, monolith, spire, ribcage,
+  freighter wreck, lamp and sign gets a trunk-sized anchor box (for
+  example 36 x 18 px for a conifer at scale 1, bigger for bigger props).
+  The boxes block nothing: players and enemies still walk through
+  scenery as before. Ground cover (grass, reeds, flora, debris, bones,
+  craters) holds nothing. A solid shape wins a tie with a prop. On the
+  planet map that is 1,960 new anchors. Pull speed, range, arc, release
+  and cooldown are unchanged.
+- **Pillars:** Creative Builds & Dynamic Play serves: forests become
+  Isaac's travel network, which was the intent of #54 ("feel like flying
+  around the map"). Clarity serves: what looks like something to grab
+  can be grabbed, and the existing valid/invalid preview ring shows it
+  before the press. Strategic Crunch serves: less dead walking for a solo
+  Isaac. Comradery is neutral.
+- **Why:** The earlier #54 patch made all solid props anchors, but the
+  generated planet's trees are visual only, so in play almost nothing
+  outside rocks worked. Making the trees solid would have blocked
+  movement across every forest. A separate anchor list keeps collision
+  as it was. City blocks are not anchors yet: they block as terrain
+  cells (an isometric footprint, not a box) and need their own query.
+  Still open for a human playtest: whether the pull feels fluid (speed,
+  arc, keeping momentum on release), and what a solo Isaac does besides
+  move (raised in the 2026-11-24 Lifeline entry).
+- **Status:** Built, needs review
+- **Where:** `include/CollisionSystem.h`, `src/CollisionSystem.cpp`
+  (`setAnchors`, `anchorForProp`, `terrainNear`), `src/ServerGameState.cpp`,
+  `tests/test_lifeline_anchors.cpp`, `tests/test_isaac_kit.cpp`
+
 ## 2026-11-24: Browser build fills the window, has fullscreen, and no Quit
 - **Decision:** The web page scales the game (still drawn at 1280x720) to
   fit the browser window at 16:9, letterboxed in near-black, with a small

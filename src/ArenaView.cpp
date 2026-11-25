@@ -1398,6 +1398,18 @@ void ArenaView::drawGround(ImDrawList* dl) {
                     72, 2.0f);
     }
 
+    // Field stations tonight (issue #45): the reach that opens the suit, in
+    // the ship's own green, and a small marker where it stands.
+    for (const FieldStationState& s : match.stations) {
+      ImVec2 c = toScreen(s.x, s.y);
+      dl->AddCircle(c, Arena::Tuning::FIELD_STATION_RADIUS,
+                    IM_COL32(120, 255, 170, 55), 72, 2.0f);
+      ImVec2 d[4] = {ImVec2(c.x, c.y - 14.0f), ImVec2(c.x + 10.0f, c.y),
+                     ImVec2(c.x, c.y + 6.0f), ImVec2(c.x - 10.0f, c.y)};
+      dl->AddConvexPolyFilled(d, 4, IM_COL32(120, 255, 170, 170));
+      dl->AddPolyline(d, 4, IM_COL32(5, 5, 10, 220), ImDrawFlags_Closed, 1.5f);
+    }
+
     // The finale's shield: everything outside is tinted and deadly. A round
     // has no zone (the crew roams and camps where night finds it).
     if (phase == Arena::MatchPhase::BossFight) {

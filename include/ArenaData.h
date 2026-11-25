@@ -600,6 +600,13 @@ constexpr float INTERMISSION_SECONDS = 90.0f;  // the night's hard limit
 // in hand, and the dawn brings an ambush.
 constexpr float CAMP_SHARE_RADIUS = 500.0f;  // crewmates this close share camp
 constexpr float CAMP_HEAL_FRACTION = 0.40f;  // of max health, alone
+// A field station (issue #45): a crewmate camped in the wild spends carried
+// scrap to set one up. Until dawn, every living crewmate within its radius
+// can install and combine infusions as at the ship. Ship upgrades, full
+// heal and banking stay at the ship. One per player per night.
+constexpr int FIELD_STATION_SCRAP = 8;
+constexpr float FIELD_STATION_RADIUS = 500.0f;
+constexpr int FIELD_STATION_MAX = 8;
 constexpr float CAMP_HEAL_PER_ALLY = 0.20f;  // more per crewmate in camp
 // A downed player is carried into a crewmate's camp (revived there at the
 // camp's heal); with nobody near they wake at the ship.

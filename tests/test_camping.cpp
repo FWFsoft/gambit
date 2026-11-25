@@ -15,6 +15,7 @@
 #include "EffectManager.h"
 #include "EnemySystem.h"
 #include "Logger.h"
+#include "Infusions.h"
 #include "MatchDirector.h"
 
 namespace {
@@ -149,6 +150,64 @@ void suitAndUpgradesOnlyAtTheShip() {
   std::cout << "  night: the ship is built by whoever camped beside it\n";
 }
 
+void fieldStationOpensTheSuitInTheWild() {
+  // Issue #45: 8 carried scrap sets one up; until dawn everyone within
+  // 500 px of it can install and combine, as at the ship.
+  namespace T = Arena::Tuning;
+  using Arena::Genus;
+  using Arena::InfusionPart;
+  World w;
+  w.place(A, 5000.0f, 5000.0f);
+  w.place(B, 5000.0f + T::FIELD_STATION_RADIUS, 5000.0f);  // inclusive edge
+  w.place(C, 5000.0f + T::FIELD_STATION_RADIUS + 1.0f, 5000.0f);  // outside
+  // Not by day.
+  w.director.addScrap(w.p(A), T::FIELD_STATION_SCRAP);
+  assert(!w.director.onBuildFieldStation(w.p(A)));
+  w.nightfall();
+  for (uint32_t id : {A, B, C}) {
+    assert(Infusions::addToInventory(w.p(id), Genus::Venoxarid,
+                                      InfusionPart::Talon));
+  }
+  // Locked in the wild until a station stands.
+  w.director.onSlotInfusion(w.p(B), Genus::Venoxarid, InfusionPart::Talon, 1,
+                            Arena::CORE_NODE);
+  assert(w.p(B).coreGenus == Genus::None);
+  // One short: refused, nothing spent.
+  w.director.spendScrap(w.p(A), 1);
+  assert(!w.director.onBuildFieldStation(w.p(A)));
+  assert(w.p(A).scrapCarried == T::FIELD_STATION_SCRAP - 1);
+  w.director.addScrap(w.p(A), 1);
+  assert(w.director.onBuildFieldStation(w.p(A)));
+  assert(w.p(A).scrapCarried == 0);
+  assert(w.director.buildState().stations.size() == 1);
+  // Paid once: a second request builds nothing more.
+  w.director.addScrap(w.p(A), T::FIELD_STATION_SCRAP);
+  assert(!w.director.onBuildFieldStation(w.p(A)));
+  assert(w.p(A).scrapCarried == T::FIELD_STATION_SCRAP);
+  // A crewmate inside it has no reason to build another.
+  w.director.addScrap(w.p(B), T::FIELD_STATION_SCRAP);
+  assert(!w.director.onBuildFieldStation(w.p(B)));
+  // Shared: the builder and B (on the edge) can install; C cannot.
+  assert(w.director.atFieldStation(w.p(A)) && w.director.atFieldStation(w.p(B)));
+  assert(!w.director.atFieldStation(w.p(C)));
+  w.director.onSlotInfusion(w.p(B), Genus::Venoxarid, InfusionPart::Talon, 1,
+                            Arena::CORE_NODE);
+  assert(w.p(B).coreGenus == Genus::Venoxarid);
+  w.director.onSlotInfusion(w.p(C), Genus::Venoxarid, InfusionPart::Talon, 1,
+                            Arena::CORE_NODE);
+  assert(w.p(C).coreGenus == Genus::None);
+  // No ship upgrades from the field.
+  w.director.onDebugCommand(w.p(A), DebugCommandKind::RoofTurrets, 0);
+  assert(!w.director.onShipUpgrade(w.p(A)));
+  // Gone at dawn: the next night needs another.
+  w.director.onDebugCommand(w.p(A), DebugCommandKind::SkipPhase, 0);
+  w.run(100.0f);
+  assert(w.director.phase() == Arena::MatchPhase::Round);
+  assert(w.director.buildState().stations.empty());
+  assert(!w.director.atFieldStation(w.p(A)));
+  std::cout << "  night: a field station opens the suit for the camp\n";
+}
+
 void dawnAmbushesWildCampsOnly() {
   World w;
   w.place(A, 0.0f, 150.0f);
@@ -216,6 +275,7 @@ int main() {
   downedAreCarriedInOrWakeAtShip();
   suitAndUpgradesOnlyAtTheShip();
   dawnAmbushesWildCampsOnly();
+  fieldStationOpensTheSuitInTheWild();
   readinessSkipsWaitButAfkCannotStall();
   std::cout << "All camping tests passed\n";
   return 0;

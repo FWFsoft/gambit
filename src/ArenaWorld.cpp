@@ -402,6 +402,51 @@ void firTier(ImDrawList* dl, ImVec2 base, float halfW, float tall, Rgb lit,
                   ImDrawFlags_Closed, 1.5f);
 }
 
+// Snow on one conifer tier (issue #55). Snow settles on what faces up: the
+// ledge of boughs across the tier's face, just under the tier above it, and
+// the tip. A lumpy band right across the cone, not slivers on its outline
+// (those read as rim light). Lit left, shaded right, like the foliage.
+void snowOnTier(ImDrawList* dl, ImVec2 base, float halfW, float tall, bool top,
+                uint32_t seed, float alpha) {
+  constexpr float LIT = 0.62f, SHADE = 0.44f;
+  auto widthAt = [&](float up) {  // the cone's half width `up` above base
+    return halfW * std::max(0.0f, 1.0f - up / tall);
+  };
+  auto band = [&](float lo, float hi, int lumps) {
+    // A trapezoid across the cone from `lo` to `hi` above the base, with
+    // lumps hanging off its lower edge where snow drapes over the boughs.
+    float wl = widthAt(lo) * 0.96f, wh = widthAt(hi) * 0.96f;
+    float yl = base.y - lo, yh = base.y - hi;
+    ImVec2 left[4] = {ImVec2(base.x - wh, yh), ImVec2(base.x, yh),
+                      ImVec2(base.x, yl + halfW * 0.06f),
+                      ImVec2(base.x - wl, yl)};
+    ImVec2 right[4] = {ImVec2(base.x, yh), ImVec2(base.x + wh, yh),
+                       ImVec2(base.x + wl, yl),
+                       ImVec2(base.x, yl + halfW * 0.06f)};
+    // Dim: the post-process blooms anything bright, and snow is ground
+    // cover, not light. The world stays darker than the heroes.
+    dl->AddConvexPolyFilled(left, 4, tone(SNOW, alpha, LIT));
+    dl->AddConvexPolyFilled(right, 4, tone(SNOW, alpha, SHADE));
+    for (int j = 0; j < lumps; j++) {
+      float u = (j + 0.5f) / lumps * 2.0f - 1.0f;  // -1..1 across
+      float r = halfW * (0.10f + 0.04f * hash01(seed * 7 + j));
+      ImVec2 c(base.x + u * wl * 0.85f,
+               yl + r * 0.35f + halfW * 0.06f * (1.0f - std::abs(u)));
+      dl->AddCircleFilled(c, r, tone(SNOW, alpha, u < 0 ? LIT : SHADE), 10);
+    }
+    // A thin ink line under the drape keeps it a separate layer.
+    dl->AddLine(ImVec2(base.x - wl, yl), ImVec2(base.x + wl, yl),
+                rgbA(0.02f, 0.02f, 0.04f, 0.35f * alpha), 1.0f);
+  };
+  if (top) {
+    band(tall * 0.70f, tall * 0.98f, 2);  // the tip, capped
+  } else {
+    // The ledge: the band the tier above leaves showing (its base sits
+    // about half this tier's height up).
+    band(tall * 0.36f, tall * 0.62f, 4);
+  }
+}
+
 }  // namespace
 
 bool ArenaView::drawVegetation(ImDrawList* dl, const MapProp& p,
@@ -439,19 +484,7 @@ bool ArenaView::drawVegetation(ImDrawList* dl, const MapProp& p,
       float h = tall * (0.42f - 0.05f * i);
       ImVec2 base(feet.x + sway * f, y);
       firTier(dl, base, w, h, FIR, FIR_DARK, alpha);
-      if (snowy) {
-        // Snow lying along the bough tips of each tier, the part the tier
-        // above does not cover: a pale sliver on both lower edges.
-        for (int side = -1; side <= 1; side += 2) {
-          ImVec2 cap[4] = {
-              ImVec2(base.x + side * w * 0.98f, base.y - h * 0.02f),
-              ImVec2(base.x + side * w * 0.45f, base.y - h * 0.58f),
-              ImVec2(base.x + side * w * 0.38f, base.y - h * 0.50f),
-              ImVec2(base.x + side * w * 0.80f, base.y + h * 0.02f)};
-          dl->AddConvexPolyFilled(cap, 4,
-                                  tone(SNOW, (side < 0 ? 0.9f : 0.6f) * alpha));
-        }
-      }
+      if (snowy) snowOnTier(dl, base, w, h, i == tiers - 1, seed + i, alpha);
     }
     return true;
   }

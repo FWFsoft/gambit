@@ -114,6 +114,9 @@ class UISystem {
   GameState lastRenderedState = GameState::TitleScreen;
   Settings settings;  // applied and saved as they change
   bool showSettings;
+  // The character you left a running match with for the main menu (0: not
+  // away). Rejoin picks it again; Abandon gives the place up (issue #52).
+  uint32_t awayCharacterId = 0;
   std::deque<Notification> notifications;  // Active pickup notifications
   std::deque<ObjectiveNotification>
       objectiveNotifications;  // Active objective notifications

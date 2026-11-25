@@ -4,11 +4,13 @@
 // read as region 15 (one genus for the whole planet) because the loader
 // ignored which row of terrain_data a layer paints with.
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <iostream>
 #include <map>
 #include <set>
+#include <vector>
 
 #include "Biome.h"
 #include "CollisionSystem.h"
@@ -85,8 +87,11 @@ int main() {
     for (const Objective& o : map.getObjectives()) {
       if (o.sites == 0 || !o.activeFor(i)) continue;
       objectives++;
-      // In play for a site means within its reach (the far ring).
-      assert(std::hypot(o.x - site.x, o.y - site.y) < 9100.0f);
+      // In play for a site means within its reach (the far ring), or a
+      // coverage fill objective, in play wherever the ship lands.
+      bool everywhere = __builtin_popcount(o.sites) ==
+                        static_cast<int>(sites.size());
+      assert(everywhere || std::hypot(o.x - site.x, o.y - site.y) < 9100.0f);
     }
     for (const EnemySpawn& e : map.getEnemySpawns()) {
       camps += e.sites != 0 && e.activeFor(i);
@@ -111,6 +116,50 @@ int main() {
     std::cout << "site " << i << ": " << objectives << " objectives, " << camps
               << " camp guards, " << spawns << " spawns, "
               << biomeName(biomeFromId(grid.biomeAt(site.x, site.y))) << "\n";
+  }
+
+  // Issue #49: wherever the ship lands, no walkable spot is far from an
+  // objective in play (straight line; tools/maps/generate_planet.py,
+  // COVER_GAP). Sampled every 8 tiles.
+  for (int i = 0; i < static_cast<int>(sites.size()); i++) {
+    std::vector<const Objective*> live;
+    for (const Objective& o : map.getObjectives()) {
+      if (o.activeFor(i)) live.push_back(&o);
+    }
+    float worst = 0.0f;
+    for (int ty = 0; ty < grid.height(); ty += 8) {
+      for (int tx = 0; tx < grid.width(); tx += 8) {
+        if (grid.biomeOf(tx, ty) == 0 || grid.blockedTile(tx, ty)) continue;
+        float wx, wy;
+        grid.cornerToWorld(tx + 0.5f, ty + 0.5f, wx, wy);
+        float best = 1e9f;
+        for (const Objective* o : live) {
+          best = std::min(best, std::hypot(o->x - wx, o->y - wy));
+        }
+        worst = std::max(worst, best);
+      }
+    }
+    std::cout << "site " << i << ": farthest walkable spot is " << worst
+              << " px from an objective\n";
+    assert(worst < 3200.0f);
+  }
+
+  // Issue #50: the land ends in a coast, never at the edge of the grid.
+  // Nothing walkable within 600 px (square to the edge) of it.
+  {
+    const float step = 1.0f / std::hypot(1.0f / 64.0f, 1.0f / 32.0f);
+    float nearest = 1e9f;
+    for (int ty = 0; ty < grid.height(); ty++) {
+      for (int tx = 0; tx < grid.width(); tx++) {
+        if (grid.blockedTile(tx, ty)) continue;
+        int inner = std::min(std::min(tx, ty), std::min(grid.width() - 1 - tx,
+                                                        grid.height() - 1 - ty));
+        nearest = std::min(nearest, (inner + 0.5f) * step);
+      }
+    }
+    std::cout << "nearest walkable tile to the map's edge: " << nearest
+              << " px\n";
+    assert(nearest >= 600.0f);
   }
 
   // Fixed places: some objectives are in play from more than one site.

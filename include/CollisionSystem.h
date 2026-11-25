@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <vector>
 
 #include "CollisionShape.h"
@@ -68,7 +69,18 @@ class CollisionSystem {
   // The solid rectangular prop or active hull whose edge is nearest (x, y),
   // if within maxDist: what Isaac's Lifeline can anchor to. This includes
   // trees and other player-blocking props, not just enemy-blocking terrain.
+  // Also searches the Lifeline-only anchors (setAnchors).
   const CollisionShape* terrainNear(float x, float y, float maxDist) const;
+  // ---- Lifeline anchors that are NOT solid: the trunks of the map's
+  // decorative trees, cacti, sea stacks and ruins (the "Props" layer, which
+  // never blocks movement). Isaac can bond to them; nothing collides with
+  // them. Replaces any earlier set.
+  void setAnchors(std::vector<CollisionShape> anchorShapes);
+  const std::vector<CollisionShape>& getAnchors() const { return anchors; }
+  // The anchor box for a prop of `kind` at (x, y), scaled, or false for
+  // kinds that are too small or flat to hold a tether (grass, reeds...).
+  static bool anchorForProp(const std::string& kind, float x, float y,
+                            float scale, CollisionShape& out);
   // The point of `box` nearest (x, y) (the point itself when inside).
   static void closestPoint(const AABB& box, float x, float y, float& outX,
                            float& outY);
@@ -78,6 +90,7 @@ class CollisionSystem {
 
  private:
   const std::vector<CollisionShape>& collisionShapes;
+  std::vector<CollisionShape> anchors;  // Lifeline only, never solid
   const TerrainGrid* terrain = nullptr;
   int hullTier = 0;
   int hullSite = -1;

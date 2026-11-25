@@ -36,7 +36,9 @@ enum class PacketType : uint8_t {
   PlayerReady = 27,        // Client → Server (ready up in lobby/intermission)
   DebugCommand = 28,       // Client → Server (playtest shortcuts)
   ShipUpgrade = 29,        // Client → Server (spend banked scrap on a tier)
-  InfusionCombine = 30     // Client → Server (two infusions → next grade)
+  InfusionCombine = 30,    // Client → Server (two infusions → next grade)
+  AbandonMatch = 31,       // Client → Server (left to the menu for good)
+  BuildFieldStation = 32   // Client → Server (spend scrap: suit in the wild)
 };
 
 // Ability buttons carried in ClientInputPacket::buttons (held state).
@@ -474,6 +476,12 @@ struct MatchPlayerState {
   float reviveProgress = 0.0f;  // 0-1 while being revived
 };
 
+// A field station in play tonight (MatchStatePacket::stations).
+struct FieldStationState {
+  float x = 0.0f, y = 0.0f;
+  uint32_t builderId = 0;
+};
+
 struct MatchStatePacket {
   PacketType type = PacketType::MatchState;
   uint8_t phase = 0;  // Arena::MatchPhase
@@ -497,6 +505,8 @@ struct MatchStatePacket {
   // see Arena::regionGenus. Sent as nibbles.
   uint8_t regionGenus[Arena::REGION_SLOTS] = {};
   std::vector<MatchPlayerState> players;
+  // Field stations standing tonight (intermission only; issue #45).
+  std::vector<FieldStationState> stations;
 };
 
 struct InfusionSlotPacket {
@@ -520,6 +530,18 @@ struct InfusionCombinePacket {
 // Spend banked scrap on the ship's next tier (intermission only).
 struct ShipUpgradePacket {
   PacketType type = PacketType::ShipUpgrade;
+};
+
+// A player who left to the main menu gives up their place in the running
+// match (no Rejoin). When nobody is playing it any more, it resets.
+struct AbandonMatchPacket {
+  PacketType type = PacketType::AbandonMatch;
+};
+
+// Set up a field station where you camped (intermission, away from the
+// ship). The server places it at your position and takes the scrap.
+struct BuildFieldStationPacket {
+  PacketType type = PacketType::BuildFieldStation;
 };
 
 struct PlayerReadyPacket {
@@ -574,6 +596,11 @@ InfusionSlotPacket deserializeInfusionSlot(const uint8_t* data, size_t size);
 PlayerReadyPacket deserializePlayerReady(const uint8_t* data, size_t size);
 std::vector<uint8_t> serialize(const ShipUpgradePacket& packet);
 ShipUpgradePacket deserializeShipUpgrade(const uint8_t* data, size_t size);
+std::vector<uint8_t> serialize(const AbandonMatchPacket& packet);
+AbandonMatchPacket deserializeAbandonMatch(const uint8_t* data, size_t size);
+std::vector<uint8_t> serialize(const BuildFieldStationPacket& packet);
+BuildFieldStationPacket deserializeBuildFieldStation(const uint8_t* data,
+                                                     size_t size);
 std::vector<uint8_t> serialize(const InfusionCombinePacket& packet);
 InfusionCombinePacket deserializeInfusionCombine(const uint8_t* data,
                                                  size_t size);

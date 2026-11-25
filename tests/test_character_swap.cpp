@@ -99,12 +99,50 @@ void leavingWhileDownComesBackDown() {
 
 }  // namespace
 
+void abandoningWhileOthersPlayKeepsTheirMatch() {
+  // Issue #52: leaving never ends the match for the crew.
+  World w;
+  w.run(5000.0f);
+  int round = w.director.round();
+  w.director.onCharacterSelected(w.hero(), 0);  // to the main menu
+  assert(w.director.isAway(HERO));
+  w.director.onAbandon(w.hero());
+  assert(!w.director.isAway(HERO));
+  assert(w.director.phase() == Arena::MatchPhase::Round);
+  assert(w.director.round() == round);
+  assert(w.players[ALLY].characterId == Arena::CharacterId::Wade);
+  std::cout << "  abandoning leaves the crew's match running\n";
+}
+
+void lastOneOutResetsTheMatch() {
+  World w;
+  w.director.onCharacterSelected(w.players[ALLY], 0);
+  w.director.onCharacterSelected(w.hero(), 0);
+  // Both away: the match waits for them (Rejoin).
+  w.run(1000.0f);
+  assert(w.director.phase() == Arena::MatchPhase::Round);
+  w.director.onAbandon(w.players[ALLY]);
+  assert(w.director.phase() == Arena::MatchPhase::Round);  // hero may return
+  // Rejoin: back in the same match, at the ship, on cooldown.
+  w.director.onCharacterSelected(w.hero(), Arena::CharacterId::Wade);
+  assert(!w.director.isAway(HERO));
+  assert(w.hero().characterId == Arena::CharacterId::Wade);
+  w.director.onCharacterSelected(w.hero(), 0);
+  w.director.onAbandon(w.hero());
+  // Nobody is playing it and nobody can come back: a fresh lobby.
+  assert(w.director.phase() == Arena::MatchPhase::Lobby);
+  assert(w.director.round() == 0);
+  std::cout << "  the last one to abandon resets the match\n";
+}
+
 int main() {
   Logger::init();
   std::cout << "Character swap\n";
   pickIsLockedInTheFight();
   mainMenuFreesThePick();
   leavingWhileDownComesBackDown();
+  abandoningWhileOthersPlayKeepsTheirMatch();
+  lastOneOutResetsTheMatch();
   std::cout << "All character-swap tests passed\n";
   return 0;
 }

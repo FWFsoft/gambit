@@ -47,6 +47,9 @@ class ServerGameState {
   const std::vector<PlayerSpawn>* playerSpawns;
   std::unordered_map<uint32_t, Player> players;
   uint32_t serverTick;
+  // What each enemy last looked like on the wire (only changes and a
+  // periodic refresh are re-sent).
+  std::unordered_map<uint32_t, NetworkEnemyState> lastSentEnemy;
   std::unique_ptr<EnemySystem> enemySystem;
   std::unique_ptr<EffectManager> effectManager;
   std::unique_ptr<ObjectiveSystem> objectiveSystem;
