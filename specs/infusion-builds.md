@@ -84,7 +84,7 @@ so the crew's effects make your core stronger.
 
 | Genus | Core (E) | Verb | What it does | So it works alone | Cooldown (guess) |
 | --- | --- | --- | --- | --- | --- |
-| Venoxarid | **Outbreak** | Contaminate | The enemy with the most debuff stacks in the area is the source; every other enemy there gets a copy of its debuffs (half stacks, at least 1) | enemies in the area gain 2 Poison first | 12 s |
+| Venoxarid | **Outbreak** | Contaminate | The enemy with the most debuff stacks in the area is the source; every other enemy there gets a copy of its full pile (was half stacks; the sandbox showed half was too weak) | enemies in the area gain 2 Poison first | 12 s |
 | Cerebrian | **Inversion** | Corrupt, Purify | Enemies' buffs become their opposite debuffs (Berserk → Stunned, Focused → Confused, Fortified → Vulnerable); allies' debuffs become their opposite buffs (Slow → Haste, Weakened → Empowered, Poison → Mend) | enemies in the area gain 2 Expose | 14 s |
 | Frigidariant | **Stasis** | Anchor, Doom | For 4 s, effects in the area stop running down: enemies are Doomed (debuffs can't be cleansed) and their debuff timers freeze; allies are Anchored and their buff timers freeze | enemies in the area gain 2 Slow | 14 s |
 | Magnarok | **Cauterize** (kept) | Detonate | Every over-time effect in the area resolves at once: enemies' Wound and Poison as a blast scaled by the time left; allies' Mend as an instant heal (new) | none needed: the kits apply Wound and Mend | 12 s |
@@ -143,6 +143,43 @@ signature talents. They live at tier 3 because most players should reach
 tier 3 somewhere by the boss (the grades spec's target). They also make
 the trees wider, answering "the trees are too shallow". The talents are
 listed under "Talents" below.
+
+## Playmaker feel: plays, not damage
+
+Decided by the human on 2026-11-26 (option A): a Playmaker's big moment is
+a setup the crew cashes in, not their own damage. The reference moments are
+a cross-map initiation arrow, a kick that repositions one key enemy into
+your team, and an ultimate that pulls a whole team together. Tested in the
+Presidente Sandbox (a browser mock of El Presidente in a live fight).
+
+- **Setup credit (scoring rule).** Damage teammates deal to enemies you
+  moved or controlled in the last 3 s counts toward your score, as its own
+  line on the meter and scoreboard. Without it a Playmaker almost never
+  wins the round's bonus infusion for top score.
+- **Plays.** When one action catches 3 or more enemies, the game tracks
+  what the crew does to them for 3.5 s. A big result gets a callout:
+  "PLAY MADE: 6 kills · 1,400 crew damage off your Bomba".
+- **Payoff through the crew.** Setup (Playmaker Offense talent) makes
+  enemies you grab, throw, slam or knock up Vulnerable ×3 for 3 s.
+- **Gather replaces Hot Potato** (Playmaker Mobility talent): an enemy you
+  throw, slam, pull or knock up takes the debuffs off every enemy it hits.
+  With Outbreak copying the full pile, one thrown elite picked up 64 stacks
+  crossing a pack and spread them to 14 enemies. Grab something tanky: a
+  thug carrying 50 stacks dies before you can press E. Rejected on the way:
+  "your next core centres on the held enemy" (no way to stage it), a
+  press-E-to-arm version (built around one character's buttons), Collateral
+  (no link to the core) and a charged echo (fights the gather loop).
+
+| El Presidente, 3 min of autopilot | Setup credit | Crew kills | Mina downs |
+| --- | --- | --- | --- |
+| Base kit, no infusions | 26,700 | 379 | 3 |
+| Full build (9 pieces) | 20,700 | 373 | 2 |
+
+**Still open:** the full-pile copy plus Stoke clears a pack before you can
+watch it build (fixes to try: Stoke doubles only the source; cap copied
+stacks at 30). The full build does not yet beat his bare kit on setup
+credit: the autopilot holds packages instead of grabbing nonstop, so this
+needs testing with real players.
 
 ## The 18 end states at a glance
 
@@ -237,10 +274,10 @@ play differently through their talents and parts. Avalanche (Frigidariant
 ### 4. Hot Potato: "Catch."
 
 - **Ancestor:** Bungus Engineer: one character makes an item great.
-- **Engine:** El Presidente grabs the most-debuffed enemy → **Hot Potato**
-  makes it the centre of his next core → he throws it into a pack and
-  presses E: **Outbreak** goes off where it lands → every third cast is a
-  Supernova.
+- **Engine:** El Presidente grabs the most-debuffed enemy → **Gather** makes
+  it take the debuffs off every enemy it flies through → he presses E where
+  it lands, and **Outbreak** copies its whole pile to the pack → every third
+  cast is a Supernova.
 - **Deep:** Genealogy, Magnarok: Cataclysm → Stoke → Supernova. Talents
   Bloodline, Purebred, Overcharge, Apex Mutation.
 - **Shallow:** Mobility 1 to 3 for **Hot Potato** (signature).
@@ -566,7 +603,7 @@ from revision 1 is dropped: Outbreak does it.
 
 | Archetype | Offense | Defense | Mobility | Genealogy |
 | --- | --- | --- | --- | --- |
-| Playmaker | **Setup**: enemies you crowd-control take 25% more damage from allies (not you) for 2 s after it ends | **Crowd Shield**: +1 Fortified for each enemy you have crowd-controlled within 300 (up to 5) | **Hot Potato**: an enemy you Grapple, pull or knock back becomes the centre of your next core cast within 4 s, wherever it is | **Lockdown**: crowd control on enemies your core affects lasts 50% longer and is Doomed |
+| Playmaker | **Setup**: enemies you grab, throw, slam or knock up are Vulnerable ×3 for 3 s, so the crew hits them harder | **Crowd Shield**: +1 Fortified for each enemy you have crowd-controlled within 300 (up to 5) | **Gather** (was Hot Potato): an enemy you throw, slam, pull or knock up takes the debuffs off every enemy it hits | **Lockdown**: crowd control on enemies your core affects lasts 50% longer and is Doomed |
 | Winger | **Conduit**: your heals also give the ally 1 stack of every buff you carry | **Purifier**: your heals Purify one debuff on the ally | **Arrival**: ending your SHIFT within 150 of an ally Hastes them ×2 and heals 5% of their max health | **Lifeblood**: your core heals each ally it affects for 3% of max health per effect it changes on them |
 | Defender | **Retribution**: damage your Guard, shields and Fortified prevent builds up to 60; your next hit deals it | **Lightning Rod**: SHIFT Marks you for 3 s (enemies within 300 attack you); Fortified ×2 while Marked | **Anchor**: after 1 s without moving, allies within 250 are Fortified ×1 and Unbounded | **Bastion**: your Guard regenerates 1 stack every 2 s (up to 3); every 25 max health above base raises your Guard cap by 1 |
 | Striker | **Overkill**: crit chance over 100% becomes crit damage; Sharpened stacks past the cap add 10% crit damage each | **Overclock**: always Vulnerable ×3; Empowered caps 3 higher, and you start each fight Empowered ×2 | **Momentum**: +1% damage per 1% move speed above base (up to +40%) | **Opportunist**: killing an enemy carrying a debuff a crewmate applied takes 1 s off your core's cooldown |

@@ -21,6 +21,31 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-26: Playmakers are credited for plays; Gather replaces Hot Potato (proposal)
+- **Decision** (option A chosen by a human in the design session; nothing
+  built in the game): a Playmaker's value is the setup the crew cashes in.
+  Proposed in `specs/infusion-builds.md` ("Playmaker feel"): setup credit
+  in the score (teammates' damage on enemies you moved or controlled in the
+  last 3 s), "PLAY MADE" callouts, the Setup talent making displaced enemies
+  Vulnerable ×3, Gather (displaced enemies take the debuffs off whatever they
+  hit) replacing Hot Potato, and Outbreak copying the full pile.
+- **Pillars:**
+  - **Comradery** decided it: individual skill shows as the team's
+    result, and the top-score infusion stops excluding Playmakers.
+  - **Creative Builds:** serves; Gather is built on general actions
+    (displacement) and the effects system, not on one character.
+  - **Crunch:** serves; the throw path and which enemy to carry become
+    the decision.
+  - **Clarity:** serves; the payoff is named on screen. Risk: full-pile copy
+    plus Stoke clears packs instantly.
+- **Why:** in a browser sandbox the build's own damage was dwarfed by the
+  Striker's, which `ARCHETYPES.md` intends (Playmaker DMG Very Low), so the
+  scoring, not the damage, had to change. Option B (Striker-level damage for
+  the build) was rejected as breaking the archetype.
+- **Status:** Proposed (direction accepted by a human; numbers untested
+  with players)
+- **Where:** `specs/infusion-builds.md`
+
 ## 2026-11-25: Cores become genus verbs; archetypes get multipliers and signature talents
 - **Decision** (requested by a human in the design session, revising the
   infusion-builds proposal below; nothing built):
