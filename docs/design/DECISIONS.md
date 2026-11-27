@@ -21,6 +21,57 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-27: Core gameplay direction: threat, auto-attacks, targeting, fixed crew, full roster
+- **Decision** (a human's, after watching the party sim; nothing built):
+  1. **Threat.** Enemies choose targets from a threat table fed by attacks
+     and abilities, not the nearest player. Taunting puts you at the top
+     of it, instead of being an effect. Threat generation is a stat that
+     can reward Defenders.
+  2. **Auto-attacks.** LMB stops being a skill shot and becomes a targeted
+     auto-attack that repeats until cancelled, modelled on League of
+     Legends. Classic mode (click-move, the default): RMB moves and
+     attacks, attack-move auto-attacks the nearest enemy, attacks can be
+     animation-cancelled, and the RMB ability moves to W. Modern mode
+     (WASD, and controller): movement is locked until the swing ends. A
+     toggle in the in-game menu; later maybe a choice in the tutorial.
+     Odd LMBs (Kade's mirror, El Presidente's grab, Stitches' self-hit)
+     should still feel like auto-attacks.
+  3. **Targeting.** A current target with Tab cycling, a target plate that
+     shows its effects with clock timers, and ally frames down the left
+     side that can be clicked to target.
+  4. **New enemy models.** The human made Venoxarid models for the warden,
+     withered prisoner, behemoth, channeler and an assassin on Meshy.
+  5. **Every character playable** in character select, with the human
+     making all hero models, so the game is not built around one hero per
+     role.
+  6. **One per archetype.** Every match has exactly one Playmaker,
+     Striker, Winger and Defender; CPUs fill the roles players did not
+     take.
+  7. **Build system.** Implement `specs/infusion-builds.md` (verb cores,
+     Gather, Crown, archetype multipliers, signature talents). It is not
+     final, but it is better than what is there now.
+- **Pillars:**
+  - **Clarity** decided 1 to 3: a locked target, visible aggro and timers
+    on effects make the fight readable.
+  - **Comradery** decided 1 and 6: the Defender protects through threat,
+    and a fixed crew shape lets each role be balanced to need the others.
+  - **Creative builds** decided 5 and 7: the whole roster and real build
+    choices keep runs from repeating.
+  - **Trades:** auto-attacks give up skill-shot aim as a skill; positioning
+    and animation cancelling replace it. Modern mode cannot cancel, so it
+    is a little slower by design. A fixed crew rules out double-Striker
+    and similar comps.
+- **Why:** the prototypes felt floaty with skill shots. The human's group
+  plays League, so its controls are a familiar on-ramp. Balancing 1 to 4
+  heroes of any role is much harder than one fixed crew.
+- **Open:** whether healing makes threat; whether ship raiders follow
+  threat; whether ally abilities use the selected ally; how the 8
+  characters without kits get them (Eliana, Fagan, Lilith, MILES, Mordryn,
+  Namora, Stitches, Valthor). The risk to watch is CPU quality: a weak CPU
+  Winger would deny the player's fun (Comradery).
+- **Status:** Accepted (by a human, as direction); not built
+- **Where:** plan doc "From Prototypes to the Real Game: Plan"
+
 ## 2026-11-27: Enemy roles: each enemy asks one archetype's question (proposal)
 - **Decision** (ideas and skill identities from a human in the design
   session; rules and numbers are first guesses; nothing built in the game):
