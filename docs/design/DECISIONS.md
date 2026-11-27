@@ -21,6 +21,42 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-27: Mina, MILES, Stitches, Eliana and Lilith get generated bodies
+- **Decision:** Five heroes are now generated models (made on Meshy by a
+  human, fitted by a human in the joint editor) with forge actors and
+  baked sheets. Their props are separate models on their own joints:
+  Mina's big bomb on her back (it comes off for the Long Shot) and small
+  ball (at her foot for the pass, under her arm for Handball), MILES's
+  keyboard held at his belly, Stitches' bag across his back. Heights: Mina
+  1.8, MILES 1.85, Stitches 2.05, Eliana 1.9, Lilith 1.95. Clips are
+  idle, run, hit, death and one per ability under the generic names the
+  game asks for (attack, secondary, special, mobility), each shaped after
+  the kit in the Character Concepts doc. Mina is the only one of the five
+  in the arena; the game picks her new sheet up by name.
+- **Pillars:** Clarity serves: each has one signature piece that breaks
+  the outline (Mina's bomb, MILES's keyboard, Stitches' bag, Eliana's
+  hair, Lilith's hat brim), and ability clips show the ability (the Long
+  Shot's bomb set down and kicked, MILES plunging forward into a target).
+  Creative Builds: neutral; no kit changed.
+- **Why:** Lane B of the plan: every hero on a generated model. Choices a
+  human should check: MILES holding the keyboard at his belly all the
+  time (it makes his outline, but no doc says how he carries it); Mina's
+  Long Shot has no held charge pose (the game plays generic clips on
+  release); Lilith's apple is not attached yet (her Forbidden Fruit raise
+  is empty-handed until it lands). Eliana's and Lilith's long coats are
+  on the body, so the tails follow the legs instead of swinging (the
+  model README prefers loose cloth off the body); regenerating without
+  them would cost credits. Lilith's hem hung beside her hands and tore
+  with them; a new skinning option (`floors` in skin.prepare) gives the
+  hem to her hips instead. These are first-pass motions, verified in
+  previews only, not in a match.
+- **Status:** Built, needs review
+- **Where:** `tools/sprite_forge/actors/{mina,miles,stitches,eliana,lilith,_hero}.py`,
+  `art/models/`, `docs/design/ART_DIRECTION.md` (Shape briefs), issue
+  FWFsoft/gambit#99
+
+---
+
 ## 2026-11-27: Five Venoxarid role enemies get their bodies and motion
 - **Decision:** The Diver, Warden, Prisoner, Behemoth and Channeler are
   generated models (made on Meshy by a human, fetched and shrunk for free),

@@ -297,6 +297,32 @@ side.
 
 ![The forge cast](../prototype/silhouettes_cast.png)
 
+**Mina: the bombs.** A street footballer in tactical kit: bandaged and
+armoured legs, grenade canisters on her shoulders, a high ponytail. The
+oversized soccer bomb on her back is the signature piece and rounds off
+her outline from every side. She waits like a player for the pass, hands
+on hips, right foot out. Her small ball appears at her instep for the
+pass and under her arm for Handball; the big one comes off her back for
+the Long Shot.
+
+**MILES: the keyboard.** A hooded hacker in an oversized cream parka and
+respirator. He holds his keyboard in front of his belly like a tray and is
+always typing: a flat slab at the waist nobody else has. Head down,
+shoulders hunched over the keys.
+
+**Stitches: the bag.** A hulking, grinning medic in a ragged,
+blood-spattered white coat. The duffle bag slung across his back widens
+his shoulders from behind and the side; huge bare hands hang open in
+front. Wide, loose stance.
+
+**Eliana: the hair.** A gothic witch in violet: a great mass of curly
+purple hair tops her outline and a long ragged coat flares from the hips.
+Hip cocked, one hand on it, the other raised at her chest mid-hex.
+
+**Lilith: the hat.** A crimson witch-hunter: the wide black hat brim is
+her top edge, puffed red sleeves square the shoulders, a flared red coat
+widens her to the ankles. Poised and still, hand on hip.
+
 **For the rest of the cast**, start from their concept art; most of it
 already has strong outline hooks:
 - Zephyr: a ragged, flowing cloak.
