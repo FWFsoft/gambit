@@ -333,6 +333,37 @@ They differ from heroes by colour first (no hero is acid green on purple)
 and from each other by size and the tank. The crowd problem below is worse
 with hero-sized enemies and is still open.
 
+**The Venoxarid roles** (2026-11-27; briefs in the "New Enemy Models:
+Brief" doc, roles in `specs/enemy-roles.md`). Five more generated models,
+one per role, each told apart by body plan and pose, not just size:
+
+- **Diver: the pouncer.** 0.9x a hero but all limbs: skinny, long arms and
+  clawed toes, hood up with the crest through it. Always crouched low,
+  never upright like the grunt. Its leap, every limb spread and claws
+  forward, is the most recognisable shape in the roster: it is seen
+  mostly in the air.
+- **Warden: the jailer.** A head taller than a hero, broad and upright.
+  Riveted armoured coat to mid-thigh and a ring of big brass keys on the
+  belt; walks tall, one fist clamped at the hip on the chains (code
+  draws the chains). When its prisoners are gone it hunches with its
+  guard down.
+- **Prisoner: not an enemy.** 0.7x a hero, withered and pale, collar and
+  shackles, a torn smock. Every pose folds inward (cowering, dragged by
+  the neck); it never squares up. Freed, it stands up straight for the
+  first time and runs.
+- **Behemoth: the ship-breaker.** The biggest thing in a fight: about
+  twice a hero's height and three times as wide (HEIGHT 4.2, drawn at
+  PIXEL_SCALE 2 so it has a hero's pixel density). A spiked, harnessed
+  gorilla with pillar arms and the head carried low and forward like a
+  ram. Upright, not the knuckle-walker the brief asked for: the model
+  was kept, and the low arm swing carries that read.
+- **Channeler: the priest.** Hero-sized, robed, standing tall behind the
+  pack. The spiked iron halo behind its head is the signature piece and
+  tops its outline from every side; the glowing canisters on its back
+  carry the genus glow. Channelling, its arms open in a wide V either
+  side of the halo. (The brief's hype man with a megaphone was dropped
+  for this model.)
+
 ## Beyond silhouettes: finding yourself in a crowd
 
 ![The crowd test](../prototype/crowd_before_after.png)

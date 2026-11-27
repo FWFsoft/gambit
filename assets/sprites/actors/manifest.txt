@@ -146,6 +146,31 @@ anim Toxlith run 48 6 14 1
 anim Toxlith attack 96 7 14 0
 anim Toxlith hit 152 3 16 0
 anim Toxlith death 176 7 12 0
+actor VenoxaridBehemoth assets/sprites/actors/VenoxaridBehemoth.png 280 260 140 180 22 2 smooth
+anim VenoxaridBehemoth idle 0 8 6 1
+anim VenoxaridBehemoth run 64 8 8 1
+anim VenoxaridBehemoth attack 128 12 12 0
+anim VenoxaridBehemoth blocked 224 8 8 1
+anim VenoxaridBehemoth braced 288 8 6 1
+anim VenoxaridBehemoth hit 352 4 12 0
+anim VenoxaridBehemoth death 384 12 10 0
+actor VenoxaridChanneler assets/sprites/actors/VenoxaridChanneler.png 184 168 92 132 22 1 smooth
+anim VenoxaridChanneler idle 0 8 8 1
+anim VenoxaridChanneler run 64 8 10 1
+anim VenoxaridChanneler plant 128 6 12 0
+anim VenoxaridChanneler channel 176 12 12 1
+anim VenoxaridChanneler interrupted 272 8 14 0
+anim VenoxaridChanneler rally 336 8 12 0
+anim VenoxaridChanneler hit 400 4 16 0
+anim VenoxaridChanneler death 432 9 12 0
+actor VenoxaridDiver assets/sprites/actors/VenoxaridDiver.png 264 184 132 140 18 1 smooth
+anim VenoxaridDiver idle 0 8 10 1
+anim VenoxaridDiver run 64 8 14 1
+anim VenoxaridDiver attack 128 12 14 0
+anim VenoxaridDiver maul 224 6 14 1
+anim VenoxaridDiver caught 272 10 12 0
+anim VenoxaridDiver hit 352 4 16 0
+anim VenoxaridDiver death 384 9 12 0
 actor VenoxaridElite assets/sprites/actors/VenoxaridElite.png 264 234 132 192 17 1 smooth
 anim VenoxaridElite idle 0 8 8 1
 anim VenoxaridElite run 64 8 12 1
@@ -158,6 +183,20 @@ anim VenoxaridGrunt run 64 8 12 1
 anim VenoxaridGrunt attack 128 9 16 0
 anim VenoxaridGrunt hit 200 4 16 0
 anim VenoxaridGrunt death 232 9 12 0
+actor VenoxaridPrisoner assets/sprites/actors/VenoxaridPrisoner.png 136 124 68 100 19 1 smooth
+anim VenoxaridPrisoner idle 0 8 8 1
+anim VenoxaridPrisoner run 64 8 10 1
+anim VenoxaridPrisoner freed 128 8 12 0
+anim VenoxaridPrisoner flee 192 8 14 1
+anim VenoxaridPrisoner hit 256 4 16 0
+anim VenoxaridPrisoner death 288 9 10 0
+actor VenoxaridWarden assets/sprites/actors/VenoxaridWarden.png 240 216 120 172 19 1 smooth
+anim VenoxaridWarden idle 0 8 8 1
+anim VenoxaridWarden run 64 8 10 1
+anim VenoxaridWarden attack 128 10 14 0
+anim VenoxaridWarden exposed 208 8 8 1
+anim VenoxaridWarden hit 272 4 16 0
+anim VenoxaridWarden death 304 9 12 0
 actor Wade assets/sprites/actors/Wade.png 176 156 88 128 34 1 smooth
 anim Wade idle 0 12 12 1
 anim Wade run 96 10 15 1

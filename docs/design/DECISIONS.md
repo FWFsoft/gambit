@@ -21,6 +21,51 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-27: Five Venoxarid role enemies get their bodies and motion
+- **Decision:** The Diver, Warden, Prisoner, Behemoth and Channeler are
+  generated models (made on Meshy by a human, fetched and shrunk for free),
+  fitted by a human in the joint editor and animated in the sprite forge.
+  Baked sheets: `assets/sprites/actors/Venoxarid<Role>.png`. Sizes: Diver
+  1.85, Warden 2.6, Prisoner 1.4, Channeler 1.85, Behemoth 4.2 (a hero is
+  1.95). Clips follow the brief's poses: Diver idle/run/attack (wind-up,
+  spread leap, land)/maul/caught; Warden run (dragging)/attack
+  (yank)/exposed; Prisoner idle (cower)/run (dragged)/freed/flee and no
+  attack; Behemoth run (lumber)/attack (two-fist smash)/blocked/braced;
+  Channeler run/plant/channel/interrupted/rally. All have idle, hit and
+  death. The model file named `alien_assassin` on Meshy is the Diver.
+- **Pillars:** Clarity serves: each role reads by pose and body plan (the
+  Diver's spread leap, the Warden's clamped fist, the Prisoner folding
+  inward so nobody wastes hits on it, the Behemoth's raised fists as the
+  smash telegraph, the Channeler's V of arms). Attack wind-ups are the
+  first 45% of `attack`, as for the thugs, so the client can hold them
+  for the server telegraph. Comradery serves: one body per role archetype
+  so each archetype gets its moment.
+- **Why:** Two models differ from the brief and a human kept both
+  (2026-11-27): the Channeler is a robed priest with a halo, not a hype
+  man with a megaphone (it still reads "caster"; no prop to drop when
+  interrupted, so the interrupt reads from the stagger and code's
+  INTERRUPTED alone); the Behemoth is an upright gorilla, not a low
+  knuckle-walker (its arms still swing near the ground). The human asked
+  for the Behemoth "way bigger" than a hero: 4.2 makes it about 2.15x a
+  hero's height and roughly 3x the width, past the brief's 2.7x width.
+  That works against Clarity in a crowd (the brief's open question 6:
+  it can hide the crew); the per-player outline is more urgent now. It is
+  drawn at PIXEL_SCALE 2 to fit the sheet under 8192 px and to keep a
+  hero's pixel density. silhouette.py first flagged the Channeler's plain
+  upright idle against the Grunt (0.83), Kade and Jeff; its idle is now a
+  preacher's wide A of arms, claws spread, and none of those pairs is
+  flagged. Two shape-only flags remain and were accepted: Prisoner/Jeff
+  and Behemoth/Isaac, whose real-size overlap is 0.42 and 0.18 (size
+  tells them apart). No game code uses these sheets yet: the roles'
+  behaviour is separate work, and the clip names here are what it should
+  ask for.
+- **Status:** Built, needs review
+- **Where:** `tools/sprite_forge/actors/venoxarid_{diver,warden,prisoner,behemoth,channeler}.py`,
+  `art/models/Venoxarid*.{glb,fit.json}`, `docs/design/ART_DIRECTION.md`
+  (Enemies), issue FWFsoft/gambit#98
+
+---
+
 ## 2026-11-25: Field stations: the suit opens at a wild camp for 8 scrap
 - **Decision:** At night, a player camped away from the ship can spend 8
   carried scrap to set up a **field station** at their camp. Until dawn,
