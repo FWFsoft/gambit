@@ -1,6 +1,6 @@
-"""Lilith, the Temptress (Winger). Body from art/models/Lilith.glb. Her
-apple (Forbidden Fruit) is still being made; it goes on a joint in her
-right hand when it lands.
+"""Lilith, the Temptress (Winger). Body from art/models/Lilith.glb; the
+forbidden fruit in her right hand is art/models/LilithApple.glb, a
+swirling crimson orb she always carries and raises for Forbidden Fruit.
 
 Shape brief: a crimson witch-hunter. The wide black hat brim is the top
 of her outline and nobody else has it; puffed red sleeves square her
@@ -29,6 +29,7 @@ import skin
 
 NAME = "Lilith"
 MODEL = "art/models/Lilith.glb"
+APPLE = "art/models/LilithApple.glb"
 HEIGHT = 1.95
 YAW = 0.0
 STYLE = "ink"
@@ -45,6 +46,7 @@ def build():
     m = Model(NAME)
     skin.attach(m, os.path.join(h.REPO, MODEL), HEIGHT, FIT, yaw=YAW,
                 floors=FLOORS)
+    h.prop(m, APPLE, "apple", "wrist_R", h.palm(m, "R"), 0.15 * K)
     return m, stand()
 
 
