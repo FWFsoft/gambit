@@ -567,7 +567,7 @@ class Skin:
 def prepare(path, height, fit=None, yaw=0.0, skeleton=HUMANOID,
             tails=HUMANOID_TAILS, down=HUMANOID_DOWN, level=HUMANOID_LEVEL,
             cache=True, log=print, centre_x=0.0, hands=False, collars=False,
-            rigid=()):
+            rigid=(), floors=()):
     """Everything attach() does short of touching a Model. Returns a dict:
     obj, imported (Nx3), fit, weights, rest (Nx3), rest_pos, skeleton.
     hands=True adds the fingers joints (HUMANOID_HANDS); collars=True adds
@@ -576,7 +576,15 @@ def prepare(path, height, fit=None, yaw=0.0, skeleton=HUMANOID,
     rigid: boxes of the imported mesh bolted to one joint, overriding the
     automatic weights, for hard parts that are not limbs (Jeff's tank
     treads). Each is (joint, z_max, abs_x_max): every vertex below z_max
-    and within abs_x_max of the centre line follows `joint` alone."""
+    and within abs_x_max of the centre line follows `joint` alone.
+
+    floors: heights below which some joints may not pull the surface, for
+    loose cloth that hangs beside a limb (Lilith's coat hem by her hands).
+    Each is (joints, z_min, to, keep): below z_min, a vertex farther than
+    `keep` (forge units) from every bone of `joints` hands its share of
+    `joints` to the joint `to` (usually "hips", which keeps a hem steady).
+    Vertices within `keep` of those bones are the limb itself (a hand
+    hanging low) and are left alone."""
     humanoid = skeleton is HUMANOID
     if hands:
         assert humanoid, "hands=True extends the humanoid skeleton only"
@@ -609,6 +617,19 @@ def prepare(path, height, fit=None, yaw=0.0, skeleton=HUMANOID,
         w = w.copy()
         w[inside] = 0.0
         w[inside, names_.index(joint)] = 1.0
+    for joints, z_min, to, keep in floors:
+        cols = [names_.index(j) for j in joints]
+        assert to in names_ and to not in joints, f"floors: bad joint {to}"
+        # The limb itself (a hand hanging below z_min) lies on its own
+        # bones; cloth hangs away from them.
+        near = np.full(len(v), np.inf)
+        for j in joints:
+            a, b = np.array(full[j]), np.array(full[tails[j]])
+            near = np.minimum(near, _segment_distance(v, a, b))
+        cloth = (v[:, 2] < z_min) & (near > keep)
+        w = w.copy()
+        w[cloth, names_.index(to)] += w[np.ix_(cloth, cols)].sum(1)
+        w[np.ix_(cloth, cols)] = 0.0
     xf, rest_pos = straighten(skeleton, full, down or {}, level or ())
     names = [n for n, _ in skeleton]
     order = np.argsort(-w, axis=1)[:, :WEIGHTS_PER_VERTEX]
