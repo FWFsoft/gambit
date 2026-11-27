@@ -21,6 +21,36 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-27: Enemy roles: each enemy asks one archetype's question (proposal)
+- **Decision** (ideas and skill identities from a human in the design
+  session; rules and numbers are first guesses; nothing built in the game):
+  `specs/enemy-roles.md`. Archetype skills: Playmaker clutch, Striker
+  uptime, Winger vision and decisions then defensive clutch, Defender
+  knowing your limits. Roster: Diver (ignores damage and effects, dies to
+  any control), Channeler (interruptible 3 s rally), Warden with prisoners
+  (it moves its debuffs onto them; healing or buffing a prisoner frees it),
+  Hex totem (cleanse destroys it, purify turns it into a buff zone),
+  Juggernaut (regenerates unless hit constantly), Behemoth (body-block it
+  or it smashes the ship), Bruiser (only Defenders can stand in front of
+  it), plus genus twists (burning Magnarok enemies quenched and made
+  Brittle by water).
+- **Pillars:**
+  - **Comradery** decided it: every archetype has moments only it handles
+    well, so crews need each other.
+  - **Crunch:** serves; enemies force quick, weighty choices instead of a
+    pile to grind through.
+  - **Creative Builds:** serves; builds now make an archetype's answer
+    bigger instead of giving it a second job.
+  - **Clarity:** weakens unless every question has its own telegraph (cast
+    bar, leap warning, chains, totem range); the spec asks for them.
+- **Why:** in the Presidente Sandbox, against a uniform horde, an idle
+  Playmaker cost his crewmate almost nothing and his build lost to his bare
+  kit. With Divers and Channelers added (3 min each, autopilot): idle,
+  Mina went down 8 times (was 4); bare kit 4 downs, 364 kills; full build
+  2 downs, 427 kills and more setup credit than the bare kit.
+- **Status:** Proposed
+- **Where:** `specs/enemy-roles.md`
+
 ## 2026-11-26: Playmakers are credited for plays; Gather replaces Hot Potato (proposal)
 - **Decision** (option A chosen by a human in the design session; nothing
   built in the game): a Playmaker's value is the setup the crew cashes in.
