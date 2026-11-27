@@ -323,6 +323,11 @@ Hip cocked, one hand on it, the other raised at her chest mid-hex.
 her top edge, puffed red sleeves square the shoulders, a flared red coat
 widens her to the ankles. Poised and still, hand on hip.
 
+**Valthor: the greatcoat.** A white-haired commander in a long,
+high-collared royal blue greatcoat with gold buttons, a glowing visor and
+armoured gauntlets. Chest out, chin up, the left elbow jutting out with
+the fist at his belt: a one-sided outline, the right gauntlet clenched.
+
 **For the rest of the cast**, start from their concept art; most of it
 already has strong outline hooks:
 - Zephyr: a ragged, flowing cloak.

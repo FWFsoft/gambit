@@ -21,14 +21,17 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
-## 2026-11-27: Mina, MILES, Stitches, Eliana and Lilith get generated bodies
+## 2026-11-27: Mina, MILES, Stitches, Eliana, Lilith and Valthor get generated bodies
 - **Decision:** Five heroes are now generated models (made on Meshy by a
   human, fitted by a human in the joint editor) with forge actors and
   baked sheets. Their props are separate models on their own joints:
   Mina's big bomb on her back (it comes off for the Long Shot) and small
   ball (at her foot for the pass, under her arm for Handball), MILES's
-  keyboard held at his belly, Stitches' bag across his back. Heights: Mina
-  1.8, MILES 1.85, Stitches 2.05, Eliana 1.9, Lilith 1.95. Clips are
+  keyboard held at his belly, Stitches' bag across his back, Lilith's
+  fruit (a crimson orb) in her right hand, raised for Forbidden Fruit.
+  Heights: Mina 1.8, MILES 1.85, Stitches 2.05, Eliana 1.9, Lilith 1.95,
+  Valthor 2.0. Valthor has no movement ability; his "mobility" clip is
+  Judgment of the Sovereign (a fist raised and brought down). Clips are
   idle, run, hit, death and one per ability under the generic names the
   game asks for (attack, secondary, special, mobility), each shaped after
   the kit in the Character Concepts doc. Mina is the only one of the five

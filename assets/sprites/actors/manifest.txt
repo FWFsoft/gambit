@@ -191,6 +191,15 @@ anim Toxlith run 48 6 14 1
 anim Toxlith attack 96 7 14 0
 anim Toxlith hit 152 3 16 0
 anim Toxlith death 176 7 12 0
+actor Valthor assets/sprites/actors/Valthor.png 188 172 94 136 22 1 smooth
+anim Valthor idle 0 8 8 1
+anim Valthor run 64 8 11 1
+anim Valthor attack 128 7 14 0
+anim Valthor secondary 184 10 12 0
+anim Valthor special 264 8 12 0
+anim Valthor mobility 328 10 12 0
+anim Valthor hit 408 4 16 0
+anim Valthor death 440 9 12 0
 actor VenoxaridBehemoth assets/sprites/actors/VenoxaridBehemoth.png 280 260 140 180 22 2 smooth
 anim VenoxaridBehemoth idle 0 8 6 1
 anim VenoxaridBehemoth run 64 8 8 1
