@@ -1,3 +1,12 @@
+actor Eliana assets/sprites/actors/Eliana.png 196 172 98 132 22 1 smooth
+anim Eliana idle 0 8 8 1
+anim Eliana run 64 8 12 1
+anim Eliana attack 128 7 16 0
+anim Eliana secondary 184 12 12 0
+anim Eliana special 280 8 14 0
+anim Eliana mobility 344 8 12 0
+anim Eliana hit 408 4 16 0
+anim Eliana death 440 9 12 0
 actor Gravon assets/sprites/actors/Gravon.png 206 184 103 115 28 1.55 smooth
 anim Gravon idle 0 6 5 1
 anim Gravon run 48 6 9 1
@@ -65,6 +74,33 @@ anim Kade death 752 12 12 0
 actor KadeMirror assets/sprites/actors/KadeMirror.png 176 156 88 128 16 1 smooth
 anim KadeMirror idle 0 1 1 1
 anim KadeMirror deploy 8 8 20 0
+actor Lilith assets/sprites/actors/Lilith.png 204 176 102 136 21 1 smooth
+anim Lilith idle 0 8 8 1
+anim Lilith run 64 8 12 1
+anim Lilith attack 128 8 16 0
+anim Lilith secondary 192 10 12 0
+anim Lilith special 272 8 12 0
+anim Lilith mobility 336 8 12 0
+anim Lilith hit 400 4 16 0
+anim Lilith death 432 9 12 0
+actor MILES assets/sprites/actors/MILES.png 184 168 92 132 22 1 smooth
+anim MILES idle 0 8 8 1
+anim MILES run 64 8 12 1
+anim MILES attack 128 8 14 0
+anim MILES secondary 192 8 16 0
+anim MILES special 256 8 12 0
+anim MILES mobility 320 8 12 0
+anim MILES hit 384 4 16 0
+anim MILES death 416 9 12 0
+actor Mina assets/sprites/actors/Mina.png 192 176 96 136 22 1 smooth
+anim Mina idle 0 8 8 1
+anim Mina run 64 8 12 1
+anim Mina attack 128 7 16 0
+anim Mina secondary 184 12 14 0
+anim Mina special 280 10 12 0
+anim Mina mobility 360 8 14 1
+anim Mina hit 424 4 16 0
+anim Mina death 456 9 12 0
 actor Nolan assets/sprites/actors/Nolan.png 176 156 88 128 26 1 smooth
 anim Nolan idle 0 12 10 1
 anim Nolan run 96 10 15 1
@@ -131,6 +167,15 @@ actor ShipTurretBase assets/sprites/actors/ShipTurretBase.png 224 184 112 136 8 
 anim ShipTurretBase idle 0 1 1 1
 actor ShipTurretTween assets/sprites/actors/ShipTurretTween.png 224 184 112 136 8 1 smooth
 anim ShipTurretTween idle 0 1 1 1
+actor Stitches assets/sprites/actors/Stitches.png 200 184 100 144 22 1 smooth
+anim Stitches idle 0 8 7 1
+anim Stitches run 64 8 11 1
+anim Stitches attack 128 8 14 0
+anim Stitches secondary 192 12 14 0
+anim Stitches special 288 8 14 0
+anim Stitches mobility 352 8 16 1
+anim Stitches hit 416 4 16 0
+anim Stitches death 448 9 12 0
 actor Suds assets/sprites/actors/Suds.png 130 130 65 111 23 1.35
 anim Suds idle 0 8 8 1
 anim Suds run 64 8 12 1
