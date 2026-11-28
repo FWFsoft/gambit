@@ -19,6 +19,8 @@ import os
 
 from forge import Clip, Key, Model
 import _hero as h
+import _rig
+import anim
 import skin
 
 PIXEL_SCALE = 1.35  # chunkier art pixels, same size on screen (see forge.ActorSpec)
@@ -215,7 +217,7 @@ def sitout_keys(land_t):
     return keys
 
 
-def clips():
+def code_clips():
     idle = [Key(f / 8, stance(3 * math.sin(f / 8 * 2 * math.pi)),
                 (0, 0, -0.03 - 0.008 * math.sin(f / 8 * 2 * math.pi)))
             for f in range(9)]
@@ -327,3 +329,112 @@ def clips():
             Key(0.7, lying, (0, 0.10, 0.16), rot=(-88, 0, 0), ease="in"),
             Key(1.0, lying, (0, 0.10, 0.16), rot=(-90, 0, 0))]),
     ]
+
+
+# ---- El Splash de Rana as editable data (pose_editor.py) -------------------
+# The empty-handed LSHIFT ("splash") is keyed in the pose editor against four
+# reference models (art/models/refs/PresidenteSplash1-4.glb): jump squat,
+# initial leap, mid-air tuck, splash spread. It is saved to
+# art/models/Presidente.anim.json; every other clip is still code above.
+# 14 frames at 18 fps; the server lands him 0.6 s in (frame ~10.8).
+
+SPLASH_FRAMES = (0, 3, 6, 10)
+
+_TABLE = None
+_RIG = None
+
+
+def joint_table():
+    """This body's joints as [(name, parent, rest position)], for the rig."""
+    global _TABLE
+    if _TABLE is None:
+        import bpy
+        data = skin.prepare(os.path.join(h.REPO, MODEL), HEIGHT, FIT,
+                            log=lambda *a: None, floors=FLOORS)
+        bpy.data.objects.remove(data["obj"], do_unlink=True)
+        _TABLE = [(n, p, tuple(float(c) for c in data["rest_pos"][n]))
+                  for n, p in data["skeleton"]]
+    return _TABLE
+
+
+def rig():
+    global _RIG
+    if _RIG is None:
+        _RIG = _rig.Rig(joint_table(), max_reach=0.999)
+    return _RIG
+
+
+def splash_poses():
+    """The first guess at the four keys, as (frame, pose, root offset,
+    root rotation), from the reference models. A human dials them in."""
+    s = stance()
+    squat = with_(s, hips=(-6, 0, 0), abdomen=(16, 0, 0), chest=(24, 0, 0),
+                  neck=(-20, 0, 0),
+                  # left hand down to the floor between the feet
+                  shoulder_L=(-50, -14, 0), elbow_L=(-6, 0, 0),
+                  # right fist pulled back by the hip
+                  shoulder_R=(30, 34, 0), elbow_R=(-100, 0, 0),
+                  hip_L=(-78, -22, 0), knee_L=(118, 0, 0), ankle_L=(-34, 8, 0),
+                  hip_R=(-78, 22, 0), knee_R=(118, 0, 0), ankle_R=(-34, -8, 0))
+    leap = with_(s, hips=(0, 0, 0), abdomen=(0, 0, 0), chest=(-6, 0, 0),
+                 neck=(-6, 0, 0),
+                 # both fists up at the chest
+                 shoulder_L=(-50, -34, 0), elbow_L=(-110, 0, 0),
+                 shoulder_R=(-50, 34, 0), elbow_R=(-110, 0, 0),
+                 # left knee driving up, right leg trailing, toe pointed
+                 hip_L=(-86, -10, 0), knee_L=(96, 0, 0), ankle_L=(-10, 0, 0),
+                 hip_R=(14, 10, 0), knee_R=(34, 0, 0), ankle_R=(34, 0, 0))
+    tuck = with_(s, hips=(-10, 0, 0), abdomen=(24, 0, 0), chest=(30, 0, 0),
+                 neck=(10, 0, 0),
+                 # hands on the shins
+                 shoulder_L=(-46, -14, 0), elbow_L=(-50, 0, 0),
+                 shoulder_R=(-46, 14, 0), elbow_R=(-50, 0, 0),
+                 hip_L=(-120, -12, 0), knee_L=(140, 0, 0), ankle_L=(-10, 0, 0),
+                 hip_R=(-120, 12, 0), knee_R=(140, 0, 0), ankle_R=(-10, 0, 0))
+    spread = with_(s, hips=(0, 0, 0), abdomen=(-8, 0, 0), chest=(-14, 0, 0),
+                   neck=(-24, 0, 0),
+                   # arms flung wide and forward
+                   shoulder_L=(-70, -80, 0), elbow_L=(-10, 0, 0),
+                   shoulder_R=(-70, 80, 0), elbow_R=(-10, 0, 0),
+                   # legs stretched out behind, a little apart
+                   hip_L=(14, -14, 0), knee_L=(16, 0, 0), ankle_L=(30, 0, 0),
+                   hip_R=(14, 14, 0), knee_R=(16, 0, 0), ankle_R=(30, 0, 0))
+    a, b, c, d = SPLASH_FRAMES
+    return [(a, squat, (0, 0, -0.42), (0, 0, 0)),
+            (b, leap, (0, -0.10, 0.55), (0, 0, 0)),
+            (c, tuck, (0, -0.25, 1.05), (0, 0, 0)),
+            # face down, flat, still high: he lands on the next frames
+            (d, spread, (0, -0.45, 0.60), (78, 0, 0))]
+
+
+def splash_animation():
+    r = rig()
+    out = anim.Builder()
+    names = ("jump squat", "initial leap", "mid-air tuck", "splash spread")
+    keys = []
+    for (frame, pose, off, rot), name in zip(splash_poses(), names):
+        keys.append((frame, out.control(r.control(pose, off), name), "smooth", rot))
+    clip = []
+    for frame, cname, how, rot in keys:
+        k = {"frame": frame, "control": cname, "ease": how}
+        if any(abs(v) > 1e-9 for v in rot):
+            k["rot"] = list(rot)
+        clip.append(k)
+    data = out.data()
+    data["clips"].append({"name": "splash", "frames": 14, "fps": 18,
+                          "loop": False, "overlap": 0.0, "keys": clip})
+    return data
+
+
+def current():
+    """The saved animation if there is one, else the first guess."""
+    data = anim.load(os.path.join(h.REPO, MODEL)) or splash_animation()
+    anim.check(data)
+    return data
+
+
+def clips():
+    """Code clips, with the ones keyed as data (splash) swapped in."""
+    made = anim.bake(current(), rig(), stance())
+    names = {c.name for c in made}
+    return [c for c in code_clips() if c.name not in names] + made
