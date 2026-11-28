@@ -21,6 +21,34 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-28: El Splash de Rana: he stays down; what he hits stays up
+- **Decision:** Landing the empty-handed splash now holds Presidente flat
+  for `SPLASH_RECOVER_MS` = 700 ms (he cannot move or act), and every
+  enemy in the 110 px splash circle is knocked airborne for the same
+  700 ms (a real knock-up, drawn in the air) instead of Stunned for
+  600 ms. Brutes and bosses keep the existing knock-up cut (x0.6, x0.25),
+  so they come down while he is still getting up. Damage, radius and
+  cooldown are unchanged; Grande Rana Bomba (holding a foe) is unchanged.
+  The clip grows from 14 to 24 frames: belly-flop, a still beat flat on
+  the floor, then a push-up, knees, crouch, standing by the window's end.
+- **Pillars:** Strategic Crunch serves: a real trade-off. Land on the
+  pack and they hang helpless while you rise; whiff, and anything you
+  missed gets 700 ms on you. Clarity serves: the knock-up now matches
+  the tooltip ("knocking up"), and lying flat shows he is open. Creative
+  Builds serves a little: airborne foes are set up for allies' follow-ups
+  (Nolan's Black-out Kick hits airborne targets).
+- **Why:** Asked for by the human, replacing the instant pop-up. Equal
+  durations make the read simple: his downtime is their downtime. 700 ms
+  is a first number (the old stun was 600); tune it in
+  src/CharacterKits.cpp with the clip (frames 11-23 at 18 fps). Not
+  checked in a match or in ArenaSim: the game did not build here (vcpkg
+  setup was blocked); the changed files compile on their own.
+- **Status:** Accepted (requested by a human)
+- **Where:** `src/CharacterKits.cpp` (PresidenteKit), `src/ArenaData.cpp`
+  (tooltip), `art/models/Presidente.anim.json`
+
+---
+
 ## 2026-11-28: El Splash de Rana keyed by hand against reference poses
 - **Decision:** Presidente's empty-handed LSHIFT ("splash", 14 frames at
   18 fps, landing 0.6 s in as the server expects) is now keyed as data

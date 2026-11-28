@@ -338,8 +338,9 @@ static const KitInfo KITS[] = {
           "that Stuns (separate cooldown).",
           9000.0f, AbilityMode::Tap, 0.0f},
          {"El Splash de Rana",
-          "Leap to the cursor and body-splash, knocking up foes where you "
-          "land. Holding a foe: Grande Rana Bomba - land on them for a much "
+          "Leap to the cursor and body-splash. Foes you land on are knocked "
+          "airborne while you get back up; you are open to anything you "
+          "missed. Holding a foe: Grande Rana Bomba - land on them for a much "
           "bigger slam.",
           9000.0f, AbilityMode::Tap, 0.0f},
      }},

@@ -336,7 +336,8 @@ def code_clips():
 # reference models (art/models/refs/PresidenteSplash1-4.glb): jump squat,
 # initial leap, mid-air tuck, splash spread. It is saved to
 # art/models/Presidente.anim.json; every other clip is still code above.
-# 14 frames at 18 fps; the server lands him 0.6 s in (frame ~10.8).
+# 24 frames at 18 fps: the server lands him 0.6 s in (frame ~10.8), then
+# holds him down for SPLASH_RECOVER_MS (700 ms, src/CharacterKits.cpp).
 
 SPLASH_FRAMES = (0, 3, 6, 10)
 

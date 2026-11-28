@@ -2548,6 +2548,11 @@ class PresidenteKit : public Kit {
   static constexpr float LEAP_MS = 600.0f;   // matches the forge clips
   static constexpr float BOMBA_MS = 620.0f;
   static constexpr float SITOUT_MS = 260.0f;  // seated after the powerbomb
+  // El Splash de Rana (empty-handed): he lies flat after the belly-flop
+  // and everything he landed on is knocked airborne for exactly as long.
+  // Hit them and they are helpless while he gets up; miss, and whatever
+  // he missed gets a free window on him.
+  static constexpr float SPLASH_RECOVER_MS = 700.0f;  // matches the forge clip
 
   static Enemy* held(AbilitySystem& sys, Player& self) {
     if (self.kitTarget == 0) return nullptr;
@@ -2603,8 +2608,11 @@ class PresidenteKit : public Kit {
     });
   }
 
+  // airMs > 0: knock everything hit airborne for that long instead of
+  // Stunning it.
   static void slam(AbilitySystem& sys, Player& self, float radius,
-                   float damage, float stunMs, VfxTheme theme) {
+                   float damage, float stunMs, VfxTheme theme,
+                   float airMs = 0.0f) {
     uint32_t id = self.id;
     uint32_t heldId = self.kitTarget;
     float cx = self.x, cy = self.y;
@@ -2614,7 +2622,11 @@ class PresidenteKit : public Kit {
       if (enemy.id == heldId) return;
       sys.damageEnemy(id, enemy, damage, DamageFlag::Explosion);
       if (Enemy* still = sys.findEnemy(enemy.id)) {
-        sys.applyToEnemy(*still, EffectType::Stunned, 1, id, stunMs);
+        if (airMs > 0.0f) {
+          sys.knockUpEnemy(*still, airMs);
+        } else {
+          sys.applyToEnemy(*still, EffectType::Stunned, 1, id, stunMs);
+        }
         sys.knockbackEnemy(*still, cx, cy, 40.0f);
       }
     });
@@ -2803,8 +2815,14 @@ class PresidenteKit : public Kit {
       if (carrying) self.kitTimer[0] = std::max(self.kitTimer[0], LEAP_MS + 200.0f);
       leap(sys, self, x, y, LEAP_MS, [&sys, carrying, radius](Player& p) {
         slam(sys, p, radius, carrying ? 45.0f : 30.0f, carrying ? 900.0f : 600.0f,
-             carrying ? VfxTheme::Fire : VfxTheme::Holy);
-        if (!carrying) return;
+             carrying ? VfxTheme::Fire : VfxTheme::Holy,
+             carrying ? 0.0f : SPLASH_RECOVER_MS);
+        if (!carrying) {
+          // Flat on the floor: he cannot move or act until he is up.
+          p.forcedVx = p.forcedVy = 0.0f;
+          p.forcedMs = SPLASH_RECOVER_MS;
+          return;
+        }
         if (Enemy* victim = held(sys, p)) {
           uint32_t vid = victim->id;
           release(sys, p);
