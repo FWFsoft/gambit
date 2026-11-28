@@ -7,6 +7,15 @@ anim Eliana special 280 8 14 0
 anim Eliana mobility 344 8 12 0
 anim Eliana hit 408 4 16 0
 anim Eliana death 440 9 12 0
+actor Fagan assets/sprites/actors/Fagan.png 196 172 98 136 21 1 smooth
+anim Fagan idle 0 8 8 1
+anim Fagan run 64 8 12 1
+anim Fagan attack 128 6 18 0
+anim Fagan secondary 176 10 12 0
+anim Fagan special 256 8 12 0
+anim Fagan mobility 320 7 14 0
+anim Fagan hit 376 4 16 0
+anim Fagan death 408 9 12 0
 actor Gravon assets/sprites/actors/Gravon.png 206 184 103 115 28 1.55 smooth
 anim Gravon idle 0 6 5 1
 anim Gravon run 48 6 9 1
@@ -101,6 +110,15 @@ anim Mina special 280 10 12 0
 anim Mina mobility 360 8 14 1
 anim Mina hit 424 4 16 0
 anim Mina death 456 9 12 0
+actor MordrynDemon assets/sprites/actors/MordrynDemon.png 264 220 132 168 21 1 smooth
+anim MordrynDemon idle 0 8 7 1
+anim MordrynDemon run 64 8 11 1
+anim MordrynDemon attack 128 8 14 0
+anim MordrynDemon secondary 192 10 12 0
+anim MordrynDemon special 272 8 12 0
+anim MordrynDemon mobility 336 8 14 0
+anim MordrynDemon hit 400 4 16 0
+anim MordrynDemon death 432 9 12 0
 actor Namora assets/sprites/actors/Namora.png 248 196 124 150 20 1 smooth
 anim Namora idle 0 8 8 1
 anim Namora run 64 8 12 1
