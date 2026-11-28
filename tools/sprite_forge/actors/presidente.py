@@ -25,7 +25,7 @@ import skin
 
 PIXEL_SCALE = 1.35  # chunkier art pixels, same size on screen (see forge.ActorSpec)
 NAME = "Presidente"
-CELL = (144, 196, 174)
+CELL = (210, 250, 174)               # wide and deep below the feet: the Splash lands him flat, arms flung forward
 MODEL = "art/models/Presidente.glb"
 HEIGHT = 2.2
 STYLE = "ink"

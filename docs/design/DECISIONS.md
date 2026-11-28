@@ -21,6 +21,34 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-28: El Splash de Rana keyed by hand against reference poses
+- **Decision:** Presidente's empty-handed LSHIFT ("splash", 14 frames at
+  18 fps, landing 0.6 s in as the server expects) is now keyed as data
+  (art/models/Presidente.anim.json). A human posed four keys in the pose
+  editor against four reference models (jump squat f0, initial leap f3,
+  mid-air tuck f6, splash spread f10). In-betweens added: a deeper load
+  (f1), a push-off with the feet still planted (f2), rising into the tuck
+  on the jump's arc (f4-5), tipping forward (f7), unfolding to the spread
+  (f8-9), a flat belly-flop impact (f11), and a snap back up to a crouch
+  (f12-13) so he is ready to run when the game frees him. As he tips
+  forward the root slides back, so the flat body (not his feet) lands on
+  the target. His cell is wider and deeper below the feet (144x196 to
+  210x250) so the flat splash fits; his sheet is now 5460x5365 (under
+  the 8192 limit, over the ~4096 hero guideline).
+- **Pillars:** Clarity serves: a big readable wind-up (the squat), a
+  cannonball at the top, and the whole body landing on the spot the
+  telegraph circle marks. Strategic Crunch: neutral, timing unchanged.
+- **Why:** The human asked to key it from reference poses. The landing
+  pops him up in two frames rather than leaving him flat, because the
+  empty-handed splash has no recovery time on the server: lying down
+  while he can already move would misreport his state.
+- **Status:** Built, needs review
+- **Where:** `tools/sprite_forge/actors/presidente.py`,
+  `art/models/Presidente.anim.json`, `art/models/refs/`,
+  `docs/prototype/presidente_splash.gif`
+
+---
+
 ## 2026-11-28: Mordryn (both forms) and Fagan get generated bodies
 - **Decision:** Mordryn's Guardian and Demon forms are two generated
   models, each with its own actor and sheet (`Mordryn`, `MordrynDemon`),
