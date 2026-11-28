@@ -1,0 +1,17 @@
+{
+  "settings": {
+    "input_task_id": "1c0d77d2-34f0-4cc0-8fd3-2d547f51acb8",
+    "target_formats": [
+      "glb"
+    ],
+    "topology": "triangle",
+    "target_polycount": 40000,
+    "origin_at": "bottom"
+  },
+  "credits": 5,
+  "from_task": "1c0d77d2-34f0-4cc0-8fd3-2d547f51acb8",
+  "task_id": "01a21fda-d8fa-72ff-89db-f0c55ae77b55",
+  "endpoint": "remesh",
+  "task_name": "",
+  "saved": "2026-11-28"
+}
