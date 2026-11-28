@@ -21,6 +21,34 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-28: Mordryn (both forms) and Fagan get generated bodies
+- **Decision:** Mordryn's Guardian and Demon forms are two generated
+  models, each with its own actor and sheet (`Mordryn`, `MordrynDemon`),
+  swapped the way Jeff's legs and treads are; the demon is 2.3 tall
+  against his 1.95. Fagan is a generated model with his knife (right
+  hand) and lantern (left hip; raised in front at head height for his
+  relic moves) as separate props. Clips follow the Character Concepts
+  kits under the generic names (attack, secondary, special, mobility).
+  Both Mordryn models were remeshed on Meshy (10 credits, approved by a
+  human): their original download links had expired.
+- **Pillars:** Clarity serves: Mordryn's red demon leg foreshadows the
+  transformation and the demon's single wing makes it unmistakable;
+  Fagan's glowing lantern marks his relic. Creative Builds: neutral.
+- **Why:** Lane B: every hero on a generated model. Fagan's lantern is
+  raised in front, not overhead, because a full overhead raise dragged
+  his duster's upper panel with the shoulder. Neither hero is in the
+  arena yet, and Fagan has two of his three relics without models; only
+  previews were checked. The demon's wing and Mordryn's cape pulled the
+  automatic centring off their bodies; both actors carry CENTRE_X.
+  Also: the `floors` skinning rule now gives the wrist twice the
+  radius, because a thumb tip counted as cloth stretched a strip from
+  hand to hip; Lilith, Zephyr and Presidente were rebaked with it.
+- **Status:** Built, needs review
+- **Where:** `tools/sprite_forge/actors/{mordryn,mordryn_demon,fagan}.py`,
+  `tools/sprite_forge/skin.py`, `art/models/`, issue FWFsoft/gambit#99
+
+---
+
 ## 2026-11-28: Namora, Volgore and Zephyr get generated bodies; Presidente and Suds swap theirs
 - **Decision:** Namora, Volgore and Zephyr are generated models on
   human-placed fits with new actors shaped after their kits (generic

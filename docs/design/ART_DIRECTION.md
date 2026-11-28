@@ -347,6 +347,19 @@ The pack of six orange turbine speakers on his back is a square block
 behind him from the side and the back. Weight forward, one gauntlet
 raised.
 
+**Mordryn: the red leg.** A masked shadow-fighter in a long dark red
+scarf and a torn black cape, a mechanical pauldron and teal bracers. His
+left leg is already the demon's: swollen, raw red and clawed below the
+knee, so the transformation is waiting in his silhouette. In Demon form
+(a separate sheet) he becomes a hunched, many-eyed brute with molten
+claws and a single burning bat wing off one shoulder: lopsided from
+every side, and about a head and a half taller (2.3 against 1.95).
+
+**Fagan: the lantern.** A grinning relic hunter in goggles, a blue scarf
+and a long tan duster. The caged hourglass lantern (the Time Crystal
+relic) glows at his left hip, and his knife is always in his right hand.
+He leans back on his heels like he is about to sell you something.
+
 **For the rest of the cast**, start from their concept art; most of it
 already has strong outline hooks.
 
