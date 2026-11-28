@@ -54,7 +54,8 @@ EYE = (250, 236, 120)
 
 def build():
     m = Model("Presidente")
-    skin.attach(m, os.path.join(h.REPO, MODEL), HEIGHT, FIT, floors=FLOORS)
+    skin.attach(m, os.path.join(h.REPO, MODEL), HEIGHT, FIT, floors=FLOORS,
+                hands=True)
     # The cape is part of the model now; its two joints stay (empty) so
     # the clips that swing them still load.
     c = m.rest_world("chest")
@@ -351,7 +352,7 @@ def joint_table():
     if _TABLE is None:
         import bpy
         data = skin.prepare(os.path.join(h.REPO, MODEL), HEIGHT, FIT,
-                            log=lambda *a: None, floors=FLOORS)
+                            log=lambda *a: None, floors=FLOORS, hands=True)
         bpy.data.objects.remove(data["obj"], do_unlink=True)
         _TABLE = [(n, p, tuple(float(c) for c in data["rest_pos"][n]))
                   for n, p in data["skeleton"]]
@@ -363,6 +364,31 @@ def rig():
     if _RIG is None:
         _RIG = _rig.Rig(joint_table(), max_reach=0.999)
     return _RIG
+
+
+# His model's hands are sculpted open, fingers together. A grip curls the
+# fingers at the knuckles and again at the middle joints (Kade's recipe):
+# 0 open, 1 a fist. Controls carry it as "j:fingers_<side>"/"j:tips_<side>".
+FIST_DEG = 80.0
+_FIST_AXIS = {"L": (1.0, 1.0, 0.0), "R": (1.0, -1.0, 0.0)}   # R mirrors L
+
+
+def fist(side, k):
+    """Finger angles for a hand closed k of the way (0 open, 1 a fist)."""
+    from mathutils import Matrix, Vector
+    if abs(k) < 1e-6:
+        return (0.0, 0.0, 0.0)
+    e = Matrix.Rotation(math.radians(FIST_DEG * k), 3,
+                        Vector(_FIST_AXIS[side]).normalized()).to_euler("XYZ")
+    return tuple(math.degrees(a) for a in e)
+
+
+def grip(c, left, right):
+    """Control `c` with its hands closed `left`/`right` of the way."""
+    c = dict(c)
+    for s, k in (("L", left), ("R", right)):
+        c[f"j:fingers_{s}"] = c[f"j:tips_{s}"] = fist(s, k)
+    return c
 
 
 def splash_poses():
