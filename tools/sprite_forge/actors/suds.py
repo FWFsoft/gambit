@@ -1,4 +1,7 @@
-"""Suds Sullivan, the Brew Brawler. Modelled from assets/previews/Suds.png.
+"""Suds Sullivan, the Brew Brawler. Body from art/models/Suds.glb (Meshy),
+on a human-placed fit; the cooler is art/models/SudsCooler.glb and the can
+is still built in code. The clips were written for the earlier code-built
+body and carry over: the joints keep their names.
 
 A big, grinning bruiser: grey flat-top, orange shades, a blue Hawaiian
 shirt open over a white tank, an orange strap across the chest, red
@@ -11,12 +14,21 @@ right hand, so his outline is lopsided from every side, unlike any other hero.
 """
 
 import math
+import os
 
 from forge import Clip, Key, Model
+import _hero as h
+import skin
 
 PIXEL_SCALE = 1.35  # chunkier art pixels, same size on screen (see forge.ActorSpec)
 NAME = "Suds"
 CELL = (176, 176, 150)
+MODEL = "art/models/Suds.glb"
+COOLER_MODEL = "art/models/SudsCooler.glb"
+HEIGHT = 2.0
+STYLE = "ink"
+RIM = (150, 200, 255)                # his light blue
+FIT = skin.load_fit(os.path.join(h.REPO, MODEL))
 
 SKIN = (226, 146, 92)
 HAIR = (196, 198, 204)
@@ -37,109 +49,23 @@ COOLER_TRIM = (170, 66, 48)
 
 
 def build():
-    m = Model("Suds")
-    skin = m.material("skin", SKIN)
-    hair = m.material("hair", HAIR)
-    shades = m.material("shades", SHADES, glow=True)
-    shirt = m.material("shirt", SHIRT)
-    flower = m.material("flower", FLOWER)
-    petal = m.material("petal", PETAL)
-    tank = m.material("tank", TANK)
-    strap = m.material("strap", STRAP)
-    armor = m.material("armor", ARMOR)
-    armor_dark = m.material("armor_dark", ARMOR_DARK)
-    belt = m.material("belt", BELT)
-    pouch = m.material("pouch", POUCH)
+    m = Model(NAME)
+    skin.attach(m, os.path.join(h.REPO, MODEL), HEIGHT, FIT)
+    # The can, in the right hand: it rises with the arm. Code-built: the
+    # model's hands are empty.
     can = m.material("can", CAN)
     label = m.material("label", LABEL)
-    cooler = m.material("cooler", COOLER)
-    trim = m.material("cooler_trim", COOLER_TRIM)
-
-    # ---- skeleton: short legs, a huge barrel ---------------------------------
-    m.joint("hips", None, (0, 0, 0.96))
-    m.joint("chest", "hips", (0, 0, 1.08))
-    m.joint("neck", "chest", (0, 0, 1.64))
-    for side, x in (("L", 1), ("R", -1)):
-        m.joint(f"shoulder_{side}", "chest", (0.40 * x, 0, 1.56))
-        m.joint(f"elbow_{side}", f"shoulder_{side}", (0.46 * x, 0, 1.27))
-        m.joint(f"wrist_{side}", f"elbow_{side}", (0.47 * x, 0, 1.00))
-        m.joint(f"hip_{side}", "hips", (0.18 * x, 0, 0.92))
-        m.joint(f"knee_{side}", f"hip_{side}", (0.20 * x, 0, 0.52))
-        m.joint(f"ankle_{side}", f"knee_{side}", (0.20 * x, 0, 0.12))
-
-    # ---- torso: a barrel in a Hawaiian shirt ------------------------------------
-    m.blob("chest", shirt, (0, 0.0, 1.32), (0.78, 0.56, 0.62), segments=11,
-           rings=8)
-    m.box("chest", tank, (0, -0.25, 1.36), (0.26, 0.08, 0.44), taper=0.9)
-    for x in (1, -1):
-        m.box("chest", shirt, (0.18 * x, -0.27, 1.50), (0.10, 0.05, 0.18),
-              rot=(0, 18 * x, 0))                                   # collar
-    # Flowers: pale blossoms with orange hearts scattered over the shirt.
-    blossoms = ((0.26, -0.24, 1.22), (-0.30, -0.22, 1.42), (0.30, -0.18, 1.50),
-                (-0.22, -0.25, 1.15), (0.36, 0.0, 1.34), (-0.38, 0.02, 1.26),
-                (0.12, 0.27, 1.44), (-0.16, 0.27, 1.22), (0.30, 0.20, 1.18),
-                (-0.30, 0.18, 1.50))
-    for x, y, z in blossoms:
-        m.box("chest", flower, (x, y * 1.04, z), (0.09, 0.03, 0.09))
-        m.box("chest", petal, (x, y * 1.08, z), (0.035, 0.03, 0.035))
-    # The strap across the chest, shoulder to hip.
-    m.box("chest", strap, (-0.02, -0.28, 1.34), (0.10, 0.04, 0.70),
-          rot=(0, -38, 0))
-    m.box("chest", strap, (0.0, 0.28, 1.34), (0.10, 0.04, 0.70), rot=(0, 38, 0))
-
-    # ---- head: flat-top, shades, a grin -----------------------------------------
-    m.limb("neck", skin, (0, 0, 1.58), (0, -0.02, 1.70), 0.14, 0.12)
-    m.blob("neck", skin, (0, -0.04, 1.82), (0.28, 0.30, 0.30), segments=10,
-           rings=8)
-    m.box("neck", skin, (0, -0.10, 1.72), (0.22, 0.18, 0.10))       # jaw
-    m.box("neck", shades, (0, -0.18, 1.86), (0.26, 0.04, 0.06))
-    m.box("neck", hair, (0, 0.0, 1.98), (0.26, 0.28, 0.08))          # flat-top
-    for x in (1, -1):
-        m.box("neck", hair, (0.12 * x, 0.02, 1.92), (0.05, 0.24, 0.10))
-
-    # ---- arms: short sleeves, then red power gauntlets ------------------------------
-    for side, x in (("L", 1), ("R", -1)):
-        sh, el, wr = f"shoulder_{side}", f"elbow_{side}", f"wrist_{side}"
-        m.blob(sh, shirt, (0.40 * x, 0, 1.54), (0.28, 0.28, 0.26))
-        m.limb(sh, skin, (0.42 * x, 0, 1.44), (0.46 * x, 0, 1.27), 0.13, 0.12)
-        m.blob(el, armor, (0.46 * x, 0, 1.24), (0.22, 0.22, 0.20))
-        m.limb(el, armor, (0.46 * x, 0, 1.24), (0.47 * x, 0, 1.03), 0.15, 0.14)
-        m.limb(el, armor_dark, (0.47 * x, 0, 1.06), (0.47 * x, 0, 1.02), 0.155,
-               0.155)
-        m.box(wr, armor, (0.47 * x, -0.01, 0.91), (0.22, 0.23, 0.20), bevel=0.04)
-    # The can, in the right hand: it rises with the arm.
-    m.limb("wrist_R", can, (-0.47, -0.04, 0.84), (-0.47, -0.04, 0.46), 0.10,
-           0.10)
-    m.limb("wrist_R", label, (-0.47, -0.04, 0.70), (-0.47, -0.04, 0.58), 0.104,
-           0.104, cap=False)
-
-    # ---- belt, pouches and the cooler -------------------------------------------------
-    m.box("hips", belt, (0, 0, 1.00), (0.66, 0.46, 0.12))
-    for x in (0.26, -0.26, 0.0):
-        m.box("hips", pouch, (x, -0.24, 0.96), (0.11, 0.06, 0.14))
+    w = m.rest_world("wrist_R")
+    m.limb("wrist_R", can, (w[0], w[1] - 0.04, w[2] - 0.16),
+           (w[0], w[1] - 0.04, w[2] - 0.54), 0.10, 0.10)
+    m.limb("wrist_R", label, (w[0], w[1] - 0.04, w[2] - 0.30),
+           (w[0], w[1] - 0.04, w[2] - 0.42), 0.104, 0.104, cap=False)
     # The cooler hangs at his left hip, sticking out past his body.
-    m.box("hips", cooler, (0.60, -0.06, 0.78), (0.82, 0.36, 0.42), bevel=0.05)
-    m.box("hips", trim, (0.60, -0.06, 1.00), (0.84, 0.38, 0.05))
-    m.box("hips", trim, (1.02, -0.06, 0.78), (0.02, 0.22, 0.12))   # handle
-    m.box("hips", armor_dark, (0.60, -0.25, 0.76), (0.56, 0.012, 0.18))
-
-    # ---- legs: armoured shins and big boots -----------------------------------------------
-    m.box("hips", armor_dark, (0, 0, 0.90), (0.56, 0.40, 0.18))
-    for side, x in (("L", 1), ("R", -1)):
-        hp, kn, an = f"hip_{side}", f"knee_{side}", f"ankle_{side}"
-        m.limb(hp, armor_dark, (0.18 * x, 0, 0.94), (0.20 * x, 0, 0.54), 0.15,
-               0.13)
-        m.blob(kn, armor, (0.20 * x, -0.04, 0.52), (0.16, 0.14, 0.14))
-        m.limb(kn, armor, (0.20 * x, 0, 0.50), (0.20 * x, 0, 0.16), 0.15, 0.17)
-        m.box(an, armor, (0.20 * x, -0.07, 0.07), (0.24, 0.40, 0.14), bevel=0.04)
-        m.box(an, armor_dark, (0.20 * x, -0.07, 0.008), (0.25, 0.41, 0.02))
-
+    hp = m.rest_world("hips")
+    h.prop(m, COOLER_MODEL, "cooler", "hips",
+           (hp[0] + 0.52, hp[1] - 0.04, hp[2] - 0.20), 0.70, turn=(0, 0, 90))
     return m, stance()
 
-
-# ---------------------------------------------------------------------------
-# Poses
-# ---------------------------------------------------------------------------
 
 def stance(sway=0.0):
     """"Round's on me!": a toast with the can raised beside his grin, belly

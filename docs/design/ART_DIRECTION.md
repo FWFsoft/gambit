@@ -328,9 +328,27 @@ high-collared royal blue greatcoat with gold buttons, a glowing visor and
 armoured gauntlets. Chest out, chin up, the left elbow jutting out with
 the fist at his belt: a one-sided outline, the right gauntlet clenched.
 
+**Namora: the tail.** A dragon monk: gold horned crown, long dark hair,
+red wraps and sash, baggy white trousers, clawed green dragon feet. Her
+green-scaled tail with its ridge of spines and arrow fin drops from the
+small of her back to the floor and trails behind her: a long curve no
+one else has from any side. It is its own model on a chain of eight
+joints (`actors/_tail.py` straightens the curled model), so it sways in
+the run and sweeps a full circle in Rebuke the Infirm. Low monk's stance,
+palm forward, fist chambered.
+
+**Volgore: the triangle of muscle.** The widest human in the cast: blue
+war paint over orange skin, a short mohawk, camo cargo pants and boots.
+Hunched forward, arms hanging wide, mouth open in a roar.
+
+**Zephyr: the speaker pack.** A white-haired wind monk in goggles, a
+high-collared navy vest, turbine gauntlets and a long ragged violet robe.
+The pack of six orange turbine speakers on his back is a square block
+behind him from the side and the back. Weight forward, one gauntlet
+raised.
+
 **For the rest of the cast**, start from their concept art; most of it
-already has strong outline hooks:
-- Zephyr: a ragged, flowing cloak.
+already has strong outline hooks.
 
 ## Enemies
 

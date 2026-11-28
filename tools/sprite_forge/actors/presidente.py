@@ -1,4 +1,7 @@
-"""El Presidente. Modelled from assets/previews/Presidente.png (splash art).
+"""El Presidente. Body from art/models/Presidente.glb (Meshy, from the
+splash art), on the joints a human placed in the fit editor
+(art/models/Presidente.fit.json). The clips below were written for the
+earlier code-built body and carry over: the joints keep their names.
 
 A huge luchador statesman: blue star-spangled mask with red eye patches and a
 gold crest, an open charcoal suit jacket over a bare chest, a gold chain,
@@ -12,12 +15,23 @@ His moves are grapples, so most clips come in two forms: empty-handed, and
 """
 
 import math
+import os
 
 from forge import Clip, Key, Model
+import _hero as h
+import skin
 
 PIXEL_SCALE = 1.35  # chunkier art pixels, same size on screen (see forge.ActorSpec)
 NAME = "Presidente"
 CELL = (144, 196, 174)
+MODEL = "art/models/Presidente.glb"
+HEIGHT = 2.2
+STYLE = "ink"
+RIM = (232, 182, 52)                 # championship gold
+# The flag cape hangs beside his hands: keep the wrists off its hem.
+ARMS = [f"{j}_{s}" for j in ("shoulder", "elbow", "wrist") for s in "LR"]
+FLOORS = ((ARMS, 1.05, "hips", 0.10),)
+FIT = skin.load_fit(os.path.join(h.REPO, MODEL))
 # The game pins a grappled foe to the midpoint of his hands.
 SOCKET = ("wrist_L", "wrist_R")
 LEAP_HEIGHT = 1.15   # root lift at the top of a leap (was 0.72)
@@ -38,142 +52,14 @@ EYE = (250, 236, 120)
 
 def build():
     m = Model("Presidente")
-    skin = m.material("skin", SKIN)
-    mask = m.material("mask", MASK)
-    red = m.material("red", MASK_RED)
-    white = m.material("white", WHITE)
-    gold = m.material("gold", GOLD)
-    jacket = m.material("jacket", JACKET)
-    shirt = m.material("shirt", SHIRT)
-    pants = m.material("pants", PANTS)
-    boot = m.material("boot", BOOT)
-    cblue = m.material("cape_blue", CAPE_BLUE)
-    cred = m.material("cape_red", CAPE_RED)
-    eye = m.material("eye", EYE, glow=True)
-
-    # ---- skeleton: Wade's layout, scaled up and broader -------------------
-    m.joint("hips", None, (0, 0, 1.02))
-    m.joint("chest", "hips", (0, 0, 1.14))
-    m.joint("neck", "chest", (0, 0, 1.62))
-    m.joint("cape", "chest", (0, 0.20, 1.58))
-    m.joint("cape_low", "cape", (0, 0.24, 1.08))
-    for side, x in (("L", 1), ("R", -1)):
-        m.joint(f"shoulder_{side}", "chest", (0.44 * x, 0, 1.55))
-        m.joint(f"elbow_{side}", f"shoulder_{side}", (0.49 * x, 0, 1.24))
-        m.joint(f"wrist_{side}", f"elbow_{side}", (0.50 * x, 0, 0.98))
-        m.joint(f"hip_{side}", "hips", (0.15 * x, 0, 0.98))
-        m.joint(f"knee_{side}", f"hip_{side}", (0.16 * x, 0, 0.55))
-        m.joint(f"ankle_{side}", f"knee_{side}", (0.16 * x, 0, 0.13))
-
-    # ---- belly, chest and abs: a heavyweight's barrel --------------------
-    m.blob("chest", skin, (0, -0.02, 1.22), (0.40, 0.30, 0.28), segments=9,
-           rings=6)
-    m.blob("chest", skin, (0, 0.01, 1.44), (0.72, 0.36, 0.38), segments=10,
-           rings=7)
-    for x in (1, -1):
-        m.blob("chest", skin, (0.12 * x, -0.13, 1.45), (0.24, 0.10, 0.17),
-               segments=8, rings=5)
-        m.box("chest", jacket, (0.03 * x, -0.165, 1.25), (0.03, 0.012, 0.04))
-    m.box("chest", jacket, (0, -0.17, 1.35), (0.014, 0.012, 0.12))
-
-    # Open suit jacket: side panels, back, lapels with a white shirt collar
-    for x in (1, -1):
-        m.box("chest", jacket, (0.33 * x, 0.05, 1.38), (0.13, 0.34, 0.50),
-              taper=1.35)
-        m.box("chest", jacket, (0.25 * x, -0.12, 1.42), (0.06, 0.06, 0.32),
-              rot=(0, 10 * x, 0))                              # lapel
-        m.box("chest", shirt, (0.13 * x, -0.14, 1.56), (0.08, 0.05, 0.08),
-              rot=(0, -20 * x, 0))                             # collar
-    m.box("chest", jacket, (0, 0.18, 1.38), (0.70, 0.07, 0.52), taper=1.3)
-    # gold chain across the chest and the flag pin
-    m.limb("chest", gold, (0.17, -0.155, 1.56), (0.0, -0.18, 1.44), 0.012, 0.012,
-           sides=4)
-    m.limb("chest", gold, (-0.17, -0.155, 1.56), (0.0, -0.18, 1.44), 0.012,
-           0.012, sides=4)
-    m.box("chest", red, (-0.24, -0.19, 1.47), (0.05, 0.02, 0.035))
-
-    # ---- head: the mask ---------------------------------------------------
-    m.limb("neck", skin, (0, 0, 1.58), (0, -0.01, 1.70), 0.10, 0.09)
-    m.blob("neck", mask, (0, -0.02, 1.80), (0.26, 0.27, 0.30), segments=10,
-           rings=8)
-    m.box("neck", skin, (0, -0.07, 1.705), (0.15, 0.17, 0.07))   # chin
-    m.box("neck", mask, (0, -0.10, 1.74), (0.14, 0.06, 0.035))   # mouth edge
-    for x in (1, -1):
-        m.box("neck", red, (0.06 * x, -0.135, 1.81), (0.085, 0.02, 0.06),
-              rot=(0, 18 * x, 0))
-        m.box("neck", eye, (0.055 * x, -0.142, 1.81), (0.035, 0.02, 0.022))
-        m.box("neck", white, (0.10 * x, -0.06, 1.90), (0.03, 0.03, 0.03))  # stars
-    m.box("neck", gold, (0, -0.13, 1.885), (0.05, 0.02, 0.06))      # badge
-    # The crest: a tall striped fin, the top of his silhouette from any side.
-    m.box("neck", red, (0, 0.01, 2.06), (0.07, 0.34, 0.26), taper=0.7)
-    for x in (1, -1):
-        m.box("neck", white, (0.04 * x, 0.01, 2.04), (0.02, 0.32, 0.22),
-              taper=0.7)
-    m.box("neck", red, (0, 0.0, 1.955), (0.05, 0.22, 0.03))         # stripe
-    m.box("neck", white, (0.035, 0.0, 1.95), (0.02, 0.22, 0.03))
-    m.box("neck", white, (-0.035, 0.0, 1.95), (0.02, 0.22, 0.03))
-
-    # ---- cape: flag over his right shoulder, hanging to the knees ---------
-    m.box("cape", cblue, (-0.12, 0.20, 1.40), (0.70, 0.05, 0.36), taper=1.1)
-    m.box("cape", cblue, (-0.36, 0.02, 1.52), (0.18, 0.40, 0.12))   # drape
-    m.box("cape", cblue, (-0.45, 0.05, 1.30), (0.06, 0.34, 0.40))   # side fall
-    m.box("cape", cred, (-0.47, 0.05, 1.02), (0.05, 0.32, 0.20))
-    for (x, z) in ((-0.28, 1.48), (-0.12, 1.42), (0.05, 1.47), (-0.20, 1.32),
-                   (0.12, 1.34), (-0.36, 1.36)):
-        m.box("cape", white, (x, 0.23, z), (0.035, 0.02, 0.035))
-    for i in range(5):
-        mat = cred if i % 2 == 0 else white
-        m.box("cape_low", mat, (-0.12, 0.25 + i * 0.012, 1.18 - i * 0.11),
-              (0.74 + i * 0.03, 0.04, 0.11), rot=(-6, 0, 0))
-
-    # ---- arms: jacket sleeves, big fists ------------------------------------
-    for side, x in (("L", 1), ("R", -1)):
-        sh, el, wr = f"shoulder_{side}", f"elbow_{side}", f"wrist_{side}"
-        m.blob(sh, jacket, (0.45 * x, 0, 1.55), (0.34, 0.30, 0.30))  # boulder
-        m.limb(sh, jacket, (0.36 * x, 0.02, 1.62), (0.10 * x, 0.02, 1.68), 0.15,
-               0.12)                                                # trapezius
-        m.limb(sh, jacket, (0.45 * x, 0, 1.52), (0.49 * x, 0, 1.24), 0.15, 0.12)
-        m.limb(el, jacket, (0.49 * x, 0, 1.24), (0.50 * x, 0, 1.03), 0.12, 0.10)
-        m.limb(el, gold, (0.50 * x, 0, 1.08), (0.50 * x, 0, 1.05), 0.095, 0.095)
-        m.box(wr, skin, (0.50 * x, -0.005, 0.91), (0.19, 0.20, 0.19), bevel=0.03)
-        if side == "L":
-            m.box(el, gold, (0.50 * x, -0.07, 1.00), (0.11, 0.06, 0.09))  # gadget
-            m.box(el, red, (0.50 * x, -0.10, 1.00), (0.06, 0.02, 0.05))
-        else:
-            for i, mat in enumerate((cred, white, cblue)):
-                m.limb(wr, mat, (0.50 * x, 0, 1.0 - i * 0.025),
-                       (0.50 * x, 0, 0.975 - i * 0.025), 0.088, 0.088,
-                       cap=False)
-        m.box(wr, white, (0.50 * x, -0.075, 0.92), (0.155, 0.03, 0.10))
-
-    # ---- belt: the championship ---------------------------------------------
-    m.box("hips", boot, (0, 0, 1.07), (0.50, 0.33, 0.10))
-    m.box("hips", gold, (0, -0.18, 1.07), (0.44, 0.05, 0.22), bevel=0.02)
-    m.box("hips", boot, (0, -0.21, 1.07), (0.30, 0.012, 0.07))  # lettering
-    m.box("hips", white, (0, -0.215, 1.07), (0.22, 0.012, 0.03))
-    m.box("hips", red, (0.17, -0.21, 1.07), (0.04, 0.012, 0.04))
-    m.box("hips", red, (-0.17, -0.21, 1.07), (0.04, 0.012, 0.04))
-    for x in (1, -1):
-        m.box("hips", gold, (0.21 * x, -0.13, 1.07), (0.08, 0.04, 0.11),
-              rot=(0, 0, 25 * x))
-
-    # ---- legs: baggy trousers into combat boots ------------------------------
-    m.box("hips", pants, (0, 0, 0.94), (0.52, 0.34, 0.22), taper=1.04)
-    for side, x in (("L", 1), ("R", -1)):
-        hp, kn, an = f"hip_{side}", f"knee_{side}", f"ankle_{side}"
-        m.limb(hp, pants, (0.15 * x, 0, 1.00), (0.16 * x, 0, 0.55), 0.16, 0.13)
-        m.limb(kn, pants, (0.16 * x, 0, 0.57), (0.16 * x, 0, 0.30), 0.13, 0.11)
-        m.limb(kn, boot, (0.16 * x, 0, 0.33), (0.16 * x, 0, 0.08), 0.10, 0.10)
-        m.box(kn, gold, (0.16 * x, -0.10, 0.22), (0.035, 0.02, 0.20))  # laces
-        m.box(an, boot, (0.16 * x, -0.06, 0.05), (0.15, 0.30, 0.10), bevel=0.025)
-        m.box(an, cred, (0.16 * x, -0.06, 0.006), (0.155, 0.305, 0.015))
-
+    skin.attach(m, os.path.join(h.REPO, MODEL), HEIGHT, FIT, floors=FLOORS)
+    # The cape is part of the model now; its two joints stay (empty) so
+    # the clips that swing them still load.
+    c = m.rest_world("chest")
+    m.joint("cape", "chest", (c[0], c[1] + 0.20, c[2] + 0.10))
+    m.joint("cape_low", "cape", (c[0], c[1] + 0.24, c[2] - 0.40))
     return m, stance()
 
-
-# ---------------------------------------------------------------------------
-# Poses
-# ---------------------------------------------------------------------------
 
 def stance(sway=0.0):
     """The power pose: fists on hips, elbows flared, feet planted wide.
@@ -185,8 +71,11 @@ def stance(sway=0.0):
         "neck": (-16, 0, 0),
         "cape": (4 - sway * 2, 0, 0),
         "cape_low": (6 - sway * 3, 0, 0),
-        "shoulder_L": (-8, -44, 0), "elbow_L": (-10, 105, 0),
-        "shoulder_R": (-8, 44, 0), "elbow_R": (-10, -105, 0),
+        # Fists at the belt, elbows flared: on the skinned body an elbow
+        # bends by pitch (the old code-built pose rolled it, which on this
+        # body swings the forearm outward).
+        "shoulder_L": (4, -44, 0), "elbow_L": (-100, 0, 0),
+        "shoulder_R": (4, 44, 0), "elbow_R": (-100, 0, 0),
         "hip_L": (-6, -17, 0), "knee_L": (22 + sway, 0, 0), "ankle_L": (-10, 14, 0),
         "hip_R": (-6, 17, 0), "knee_R": (22 + sway, 0, 0), "ankle_R": (-10, -14, 0),
     }
@@ -346,8 +235,8 @@ def clips():
                   shoulder_R=(-84, -10, 0), elbow_L=(-10, 0, 0),
                   elbow_R=(-10, 0, 0), hip_L=(-30, -10, 0), knee_L=(30, 0, 0))
     clamp = with_(s, chest=(12, 0, 0), shoulder_L=(-80, 0, 18),
-                  shoulder_R=(-80, 0, -18), elbow_L=(0, 70, 0),
-                  elbow_R=(0, -70, 0))
+                  shoulder_R=(-80, 0, -18), elbow_L=(0, -56, 0),
+                  elbow_R=(0, 56, 0))
     # Látigo: spin with the foe at arm's length, then let go
     whirl = [Key(0.0, overhead(), (0, 0, 0))]
     for i, angle in enumerate((90, 200, 310, 420)):
@@ -372,19 +261,19 @@ def clips():
                      hip_R=(-40, 6, 0), knee_R=(40, 0, 0))
     # Grande Cajones: double-biceps flex and a roar
     flex = with_(s, chest=(-14, 0, 0), neck=(-24, 0, 0),
-                 shoulder_L=(-10, -88, 0), elbow_L=(0, -105, 0),
-                 shoulder_R=(-10, 88, 0), elbow_R=(0, 105, 0),
+                 shoulder_L=(-10, -88, 0), elbow_L=(0, 84, 0),
+                 shoulder_R=(-10, 88, 0), elbow_R=(0, -84, 0),
                  cape=(14, 0, 0))
     # Abrazo de oso: bear hug, squeezing in pulses
     hug_open = with_(s, chest=(4, 0, 0), shoulder_L=(-80, 0, 40),
-                     shoulder_R=(-80, 0, -40), elbow_L=(0, 20, 0),
-                     elbow_R=(0, -20, 0))
+                     shoulder_R=(-80, 0, -40), elbow_L=(0, -16, 0),
+                     elbow_R=(0, 16, 0))
     hug = with_(s, chest=(-14, 0, 0), neck=(-10, 0, 0),
                 shoulder_L=(-78, 0, 26), shoulder_R=(-78, 0, -26),
-                elbow_L=(0, 78, 0), elbow_R=(0, -78, 0))
+                elbow_L=(0, -62, 0), elbow_R=(0, 62, 0))
     squeeze = with_(hug, chest=(-26, 0, 0), neck=(-18, 0, 0),
                     shoulder_L=(-74, 0, 16), shoulder_R=(-74, 0, -16),
-                    elbow_L=(0, 100, 0), elbow_R=(0, -100, 0))
+                    elbow_L=(0, -80, 0), elbow_R=(0, 80, 0))
     hurt = with_(s, chest=(-18, -6, 10), neck=(-20, 0, 0),
                  shoulder_L=(-20, -50, 0), shoulder_R=(-20, 50, 0),
                  elbow_L=(-30, 0, 0), elbow_R=(-30, 0, 0),

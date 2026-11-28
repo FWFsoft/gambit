@@ -21,6 +21,36 @@ decision goes against a pillar or a design doc, say so plainly in **Why**.
 
 ---
 
+## 2026-11-28: Namora, Volgore and Zephyr get generated bodies; Presidente and Suds swap theirs
+- **Decision:** Namora, Volgore and Zephyr are generated models on
+  human-placed fits with new actors shaped after their kits (generic
+  clip names). Presidente and Suds keep every clip they had (the game
+  asks them for their own names) and swap the code-built body for their
+  generated models. Props on their own joints: Zephyr's speaker pack and
+  Suds' cooler (at his hip, as in his old design); Suds' can is still
+  built in code, because the model's hands are empty. Namora's tail is a
+  separate model straightened in code and bound to an eight-joint chain
+  off her hips: it trails along the floor, sways in the run and sweeps a
+  full circle in Rebuke the Infirm. Heights: Namora 1.85, Volgore 2.2,
+  Zephyr 1.95, Presidente 2.2, Suds 2.0.
+- **Pillars:** Clarity serves: each keeps one signature piece (Namora's
+  tail, Volgore's width, Zephyr's pack, Presidente's cape and fists at the
+  belt, Suds' raised can and cooler). The tail's sweep shows the area
+  Rebuke the Infirm hits. Creative Builds: neutral, no kit changed.
+- **Why:** Lane B: every hero on a generated model. Presidente's old idle
+  folded the forearms to the hips by rolling the elbows; on the skinned
+  arm a roll swings the other way, so his idle now bends the elbows and
+  his other elbow rolls were flipped and scaled (0.8). His fists now sit
+  at his belt, not on his hips; a human should check his grapple clips in
+  a match, since only previews were checked. The cape, robe and coat hems
+  that hang beside hands (Presidente, Zephyr) use the `floors` skinning
+  rule. Volgore and Zephyr, both in the arena, get their new art by name.
+- **Status:** Built, needs review
+- **Where:** `tools/sprite_forge/actors/{namora,volgore,zephyr,presidente,suds,_tail}.py`,
+  `art/models/`, `docs/design/ART_DIRECTION.md`, issue FWFsoft/gambit#99
+
+---
+
 ## 2026-11-27: Mina, MILES, Stitches, Eliana, Lilith and Valthor get generated bodies
 - **Decision:** Five heroes are now generated models (made on Meshy by a
   human, fitted by a human in the joint editor) with forge actors and
