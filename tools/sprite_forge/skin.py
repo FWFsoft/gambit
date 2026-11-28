@@ -625,7 +625,10 @@ def prepare(path, height, fit=None, yaw=0.0, skeleton=HUMANOID,
         near = np.full(len(v), np.inf)
         for j in joints:
             a, b = np.array(full[j]), np.array(full[tails[j]])
-            near = np.minimum(near, _segment_distance(v, a, b))
+            # A hand is wider than the bone that runs down it: a thumb
+            # sits well off the wrist-to-fingertip line.
+            reach = 2.0 if j.startswith("wrist") else 1.0
+            near = np.minimum(near, _segment_distance(v, a, b) / reach)
         cloth = (v[:, 2] < z_min) & (near > keep)
         w = w.copy()
         w[cloth, names_.index(to)] += w[np.ix_(cloth, cols)].sum(1)
