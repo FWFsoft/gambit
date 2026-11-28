@@ -25,7 +25,10 @@ adds a posed model (an image-to-3D render of the key, say) as a
 see-through ghost in all three views. It shows on that key by default; the
 page's Reference card picks any ghost for any key and sets its size,
 position and opacity. Ghosts are stored at 1.0 tall and sized on the page
-to the rig's height in the key, so a crouch is compared with a crouch.
+to the rig's height in the key when the page opens, times --ref-scale
+(default 1; use it when the references are drawn with a bigger head than
+the model, say 0.67). The size is then fixed, so it does not drift while
+the key is posed; the Size slider tunes each ghost.
 """
 
 import base64
@@ -148,9 +151,12 @@ def main():
     refs = []
     argv = []
     it = iter(sys.argv[1:])
+    ref_scale = 1.0
     for a in it:
         if a == "--ref":
             refs.append(next(it))
+        elif a == "--ref-scale":
+            ref_scale = float(next(it))
         else:
             argv.append(a)
     sys.argv = [sys.argv[0]] + argv
@@ -178,6 +184,7 @@ def main():
         "texture": texture_uri(s),
         "anim": data,
         "refs": [ref_payload(r) for r in refs],
+        "ref_scale": ref_scale,
     }
     if "--check" in sys.argv:
         payload["check"] = {}

@@ -172,11 +172,11 @@ textarea { width: 100%; box-sizing: border-box; height: 130px; margin-top: 8px; 
         <h2>Reference</h2>
         <label class="refrow">Show <select id="refsel"></select></label>
         <label class="refrow">Opacity <input type="range" id="refop" min="0" max="1" step="0.05" value="0.4"></label>
-        <label class="refrow">Size <input type="range" id="refsize" min="0.6" max="1.4" step="0.01" value="1"></label>
+        <label class="refrow">Size <input type="range" id="refsize" min="0.4" max="1.8" step="0.01" value="1"></label>
         <label class="refrow">Forward / back <input type="range" id="refy" min="-0.6" max="0.6" step="0.01" value="0"></label>
         <label class="refrow">Left / right <input type="range" id="refx" min="-0.6" max="0.6" step="0.01" value="0"></label>
         <button id="refreset" type="button">Reset size and position</button>
-        <p class="dimtext">The posed reference model, drawn see-through over Kade in every view and sized to his height in this key. Drag his joints onto it. Size and position are per reference.</p>
+        <p class="dimtext">The posed reference model, drawn see-through over Kade in every view and sized to his height in this key when the page opened, then fixed. Drag his joints onto it. Size and position are per reference.</p>
       </div>
       <div class="card">
         <h2>Joints</h2>
@@ -548,7 +548,10 @@ const DATA = /*POSE_DATA*/null;
     for (let v = 2; v < posed.length; v += 3) tall = Math.max(tall, posed[v]);
     const ghost = playing ? null : activeGhost();
     for (const g of ghosts) g.mesh.visible = false;
-    if (ghost) ghost.mesh.scale.setScalar(tall * ghost.adj.s);
+    // Sized once, from the key's starting pose, then fixed: re-measuring
+    // every frame made the ghost grow and shrink as the key was posed.
+    if (ghost && !ghost.size) ghost.size = tall * (DATA.ref_scale || 1);
+    if (ghost) ghost.mesh.scale.setScalar(ghost.size * ghost.adj.s);
     for (const id of ["front", "side", "game"]) {
       const s = stages[id];
       if (id !== "game") placeCam(id);
