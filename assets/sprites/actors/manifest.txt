@@ -110,6 +110,15 @@ anim Mina special 280 10 12 0
 anim Mina mobility 360 8 14 1
 anim Mina hit 424 4 16 0
 anim Mina death 456 9 12 0
+actor Mordryn assets/sprites/actors/Mordryn.png 212 180 106 140 21 1 smooth
+anim Mordryn idle 0 8 8 1
+anim Mordryn run 64 8 13 1
+anim Mordryn attack 128 6 18 0
+anim Mordryn secondary 176 10 12 0
+anim Mordryn special 256 8 12 0
+anim Mordryn mobility 320 10 14 0
+anim Mordryn hit 400 4 16 0
+anim Mordryn death 432 9 12 0
 actor MordrynDemon assets/sprites/actors/MordrynDemon.png 264 220 132 168 21 1 smooth
 anim MordrynDemon idle 0 8 7 1
 anim MordrynDemon run 64 8 11 1
